@@ -6,6 +6,7 @@ ext {
     javaVersion = '1.8'
     scalaVersion = '2.11.7'
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
+    akkaVersion = '2.4.9-RC1'
 }
 
 apply plugin: 'java'
@@ -59,8 +60,10 @@ dependencies {
     compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
 
     compile group: 'net.sourceforge.htmlcleaner', name: 'htmlcleaner', version: '2.6.1'
-    compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: '2.4.8'
-    compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: '2.4.8'
+    compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.typesafe.akka', name: 'akka-http-experimental_' + baseScalaVersion, version: akkaVersion
 
     compile group: 'com.google.inject', name: 'guice', version: 3.0
 
