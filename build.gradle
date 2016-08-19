@@ -58,16 +58,14 @@ dependencies {
     compile 'org.scala-lang:scala-library:' + scalaVersion
     compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
     compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
+//    compile group: 'com.google.inject', name: 'guice', version: 3.0
 
-    compile group: 'net.sourceforge.htmlcleaner', name: 'htmlcleaner', version: '2.6.1'
+    compile group: 'com.101tec', name: 'zkclient', version:'0.9'
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
-//    compile group: 'com.typesafe.akka', name: 'akka-http-experimental_' + baseScalaVersion, version: akkaVersion
 //    compile group: 'com.typesafe.akka', name: 'akka-persistence_' + baseScalaVersion, version: akkaVersion
-
-    compile group: 'com.google.inject', name: 'guice', version: 3.0
 
     testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
     testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'

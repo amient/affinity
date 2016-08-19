@@ -1,0 +1,86 @@
+package io.amient.akkahttp.actor
+
+import java.util.concurrent.ConcurrentHashMap
+
+import akka.actor.ActorSystem
+import akka.dispatch.Dispatchers
+import akka.event.Logging
+import akka.routing._
+import io.amient.akkahttp.Coordinator
+import io.amient.akkahttp.actor.Partition.{CollectUserInput, Keyed}
+
+import scala.collection.immutable
+import scala.collection.immutable.IndexedSeq
+
+final case class PartitionedGroup(numPartitions: Int) extends Group {
+
+  //TODO each partition is a set of replicas for which:
+  //TODO reading is preformed by RoundRobinLogic
+  //TODO writing is preformed by ScatterGatherFirstCompletedRouter
+
+  override def paths(system: ActorSystem) = List()
+
+  override val routerDispatcher: String = Dispatchers.DefaultDispatcherId
+
+  //  @volatile private var partitionMapDirty = true
+  //
+  //  def markPartitionsAsDirty(): Unit = {
+  //    partitionMapDirty = true
+  //  }
+
+  override def createRouter(system: ActorSystem): Router = {
+    val log = Logging.getLogger(system, this)
+    log.info("Creating PartitionedGroup router")
+
+    val defaultLogic = RoundRobinRoutingLogic()
+
+    val logic = new RoutingLogic {
+
+      private var prevRoutees: immutable.IndexedSeq[Routee] = immutable.IndexedSeq()
+      private val currentRouteMap = new ConcurrentHashMap[Int, Routee]()
+
+      def abs(i: Int): Int = math.abs(i) match {
+        case Int.MinValue => 0
+        case a => a
+      }
+
+      def select(message: Any, routees: immutable.IndexedSeq[Routee]): Routee = {
+
+        val selected: Routee = message match {
+          case k: Keyed[_] =>
+            if (!prevRoutees.eq(routees)) {
+              prevRoutees.synchronized {
+                println("synchronizing route map")
+                if (!prevRoutees.eq(routees)) {
+                  println("updating route map")
+                  currentRouteMap.clear()
+                  routees.foreach {
+                    case arr: ActorRefRoutee =>
+                      currentRouteMap.put(arr.ref.path.name.substring(10).toInt, arr)
+                  }
+                  prevRoutees = routees
+                }
+              }
+            }
+            val partition = abs(k.hashCode()) % numPartitions
+
+            if (!currentRouteMap.containsKey(partition)) throw new IllegalStateException(
+              s"Partition `$partition` is not represented by any Actor - " +
+              s"this shouldn't happen - gateway should suspend all requests until all partitions are present")
+
+            currentRouteMap.get(partition)
+
+          case CollectUserInput(_) => routees(0)
+          case _ => defaultLogic.select(message, routees)
+        }
+
+        if (log.isDebugEnabled) {
+          log.debug("partition selected: " + selected)
+        }
+        selected
+      }
+    }
+    new Router(logic)
+  }
+
+}
