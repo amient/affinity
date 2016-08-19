@@ -2,18 +2,12 @@ package io.amient.akkahttp
 
 import akka.actor.{ActorPath, ActorSystem, Props}
 import akka.event.Logging
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.model._
-import akka.pattern.ask
-import akka.routing.{ActorRefRoutee, AddRoutee}
-import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import io.amient.akkahttp.actor.{Gateway, Partition}
+import io.amient.akkahttp.actor.{Gateway, HttpInterface, Partition}
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 object SymmetricClusterNode extends App {
 
@@ -41,68 +35,18 @@ object SymmetricClusterNode extends App {
 
   implicit val system = ActorSystem(ActorSystemName, config)
 
-  import system.dispatcher
-
   val log = Logging.getLogger(system, this)
-
-  //construct gateway actor
-  val gateway = system.actorOf(Props(new Gateway(numPartitions)), name ="gateway")
-
-  //construct partition actors
-  val partitions = for (p <- partitionList) yield {
-    system.actorOf(Props(new Partition(p)), name = "partition-" + p)
-  }
 
   val coordinator = new Coordinator(zkRoot, zkConnect, zkSessionTimeout, zkConnectTimeout)
 
+  val gateway = system.actorOf(Props(
+    new Gateway(host, akkaPort, numPartitions, partitionList, coordinator)), name = "gateway")
 
-  //register partitions that have booted successfully
-  for(p <- partitions) {
-    val anchor = ActorPath.fromString(s"akka.tcp://${ActorSystemName}@${host}:${akkaPort}${p.path.toStringWithoutAddress}")
-    implicit val timeout =  Timeout(24 hours)
-    for(partitionActorRef <- system.actorSelection(anchor).resolveOne()) {
-      //gateway ! AddRoutee(ActorRefRoutee(partitionActorRef))
-      coordinator.addAnchor(anchor)
-      coordinator.subscribeToPartitions(system, gateway) //TODO move this outside the for comprehension
-    }
-  }
-
-
-  implicit val materializer = ActorMaterializer.create(system)
-
-  val requestHandler: HttpRequest => Future[HttpResponse] = { httpRequest =>
-    implicit val timeout = Timeout(120 seconds)
-
-    val result = for (result <- gateway ? httpRequest) yield result match {
-      case response: HttpResponse => response
-      case any =>
-        log.error("Gateway gave invalid response, expecting HttpResponse, got " + any)
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> That's embarrassing..</h1>"))
-    }
-
-    result recover {
-      case e: Throwable =>
-        log.error("Gateway leaked exception", e)
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> That's embarrassing..</h1>"))
-    }
-  }
-  val bindingFuture = Http().bindAndHandleAsync(requestHandler, host, httpPort)
-
-  bindingFuture.onFailure {
-    //TODO server cannot bind to the port
-    case e: Exception => e.printStackTrace()
-  }
-  println(s"Akka Http Server online at http://$host:$httpPort/\nPress ^C to stop...")
-
-  val binding: ServerBinding = Await.result(bindingFuture, 10 seconds)
+  val httpInterface = system.actorOf(Props(
+    new HttpInterface(host, httpPort, gateway)), name = "interface")
 
   sys.addShutdownHook {
-    println("unbinding server port ...")
-    Await.result(binding.unbind(), 10 seconds)
-    println("server unbound, terminating actor system")
-    system.terminate()
+    Await.result(system.terminate(), 30 seconds)
     coordinator.close()
   }
 }

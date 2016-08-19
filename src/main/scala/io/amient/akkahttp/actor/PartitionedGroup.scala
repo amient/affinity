@@ -6,11 +6,9 @@ import akka.actor.ActorSystem
 import akka.dispatch.Dispatchers
 import akka.event.Logging
 import akka.routing._
-import io.amient.akkahttp.Coordinator
 import io.amient.akkahttp.actor.Partition.{CollectUserInput, Keyed}
 
 import scala.collection.immutable
-import scala.collection.immutable.IndexedSeq
 
 final case class PartitionedGroup(numPartitions: Int) extends Group {
 
@@ -21,12 +19,6 @@ final case class PartitionedGroup(numPartitions: Int) extends Group {
   override def paths(system: ActorSystem) = List()
 
   override val routerDispatcher: String = Dispatchers.DefaultDispatcherId
-
-  //  @volatile private var partitionMapDirty = true
-  //
-  //  def markPartitionsAsDirty(): Unit = {
-  //    partitionMapDirty = true
-  //  }
 
   override def createRouter(system: ActorSystem): Router = {
     val log = Logging.getLogger(system, this)

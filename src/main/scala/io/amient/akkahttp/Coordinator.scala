@@ -12,6 +12,7 @@ import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.Success
 
 class Coordinator(val zkRoot: String, zkConnect: String, zkSessionTimeout: Int, zkConnectTimeout: Int)
 
@@ -20,18 +21,22 @@ class Coordinator(val zkRoot: String, zkConnect: String, zkSessionTimeout: Int, 
 
     override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
   }) {
+
   def addAnchor(anchor: ActorPath) = {
     val anchorZkNode = s"${zkRoot}/${anchor.hashCode()}"
     create(anchorZkNode, anchor.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
   }
 
+  def removeAnchor(anchor: ActorPath) = {
+    println("removing " + anchor)
+  }
 
   if (!exists(zkRoot)) {
     println("creating zk root " + zkRoot)
     createPersistent(zkRoot, true)
   }
 
-  private val current = new ConcurrentHashMap[ActorPath, Boolean]()
+  private val current = new ConcurrentHashMap[ActorPath, String]()
 
   def subscribeToPartitions(system: ActorSystem, gateway: ActorRef): Unit = {
 
@@ -39,34 +44,33 @@ class Coordinator(val zkRoot: String, zkConnect: String, zkSessionTimeout: Int, 
 
     def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-    def addAnchor(anchor: String): Unit = {
+    def addAnchor(seqId: String): Unit = {
+      val anchorNode = s"${zkRoot}/$seqId"
+      val anchor:String = readData(anchorNode)
       implicit val timeout = new Timeout(24 hours)
-//      System.err.println(s"looking up $anchor")
-      system.actorSelection(anchor).resolveOne().onSuccess {
-        case partitionActorRef =>
-//          System.err.println(partitionActorRef.path)
-          current.put(partitionActorRef.path, true)
-          gateway ! AddRoutee(ActorRefRoutee(partitionActorRef))
+      system.actorSelection(anchor).resolveOne() andThen {
+        case Success(partitionActorRef) =>
+          if (!current.containsKey(partitionActorRef.path)) {
+            current.put(partitionActorRef.path, seqId)
+            gateway ! AddRoutee(ActorRefRoutee(partitionActorRef))
+          }
+
       }
     }
 
-//    subscribeChildChanges(zkRoot, new IZkChildListener() {
-//      override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
-//        val newList = listAsIndexedSeq(currentChilds)
-//        newList.foreach { newPath =>
-//          if (!current.containsKey(newPath)) {
-//            current.put(newPath, null)
-//
-//            actor ! AddRoutee(ActorRefRoutee())
-//          }
-//        }
-//      }
-//    })
-//
-    listAsIndexedSeq(getChildren(zkRoot)).foreach { seqId =>
-      val anchorNode = s"${zkRoot}/$seqId"
-      addAnchor(readData(anchorNode))
-    }
+    subscribeChildChanges(zkRoot, new IZkChildListener() {
+      override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
+        val newList = listAsIndexedSeq(currentChilds)
+        newList.foreach(addAnchor(_))
+        //TODO delete missing
+        newList.foreach(println)
+        println("-----------------")
+
+      }
+    })
+
+    listAsIndexedSeq(getChildren(zkRoot)).foreach(addAnchor(_))
+
   }
 
 }

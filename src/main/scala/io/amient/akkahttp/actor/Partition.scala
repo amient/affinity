@@ -8,12 +8,15 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 
 object Partition {
-  sealed abstract class Keyed[K](key: K) {
+  final case class TestError()
+  case class CollectUserInput(greeting: String)
+
+  sealed abstract class Keyed[K](key: K) extends Serializable {
     override def hashCode() = key.hashCode()
   }
 
-  final case class TestError()
-  case class CollectUserInput(greeting: String)
+  final case class KillNode(partition: Int) extends Keyed[Int](partition)
+
   case class StringEntry(key: String, value: String) extends Keyed[String](key)
   case class GetStringEntry(key: String) extends Keyed[String](key)
 }
@@ -40,6 +43,12 @@ class Partition(partition: Int) extends Actor {
   def receive = {
 
     case TestError => sender ! Status.Failure(new IllegalStateException())
+
+    case KillNode(_) =>
+      sender ! "OK"
+      Thread.sleep(500)
+      println("killing system "+  context.system.name)
+      context.system.terminate()
 
     case CollectUserInput(greeting) =>
       implicit val timeout = Timeout(60 seconds)
