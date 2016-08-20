@@ -38,12 +38,10 @@ final case class PartitionedGroup(numPartitions: Int) extends Group {
           case k: Keyed[_] =>
             if (!prevRoutees.eq(routees)) {
               prevRoutees.synchronized {
-                println("synchronizing routee map")
                 if (!prevRoutees.eq(routees)) {
                   currentRouteMap.clear()
                   routees.foreach {
                     case actorRefRoutee: ActorRefRoutee =>
-                      println(actorRefRoutee.ref.path)
                       currentRouteMap.put(actorRefRoutee.ref.path.name.substring(10).toInt, actorRefRoutee)
                   }
                   prevRoutees = routees

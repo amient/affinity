@@ -65,7 +65,6 @@ class Partition(partition: Int) extends Actor {
       if (log.isDebugEnabled) {
         log.debug(msg)
       }
-      println(msg)
       cache += (key -> value)
       sender ! true
 
