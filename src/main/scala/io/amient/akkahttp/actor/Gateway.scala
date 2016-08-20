@@ -10,9 +10,9 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.akkahttp.Coordinator
-import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, TestError}
+import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, ShowIndex, TestError}
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -39,42 +39,32 @@ class Gateway(host: String,
   }
 
   //create coorinator and register the partitions
-  coordinator.subscribeToPartitions(context.system, self)
+  coordinator.listenToPartitionAssignemnts(context.system, self)
 
   //register partitions that have booted successfully
-  val partitionActors = for (p <- partitions) yield {
-    val anchor = ActorPath.fromString(
+  val handles = for (p <- partitions) yield {
+    val partitionActorPath = ActorPath.fromString(
       s"akka.tcp://${context.system.name}@${host}:${akkaPort}${p.path.toStringWithoutAddress}")
     implicit val timeout = Timeout(24 hours)
-    context.actorSelection(anchor).resolveOne().onSuccess{
-      case partitionActorRef  =>
-        coordinator.addAnchor(anchor)
-        partitionActorRef
+    (for (partitionActorRef <- context.actorSelection(partitionActorPath).resolveOne()) yield {
+      coordinator.register(partitionActorPath)
+    }) recover {
+      case any => throw new RuntimeException(any)
     }
   }
 
   override def preStart(): Unit = {
     log.info("Gateway Starting")
-    //TODO set state as unknown and wait until at least one routee for each partition is added
-    //TODO upon receiving add routee or remove routee, check the list of routees and notify all suspended
   }
 
   override def postStop(): Unit = {
-    println("!!!")
-    for (p <- partitions) {
-      val anchor = ActorPath.fromString(
-        s"akka.tcp://${context.system.name}@${host}:${akkaPort}${p.path.toStringWithoutAddress}")
-      implicit val timeout = Timeout(24 hours)
-      for (partitionActorRef <- context.actorSelection(anchor).resolveOne()) {
-        coordinator.removeAnchor(anchor)
-      }
-    }
+    Await.result(Future.sequence(handles), 1 minute).foreach(coordinator.unregister)
     super.postStop()
   }
 
   def receive = {
     case HttpRequest(GET, Uri.Path("/error"), _, _, _) =>
-      implicit val timeout = Timeout(60 seconds)
+      implicit val timeout = Timeout(1 second)
       forwardAndHandleErrors(partitioner ? TestError, sender) {
         case x => sys.error("Expecting failure, got" + x)
       }
@@ -82,11 +72,16 @@ class Gateway(host: String,
     //query path (GET)
     case HttpRequest(GET, uri, _, _, _) => uri match {
 
-      case Uri.Path("/") => HttpResponse(
-        entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Welcome</h1>"))
+      case Uri.Path("/") | Uri.Path("") =>
+        implicit val timeout = Timeout(1 second)
+        forwardAndHandleErrors(partitioner ? ShowIndex(uri.queryString().getOrElse("")), sender) {
+        case any =>  HttpResponse(
+          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>" + any + "</h1>"))
+
+        }
 
       case Uri.Path("/kill") =>
-        implicit val timeout = Timeout(1 seconds)
+        implicit val timeout = Timeout(1 second)
         uri.query() match {
           case Seq(("p", x)) if (x.toInt >= 0 && x.toInt < numPartitions) =>
             forwardAndHandleErrors(partitioner ? KillNode(x.toInt), sender) {

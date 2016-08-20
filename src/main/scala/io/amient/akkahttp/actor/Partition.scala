@@ -15,6 +15,7 @@ object Partition {
     override def hashCode() = key.hashCode()
   }
 
+  final case class ShowIndex(key: String) extends Keyed[String](key)
   final case class KillNode(partition: Int) extends Keyed[Int](partition)
 
   case class StringEntry(key: String, value: String) extends Keyed[String](key)
@@ -49,6 +50,9 @@ class Partition(partition: Int) extends Actor {
       Thread.sleep(500)
       println("killing system "+  context.system.name)
       context.system.terminate()
+
+    case ShowIndex(msg) =>
+      sender ! s"${self.path.name}:$msg"
 
     case CollectUserInput(greeting) =>
       implicit val timeout = Timeout(60 seconds)

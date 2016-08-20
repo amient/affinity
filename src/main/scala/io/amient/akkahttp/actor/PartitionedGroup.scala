@@ -12,10 +12,6 @@ import scala.collection.immutable
 
 final case class PartitionedGroup(numPartitions: Int) extends Group {
 
-  //TODO each partition is a set of replicas for which:
-  //TODO reading is preformed by RoundRobinLogic
-  //TODO writing is preformed by ScatterGatherFirstCompletedRouter
-
   override def paths(system: ActorSystem) = List()
 
   override val routerDispatcher: String = Dispatchers.DefaultDispatcherId
@@ -42,13 +38,13 @@ final case class PartitionedGroup(numPartitions: Int) extends Group {
           case k: Keyed[_] =>
             if (!prevRoutees.eq(routees)) {
               prevRoutees.synchronized {
-                println("synchronizing route map")
+                println("synchronizing routee map")
                 if (!prevRoutees.eq(routees)) {
-                  println("updating route map")
                   currentRouteMap.clear()
                   routees.foreach {
-                    case arr: ActorRefRoutee =>
-                      currentRouteMap.put(arr.ref.path.name.substring(10).toInt, arr)
+                    case actorRefRoutee: ActorRefRoutee =>
+                      println(actorRefRoutee.ref.path)
+                      currentRouteMap.put(actorRefRoutee.ref.path.name.substring(10).toInt, actorRefRoutee)
                   }
                   prevRoutees = routees
                 }

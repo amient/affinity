@@ -22,31 +22,33 @@ class Coordinator(val zkRoot: String, zkConnect: String, zkSessionTimeout: Int, 
     override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
   }) {
 
-  def addAnchor(anchor: ActorPath) = {
-    val anchorZkNode = s"${zkRoot}/${anchor.hashCode()}"
-    create(anchorZkNode, anchor.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
+  /**
+    * @param actorPath of the actor that needs to managed as part of coordinated group
+    * @return unique coordinator handle which points to the registered ActorPath
+    */
+  def register(actorPath: ActorPath): String = {
+    create(s"${zkRoot}/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
   }
 
-  def removeAnchor(anchor: ActorPath) = {
-    println("removing " + anchor)
+  def unregister(handle: String) = {
+    delete(handle)
   }
 
   if (!exists(zkRoot)) {
-    println("creating zk root " + zkRoot)
     createPersistent(zkRoot, true)
   }
 
   private val current = new ConcurrentHashMap[ActorPath, String]()
 
-  def subscribeToPartitions(system: ActorSystem, gateway: ActorRef): Unit = {
+  def listenToPartitionAssignemnts(system: ActorSystem, gateway: ActorRef): Unit = {
 
     import system.dispatcher
 
     def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
     def addAnchor(seqId: String): Unit = {
-      val anchorNode = s"${zkRoot}/$seqId"
-      val anchor:String = readData(anchorNode)
+      val anchorPath = s"${zkRoot}/$seqId"
+      val anchor: String = readData(anchorPath)
       implicit val timeout = new Timeout(24 hours)
       system.actorSelection(anchor).resolveOne() andThen {
         case Success(partitionActorRef) =>
@@ -60,12 +62,15 @@ class Coordinator(val zkRoot: String, zkConnect: String, zkSessionTimeout: Int, 
 
     subscribeChildChanges(zkRoot, new IZkChildListener() {
       override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
-        val newList = listAsIndexedSeq(currentChilds)
-        newList.foreach(addAnchor(_))
-        //TODO delete missing
-        newList.foreach(println)
-        println("-----------------")
-
+        if (currentChilds != null) {
+          val newList = listAsIndexedSeq(currentChilds)
+          newList.foreach(addAnchor(_))
+          current.entrySet().asScala.foreach { entry =>
+            if (!newList.contains(entry.getValue)) {
+              current.remove(entry.getKey)
+            }
+          }
+        }
       }
     })
 
