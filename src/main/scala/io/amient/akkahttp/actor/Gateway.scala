@@ -1,6 +1,6 @@
 package io.amient.akkahttp.actor
 
-import java.util.UUID
+import java.util.{Properties, UUID}
 
 import akka.actor.{Actor, ActorPath, ActorRef, Props, Status}
 import akka.event.Logging
@@ -17,19 +17,31 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Gateway(host: String,
-              akkaPort: Int,
-              numPartitions: Int,
-              partitionList: List[Int],
-              coordinator: Coordinator) extends Actor {
+object Gateway {
+  final val CONFIG_AKKA_HOST = "gateway.akka.host"
+  final val CONFIG_AKKA_PORT = "gateway.akka.port"
+  final val CONFIG_NUM_PARTITIONS = "num.partitions"
+  final val CONFIG_PARTITION_LIST = "partition.list"
+}
 
-  import context.dispatcher
+class Gateway(appConfig: Properties) extends Actor {
+
+  //TODO gateway must be able to route before the local partitions are online
+  //TODO after the local partitions are online they must tell it to the coordinator
+  //which then updates all other gateway nodes that are online
+
+  import Gateway._
+
+  val host = appConfig.getProperty(CONFIG_AKKA_HOST, "localhost")
+  val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT, "2552").toInt
+  val numPartitions = appConfig.getProperty(CONFIG_NUM_PARTITIONS).toInt
+  val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
+
+  val coordinator = Coordinator.fromProperties(appConfig)
 
   val log = Logging.getLogger(context.system, this)
 
   val uuid = UUID.randomUUID()
-
-  val inputMediator = context.actorOf(Props(new UserInputMediator), "mediator")
 
   val partitioner = context.actorOf(PartitionedGroup(numPartitions).props(), name = "partitioner")
 
@@ -39,7 +51,9 @@ class Gateway(host: String,
   }
 
   //create coorinator and register the partitions
-  coordinator.listenToPartitionAssignemnts(context.system, self)
+  coordinator.watchRoutees(context.system, self)
+
+  import context.dispatcher
 
   //register partitions that have booted successfully
   val handles = for (p <- partitions) yield {
@@ -53,12 +67,15 @@ class Gateway(host: String,
     }
   }
 
+  override val supervisorStrategy = null
+
   override def preStart(): Unit = {
     log.info("Gateway Starting")
   }
 
   override def postStop(): Unit = {
     Await.result(Future.sequence(handles), 1 minute).foreach(coordinator.unregister)
+    coordinator.close()
     super.postStop()
   }
 
@@ -83,11 +100,11 @@ class Gateway(host: String,
       case Uri.Path("/kill") =>
         implicit val timeout = Timeout(1 second)
         uri.query() match {
-          case Seq(("p", x)) if (x.toInt >= 0 && x.toInt < numPartitions) =>
+          case Seq(("p", x)) if (x.toInt >= 0) =>
             forwardAndHandleErrors(partitioner ? KillNode(x.toInt), sender) {
               case any => HttpResponse(status = StatusCodes.Accepted)
             }
-          case _ => sender ! badRequest(sender, "query string param p must be between 0 and " + (numPartitions - 1))
+          case _ => sender ! badRequest(sender, "query string param p must be >=0")
         }
 
       case Uri.Path("/hello") =>

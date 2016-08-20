@@ -6,6 +6,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 object Partition {
   final case class TestError()
@@ -41,6 +42,16 @@ class Partition(partition: Int) extends Actor {
     log.info("Partition Actor Starting: " + self.path.name)
   }
 
+  override def postStop(): Unit = {
+    println("!stopping")
+    super.postStop()
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    println("!restarting")
+    super.preRestart(reason, message)
+  }
+
   def receive = {
 
     case TestError => sender ! Status.Failure(new IllegalStateException())
@@ -48,7 +59,7 @@ class Partition(partition: Int) extends Actor {
     case KillNode(_) =>
       sender ! "OK"
       Thread.sleep(500)
-      println("killing system "+  context.system.name)
+      println("killing system " + context.system.name)
       context.system.terminate()
 
     case ShowIndex(msg) =>
@@ -58,7 +69,10 @@ class Partition(partition: Int) extends Actor {
       implicit val timeout = Timeout(60 seconds)
       val origin = sender()
       val prompt = s"${self.path.name}: $greeting >"
-      for (userInput <- userInputMediator ? prompt) origin ! userInput
+      userInputMediator ? prompt andThen {
+        case Success(userInput) => origin ! userInput
+        case Failure(e) => origin ! Status.Failure(e)
+      }
 
     case StringEntry(key, value) =>
       val msg = s"${self.path.name}: PUT ($key, $value)"
