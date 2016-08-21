@@ -7,12 +7,11 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.routing.{ActorRefRoutee, AddRoutee, RemoveRoutee}
 import akka.util.Timeout
-import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Success
 
@@ -22,7 +21,9 @@ object Coordinator {
 
   def fromProperties(appConfig: Properties): Coordinator = {
     appConfig.getProperty(CONFIG_IMPLEMENTATION, "zookeeper") match {
-      case "zookeeper" => new ZkCoordinator(appConfig)
+      case "zookeeper" =>
+        //FIXME throw new RuntimeException("some error") that needs to result in system termination and exit code > 0
+        new ZkCoordinator(appConfig)
     }
   }
 }

@@ -2,90 +2,60 @@ package io.amient.akkahttp.actor
 
 import java.util.Properties
 
-import akka.actor.{Actor, Props}
+import akka.actor.{ActorRef, ActorSystem}
 import akka.event.Logging
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.Http.{IncomingConnection, ServerBinding}
 import akka.http.scaladsl.model._
-import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
+import akka.stream.scaladsl.{Sink, Source}
+import io.amient.akkahttp.actor.Gateway.HttpExchange
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, Promise}
 
 object HttpInterface {
   final val CONFIG_HTTP_HOST = "http.host"
   final val CONFIG_HTTP_PORT = "http.port"
 }
 
-class HttpInterface(appConfig: Properties) extends Actor {
+class HttpInterface(appConfig: Properties, gateway: ActorRef)(implicit system: ActorSystem) {
 
-  implicit val system = context.system
+  implicit val materializer = ActorMaterializer.create(system)
 
   val log = Logging.getLogger(system, this)
 
   import HttpInterface._
 
-  val httoHost = appConfig.getProperty(CONFIG_HTTP_HOST, "localhost")
+  val httpHost = appConfig.getProperty(CONFIG_HTTP_HOST, "localhost")
   val httpPort = appConfig.getProperty(CONFIG_HTTP_PORT, "8080").toInt
 
-  //TODO is this how child actors should be created - seems unsafe
-  val gateway = system.actorOf(Props(new Gateway(appConfig)), name = "gateway")
-
-  implicit val materializer = ActorMaterializer.create(context.system)
-
-  import context.dispatcher
-
-  val requestHandler: HttpRequest => Future[HttpResponse] = { httpRequest =>
-    implicit val timeout = Timeout(120 seconds)
-
-    val result = for (result <- gateway ? httpRequest) yield result match {
-      case response: HttpResponse => response
-      case any =>
-        log.error("Gateway gave invalid response, expecting HttpResponse, got " + any)
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> That's embarrassing..</h1>"))
-    }
-
-    result recover {
-      case e: Throwable =>
-        log.error("Gateway leaked exception", e)
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> That's embarrassing..</h1>"))
-    }
-  }
-
-  val bindingFuture = Http().bindAndHandleAsync(requestHandler, httoHost, httpPort)
-  //TODO server cannot bind to the port
-
-//  bindingFuture.onFailure {
-//    case e: Exception => log.error("Failed to start http interface", e)
-//  }
-
-  try {
-    val binding: ServerBinding = Await.result(bindingFuture, 10 seconds)
-    println(binding)
-  } catch {
-    case e: Throwable =>
-      println("re-throwing throwable caught during binding")
-      throw e
-  }
+  val incoming: Source[IncomingConnection, Future[ServerBinding]] = Http().bind(httpHost, httpPort)
 
 
-  override def preStart(): Unit = {
-    log.info(s"Akka Http Server online at http://$httoHost:$httpPort/\nPress ^C to stop...")
-  }
+  val bindingFuture: Future[Http.ServerBinding] =
+    incoming.to(Sink.foreach { connection => // foreach materializes the source
+      println("Accepted new connection from " + connection.remoteAddress)
+      // ... and then actually handle the connection
+      connection.handleWithAsyncHandler{ req =>
 
-  override def postStop(): Unit = {
+        val responsePromise = Promise[HttpResponse]()
+
+        gateway ! HttpExchange(req.method, req.uri, req.headers, req.entity, responsePromise)
+
+        responsePromise.future
+      }
+    }).run()
+
+
+  val binding: ServerBinding = Await.result(bindingFuture, 10 seconds)
+
+  log.info(s"Akka Http Server online at http://$httpHost:$httpPort/\nPress ^C to stop...")
+
+  def close(): Unit = {
     log.info("unbinding server port " + httpPort)
-//    Await.result(binding.unbind(), 15 seconds)
-    log.info("server unbound, closing coordinator")
-    super.postStop()
+    Await.result(binding.unbind(), 15 seconds)
   }
 
-  override def receive: Receive = {
-    case any =>
-  }
 }
 

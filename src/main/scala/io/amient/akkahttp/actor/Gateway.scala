@@ -2,26 +2,34 @@ package io.amient.akkahttp.actor
 
 import java.util.{Properties, UUID}
 
-import akka.actor.{Actor, ActorPath, ActorRef, Props, Status}
+import akka.actor.{Actor, ActorPath, Props, Status}
 import akka.event.Logging
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.{HttpRequest, _}
+import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.akkahttp.Coordinator
-import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, ShowIndex, TestError}
+import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, TestError}
 
-import scala.concurrent.{Await, Future}
+import scala.collection.immutable
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
 
 object Gateway {
   final val CONFIG_AKKA_HOST = "gateway.akka.host"
   final val CONFIG_AKKA_PORT = "gateway.akka.port"
   final val CONFIG_NUM_PARTITIONS = "num.partitions"
   final val CONFIG_PARTITION_LIST = "partition.list"
+
+  final case class HttpExchange(
+             method:   HttpMethod,
+             uri:      Uri,
+             headers:  immutable.Seq[HttpHeader],
+             entity:   RequestEntity,
+             promise: Promise[HttpResponse]) {
+  }
 }
 
 class Gateway(appConfig: Properties) extends Actor {
@@ -67,49 +75,59 @@ class Gateway(appConfig: Properties) extends Actor {
     }
   }
 
-  override val supervisorStrategy = null
 
   override def preStart(): Unit = {
     log.info("Gateway Starting")
   }
 
-  override def postStop(): Unit = {
-    Await.result(Future.sequence(handles), 1 minute).foreach(coordinator.unregister)
-    coordinator.close()
-    super.postStop()
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    super.preRestart(reason, message)
+    println("preRestart Gateway")
   }
 
+  override def postRestart(reason: Throwable): Unit = {
+    super.postRestart(reason)
+    println("postRestart Gateway")
+  }
+
+
+  override def postStop(): Unit = {
+    Await.result(Future.sequence(handles), 1 minute).foreach(coordinator.unregister)
+    log.info("closing coordinator")
+    coordinator.close()
+  }
+
+
   def receive = {
-    case HttpRequest(GET, Uri.Path("/error"), _, _, _) =>
-      implicit val timeout = Timeout(1 second)
-      forwardAndHandleErrors(partitioner ? TestError, sender) {
-        case x => sys.error("Expecting failure, got" + x)
-      }
 
-    //query path (GET)
-    case HttpRequest(GET, uri, _, _, _) => uri match {
+    //non-delegate response
+    case HttpExchange(GET, Uri.Path("/") | Uri.Path(""), _, _, promise) =>
+      promise.success(HttpResponse(
+        entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Hello World!</h1>")))
 
-      case Uri.Path("/") | Uri.Path("") =>
+
+    //delegate query path
+    case HttpExchange(GET, uri, _, _, promise) => uri match {
+
+      case Uri.Path("/error") =>
         implicit val timeout = Timeout(1 second)
-        forwardAndHandleErrors(partitioner ? ShowIndex(uri.queryString().getOrElse("")), sender) {
-        case any =>  HttpResponse(
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>" + any + "</h1>"))
-
+        fulfillAndHandleErrors(promise, partitioner ? TestError) {
+          case x => sys.error("Expecting failure, got" + x)
         }
 
       case Uri.Path("/kill") =>
         implicit val timeout = Timeout(1 second)
         uri.query() match {
           case Seq(("p", x)) if (x.toInt >= 0) =>
-            forwardAndHandleErrors(partitioner ? KillNode(x.toInt), sender) {
+            fulfillAndHandleErrors(promise, partitioner ? KillNode(x.toInt)) {
               case any => HttpResponse(status = StatusCodes.Accepted)
             }
-          case _ => sender ! badRequest(sender, "query string param p must be >=0")
+          case _ => badRequest(promise, "query string param p must be >=0")
         }
 
       case Uri.Path("/hello") =>
         implicit val timeout = Timeout(60 seconds)
-        forwardAndHandleErrors(partitioner ? CollectUserInput(uri.queryString().getOrElse(null)), sender) {
+        fulfillAndHandleErrors(promise, partitioner ? CollectUserInput(uri.queryString().getOrElse(null))) {
           case justText: String => HttpResponse(
             entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>" + justText + "</h1>"))
 
@@ -118,22 +136,23 @@ class Gateway(appConfig: Properties) extends Actor {
         }
 
       case Uri.Path("/hi") =>
-        sender ! HttpResponse(entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
+        promise.success(HttpResponse(entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
           "<html><body><h2>Please wait..</h2>" +
-            "<script>setTimeout(\"location.href = '/hello?" + uri.query() + "';\",100);</script></body></html>"))
+            "<script>setTimeout(\"location.href = '/hello?" + uri.query() + "';\",100);" +
+            "</script></body></html>")))
 
       case _ =>
-        sender ! HttpResponse(status = StatusCodes.NotFound,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Haven't got that</h1>"))
+        promise.success(HttpResponse(status = StatusCodes.NotFound,
+          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Haven't got that</h1>")))
     }
 
 
     //TODO command path (POST)
 
 
-    case HttpRequest(_, _, _, _, _) =>
-      sender ! HttpResponse(status = StatusCodes.MethodNotAllowed,
-        entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Can't do that here </h1>"))
+    case HttpExchange(_, _, _, _, promise) =>
+      promise.success(HttpResponse(status = StatusCodes.MethodNotAllowed,
+        entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Can't do that here </h1>")))
 
     //Management queries
     case m: AddRoutee =>
@@ -153,31 +172,32 @@ class Gateway(appConfig: Properties) extends Actor {
 
   }
 
-  def badRequest(replyTo: ActorRef, message: String) = {
-    replyTo ! HttpResponse(status = StatusCodes.BadRequest,
-      entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>$message</h1>"))
+  def badRequest(promise: Promise[HttpResponse], message: String) = {
+    promise.success(HttpResponse(status = StatusCodes.BadRequest,
+      entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>$message</h1>")))
+  }
+  def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any])(f: Any => HttpResponse) = {
+    promise.completeWith(handleErrors(future, f))
   }
 
-  def forwardAndHandleErrors(future: Future[Any], replyTo: ActorRef)(f: Any => HttpResponse) = {
-    future andThen {
-      case Success(result) =>
-        replyTo ! f(result)
-
-      case Failure(e: IllegalArgumentException) =>
+  def handleErrors(future: Future[Any], f: Any => HttpResponse): Future[HttpResponse] = {
+    future map(f) recover {
+      case e: IllegalArgumentException =>
         log.error("Gateway contains bug! ", e)
-        replyTo ! HttpResponse(status = StatusCodes.InternalServerError,
+        HttpResponse(status = StatusCodes.InternalServerError,
           entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> Eeek! We have a bug..</h1>"))
 
-      case Failure(NonFatal(e)) =>
+      case NonFatal(e) =>
         log.error("Cluster encountered failure ", e)
-        replyTo ! HttpResponse(status = StatusCodes.InternalServerError,
+        HttpResponse(status = StatusCodes.InternalServerError,
           entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
             "<h1> Well, something went wrong but we should be back..</h1>"))
 
-      case Failure(e) =>
-        replyTo ! HttpResponse(status = StatusCodes.InternalServerError,
+      case e =>
+        HttpResponse(status = StatusCodes.InternalServerError,
           entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
             "<h1> Something is seriously wrong with our servers..</h1>"))
+
     }
   }
 

@@ -23,7 +23,7 @@ object Partition {
   case class GetStringEntry(key: String) extends Keyed[String](key)
 }
 
-import Partition._
+import io.amient.akkahttp.actor.Partition._
 
 
 class Partition(partition: Int) extends Actor {
@@ -43,14 +43,21 @@ class Partition(partition: Int) extends Actor {
   }
 
   override def postStop(): Unit = {
-    println("!stopping")
+    println("stopping Partition")
     super.postStop()
   }
 
+
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    println("!restarting")
     super.preRestart(reason, message)
+    println("preRestart Partition")
   }
+
+  override def postRestart(reason: Throwable): Unit = {
+    super.postRestart(reason)
+    println("postRestart Partitionh")
+  }
+
 
   def receive = {
 
@@ -70,7 +77,9 @@ class Partition(partition: Int) extends Actor {
       val origin = sender()
       val prompt = s"${self.path.name}: $greeting >"
       userInputMediator ? prompt andThen {
-        case Success(userInput) => origin ! userInput
+        case Success(userInput: String) =>
+          if (userInput == "error") origin ! Status.Failure(throw new RuntimeException(userInput))
+          else origin ! userInput
         case Failure(e) => origin ! Status.Failure(e)
       }
 
