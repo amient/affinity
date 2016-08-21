@@ -1,4 +1,4 @@
-package io.amient.akkahttp.actor
+package io.amient.akkahttp
 
 import java.util.Properties
 
@@ -34,10 +34,8 @@ class HttpInterface(appConfig: Properties, gateway: ActorRef)(implicit system: A
 
 
   val bindingFuture: Future[Http.ServerBinding] =
-    incoming.to(Sink.foreach { connection => // foreach materializes the source
-      println("Accepted new connection from " + connection.remoteAddress)
-      // ... and then actually handle the connection
-      connection.handleWithAsyncHandler{ req =>
+    incoming.to(Sink.foreach { connection =>
+      connection.handleWithAsyncHandler { req =>
 
         val responsePromise = Promise[HttpResponse]()
 

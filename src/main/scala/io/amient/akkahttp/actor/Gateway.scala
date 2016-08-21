@@ -10,7 +10,7 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.akkahttp.Coordinator
-import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, TestError}
+import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, SimulateError}
 
 import scala.collection.immutable
 import scala.concurrent.duration._
@@ -40,16 +40,14 @@ class Gateway(appConfig: Properties) extends Actor {
 
   import Gateway._
 
+  val log = Logging.getLogger(context.system, this)
+
   val host = appConfig.getProperty(CONFIG_AKKA_HOST, "localhost")
   val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT, "2552").toInt
   val numPartitions = appConfig.getProperty(CONFIG_NUM_PARTITIONS).toInt
   val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
 
   val coordinator = Coordinator.fromProperties(appConfig)
-
-  val log = Logging.getLogger(context.system, this)
-
-  val uuid = UUID.randomUUID()
 
   val partitioner = context.actorOf(PartitionedGroup(numPartitions).props(), name = "partitioner")
 
@@ -78,23 +76,25 @@ class Gateway(appConfig: Properties) extends Actor {
 
   override def preStart(): Unit = {
     log.info("Gateway Starting")
+    context.parent ! Controller.GatewayCreated()
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     super.preRestart(reason, message)
-    println("preRestart Gateway")
+      log.info("preRestart Gateway")
   }
 
   override def postRestart(reason: Throwable): Unit = {
     super.postRestart(reason)
-    println("postRestart Gateway")
+    log.info("postRestart Gateway")
   }
 
 
   override def postStop(): Unit = {
+    log.info("stopped Gateway, closing coordinator..")
     Await.result(Future.sequence(handles), 1 minute).foreach(coordinator.unregister)
-    log.info("closing coordinator")
     coordinator.close()
+    log.info("Coordinator closed")
   }
 
 
@@ -111,9 +111,10 @@ class Gateway(appConfig: Properties) extends Actor {
 
       case Uri.Path("/error") =>
         implicit val timeout = Timeout(1 second)
-        fulfillAndHandleErrors(promise, partitioner ? TestError) {
-          case x => sys.error("Expecting failure, got" + x)
-        }
+        //TODO the default supervisor strategy will try to restart gateway after the following line
+        throw new RuntimeException("XXX")
+        partitioner ! SimulateError
+        promise.success(HttpResponse(status = StatusCodes.Accepted))
 
       case Uri.Path("/kill") =>
         implicit val timeout = Timeout(1 second)
@@ -188,7 +189,7 @@ class Gateway(appConfig: Properties) extends Actor {
           entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> Eeek! We have a bug..</h1>"))
 
       case NonFatal(e) =>
-        log.error("Cluster encountered failure ", e)
+        log.error("Cluster encountered failure ", e.getMessage)
         HttpResponse(status = StatusCodes.InternalServerError,
           entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
             "<h1> Well, something went wrong but we should be back..</h1>"))

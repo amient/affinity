@@ -9,7 +9,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object Partition {
-  final case class TestError()
+  final case class SimulateError()
   case class CollectUserInput(greeting: String)
 
   sealed abstract class Keyed[K](key: K) extends Serializable {
@@ -43,31 +43,36 @@ class Partition(partition: Int) extends Actor {
   }
 
   override def postStop(): Unit = {
-    println("stopping Partition")
+    log.info("stopping Partition: " + self.path.name)
     super.postStop()
   }
 
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     super.preRestart(reason, message)
-    println("preRestart Partition")
+    log.info("preRestart Partition: " + self.path.name)
   }
 
   override def postRestart(reason: Throwable): Unit = {
     super.postRestart(reason)
-    println("postRestart Partitionh")
+    log.info("postRestart Partition: " + self.path.name)
   }
 
 
   def receive = {
 
-    case TestError => sender ! Status.Failure(new IllegalStateException())
+    case SimulateError =>
+      log.warning("TestError instruction in partition " + context.system.name)
+      throw new IllegalStateException()
 
     case KillNode(_) =>
-      sender ! "OK"
-      Thread.sleep(500)
-      println("killing system " + context.system.name)
-      context.system.terminate()
+      log.warning("killing the entire node " + context.system.name)
+      try {
+        context.system.terminate()
+      } finally {
+        System.exit(666)
+      }
+
 
     case ShowIndex(msg) =>
       sender ! s"${self.path.name}:$msg"

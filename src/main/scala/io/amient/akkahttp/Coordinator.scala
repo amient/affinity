@@ -21,9 +21,7 @@ object Coordinator {
 
   def fromProperties(appConfig: Properties): Coordinator = {
     appConfig.getProperty(CONFIG_IMPLEMENTATION, "zookeeper") match {
-      case "zookeeper" =>
-        //FIXME throw new RuntimeException("some error") that needs to result in system termination and exit code > 0
-        new ZkCoordinator(appConfig)
+      case "zookeeper" => new ZkCoordinator(appConfig)
     }
   }
 }

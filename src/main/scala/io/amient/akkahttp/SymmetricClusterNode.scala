@@ -4,7 +4,7 @@ import java.util.Properties
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import io.amient.akkahttp.actor.{Gateway, HttpInterface}
+import io.amient.akkahttp.actor.{Controller, Gateway}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -53,18 +53,17 @@ object SymmetricClusterNode extends App {
 
       implicit val system = ActorSystem(ActorSystemName, systemConfig)
 
-      //TODO is this how child actors should be created - seems unsafe
-      val gateway = system.actorOf(Props(new Gateway(appConfig)), name = "gateway")
+      val controller = system.actorOf(Props(new Controller(appConfig)))
 
-      val httpInterface = new HttpInterface(appConfig, gateway)
+      controller ! Controller.CreateGateway()
 
+      //in case the process is stopped from outside
       sys.addShutdownHook {
-        try {
-          Await.result(system.terminate(), 30 seconds)
-        } finally {
-          httpInterface.close()
-        }
+        system.terminate()
+        //we cannot use future from system.terminate() because shutdown may have already been invoked
+        Await.ready(system.whenTerminated, 30 seconds) // TODO shutdown timeout by configuration
       }
+
     } catch {
       case e: IllegalArgumentException =>
         e.printStackTrace()
