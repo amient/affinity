@@ -18,7 +18,7 @@ object SymmetricClusterNode extends App {
   override def main(args: Array[String]): Unit = {
 
     try {
-      require(args.length == 6)
+      require(args.length >=5)
 
       val akkaPort = args(0).toInt
       val host = args(1)

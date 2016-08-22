@@ -40,7 +40,7 @@ final case class PartitionedGroup(numPartitions: Int) extends Group {
               currentRouteMap.clear()
               routees.foreach {
                 case actorRefRoutee: ActorRefRoutee =>
-                  currentRouteMap.put(actorRefRoutee.ref.path.name.substring(10).toInt, actorRefRoutee)
+                  currentRouteMap.put(actorRefRoutee.ref.path.name.split("-")(1).toInt, actorRefRoutee)
               }
               prevRoutees = routees
             }

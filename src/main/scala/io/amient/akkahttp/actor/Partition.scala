@@ -10,7 +10,6 @@ import scala.util.{Failure, Success}
 
 object Partition {
   final case class SimulateError()
-  case class CollectUserInput(greeting: String)
 
   sealed abstract class Keyed[K](key: K) extends Serializable {
     override def hashCode() = key.hashCode()
@@ -18,9 +17,9 @@ object Partition {
 
   final case class ShowIndex(key: String) extends Keyed[String](key)
   final case class KillNode(partition: Int) extends Keyed[Int](partition)
-
-  case class StringEntry(key: String, value: String) extends Keyed[String](key)
-  case class GetStringEntry(key: String) extends Keyed[String](key)
+  final case class CollectUserInput(greeting: String) extends Keyed(greeting)
+  final case class StringEntry(key: String, value: String) extends Keyed[String](key)
+  final case class GetStringEntry(key: String) extends Keyed[String](key)
 }
 
 import io.amient.akkahttp.actor.Partition._
@@ -62,10 +61,9 @@ class Partition(partition: Int) extends Actor {
 
     case KillNode(_) =>
       log.warning("killing the entire node " + context.system.name)
-      try {
-        context.system.terminate()
-      } finally {
-        System.exit(666)
+      implicit val timeout = Timeout(10 seconds)
+      context.actorSelection("/user/controller").resolveOne().onSuccess{
+        case controller => context.stop(controller)
       }
 
 
