@@ -38,24 +38,19 @@ class Partition(partition: Int) extends Actor {
 
   val userInputMediator = context.actorOf(Props(new UserInputMediator))
 
-  override def preStart(): Unit = {
-    log.info("Partition Actor Starting: " + self.path.name)
-  }
-
   override def postStop(): Unit = {
-    log.info("stopping Partition: " + self.path.name)
+    log.info("Comitting Partition ChangeLog: " + self.path.name)
+    //TODO commit change log
+    //TODO clear state
+    context.parent ! Region.PartitionOffline(self)
     super.postStop()
   }
 
-
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
-    log.info("preRestart Partition: " + self.path.name)
-  }
-
-  override def postRestart(reason: Throwable): Unit = {
-    super.postRestart(reason)
-    log.info("postRestart Partition: " + self.path.name)
+  override def preStart(): Unit = {
+    log.info("Bootstrapping partition: " + self.path.name)
+    //TODO bootstrap data
+    Thread.sleep(1500)
+    context.parent ! Region.PartitionOnline(self)
   }
 
 

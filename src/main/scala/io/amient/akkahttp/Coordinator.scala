@@ -46,7 +46,7 @@ trait Coordinator {
     * call addRouteeActor() and removeRouteeActor() methods when respective
     * changes occur.
     *
-    * @param system ActorSystem instance
+    * @param system  ActorSystem instance
     * @param watcher actor which will receive the messages
     */
   def watchRoutees(system: ActorSystem, watcher: ActorRef): Unit
@@ -56,16 +56,15 @@ trait Coordinator {
   /**
     * internal data structure
     */
-  private val handles = new ConcurrentHashMap[ActorPath, (String, ActorRef)]()
+  private val handles = new ConcurrentHashMap[String, ActorRef]()
 
-  def getAllHandles: Set[String] = handles.entrySet().asScala.map(_.getValue._1).toSet
+  def getAllHandles: Set[String] = handles.keySet().asScala.toSet
 
   protected def removeRoutee(watcher: ActorRef, routeeHandle: String): Unit = {
-    handles.entrySet().asScala.foreach { case entry =>
-      val (handle, actorRef) = entry.getValue
-      if (routeeHandle == handle) {
-        watcher ! RemoveRoutee(ActorRefRoutee(actorRef))
-        handles.remove(entry.getKey)
+    if (handles.containsKey(routeeHandle)) {
+      val entry = handles.remove(routeeHandle)
+      if (entry != null) {
+        watcher ! RemoveRoutee(ActorRefRoutee(entry))
       }
     }
   }
@@ -76,10 +75,10 @@ trait Coordinator {
                                routeePath: String): Unit = {
     import system.dispatcher
     implicit val timeout = new Timeout(24 hours)
-    system.actorSelection(routeePath).resolveOne() andThen {
-      case Success(partitionActorRef) =>
-        if (!handles.containsKey(partitionActorRef.path)) {
-          handles.put(partitionActorRef.path, (routeeHandle, partitionActorRef))
+    system.actorSelection(routeePath).resolveOne() onSuccess  {
+      case partitionActorRef =>
+        if (!handles.containsKey(routeeHandle)) {
+          handles.put(routeeHandle, partitionActorRef)
           watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
         }
     }
@@ -138,7 +137,9 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
         if (currentChilds != null) {
           val newList = listAsIndexedSeq(currentChilds)
           newList.foreach(addRoutee(_))
-          getAllHandles.filter(!newList.contains(_)).foreach(handle => removeRoutee(watcher, handle))
+          getAllHandles.filter(!newList.contains(_)).foreach{ handle =>
+            removeRoutee(watcher, handle)
+          }
         }
       }
     })

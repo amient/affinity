@@ -1,15 +1,14 @@
 package io.amient.akkahttp.actor
 
-import java.util.{Properties, UUID}
+import java.util.Properties
 
-import akka.actor.{Actor, ActorPath, Props, Status}
+import akka.actor.{Actor, Status, Terminated}
 import akka.event.Logging
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.akkahttp.Coordinator
 import io.amient.akkahttp.actor.Partition.{CollectUserInput, KillNode, SimulateError}
 
 import scala.collection.immutable
@@ -18,10 +17,8 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.control.NonFatal
 
 object Gateway {
-  final val CONFIG_AKKA_HOST = "gateway.akka.host"
-  final val CONFIG_AKKA_PORT = "gateway.akka.port"
+
   final val CONFIG_NUM_PARTITIONS = "num.partitions"
-  final val CONFIG_PARTITION_LIST = "partition.list"
 
   final case class HttpExchange(
              method:   HttpMethod,
@@ -34,69 +31,22 @@ object Gateway {
 
 class Gateway(appConfig: Properties) extends Actor {
 
-  //TODO gateway must be able to route before the local partitions are online
-  //TODO after the local partitions are online they must tell it to the coordinator
-  //which then updates all other gateway nodes that are online
+  val log = Logging.getLogger(context.system, this)
 
   import Gateway._
 
-  val log = Logging.getLogger(context.system, this)
-
-  val host = appConfig.getProperty(CONFIG_AKKA_HOST, "localhost")
-  val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT, "2552").toInt
   val numPartitions = appConfig.getProperty(CONFIG_NUM_PARTITIONS).toInt
-  val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
-
-  val coordinator = Coordinator.fromProperties(appConfig)
 
   val partitioner = context.actorOf(PartitionedGroup(numPartitions).props(), name = "partitioner")
 
-  //construct partition actors
-  val partitions = for (p <- partitionList) yield {
-    context.actorOf(Props(new Partition(p)), name = "partition-" + p)
-  }
-
-  //create coorinator and register the partitions
-  coordinator.watchRoutees(context.system, self)
-
   import context.dispatcher
 
-  //register partitions that have booted successfully
-  val handles = for (p <- partitions) yield {
-    val partitionActorPath = ActorPath.fromString(
-      s"akka.tcp://${context.system.name}@${host}:${akkaPort}${p.path.toStringWithoutAddress}")
-    implicit val timeout = Timeout(24 hours)
-    (for (partitionActorRef <- context.actorSelection(partitionActorPath).resolveOne()) yield {
-      coordinator.register(partitionActorPath)
-    }) recover {
-      case any => throw new RuntimeException(any)
-    }
-  }
-
+  context.watch(partitioner)
 
   override def preStart(): Unit = {
-    log.info("Gateway Starting")
+    Await.ready(context.actorSelection(partitioner.path).resolveOne()(10 seconds), 10 seconds)
     context.parent ! Controller.GatewayCreated()
   }
-
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
-      log.info("preRestart Gateway")
-  }
-
-  override def postRestart(reason: Throwable): Unit = {
-    super.postRestart(reason)
-    log.info("postRestart Gateway")
-  }
-
-
-  override def postStop(): Unit = {
-    log.info("stopped Gateway, closing coordinator..")
-    Await.result(Future.sequence(handles), 1 minute).foreach(coordinator.unregister)
-    coordinator.close()
-    log.info("Coordinator closed")
-  }
-
 
   def receive = {
 
@@ -111,8 +61,7 @@ class Gateway(appConfig: Properties) extends Actor {
 
       case Uri.Path("/error") =>
         implicit val timeout = Timeout(1 second)
-        //TODO the default supervisor strategy will try to restart gateway after the following line
-        throw new RuntimeException("XXX")
+        //TODO the default supervisor strategy will try to restart gateway if exception occurs here
         partitioner ! SimulateError
         promise.success(HttpResponse(status = StatusCodes.Accepted))
 
@@ -168,6 +117,9 @@ class Gateway(appConfig: Properties) extends Actor {
       val origin = sender()
       implicit val timeout = Timeout(60 seconds)
       partitioner ? m onSuccess { case routees => origin ! routees }
+
+    case Terminated(partitioner) =>
+      throw new IllegalStateException("Partitioner terminated - must restart the gateway")
 
     case _ => sender ! Status.Failure(new IllegalArgumentException)
 

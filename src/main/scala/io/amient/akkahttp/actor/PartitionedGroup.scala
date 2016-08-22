@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.dispatch.Dispatchers
 import akka.event.Logging
 import akka.routing._
-import io.amient.akkahttp.actor.Partition.{CollectUserInput, Keyed}
+import io.amient.akkahttp.actor.Partition.Keyed
 
 import scala.collection.immutable
 
@@ -22,7 +22,7 @@ final case class PartitionedGroup(numPartitions: Int) extends Group {
 
     val defaultLogic = RoundRobinRoutingLogic()
 
-    val logic = new RoutingLogic {
+    val partitioningLogic = new RoutingLogic {
 
       private var prevRoutees: immutable.IndexedSeq[Routee] = immutable.IndexedSeq()
       private val currentRouteMap = new ConcurrentHashMap[Int, Routee]()
@@ -34,39 +34,38 @@ final case class PartitionedGroup(numPartitions: Int) extends Group {
 
       def select(message: Any, routees: immutable.IndexedSeq[Routee]): Routee = {
 
-        val selected: Routee = message match {
-          case k: Keyed[_] =>
+        if (!prevRoutees.eq(routees)) {
+          prevRoutees.synchronized {
             if (!prevRoutees.eq(routees)) {
-              prevRoutees.synchronized {
-                if (!prevRoutees.eq(routees)) {
-                  currentRouteMap.clear()
-                  routees.foreach {
-                    case actorRefRoutee: ActorRefRoutee =>
-                      currentRouteMap.put(actorRefRoutee.ref.path.name.substring(10).toInt, actorRefRoutee)
-                  }
-                  prevRoutees = routees
-                }
+              currentRouteMap.clear()
+              routees.foreach {
+                case actorRefRoutee: ActorRefRoutee =>
+                  currentRouteMap.put(actorRefRoutee.ref.path.name.substring(10).toInt, actorRefRoutee)
               }
+              prevRoutees = routees
             }
-            val partition = abs(k.hashCode()) % numPartitions
+          }
+        }
+        val partition = abs(message.hashCode()) % numPartitions
 
-            if (!currentRouteMap.containsKey(partition)) throw new IllegalStateException(
-              s"Partition `$partition` is not represented by any Actor - " +
-              s"this shouldn't happen - gateway should suspend all requests until all partitions are present")
+        //TODO test the suspended scenario
+        if (!currentRouteMap.containsKey(partition)) throw new IllegalStateException(
+          s"Partition `$partition` is not represented by any Actor - " +
+            s"this shouldn't happen - gateway should suspend all requests until all partitions are present")
 
-            currentRouteMap.get(partition)
+        currentRouteMap.get(partition)
+      }
 
-          case CollectUserInput(_) => routees(0)
+    }
+
+    new Router(new RoutingLogic {
+      def select(message: Any, routees: immutable.IndexedSeq[Routee]): Routee = {
+        message match {
+          case k: Keyed[_] => partitioningLogic.select(message, routees)
           case _ => defaultLogic.select(message, routees)
         }
-
-        if (log.isDebugEnabled) {
-          log.debug("partition selected: " + selected)
-        }
-        selected
       }
-    }
-    new Router(logic)
+    })
   }
 
 }

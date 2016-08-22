@@ -4,7 +4,8 @@ import java.util.Properties
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import io.amient.akkahttp.actor.{Controller, Gateway}
+import io.amient.akkahttp.actor.Controller.{CreateGateway, CreateRegion}
+import io.amient.akkahttp.actor.{Controller, Gateway, Region}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -41,10 +42,10 @@ object SymmetricClusterNode extends App {
       val appConfig = new Properties()
       appConfig.put(HttpInterface.CONFIG_HTTP_HOST, host)
       appConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
-      appConfig.put(Gateway.CONFIG_AKKA_HOST, host)
-      appConfig.put(Gateway.CONFIG_AKKA_PORT, akkaPort.toString)
       appConfig.put(Gateway.CONFIG_NUM_PARTITIONS, numPartitions.toString)
-      appConfig.put(Gateway.CONFIG_PARTITION_LIST, partitionList)
+      appConfig.put(Region.CONFIG_AKKA_HOST, host)
+      appConfig.put(Region.CONFIG_AKKA_PORT, akkaPort.toString)
+      appConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
       appConfig.put(Coordinator.CONFIG_IMPLEMENTATION,"zookeeper")
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, zkConnectTimeout.toString)
@@ -53,9 +54,10 @@ object SymmetricClusterNode extends App {
 
       implicit val system = ActorSystem(ActorSystemName, systemConfig)
 
-      val controller = system.actorOf(Props(new Controller(appConfig)))
+      val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
 
-      controller ! Controller.CreateGateway()
+      controller ! CreateGateway()
+      controller ! CreateRegion()
 
       //in case the process is stopped from outside
       sys.addShutdownHook {
