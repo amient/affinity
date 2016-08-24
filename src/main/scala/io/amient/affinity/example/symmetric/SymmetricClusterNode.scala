@@ -1,11 +1,12 @@
-package io.amient.akkahttp
+package io.amient.affinity.example.symmetric
 
 import java.util.Properties
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import io.amient.akkahttp.actor.Controller.{CreateGateway, CreateRegion}
-import io.amient.akkahttp.actor.{Controller, Gateway, Region}
+import io.amient.affinity.core.{Coordinator, HttpInterface, ZkCoordinator}
+import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion}
+import io.amient.affinity.core.actor.{Controller, Gateway, Region}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -43,7 +44,7 @@ object SymmetricClusterNode extends App {
       appConfig.put(Region.CONFIG_AKKA_HOST, host)
       appConfig.put(Region.CONFIG_AKKA_PORT, akkaPort.toString)
       appConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
-      appConfig.put(Coordinator.CONFIG_IMPLEMENTATION,"zookeeper")
+      appConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, ZkCoordinator.getClass.getName)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, zkConnectTimeout.toString)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, zkSessionTimeout.toString)

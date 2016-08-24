@@ -1,0 +1,6 @@
+Packaged version of this software contains:
+
+- Akka (Apache 2.0 License)
+- Apache Zookeeper Client (Apache 2.0 License)
+- RocksDB (BSD License)
+- Apache Kafka Client (Apache 2.0 License)
