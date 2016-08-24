@@ -22,8 +22,12 @@ class Region(appConfig: Properties, coordinator: Coordinator) extends Actor {
 
   import Region._
 
-  val host = appConfig.getProperty(CONFIG_AKKA_HOST, "localhost")
   val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT, "2552").toInt
+  val akkaAddress = appConfig.getProperty(CONFIG_AKKA_HOST, null) match {
+    case null => s"akka://${context.system.name}"
+    case host => s"akka.tcp://${context.system.name}@${host}:${akkaPort}"
+  }
+
   val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
 
   private var partitions = scala.collection.mutable.Map[ActorRef, String]()
@@ -44,18 +48,17 @@ class Region(appConfig: Properties, coordinator: Coordinator) extends Actor {
 
   override def receive: Receive = {
     case PartitionOnline(ref) =>
-      val partitionActorPath = ActorPath.fromString(
-        s"akka.tcp://${context.system.name}@${host}:${akkaPort}${ref.path.toStringWithoutAddress}")
+      val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
       val handle = coordinator.register(partitionActorPath)
       log.info(s"Partition online: handle=$handle, path=${partitionActorPath}")
       partitions += (ref -> handle)
-      context.watch(ref)
+//      context.watch(ref)
 
     case PartitionOffline(ref) =>
       log.info(s"Partition offline: handle=${partitions(ref)}, path=${ref.path}")
       coordinator.unregister(partitions(ref))
+//      context.unwatch(ref)
 
-    case any => System.err.println(any)
   }
 }
 

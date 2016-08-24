@@ -62,7 +62,7 @@ class Gateway(appConfig: Properties) extends Actor {
       case Uri.Path("/error") =>
         implicit val timeout = Timeout(1 second)
         //TODO the default supervisor strategy will try to restart gateway if exception occurs here
-        partitioner ! SimulateError
+        partitioner ! SimulateError(new IllegalStateException)
         promise.success(HttpResponse(status = StatusCodes.Accepted))
 
       case Uri.Path("/kill") =>

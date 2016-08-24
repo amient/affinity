@@ -9,7 +9,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object Partition {
-  final case class SimulateError()
+  final case class SimulateError(e: Exception)
 
   sealed abstract class Keyed[K](key: K) extends Serializable {
     override def hashCode() = key.hashCode()
@@ -40,7 +40,7 @@ class Partition(partition: Int) extends Actor {
   override def postStop(): Unit = {
     log.info("Comitting Partition ChangeLog: " + self.path.name)
     //TODO commit change log
-    //TODO clear state
+    //TODO clear state (if this is not a new instance)
     context.parent ! Region.PartitionOffline(self)
     super.postStop()
   }
@@ -55,14 +55,14 @@ class Partition(partition: Int) extends Actor {
 
   def receive = {
 
-    case SimulateError =>
+    case SimulateError(e) =>
       log.warning("TestError instruction in partition " + context.system.name)
-      throw new IllegalStateException()
+      throw e
 
     case KillNode(_) =>
       log.warning("killing the entire node " + context.system.name)
       implicit val timeout = Timeout(10 seconds)
-      context.actorSelection("/user/controller").resolveOne().onSuccess{
+      context.actorSelection("/user").resolveOne().onSuccess{
         case controller => context.stop(controller)
       }
 

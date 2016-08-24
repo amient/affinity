@@ -7,6 +7,9 @@ ext {
     scalaVersion = '2.11.7'
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
     akkaVersion = '2.4.9-RC2'
+    zkClientVersion = '0.9'
+    rocksDbVersion = '4.9.0'
+    kafkaClientVersion = '0.10.0.1'
 }
 
 apply plugin: 'java'
@@ -55,20 +58,23 @@ test.dependsOn scalaTest
 test.systemProperties 'property': 'value'
 
 dependencies {
-    compile 'org.scala-lang:scala-library:' + scalaVersion
-    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
-    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
-//    compile group: 'com.google.inject', name: 'guice', version: 3.0
 
-    compile group: 'com.101tec', name: 'zkclient', version:'0.9'
+    testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
+    testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
+    testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
 //    compile group: 'com.typesafe.akka', name: 'akka-persistence_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
+    compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaClientVersion
+//    compile group: 'com.google.inject', name: 'guice', version: 3.0
+    compile 'org.scala-lang:scala-library:' + scalaVersion
+    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
+    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
 
-    testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
-    testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
 }
 
 

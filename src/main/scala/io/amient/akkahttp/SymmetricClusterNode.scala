@@ -31,13 +31,10 @@ object SymmetricClusterNode extends App {
       val zkConnectTimeout = 30000
       val zkRoot = "/akka"
 
-      println(s"Http port: $httpPort")
-      println(s"Akka port: $akkaPort")
+      println(s"Http: $host:$httpPort")
+      println(s"Akka: $host:$akkaPort")
       println(s"Zookeeper: $zkConnect")
       println(s"Partitions: $partitionList of $numPartitions")
-
-      val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-        .withFallback(ConfigFactory.load("application"))
 
       val appConfig = new Properties()
       appConfig.put(HttpInterface.CONFIG_HTTP_HOST, host)
@@ -51,6 +48,9 @@ object SymmetricClusterNode extends App {
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, zkConnectTimeout.toString)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, zkSessionTimeout.toString)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_ROOT,zkRoot)
+
+      val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
+        .withFallback(ConfigFactory.load("application"))
 
       implicit val system = ActorSystem(ActorSystemName, systemConfig)
 
