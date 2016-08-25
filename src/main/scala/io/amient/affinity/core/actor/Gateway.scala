@@ -63,6 +63,8 @@ class Gateway(appConfig: Properties) extends Actor {
 
   def receive = {
 
+    //TODO create an annotation which handles HttpExchange matching by parameter and fulfillment by implementation
+
     //non-delegate response
     case HttpExchange(GET, Uri.Path("/") | Uri.Path(""), _, _, promise) =>
       promise.success(HttpResponse(

@@ -1,12 +1,23 @@
-# Deisgn 
+# Design Goals 
+
+- library for building stateful, horizontally scalable REST APIs
+- must be fault-tolerant
+- must be horizontally scalable
+- zero-downtime should be possible
+- can be attached to stream-processing systems 
+- currently a prototype but should become a library 
+
+# Architecture
+ 
+
+## Cluster Architecture
+ ![DXPSpark](doc/DXPSpark.png)
+ 
+## State Architecture
+
+...
 
 
-..goals
-..design decisions
-
-# Architecture 
-
-- currently a prototype, to be a library
 - akka for asynchronous communication 
 - akka http as the main interface
 - zookeeper for distributed coordiation

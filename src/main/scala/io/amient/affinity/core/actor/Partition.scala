@@ -57,7 +57,7 @@ class Partition(partition: Int) extends Actor {
   val userInputMediator = context.actorOf(Props(new UserInputMediator))
 
   override def postStop(): Unit = {
-    log.info("Comitting Partition ChangeLog: " + self.path.name)
+    log.info("Committing Partition ChangeLog: " + self.path.name)
     //TODO commit change log
     //TODO clear state (if this is not a new instance)
     context.parent ! Region.PartitionOffline(self)
