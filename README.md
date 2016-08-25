@@ -11,7 +11,7 @@
  
 
 ## Cluster Architecture
- ![DXPSpark](doc/DXPSpark.png)
+ ![Cluster Architecture](doc/ClusterArchitecture.png)
  
 ## State Architecture
 
