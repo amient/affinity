@@ -17,31 +17,21 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.core.storage
 
-import akka.actor.Actor
-import akka.event.Logging
+trait MemStoreSimpleMap[K,V] extends MemStore[K,V] {
 
-abstract class Partition extends Actor {
+  private val internal = scala.collection.mutable.Map[K, V]()
 
-  val log = Logging.getLogger(context.system, this)
+  override def get(key: K): Option[V] = internal.get(key)
 
-  val partition = self.path.name.split("-").last.toInt
+  override def iterator = internal.iterator
 
-  final override def postStop(): Unit = {
-    log.info("Committing Partition ChangeLog: " + self.path.name)
-    //TODO commit change log
-    //TODO clear state (if this is not a new instance)
-    context.parent ! Region.PartitionOffline(self)
-    super.postStop()
+  override protected def update(key: K, value: V): Boolean = internal.put(key, value) match {
+    case None => true
+    case Some(prev) if (prev != value) => true
+    case _ => false
   }
 
-  final override def preStart(): Unit = {
-    log.info("Bootstrapping partition: " + self.path.name)
-    //TODO bootstrap data
-    Thread.sleep(1500)
-    context.parent ! Region.PartitionOnline(self)
-  }
-
+  override protected def remove(key: K): Boolean = internal.remove(key).isDefined
 }
-

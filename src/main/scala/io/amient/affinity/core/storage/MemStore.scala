@@ -17,31 +17,21 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.core.storage
 
-import akka.actor.Actor
-import akka.event.Logging
+trait MemStore[K, V] {
 
-abstract class Partition extends Actor {
+  def get(key: K): Option[V]
 
-  val log = Logging.getLogger(context.system, this)
+  def iterator: Iterator[(K,V)]
 
-  val partition = self.path.name.split("-").last.toInt
+  protected def update(key: K, value: V): Boolean
 
-  final override def postStop(): Unit = {
-    log.info("Committing Partition ChangeLog: " + self.path.name)
-    //TODO commit change log
-    //TODO clear state (if this is not a new instance)
-    context.parent ! Region.PartitionOffline(self)
-    super.postStop()
-  }
+  protected def remove(key: K): Boolean
 
-  final override def preStart(): Unit = {
-    log.info("Bootstrapping partition: " + self.path.name)
-    //TODO bootstrap data
-    Thread.sleep(1500)
-    context.parent ! Region.PartitionOnline(self)
+  def put(key: K, value: Option[V]): Unit = value match {
+    case None => remove(key)
+    case Some(data) => update(key, data)
   }
 
 }
-

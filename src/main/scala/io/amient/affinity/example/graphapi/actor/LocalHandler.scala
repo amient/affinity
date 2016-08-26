@@ -43,23 +43,31 @@ object LocalHandler {
 
   final case class CollectUserInput(greeting: String)
 
-  sealed class Graph(val key: Int, val name: String = "") {
+  final case class Vertex(val key: Int, val name: String) extends Serializable {
+    val serialVersionUID = 1L
+    def this(copy: Vertex) = this(copy.key, copy.name)
+    def toComponent(withEdges: Set[Vertex] = Set()) = Component(key, name, withEdges)
     override def hashCode = key.hashCode
 
     override def equals(obj: scala.Any): Boolean =
-      obj.isInstanceOf[Graph] &&
-      obj.asInstanceOf[Graph].key == key &&
-        obj.asInstanceOf[Graph].name == name
+      obj.isInstanceOf[Vertex] &&
+        obj.asInstanceOf[Vertex].key == key &&
+        obj.asInstanceOf[Vertex].name == name
 
-    def toVertex(withEdges: Set[Graph] = Set()) = Vertex(key, name, withEdges)
   }
 
-  final case class Vertex(override val key: Int, override val name: String, val edges: Set[Graph] = Set())
-      extends Graph(key, name) {
-    def copy(withEdges: Set[Graph]) = Vertex(key, name, withEdges)
+  final case class Component(val key: Int, val name: String, val edges: Set[Vertex] = Set()) {
+    def copy(withEdges: Set[Vertex]) = Component(key, name, withEdges)
+    override def equals(obj: scala.Any): Boolean =
+      obj.isInstanceOf[Component] &&
+        obj.asInstanceOf[Component].key == key &&
+        obj.asInstanceOf[Component].name == name &&
+        obj.asInstanceOf[Component].edges == edges
   }
 
-  final case class Connect(source: Graph, target: Graph) extends Graph(source.key)
+  final case class Connect(source: Vertex, target: Vertex) {
+    override def hashCode = source.hashCode
+  }
 
 }
 
@@ -68,14 +76,13 @@ class LocalHandler extends Partition {
   final val DEFAULT_KEYSPACE = "graph"
 
   import LocalHandler._
-
   import context._
 
   val userInputMediator = actorOf(Props(new UserInputMediator))
 
   val cluster = context.actorSelection("/user/controller/gateway/cluster")
 
-  val graph = storage[Int, Vertex]("graph")
+  val graph = new PrototypeKafkaBackedMemStore(partition)
 
   override def receive = {
 
@@ -83,19 +90,19 @@ class LocalHandler extends Partition {
 
     case Ping(ts) => sender ! s"${parent.path.name}:Pong"
 
-    case Describe(p) => sender ! s"$p:\n" + graph.values.mkString("\n\t")
+    case Describe(p) => sender ! s"$p:\n" + graph.iterator.mkString("\n\t")
 
     case Connect(source, target) => {
       (graph.get(source.key) match {
-        case Some(vertex) if (vertex.edges.contains(target)) => None
-        case Some(vertex) => Some(vertex.copy(vertex.edges + target))
-        case None => Some(source.toVertex(Set(target)))
-      }) foreach { updatedVertex =>
+        case Some(component) if (component.edges.contains(target)) => None
+        case Some(component) => Some(component.copy(component.edges + new Vertex(target)))
+        case None => Some(source.toComponent(Set(new Vertex(target))))
+      }) foreach { updatedComponent =>
         cluster ! Connect(target, source)
-        updatedVertex.edges.filter(_ != target).foreach { other =>
+        updatedComponent.edges.filter(_ != target).foreach { other =>
           cluster ! Connect(other, target)
         }
-        graph.update(source.key, updatedVertex)
+        graph.put(source.key, Some(updatedComponent))
       }
     }
 
