@@ -21,9 +21,11 @@ package io.amient.affinity.example.symmetric
 
 object SymmetricClusterApp extends App {
 
-  SymmetricClusterNode.main(Seq("2551","127.0.0.1","8081","4","0,2").toArray)
-  SymmetricClusterNode.main(Seq("2552","127.0.0.1","8082","4","1,3").toArray)
+  val numPartitions = "4"
+
+  SymmetricClusterNode.main(Seq("2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
+  SymmetricClusterNode.main(Seq("2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
   // replicas
-  SymmetricClusterNode.main(Seq("2553","127.0.0.1","8083","4","1,3").toArray)
+//  SymmetricClusterNode.main(Seq("2553","127.0.0.1","8083", numPartitions,"1,3").toArray)
 
 }

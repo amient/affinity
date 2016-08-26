@@ -39,13 +39,19 @@ object RequestHandler {
 
   final case class ShowIndex(ts: Long = System.currentTimeMillis())
 
-  final case class KillNode(partition: Int)
+  final case class KillNode(partition: Int) {
+    override def hashCode = partition
+  }
 
   final case class CollectUserInput(greeting: String)
 
-  final case class StringEntry(key: String, value: String)
+  final case class StringEntry(key: String, value: Option[String]) {
+    override def hashCode = key.hashCode
+  }
 
-  final case class GetStringEntry(key: String)
+  final case class GetStringEntry(key: String) {
+    override def hashCode = key.hashCode
+  }
 
 }
 
@@ -59,11 +65,21 @@ class LocalHandler extends Actor {
 
   val userInputMediator = actorOf(Props(new UserInputMediator))
 
+  val cluster = context.actorSelection("/user/controller/gateway/cluster")
+
   //TODO this is a prototype for the embedded storage API which will be supplied via core.Partition
-  var cache = Map.empty[String, String]
+  var cache = scala.collection.mutable.Map[String, String]()
 
   def receive = {
-    case ShowIndex(ts) => sender ! s"${parent.path.name}:Hello World!"
+    case ShowIndex(ts) =>
+      val origin = sender
+      implicit val timeout = Timeout(10 seconds)
+      val randomKey = ts.toString
+      cluster ! StringEntry(randomKey, Some("world"))
+      cluster ? GetStringEntry(randomKey) onSuccess {
+        case any => origin ! s"${parent.path.name}:Hello World!: " + any
+      }
+
 
     case KillNode(_) =>
       log.warning("killing the entire node " + system.name)
@@ -88,13 +104,14 @@ class LocalHandler extends Actor {
       if (log.isDebugEnabled) {
         log.debug(msg)
       }
-      cache += (key -> value)
+
+      if (value.isEmpty) cache -= key else value.foreach {
+        case data => cache += (key -> data)
+      }
+
       sender ! true
 
-    case GetStringEntry(key) =>
-      val value = cache.get(key)
-      log.debug(s"GET: ($key, $value)")
-      sender ! value
+    case GetStringEntry(key) => sender ! StringEntry(key, cache.get(key))
 
     case unknown => sender ! Status.Failure(new IllegalArgumentException(unknown.getClass.getName))
 

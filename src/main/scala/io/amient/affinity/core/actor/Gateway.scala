@@ -75,9 +75,10 @@ class Gateway(appConfig: Properties, handlerClass: Class[_ <: Handler]) extends 
       cluster ? m onSuccess { case routees => origin ! routees }
 
     case Terminated(cluster) =>
-      throw new IllegalStateException("Cluster terminated - must restart the gateway")
+      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway")
 
     case _ => sender ! Status.Failure(new IllegalArgumentException)
+//    case any => cluster.forward(any)
 
   }
 

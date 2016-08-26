@@ -58,6 +58,7 @@ object SymmetricClusterNode extends App {
 
       val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
 
+      //this cluster is symmetric - all nodes serve both as Gateways and Regions
       controller ! CreateGateway(classOf[RequestHandler])
       controller ! CreateRegion(Props(new LocalHandler))
 
