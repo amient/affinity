@@ -1,4 +1,4 @@
-package io.amient.affinity.example.symmetric
+package io.amient.affinity.example.graphapi
 
 import java.util.Properties
 
@@ -8,6 +8,7 @@ import io.amient.affinity.core.HttpInterface
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion}
 import io.amient.affinity.core.actor.{Controller, Region}
 import io.amient.affinity.core.cluster.{Cluster, Coordinator, ZkCoordinator}
+import io.amient.affinity.example.graphapi.actor.LocalHandler
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -15,7 +16,7 @@ import scala.util.control.NonFatal
 
 object SymmetricClusterNode extends App {
 
-  final val ActorSystemName = "MySymmetricCluster"
+  final val ActorSystemName = "ExampleGraphAPI"
 
   override def main(args: Array[String]): Unit = {
 
@@ -59,7 +60,7 @@ object SymmetricClusterNode extends App {
       val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
 
       //this cluster is symmetric - all nodes serve both as Gateways and Regions
-      controller ! CreateGateway(classOf[RequestHandler])
+      controller ! CreateGateway(classOf[RequestMapper])
       controller ! CreateRegion(Props(new LocalHandler))
 
       //in case the process is stopped from outside

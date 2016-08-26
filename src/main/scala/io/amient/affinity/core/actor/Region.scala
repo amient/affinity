@@ -35,7 +35,8 @@ object Region {
   case class PartitionOffline(partition: ActorRef)
 }
 
-class Region(appConfig: Properties, coordinator: Coordinator, handlerProps: Props) extends Actor {
+class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Props)
+  extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
@@ -54,7 +55,7 @@ class Region(appConfig: Properties, coordinator: Coordinator, handlerProps: Prop
   override def preStart(): Unit = {
     //initiate creation of partitions and register them once booted
     for (p <- partitionList) {
-      context.actorOf(Props(new Partition(p, handlerProps)), name = System.nanoTime() + "-" + p)
+      context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
     }
   }
 

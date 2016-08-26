@@ -27,7 +27,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.core.Handler
+import io.amient.affinity.core.HttpRequestMapper
 import io.amient.affinity.core.cluster.Cluster
 
 import scala.concurrent.duration._
@@ -37,7 +37,7 @@ object Gateway {
   final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse])
 }
 
-class Gateway(appConfig: Properties, handlerClass: Class[_ <: Handler]) extends Actor {
+class Gateway(appConfig: Properties, handlerClass: Class[_ <: HttpRequestMapper]) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
@@ -78,7 +78,6 @@ class Gateway(appConfig: Properties, handlerClass: Class[_ <: Handler]) extends 
       throw new IllegalStateException("Cluster Actor terminated - must restart the gateway")
 
     case _ => sender ! Status.Failure(new IllegalArgumentException)
-//    case any => cluster.forward(any)
 
   }
 

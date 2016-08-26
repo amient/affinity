@@ -19,16 +19,25 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, Props}
+import akka.actor.Actor
 import akka.event.Logging
+import scala.collection.mutable._
 
-class Partition(partition: Int, handlerProps: Props) extends Actor {
-
-  val handler = context.actorOf(handlerProps, name = "handler")
+abstract class Partition extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
-  override def postStop(): Unit = {
+  val id = self.path.name.split("-").last.toInt
+
+  //TODO this is a prototype for the embedded storage API
+  private val store = scala.collection.mutable.Map[String, Map[_, _]]()
+  protected def storage[K,V](keyspace:String): scala.collection.mutable.Map[K, V] = {
+    val storage = scala.collection.mutable.Map[K, V]()
+    store += (keyspace -> storage)
+    storage
+  }
+
+  final override def postStop(): Unit = {
     log.info("Committing Partition ChangeLog: " + self.path.name)
     //TODO commit change log
     //TODO clear state (if this is not a new instance)
@@ -36,19 +45,11 @@ class Partition(partition: Int, handlerProps: Props) extends Actor {
     super.postStop()
   }
 
-  override def preStart(): Unit = {
+  final override def preStart(): Unit = {
     log.info("Bootstrapping partition: " + self.path.name)
     //TODO bootstrap data
     Thread.sleep(1500)
     context.parent ! Region.PartitionOnline(self)
-  }
-
-  def receive = {
-
-    case stateError: IllegalStateException => throw stateError
-
-    case any => handler.forward(any)
-
   }
 
 }

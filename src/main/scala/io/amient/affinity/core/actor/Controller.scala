@@ -24,13 +24,13 @@ import java.util.Properties
 import akka.actor.{Actor, Props, Terminated}
 import akka.event.Logging
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.{Handler, HttpInterface}
+import io.amient.affinity.core.{HttpRequestMapper, HttpInterface}
 
 object Controller {
 
   final case class CreateRegion(handlerProps: Props)
 
-  final case class CreateGateway(rootHandlerClass: Class[_ <: Handler])
+  final case class CreateGateway(rootHandlerClass: Class[_ <: HttpRequestMapper])
 
   final case class GatewayCreated()
 

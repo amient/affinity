@@ -16,16 +16,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.amient.affinity.core
 
-package io.amient.affinity.example.symmetric
+import akka.actor.ActorRef
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 
-object SymmetricClusterApp extends App {
+import scala.concurrent.{ExecutionContext, Promise}
 
-  val numPartitions = "4"
+trait HttpRequestMapper {
 
-  SymmetricClusterNode.main(Seq("2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
-  SymmetricClusterNode.main(Seq("2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
-  // replicas
-//  SymmetricClusterNode.main(Seq("2553","127.0.0.1","8083", numPartitions,"1,3").toArray)
+  def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext): Unit
 
 }
