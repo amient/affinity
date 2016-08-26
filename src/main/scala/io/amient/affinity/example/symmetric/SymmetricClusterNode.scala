@@ -4,9 +4,10 @@ import java.util.Properties
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.core.{Coordinator, HttpInterface, ZkCoordinator}
+import io.amient.affinity.core.HttpInterface
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion}
-import io.amient.affinity.core.actor.{Controller, Gateway, Region}
+import io.amient.affinity.core.actor.{Controller, Region}
+import io.amient.affinity.core.cluster.{Cluster, Coordinator, ZkCoordinator}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -40,11 +41,11 @@ object SymmetricClusterNode extends App {
       val appConfig = new Properties()
       appConfig.put(HttpInterface.CONFIG_HTTP_HOST, host)
       appConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
-      appConfig.put(Gateway.CONFIG_NUM_PARTITIONS, numPartitions.toString)
+      appConfig.put(Cluster.CONFIG_NUM_PARTITIONS, numPartitions.toString)
       appConfig.put(Region.CONFIG_AKKA_HOST, host)
       appConfig.put(Region.CONFIG_AKKA_PORT, akkaPort.toString)
       appConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
-      appConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, ZkCoordinator.getClass.getName)
+      appConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, zkConnectTimeout.toString)
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, zkSessionTimeout.toString)
@@ -57,13 +58,13 @@ object SymmetricClusterNode extends App {
 
       val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
 
-      controller ! CreateGateway()
-      controller ! CreateRegion()
+      controller ! CreateGateway(classOf[RequestHandler])
+      controller ! CreateRegion(Props(new LocalHandler))
 
       //in case the process is stopped from outside
       sys.addShutdownHook {
         system.terminate()
-        //we cannot use future from system.terminate() because shutdown may have already been invoked
+        //we cannot use the future returned by system.terminate() because shutdown may have already been invoked
         Await.ready(system.whenTerminated, 30 seconds) // TODO shutdown timeout by configuration
       }
 

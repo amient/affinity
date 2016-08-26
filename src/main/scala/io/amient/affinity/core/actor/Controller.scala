@@ -23,13 +23,14 @@ import java.util.Properties
 
 import akka.actor.{Actor, Props, Terminated}
 import akka.event.Logging
-import io.amient.affinity.core.{Coordinator, HttpInterface}
+import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.{Handler, HttpInterface}
 
 object Controller {
 
-  final case class CreateRegion()
+  final case class CreateRegion(handlerProps: Props)
 
-  final case class CreateGateway()
+  final case class CreateGateway(rootHandlerClass: Class[_ <: Handler])
 
   final case class GatewayCreated()
 
@@ -70,9 +71,9 @@ class Controller(appConfig: Properties) extends Actor {
 
   override def receive: Receive = {
 
-    case CreateRegion() =>
+    case CreateRegion(handlerProps) =>
       try {
-        context.actorOf(Props(new Region(appConfig, coordinator)), name = "region")
+        context.actorOf(Props(new Region(appConfig, coordinator, handlerProps)), name = "region")
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>
@@ -81,9 +82,9 @@ class Controller(appConfig: Properties) extends Actor {
           }
       }
 
-    case CreateGateway() =>
+    case CreateGateway(handlerClass) =>
       try {
-        context.watch(context.actorOf(Props(new Gateway(appConfig)), name = "gateway"))
+        context.watch(context.actorOf(Props(new Gateway(appConfig, handlerClass)), name = "gateway"))
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>

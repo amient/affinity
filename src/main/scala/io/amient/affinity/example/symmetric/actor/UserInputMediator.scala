@@ -17,28 +17,25 @@
  * limitations under the License.
  */
 
-package io.amient.affinity
+package io.amient.affinity.example.symmetric.actor
 
-import akka.actor.{ActorPath, ActorRef, ActorSystem}
-import io.amient.affinity.core.cluster.Coordinator
+import akka.actor.{Actor, Status}
 
-class TestCoordinator(storage: scala.collection.mutable.Set[String]) extends Coordinator {
+import scala.io.StdIn
 
-//  @volatile private var watcher: ActorRef = null
-  override def watchRoutees(system: ActorSystem, watcher: ActorRef): Unit = {
-//    this.watcher = watcher
-    ???
+
+class UserInputMediator extends Actor {
+
+  override def receive: Receive = {
+    case greeting: String =>
+      require(greeting != null && !greeting.isEmpty, "User Mediator requires non-empty greeting")
+      print(s"'$greeting', please reply: ")
+      //IOException on the next line may result in this actor being restarted
+      sender ! StdIn.readLine()
+
+    case _ =>
+      //not a fault of this actor, sender's bad
+      sender ! Status.Failure(new IllegalArgumentException("UserInputMediator only understands String messages"))
   }
 
-  override def register(actorPath: ActorPath): String = {
-    val handle = actorPath.toString
-    storage.add(handle)
-    handle
-  }
-
-  override def unregister(handle: String): Unit = {
-    storage.remove(handle)
-  }
-
-  override def close(): Unit = {}
 }

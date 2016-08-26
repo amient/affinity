@@ -25,7 +25,6 @@ import akka.actor.{ActorPath, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import io.amient.affinity.TestCoordinator
-import io.amient.affinity.core.actor.Partition.SimulateError
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -48,7 +47,7 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
       //wait for a region of 4 partitions to be online
       props.put(Region.CONFIG_PARTITION_LIST, "0,1,2,3")
-      system.actorOf(Props(new Region(props, coordinator)), name = "region")
+      system.actorOf(Props(new Region(props, coordinator, Props.empty)), name = "region")
       awaitCond(partitions.size == 4)
 
       //first stop Partition explicitly - it shouldn't be restarted
@@ -61,7 +60,7 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       //now simulate error in one of the partitions
       val partitionToFail = partitions.head
       system.actorSelection(ActorPath.fromString(partitions.head)).resolveOne() onSuccess{
-        case actorRef => actorRef ! SimulateError(new IllegalStateException)
+        case actorRef => actorRef ! new IllegalStateException
       }
       awaitCond(partitions.size == 2 && !partitions.contains(partitionToFail))
       //it had a failure, it should be restarted

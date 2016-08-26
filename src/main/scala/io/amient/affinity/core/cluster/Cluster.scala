@@ -17,17 +17,28 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.cluster
 
-import akka.http.scaladsl.model._
+import java.util.Properties
 
-import scala.collection.immutable
-import scala.concurrent.Promise
+import akka.actor.ActorSystem
+import akka.dispatch.Dispatchers
+import akka.routing._
 
-final case class HttpExchange(
-                               method: HttpMethod,
-                               uri: Uri,
-                               headers: immutable.Seq[HttpHeader],
-                               entity: RequestEntity,
-                               promise: Promise[HttpResponse]) {
+object Cluster {
+  final val CONFIG_NUM_PARTITIONS = "num.partitions"
+}
+
+class Cluster(appConfig: Properties) extends Group {
+
+  val numPartitions = appConfig.getProperty(Cluster.CONFIG_NUM_PARTITIONS).toInt
+
+  override def paths(system: ActorSystem) = List()
+
+  override val routerDispatcher: String = Dispatchers.DefaultDispatcherId
+
+  override def createRouter(system: ActorSystem): Router = {
+    new Router(DeterministicRoutingLogic(numPartitions))
+  }
+
 }

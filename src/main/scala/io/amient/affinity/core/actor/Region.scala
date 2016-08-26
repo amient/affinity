@@ -23,7 +23,7 @@ import java.util.Properties
 
 import akka.actor.{Actor, ActorPath, ActorRef, Props}
 import akka.event.Logging
-import io.amient.affinity.core.Coordinator
+import io.amient.affinity.core.cluster.Coordinator
 
 object Region {
   final val CONFIG_AKKA_HOST = "gateway.akka.host"
@@ -35,7 +35,7 @@ object Region {
   case class PartitionOffline(partition: ActorRef)
 }
 
-class Region(appConfig: Properties, coordinator: Coordinator) extends Actor {
+class Region(appConfig: Properties, coordinator: Coordinator, handlerProps: Props) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
@@ -54,7 +54,7 @@ class Region(appConfig: Properties, coordinator: Coordinator) extends Actor {
   override def preStart(): Unit = {
     //initiate creation of partitions and register them once booted
     for (p <- partitionList) {
-      context.actorOf(Props(new Partition(p)), name = System.nanoTime() + "-" + p)
+      context.actorOf(Props(new Partition(p, handlerProps)), name = System.nanoTime() + "-" + p)
     }
   }
 
@@ -71,13 +71,11 @@ class Region(appConfig: Properties, coordinator: Coordinator) extends Actor {
       val handle = coordinator.register(partitionActorPath)
       log.info(s"Partition online: handle=$handle, path=${partitionActorPath}")
       partitions += (ref -> handle)
-//      context.watch(ref)
 
     case PartitionOffline(ref) =>
       log.info(s"Partition offline: handle=${partitions(ref)}, path=${ref.path}")
       coordinator.unregister(partitions(ref))
-//      context.unwatch(ref)
-
   }
+
 }
 

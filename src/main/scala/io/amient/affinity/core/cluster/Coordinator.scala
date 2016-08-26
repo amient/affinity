@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.cluster
 
 import java.util
 import java.util.Properties
@@ -38,7 +38,7 @@ object Coordinator {
   final val CONFIG_COORDINATOR_CLASS = "coordinator.class"
 
   def fromProperties(appConfig: Properties): Coordinator = {
-    val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, ZkCoordinator.getClass.getName)
+    val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
     val cls = Class.forName(className).asSubclass(classOf[Coordinator])
     val constructor = cls.getConstructor(classOf[Properties])
     constructor.newInstance(appConfig)

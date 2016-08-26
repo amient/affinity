@@ -17,28 +17,14 @@
  * limitations under the License.
  */
 
-package io.amient.affinity
+package io.amient.affinity.example.symmetric.actor
 
-import akka.actor.{ActorPath, ActorRef, ActorSystem}
-import io.amient.affinity.core.cluster.Coordinator
+import akka.actor.Actor
 
-class TestCoordinator(storage: scala.collection.mutable.Set[String]) extends Coordinator {
+final case class Vertex(key: Int, edges: Set[Int])
 
-//  @volatile private var watcher: ActorRef = null
-  override def watchRoutees(system: ActorSystem, watcher: ActorRef): Unit = {
-//    this.watcher = watcher
-    ???
+class ConnectedGraphActor extends Actor {
+  override def receive: Receive = {
+    case x =>
   }
-
-  override def register(actorPath: ActorPath): String = {
-    val handle = actorPath.toString
-    storage.add(handle)
-    handle
-  }
-
-  override def unregister(handle: String): Unit = {
-    storage.remove(handle)
-  }
-
-  override def close(): Unit = {}
 }

@@ -16,26 +16,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.amient.affinity.core
 
-package io.amient.affinity.core.actor
+import akka.actor.{Actor, ActorContext, ActorRef}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 
-import akka.actor.{Actor, Status}
+import scala.concurrent.{ExecutionContext, Promise}
 
-import scala.io.StdIn
+trait Handler {
 
-
-class UserInputMediator extends Actor {
-
-  override def receive: Receive = {
-    case greeting: String =>
-      require(greeting != null && !greeting.isEmpty, "User Mediator requires non-empty greeting")
-      print(s"'$greeting', please reply: ")
-      //IOException on the next line may result in this actor being restarted
-      sender ! StdIn.readLine()
-
-    case _ =>
-      //not a fault of this actor, sender's bad
-      sender ! Status.Failure(new IllegalArgumentException("UserInputMediator only understands String messages"))
-  }
+  def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext): Unit
 
 }
