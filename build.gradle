@@ -10,11 +10,25 @@ ext {
     zkClientVersion = '0.9'
     rocksDbVersion = '4.9.0'
     kafkaClientVersion = '0.10.0.1'
+    avroVersion = '1.7.7'
+    jacksonVersion = '2.8.1'
 }
+
+//buildscript {
+//    repositories {
+//        maven {
+//            url "https://plugins.gradle.org/m2/"
+//        }
+//    }
+//    dependencies {
+//        classpath "com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0"
+//    }
+//}
 
 apply plugin: 'java'
 apply plugin: 'scala'
 apply plugin: 'idea'
+//apply plugin: "com.commercehub.gradle.plugin.avro"
 
 sourceCompatibility = javaVersion
 
@@ -59,6 +73,7 @@ test.systemProperties 'property': 'value'
 
 dependencies {
 
+    compile 'org.scala-lang:scala-library:' + scalaVersion
     testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
     testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
     testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
@@ -66,14 +81,16 @@ dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
-//    compile group: 'com.typesafe.akka', name: 'akka-persistence_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaClientVersion
+    compile group: 'org.apache.avro', name: 'avro', version: avroVersion
+//    compile group: 'org.reflections', name: 'reflections', version: '0.9.10'
+
+//    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
 //    compile group: 'com.google.inject', name: 'guice', version: 3.0
-    compile 'org.scala-lang:scala-library:' + scalaVersion
-    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
-    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
+//    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
+//    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
 
 }
 

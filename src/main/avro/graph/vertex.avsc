@@ -1,0 +1,15 @@
+{
+  "namespace": "io.amient.affinity.example.data",
+  "type": "record",
+  "name": "VertexV1",
+  "fields": [
+    {
+        "name": "id",
+        "type": "int"
+    },
+    {
+        "name": "cat",
+        "type": "string"
+    }
+  ]
+}

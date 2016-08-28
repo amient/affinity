@@ -53,7 +53,6 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   private var partitions = scala.collection.mutable.Map[ActorRef, String]()
 
   override def preStart(): Unit = {
-    //initiate creation of partitions and register them once booted
     for (p <- partitionList) {
       context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
     }

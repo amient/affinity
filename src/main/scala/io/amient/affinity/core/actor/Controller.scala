@@ -118,7 +118,7 @@ class Controller(appConfig: Properties) extends Actor {
       }
 
     case any => system.terminate() onComplete { _ =>
-      System.err.println("Unknown controller message " + any)
+      log.error("Unknown controller message " + any)
       System.exit(14)
     }
   }

@@ -1,0 +1,15 @@
+{
+  "namespace": "io.amient.affinity.example.data",
+  "type": "record",
+  "name": "ComponentV1",
+  "fields": [
+    {
+        "name": "key",
+        "type": "io.amient.affinity.example.data.VertexV1"
+    },
+    {
+        "name": "edges",
+        "type": {"type" : "array", "items" : "io.amient.affinity.example.data.VertexV1"}
+    }
+  ]
+}

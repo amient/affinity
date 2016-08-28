@@ -1,4 +1,23 @@
-package io.amient.affinity.example.graphapi
+/*
+ * Copyright 2016 Michal Harish, michal.harish@gmail.com
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.amient.affinity.example
 
 import java.util.Properties
 
@@ -8,7 +27,7 @@ import io.amient.affinity.core.HttpInterface
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion}
 import io.amient.affinity.core.actor.{Controller, Region}
 import io.amient.affinity.core.cluster.{Cluster, Coordinator, ZkCoordinator}
-import io.amient.affinity.example.graphapi.actor.LocalHandler
+import io.amient.affinity.example.actor.LocalHandler
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -53,7 +72,8 @@ object SymmetricClusterNode extends App {
       appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_ROOT,zkRoot)
 
       val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-        .withFallback(ConfigFactory.load("application"))
+        .withFallback(ConfigFactory.load("example"))
+
 
       implicit val system = ActorSystem(ActorSystemName, systemConfig)
 
@@ -61,7 +81,7 @@ object SymmetricClusterNode extends App {
 
       //this cluster is symmetric - all nodes serve both as Gateways and Regions
       controller ! CreateGateway(classOf[RequestMapper])
-      controller ! CreateRegion(Props(new LocalHandler))
+      controller ! CreateRegion(Props(new LocalHandler(appConfig)))
 
       //in case the process is stopped from outside
       sys.addShutdownHook {

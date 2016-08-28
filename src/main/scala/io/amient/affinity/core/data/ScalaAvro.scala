@@ -17,25 +17,11 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.storage
+package io.amient.affinity.core.data
 
-trait Storage[K,V] extends MemStore[K, V] {
 
-  /**
-    * @param becomeMaster a function that can check whether this instance should become master, otherwise standby
-    */
-  def boot(becomeMaster: () => Boolean): Unit
+trait ScalaAvro extends org.apache.avro.generic.GenericData.Record {
 
-  override def put(key: K, value: Option[V]): Unit = value match {
-    case None => if (remove(key)) {
-      write(serialize(key, null.asInstanceOf[V]))
-    }
-    case Some(data) => if (update(key, data)) {
-      write(serialize(key, data))
-    }
-  }
+    //TODO put all arguments by reflection into underlying Record reflect
 
-  def write(kv: (Array[Byte], Array[Byte]))
-  def serialize: (K,V) => (Array[Byte], Array[Byte])
-  def deserialize: (Array[Byte], Array[Byte]) => (K,V)
 }

@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graphapi
+package io.amient.affinity.example
 
 object SymmetricClusterApp extends App {
 

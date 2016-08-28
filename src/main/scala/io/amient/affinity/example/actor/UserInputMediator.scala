@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graphapi.actor
+package io.amient.affinity.example.actor
 
 import akka.actor.{Actor, Status}
 

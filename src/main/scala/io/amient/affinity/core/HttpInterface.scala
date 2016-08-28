@@ -60,7 +60,7 @@ class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: Ac
 
   def bind(gateway: ActorRef): Unit = {
     close()
-    log.info("binding http interface")
+    log.info(s"binding http interface to http  $httpHost:$httpPort")
     val bindingFuture: Future[Http.ServerBinding] =
       incoming.to(Sink.foreach { connection =>
         connection.handleWithAsyncHandler { request =>

@@ -30,8 +30,8 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
   private var prevRoutees: immutable.IndexedSeq[Routee] = immutable.IndexedSeq()
   private val currentRouteMap = new ConcurrentHashMap[Int, Routee]()
 
-  def partition(message: Any): Int = {
-    (math.abs(message.hashCode()) match {
+  def partition(key: Any): Int = {
+    (math.abs(key.hashCode()) match {
       case Int.MinValue => 0
       case a => a
     })  % numPartitions
@@ -51,7 +51,10 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
         }
       }
     }
-    val p = partition(message)
+    val p = message match {
+      case (k, v) => partition(k)
+      case v => partition(v)
+    }
 
     //TODO test the suspended scenario
     if (!currentRouteMap.containsKey(p)) throw new IllegalStateException(
