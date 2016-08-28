@@ -14,21 +14,9 @@ ext {
     jacksonVersion = '2.8.1'
 }
 
-//buildscript {
-//    repositories {
-//        maven {
-//            url "https://plugins.gradle.org/m2/"
-//        }
-//    }
-//    dependencies {
-//        classpath "com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0"
-//    }
-//}
-
 apply plugin: 'java'
 apply plugin: 'scala'
 apply plugin: 'idea'
-//apply plugin: "com.commercehub.gradle.plugin.avro"
 
 sourceCompatibility = javaVersion
 
@@ -85,7 +73,6 @@ dependencies {
     compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
-//    compile group: 'org.reflections', name: 'reflections', version: '0.9.10'
 
 //    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
 //    compile group: 'com.google.inject', name: 'guice', version: 3.0
