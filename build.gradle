@@ -10,9 +10,24 @@ ext {
     zkClientVersion = '0.9'
     rocksDbVersion = '4.9.0'
     kafkaClientVersion = '0.10.0.1'
-    avroVersion = '1.7.7'
+    avroVersion = '1.8.1'
     jacksonVersion = '2.8.1'
 }
+
+//avro code generator
+//buildscript {
+//    repositories {
+//        maven {
+//            url "https://plugins.gradle.org/m2/"
+//        }
+//    }
+//    dependencies {
+//        classpath "com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0"
+//    }
+//}
+//apply plugin: "com.commercehub.gradle.plugin.avro"
+//avro code generator
+
 
 apply plugin: 'java'
 apply plugin: 'scala'

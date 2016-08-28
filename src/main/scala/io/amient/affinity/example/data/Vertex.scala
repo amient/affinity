@@ -19,6 +19,7 @@
 
 package io.amient.affinity.example.data
 
+import io.amient.affinity.core.data.AvroRecord
 import org.apache.avro.generic.GenericData.Record
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{Schema, SchemaBuilder}
@@ -43,4 +44,8 @@ final case class Vertex(id: Int, cat: String) extends Record(Vertex.schema) {
     case other: Vertex => other.id == id && other.cat == cat
     case _ => false
   }
+}
+
+final case class VertexV1(id: Int, cat: String) extends AvroRecord(Vertex.schema) {
+  override def hashCode(): Int = id.hashCode()
 }

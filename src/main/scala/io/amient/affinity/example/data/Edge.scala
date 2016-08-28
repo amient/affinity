@@ -39,7 +39,7 @@ final case class Edge(source: Vertex, target: Vertex) extends Record(Edge.schema
     new Vertex(record.get("target").asInstanceOf[GenericRecord]))
 
   def this(initializer: (Schema => GenericRecord)) = this(initializer(Edge.schema))
-  override def hashCode(): Int = source.id.hashCode()
+  override def hashCode(): Int = source.hashCode()
 
   override def equals(o: scala.Any): Boolean = o match {
     case other: Edge => other.source == source && other.target == target
