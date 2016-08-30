@@ -19,13 +19,8 @@
 
 package io.amient.affinity.core.data
 
-import java.io.ByteArrayOutputStream
-
 import akka.serialization.JSerializer
 import org.apache.avro.Schema
-import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord}
-import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
-import org.apache.avro.specific.SpecificDatumWriter
 
 abstract class AvroSerde extends JSerializer {
 
@@ -50,48 +45,16 @@ abstract class AvroSerde extends JSerializer {
   override def includeManifest: Boolean = false
 
   def toBytes[T](obj: T): Array[Byte] = {
-    val valueOut = new ByteArrayOutputStream()
-    try {
-      val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
-      if (obj.isInstanceOf[GenericRecord]) {
-        val datum = obj.asInstanceOf[GenericRecord]
-        reg1.get(obj.getClass) match {
-          case None =>
-              encoder.writeInt(-1)
-              val writer = new GenericDatumWriter[GenericRecord](datum.getSchema)
-              writer.write(datum, encoder)
-          case Some(schemaId) =>
-              val schema = reg2(schemaId)
-              encoder.writeInt(schemaId)
-              val writer = new GenericDatumWriter[GenericRecord](schema)
-              writer.write(datum, encoder)
-        }
-      } else {
-        val writer = new SpecificDatumWriter[T](obj.getClass.asInstanceOf[Class[T]])
-        writer.write(obj, encoder)
-      }
-      encoder.flush()
-      valueOut.toByteArray
-    } finally {
-      valueOut.close
+    reg1.get(obj.getClass) match {
+      case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
+      case Some(schemaId) =>
+        val schema = reg2(schemaId)
+        AvroRecord.write(obj, schema, schemaId)
     }
   }
 
   def fromBytes[T <: AnyRef](bytes: Array[Byte], cls: Class[T]): T = {
-    val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
-    decoder.readInt() match {
-      case schemaId if (schemaId >= 0) =>
-        val schema = reg2(schemaId)
-        val reader = new GenericDatumReader[GenericRecord](schema)
-        val constructor = cls.getConstructor(classOf[GenericRecord])
-        constructor.newInstance(reader.read(null, decoder))
-      case -1 =>
-        val constructor = cls.getConstructor(classOf[(Schema => GenericRecord)])
-        constructor.newInstance((schema: Schema) => {
-          val reader = new GenericDatumReader[GenericRecord](schema)
-          reader.read(null, decoder)
-        })
-    }
+    AvroRecord.read(bytes, cls, (schemaId: Int) => reg2(schemaId))
   }
 
 

@@ -19,30 +19,16 @@
 
 package io.amient.affinity.example.data
 
-import org.apache.avro.{Schema, SchemaBuilder}
-import org.apache.avro.generic.GenericData.Record
-import org.apache.avro.generic.GenericRecord
+import io.amient.affinity.core.data.AvroRecord
+import org.apache.avro.SchemaBuilder
 
 object Edge {
-  val schema: Schema = SchemaBuilder.record("Edge_v1")
-    .namespace("io.amient.affinity.example").fields()
+  val schema = SchemaBuilder.record("Edge")
+    .namespace("io.amient.affinity.example.data").fields()
     .name("source").`type`(Vertex.schema).noDefault()
     .name("target").`type`(Vertex.schema).noDefault()
     .endRecord()
 }
-final case class Edge(source: Vertex, target: Vertex) extends Record(Edge.schema) {
-  put("source", source)
-  put("target", target)
-
-  def this(record: GenericRecord) = this(
-    new Vertex(record.get("source").asInstanceOf[GenericRecord]),
-    new Vertex(record.get("target").asInstanceOf[GenericRecord]))
-
-  def this(initializer: (Schema => GenericRecord)) = this(initializer(Edge.schema))
+final case class Edge(source: Vertex, target: Vertex) extends AvroRecord(Edge.schema) {
   override def hashCode(): Int = source.hashCode()
-
-  override def equals(o: scala.Any): Boolean = o match {
-    case other: Edge => other.source == source && other.target == target
-    case _ => false
-  }
 }

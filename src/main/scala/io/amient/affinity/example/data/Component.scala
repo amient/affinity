@@ -20,48 +20,18 @@
 package io.amient.affinity.example.data
 
 import io.amient.affinity.core.data.AvroRecord
-import org.apache.avro.generic.GenericData.Record
-import org.apache.avro.generic.{GenericData, GenericRecord}
-import org.apache.avro.specific.{SpecificRecord, SpecificRecordBase}
-import org.apache.avro.{Schema, SchemaBuilder}
-
-import scala.collection.JavaConverters._
+import org.apache.avro.SchemaBuilder
 
 object Component {
-  val schema = SchemaBuilder.record("Component_v1").namespace("io.amient.affinity.example").fields()
+  val schema = SchemaBuilder.record("Component")
+    .namespace("io.amient.affinity.example.data").fields()
     .name("key").`type`(Vertex.schema).noDefault()
     .name("edges").`type`().array().items().`type`(Vertex.schema).noDefault()
     .endRecord()
 }
 
-final case class Component(val key: Vertex, val edges: Set[Vertex]) extends SpecificRecord {
+final case class Component(val key: Vertex, val edges: Set[Vertex])
+  extends AvroRecord(Component.schema) {
 
-  def this(record: GenericRecord) = this(
-    new Vertex(record.get("key").asInstanceOf[GenericRecord]),
-      record.get("edges").asInstanceOf[GenericData.Array[_]].iterator.asScala.map {
-        item => new Vertex(item.asInstanceOf[GenericRecord])
-      }.toSet
-    )
-
-//  def this(initializer: (Schema => GenericRecord)) = this(initializer(Component.schema))
-
-  override def hashCode(): Int = key.hashCode()
-
-  override def equals(o: scala.Any): Boolean = o match {
-    case other: Component => other.key == key && other.edges == edges
-    case _ => false
-  }
-
-  override def getSchema: Schema = Component.schema
-
-  override def get(i: Int): AnyRef = i match {
-    case 0 => key
-    case 1 => edges
-  }
-
-  override def put(i: Int, o: scala.Any) = throw new IllegalAccessError("Scala Avro Recrod is immutable")
-}
-
-final case class ComponentV1(val key: VertexV1, val edges: Set[VertexV1]) extends AvroRecord(Component.schema) {
-  override def hashCode(): Int = key.hashCode()
+  override def hashCode(): Int = key.hashCode
 }

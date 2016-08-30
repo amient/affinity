@@ -20,32 +20,16 @@
 package io.amient.affinity.example.data
 
 import io.amient.affinity.core.data.AvroRecord
-import org.apache.avro.generic.GenericData.Record
-import org.apache.avro.generic.GenericRecord
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.SchemaBuilder
 
 object Vertex {
-  val schema = SchemaBuilder.record("Vertex_v1")
-    .namespace("io.amient.affinity.example").fields()
+  val schema = SchemaBuilder.record("Vertex")
+    .namespace("io.amient.affinity.example.data").fields()
     .name("id").`type`().intType().noDefault()
     .name("cat").`type`().stringType().noDefault()
     .endRecord()
 }
-final case class Vertex(id: Int, cat: String) extends Record(Vertex.schema) {
-  put("id", id)
-  put("cat", cat)
 
-  def this(record: GenericRecord) = this(record.get("id").asInstanceOf[Int], record.get("cat").toString)
-  def this(initializer: (Schema => GenericRecord)) = this(initializer(Vertex.schema))
-
-  override def hashCode(): Int = id.hashCode()
-
-  override def equals(o: scala.Any): Boolean = o match {
-    case other: Vertex => other.id == id && other.cat == cat
-    case _ => false
-  }
-}
-
-final case class VertexV1(id: Int, cat: String) extends AvroRecord(Vertex.schema) {
+final case class Vertex(id: Int, cat: String) extends AvroRecord(Vertex.schema) {
   override def hashCode(): Int = id.hashCode()
 }
