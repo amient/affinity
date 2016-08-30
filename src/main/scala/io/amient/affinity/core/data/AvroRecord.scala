@@ -22,6 +22,7 @@ package io.amient.affinity.core.data
 import java.io.ByteArrayOutputStream
 
 import org.apache.avro.Schema.Type._
+import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord, IndexedRecord}
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
@@ -29,6 +30,8 @@ import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroRuntimeException, Schema}
 
 import scala.collection.JavaConverters._
+
+//import scala.reflect.runtime.universe._
 
 object AvroRecord {
 
@@ -49,6 +52,7 @@ object AvroRecord {
       valueOut.close
     }
   }
+
 
   def read[T](bytes: Array[Byte], cls: Class[T], schema: Schema): T = {
     val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
@@ -82,13 +86,15 @@ object AvroRecord {
       case FLOAT => new java.lang.Float(datum.asInstanceOf[Float])
       case DOUBLE => new java.lang.Double(datum.asInstanceOf[Double])
       case LONG => new java.lang.Long(datum.asInstanceOf[Long])
-      case BYTES => datum.asInstanceOf[Array[Byte]]
+      case FIXED | BYTES => datum.asInstanceOf[Array[Byte]]
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
       case RECORD => readRecord(datum.asInstanceOf[GenericRecord], classCache(schema.getFullName))
-      //TODO case UNION=>
-      //TODO case ENUM =>
-      //TODO case FIXED =>
-      //TODO case MAP =>
+      case ENUM => classCache(schema.getFullName).getMethod("withName", classOf[String])
+          .invoke(null, datum.asInstanceOf[EnumSymbol].toString)
+      case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
+          .map{ case (k,v)  => (
+            k.toString,
+            readDatum(v, classCache(schema.getValueType.getFullName), schema.getValueType))}
       case ARRAY => val iterable = datum.asInstanceOf[java.util.Collection[_]].asScala
           .map(item => readDatum(item, classCache(schema.getElementType.getFullName), schema.getElementType))
         if (cls.isAssignableFrom(classOf[Set[_]])) {
@@ -104,6 +110,8 @@ object AvroRecord {
         } else {
           iterable
         }
+      //TODO Avro Union to Scala conversion
+      case UNION=> throw new NotImplementedError("Avro Unions are not supported")
     }
   }
 
@@ -145,6 +153,8 @@ abstract class AvroRecord(val schema: Schema) extends SpecificRecord {
     val field = fields(i)
     schemaField.schema().getType match {
       case ARRAY => field.get(this).asInstanceOf[Iterable[_]].asJava
+      case ENUM => new EnumSymbol(schemaField.schema, field.get(this))
+      case MAP => field.get(this).asInstanceOf[Map[String, _]].asJava
       case _ => field.get(this)
     }
   }
