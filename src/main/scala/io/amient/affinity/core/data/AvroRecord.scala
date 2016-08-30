@@ -73,11 +73,17 @@ object AvroRecord {
     read(bytes, cls, schema, decoder)
   }
 
+  private val cache = scala.collection.mutable.Map[String, Class[_]]()
   private def readDatum(datum: Any, cls: Class[_], schema: Schema): AnyRef = {
 
-    def classCache(getFullName: String) = {
-      //TODO simple active cache
-      Class.forName(getFullName)
+    def classCache(fullClassName: String): Class[_] = {
+      cache.get(fullClassName) match {
+        case Some(cls) => cls
+        case None =>
+          val cls = Class.forName(fullClassName)
+          cache.put(fullClassName, cls)
+          cls
+      }
     }
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
