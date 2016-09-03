@@ -27,10 +27,10 @@ trait Storage[K,V] extends MemStore[K, V] {
   def boot(becomeMaster: () => Boolean): Unit
 
   override def put(key: K, value: Option[V]): Unit = value match {
-    case None => if (remove(key)) {
+    case None => if (remove_(key)) {
       write(serialize(key, null.asInstanceOf[V]))
     }
-    case Some(data) => if (update(key, data)) {
+    case Some(data) => if (update_(key, data)) {
       write(serialize(key, data))
     }
   }

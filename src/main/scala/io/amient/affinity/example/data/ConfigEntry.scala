@@ -17,21 +17,22 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.storage
+package io.amient.affinity.example.data
 
-trait MemStoreSimpleMap[K,V] extends MemStore[K,V] {
+import com.fasterxml.jackson.annotation.JsonIgnore
+import io.amient.affinity.core.data.AvroRecord
+import io.amient.util.JavaCryptoProofSHA256
+import org.apache.avro.SchemaBuilder
 
-  private val internal = scala.collection.mutable.Map[K, V]()
+object ConfigEntry {
+  val schema = SchemaBuilder.record("ConfigEntry")
+    .namespace("io.amient.affinity.example.data").fields()
+    .name("val1").`type`().stringType().noDefault()
+    .name("salt").`type`().stringType().noDefault()
+    .endRecord()
+}
 
-  override def get(key: K): Option[V] = internal.get(key)
-
-  override def iterator = internal.iterator
-
-  override protected def update_(key: K, value: V): Boolean = internal.put(key, value) match {
-    case None => true
-    case Some(prev) if (prev != value) => true
-    case _ => false
-  }
-
-  override protected def remove_(key: K): Boolean = internal.remove(key).isDefined
+final case class ConfigEntry(val1: String, @JsonIgnore salt: String) extends AvroRecord(ConfigEntry.schema) {
+  @JsonIgnore val crypto = new JavaCryptoProofSHA256(salt)
+  override def hashCode(): Int = val1.hashCode()
 }

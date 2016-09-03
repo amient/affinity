@@ -25,13 +25,14 @@ trait MemStore[K, V] {
 
   def iterator: Iterator[(K,V)]
 
-  protected def update(key: K, value: V): Boolean
+  protected def update_(key: K, value: V): Boolean
 
-  protected def remove(key: K): Boolean
+  protected def remove_(key: K): Boolean
 
-  def put(key: K, value: Option[V]): Unit = value match {
-    case None => remove(key)
-    case Some(data) => update(key, data)
+  protected def put(key: K, value: Option[V]): Unit = value match {
+    case None => remove_(key)
+    case Some(data) => update_(key, data)
   }
+
 
 }

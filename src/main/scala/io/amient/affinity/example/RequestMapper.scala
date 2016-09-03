@@ -26,12 +26,32 @@ import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.HttpRequestMapper
-import io.amient.affinity.example.data.{Edge, Vertex}
+import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
+import io.amient.affinity.example.data.{AvroSerde, ConfigEntry, Edge, Vertex}
+import io.amient.util.JavaCryptoProofSHA256
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Promise}
 
 class RequestMapper extends HttpRequestMapper {
+
+  //broadcast memstore
+  val settings = new KafkaStorage[String, ConfigEntry](topic = "settings", 0)
+    with MemStoreSimpleMap[String, ConfigEntry] {
+    val serde = new AvroSerde()
+
+    override def serialize: (String, ConfigEntry) => (Array[Byte], Array[Byte]) = (k, v) => {
+      (if (k == null) null else k.getBytes(), serde.toBytes(v))
+    }
+
+    override def deserialize: (Array[Byte], Array[Byte]) => (String, ConfigEntry) = (k, v) => {
+      (if (k == null) null else new String(k), serde.fromBytes(v, classOf[ConfigEntry]))
+    }
+  }
+  //TODO provide a way for broadcasts to keep consuming new messages
+  settings.boot(() => true)
+  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
+  settings.iterator.foreach(println)
 
   def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext) {
 
@@ -55,22 +75,38 @@ class RequestMapper extends HttpRequestMapper {
 
     //filter
     val query = request.uri.query().toMap
-    if (!query.contains("signature")) {
-      response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
+    println(request.uri.fragment)
+    request.uri.fragment match {
+      case None => response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
+      case Some(sig) => {
+        sig.split(":") match {
+          case Array(k, s) => settings.get(k) match {
+            case None => response.success(errorValue(Unauthorized, ContentTypes.`application/json`, "Unauthorized"))
+            case Some(configEntry) =>
+              val arg = request.uri.toString
+              println(arg)
+              println(configEntry.crypto.sign(arg))
+          }
+
+          case _ => response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
+        }
+
+      }
     }
 
     //handlers
     if (!response.isCompleted) request match {
       case HttpRequest(GET, uri, _, _, _) if (uri.path == Uri.Path("/")) =>
         implicit val timeout = Timeout(1 second)
-        uri.query() match {
-          case Seq(("p", p)) if (p.toInt >= 0) =>
+        query.get("p") match {
+          case None => response.success(errorValue(BadRequest,
+            ContentTypes.`application/json`, "query string param p must be >=0"))
+
+          case Some(p) =>
             val task = cluster ? (p.toInt, "describe")
             fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
               case any => jsonValue(OK, any)
             }
-          case _ => response.success(errorValue(BadRequest,
-            ContentTypes.`application/json`, "query string param p must be >=0"))
         }
 
       case HttpRequest(GET, Uri.Path("/fail"), _, _, _) =>

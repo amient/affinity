@@ -58,7 +58,7 @@ class JavaCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
       hexProof.verify(signature, arg)
       proof.verify(hexSignature, arg)
       hexProof.verify(hexSignature, arg)
-      //println(hexSalt + " + " + arg + " -> " + signature)
+//      println(hexSalt + " + " + arg + " -> " + signature)
     }
   }
 

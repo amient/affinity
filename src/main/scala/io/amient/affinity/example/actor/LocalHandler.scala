@@ -42,18 +42,22 @@ class LocalHandler(config: Properties) extends Partition {
 
   val cluster = context.actorSelection("/user/controller/gateway/cluster")
 
-  val graph = new KafkaStorage[Vertex, Component](topic = "graph", partition) with MemStoreSimpleMap[Vertex, Component] {
-
+  abstract class AvroKafkaStorage[K <: AnyRef, V <:AnyRef ](topic: String, partition: Int, keyClass: Class[K], valueClass: Class[V])
+    extends KafkaStorage[K, V](topic, partition) {
     val serde = new AvroSerde()
 
-    override def serialize: (Vertex, Component) => (Array[Byte], Array[Byte]) = (k, v) => {
+    override def serialize: (K, V) => (Array[Byte], Array[Byte]) = (k, v) => {
       (serde.toBytes(k), serde.toBytes(v))
     }
 
-    override def deserialize: (Array[Byte], Array[Byte]) => (Vertex, Component) = (k, v) => {
-      (serde.fromBytes(k, classOf[Vertex]), serde.fromBytes(v, classOf[Component]))
+    override def deserialize: (Array[Byte], Array[Byte]) => (K, V) = (k, v) => {
+      (serde.fromBytes(k, keyClass), serde.fromBytes(v, valueClass))
     }
   }
+
+  //partitioned memstore
+  val graph = new AvroKafkaStorage[Vertex, Component](topic = "graph", partition, classOf[Vertex], classOf[Component])
+    with MemStoreSimpleMap[Vertex, Component]
 
   //TODO provide function that can detected master-standby status changes
   graph.boot(() => true)

@@ -45,7 +45,7 @@ abstract class AvroSerde extends JSerializer {
   override def includeManifest: Boolean = false
 
   def toBytes[T](obj: T): Array[Byte] = {
-    reg1.get(obj.getClass) match {
+    if (obj == null) null else reg1.get(obj.getClass) match {
       case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
       case Some(schemaId) =>
         val schema = reg2(schemaId)

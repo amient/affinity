@@ -19,8 +19,6 @@
 
 package io.amient.util;
 
-import javax.xml.bind.DatatypeConverter;
-import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -44,6 +42,5 @@ public class JavaCryptoProofSHA256 extends  JavaCryptoProof {
         System.arraycopy(arg, 0, input, salt.length, arg.length);
         return digest.digest(input);
     }
-
 
 }

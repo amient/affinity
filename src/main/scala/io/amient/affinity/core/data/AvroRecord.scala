@@ -32,8 +32,6 @@ import org.apache.avro.{AvroRuntimeException, Schema}
 
 import scala.collection.JavaConverters._
 
-//import scala.reflect.runtime.universe._
-
 object AvroRecord {
 
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
@@ -67,11 +65,13 @@ object AvroRecord {
   }
 
   def read[T](bytes: Array[Byte], cls: Class[T], schemaRegistry: (Int) => Schema): T = {
-    val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
-    val schemaId = decoder.readInt()
-    require(schemaId >= 0)
-    val schema = schemaRegistry(schemaId)
-    read(bytes, cls, schema, decoder)
+    if (bytes == null) null.asInstanceOf[T] else {
+      val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
+      val schemaId = decoder.readInt()
+      require(schemaId >= 0)
+      val schema = schemaRegistry(schemaId)
+      read(bytes, cls, schema, decoder)
+    }
   }
 
   private val cache = scala.collection.mutable.Map[String, Class[_]]()

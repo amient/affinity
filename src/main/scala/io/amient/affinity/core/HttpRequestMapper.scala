@@ -34,7 +34,6 @@ trait HttpRequestMapper {
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
 
-
   def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)
            (implicit ctx: ExecutionContext): Unit
 
