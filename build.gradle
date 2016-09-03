@@ -89,8 +89,8 @@ dependencies {
     compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
 
-//    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
 //    compile group: 'com.google.inject', name: 'guice', version: 3.0
 //    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
 //    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
