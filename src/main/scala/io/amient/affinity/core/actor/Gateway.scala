@@ -34,7 +34,9 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
 
 object Gateway {
+
   final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse])
+
 }
 
 class Gateway(appConfig: Properties, handlerClass: Class[_ <: HttpRequestMapper]) extends Actor {

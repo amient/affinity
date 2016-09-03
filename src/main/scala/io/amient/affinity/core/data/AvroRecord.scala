@@ -21,6 +21,7 @@ package io.amient.affinity.core.data
 
 import java.io.ByteArrayOutputStream
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord, IndexedRecord}
@@ -135,7 +136,7 @@ object AvroRecord {
 
 }
 
-abstract class AvroRecord(val schema: Schema) extends SpecificRecord {
+abstract class AvroRecord(@JsonIgnore schema: Schema) extends SpecificRecord {
 
   private val schemaFields = schema.getFields
   private val params = getClass.getConstructors()(0).getParameters

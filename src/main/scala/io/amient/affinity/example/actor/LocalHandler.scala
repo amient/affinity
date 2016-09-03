@@ -42,8 +42,6 @@ class LocalHandler(config: Properties) extends Partition {
 
   val cluster = context.actorSelection("/user/controller/gateway/cluster")
 
-  //val serialization = SerializationExtension.get(context.system)
-
   val graph = new KafkaStorage[Vertex, Component](topic = "graph", partition) with MemStoreSimpleMap[Vertex, Component] {
 
     val serde = new AvroSerde()
@@ -64,9 +62,10 @@ class LocalHandler(config: Properties) extends Partition {
 
     case stateError: IllegalStateException => throw stateError
 
-    case (ts: Long, "ping") => sender ! s"${parent.path.name}:Pong"
+    case (ts: Long, "ping") => sender ! (self.path.name, "pong")
 
-    case (p: Int, "describe") => sender ! s"$p:\n" + graph.iterator.map(_._2).mkString("\n\t")
+    case (p: Int, "describe") =>
+      sender ! graph.iterator.map(_._2).toList
 
     case Edge(source, target) => {
       (graph.get(source) match {
@@ -99,7 +98,6 @@ class LocalHandler(config: Properties) extends Partition {
           else origin ! userInput
         case Failure(e) => origin ! Status.Failure(e)
       }
-
 
     case unknown => sender ! Status.Failure(new IllegalArgumentException(unknown.getClass.getName))
 

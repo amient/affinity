@@ -29,97 +29,93 @@ import io.amient.affinity.core.HttpRequestMapper
 import io.amient.affinity.example.data.{Edge, Vertex}
 
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Promise}
 
 class RequestMapper extends HttpRequestMapper {
 
   def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext) {
+
     request match {
 
+      //handlers without filter
       case HttpRequest(GET, Uri.Path("/ping"), _, _, _) =>
         implicit val timeout = Timeout(1 second)
         val task = cluster ? (System.currentTimeMillis(), "ping")
-        fulfillAndHandleErrors(response, task) {
-          case any => htmlMessage(OK, s"$any")
+        fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+          case any => jsonValue(OK, any)
         }
 
+      //handlers with filter
+      case _ => applyFiltered(request, response, cluster)
+
+    }
+  }
+
+  def applyFiltered(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext): Unit = {
+
+    //filter
+    val query = request.uri.query().toMap
+    if (!query.contains("signature")) {
+      response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
+    }
+
+    //handlers
+    if (!response.isCompleted) request match {
       case HttpRequest(GET, uri, _, _, _) if (uri.path == Uri.Path("/")) =>
         implicit val timeout = Timeout(1 second)
         uri.query() match {
           case Seq(("p", p)) if (p.toInt >= 0) =>
             val task = cluster ? (p.toInt, "describe")
-            fulfillAndHandleErrors(response, task) {
-              case any => htmlMessage(OK, s"$any")
+            fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+              case any => jsonValue(OK, any)
             }
-          case _ => response.success(htmlMessage(BadRequest, "query string param p must be >=0"))
+          case _ => response.success(errorValue(BadRequest,
+            ContentTypes.`application/json`, "query string param p must be >=0"))
         }
 
-      case HttpRequest(GET, Uri.Path("/error"), _, _, _) =>
+      case HttpRequest(GET, Uri.Path("/fail"), _, _, _) =>
         implicit val timeout = Timeout(1 second)
         cluster ! new IllegalStateException
         response.success(HttpResponse(status = StatusCodes.Accepted))
+
+      case HttpRequest(GET, Uri.Path("/error"), _, _, _) =>
+        implicit val timeout = Timeout(1 second)
+        val task = cluster ? "message-that-can't-be-handled"
+        fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+          case any => jsonValue(OK, any)
+        }
 
       case HttpRequest(GET, uri, _, _, _) if (uri.path == Uri.Path("/kill")) =>
         implicit val timeout = Timeout(1 second)
         uri.query() match {
           case Seq(("p", p)) if (p.toInt >= 0) =>
             val task = cluster ? (p.toInt, "kill-node")
-            fulfillAndHandleErrors(response, task) {
+            fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
               case any => HttpResponse(status = StatusCodes.Accepted)
             }
-          case _ => response.success(htmlMessage(BadRequest, "query string param p must be >=0"))
+          case _ => response.success(errorValue(BadRequest,
+            ContentTypes.`application/json`, "query string param p must be >=0"))
         }
 
       case HttpRequest(GET, uri, _, _, _) if (uri.path == Uri.Path("/connect")) =>
         implicit val timeout = Timeout(60 seconds)
         val task = cluster ? (System.currentTimeMillis(), "collect-user-input")
-        fulfillAndHandleErrors(response, task) {
+        fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
           case userInput: String =>
             val Array(start, end) = userInput.split(",").map(_.toInt)
             val source = Vertex(start, "A")
             val target = Vertex(end, "B")
             cluster ! Edge(source, target)
-            htmlMessage(OK, s"Connecting vertex $start with $end")
+            jsonValue(OK, s"Connecting vertex $start with $end")
 
-          case s => htmlMessage(NotAcceptable, "Can't give you that: " + s.getClass )
+          case s => errorValue(NotAcceptable,
+            ContentTypes.`application/json`, "Can't give you that: " + s.getClass)
         }
 
-      case _ => response.success(htmlMessage(NotFound, "Haven't got that"))
+      case _ => response.success(htmlValue(NotFound, "Haven't got that"))
 
     }
-  }
 
-  def htmlMessage(status: StatusCode, message: String): HttpResponse = {
-    val formattedMessage = message.replace("\n", "<br/>")
-    HttpResponse(status,
-      entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h3>$formattedMessage</h3s>"))
-  }
-
-  def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any])
-                            (f: Any => HttpResponse)(implicit ctx: ExecutionContext) = {
-    promise.completeWith(handleErrors(future, f))
-  }
-
-  def handleErrors(future: Future[Any], f: Any => HttpResponse)(implicit ctx: ExecutionContext): Future[HttpResponse] = {
-    future map (f) recover {
-      case e: IllegalArgumentException =>
-        e.printStackTrace() //log.error("Gateway contains bug! ", e)
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1> Eeek! We have a bug..</h1>"))
-
-      case NonFatal(e) =>
-        e.printStackTrace() //log.error("Cluster encountered failure ", e.getMessage)
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
-            "<h1> Well, something went wrong but we should be back..</h1>"))
-
-      case e =>
-        HttpResponse(status = StatusCodes.InternalServerError,
-          entity = HttpEntity(ContentTypes.`text/html(UTF-8)`,
-            "<h1> Something is seriously wrong with our servers..</h1>"))
-    }
   }
 
 }
-

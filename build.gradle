@@ -11,7 +11,7 @@ ext {
     rocksDbVersion = '4.9.0'
     kafkaClientVersion = '0.10.0.1'
     avroVersion = '1.8.1'
-    jacksonVersion = '2.8.1'
+    jacksonVersion = '2.7.5'
 }
 
 //avro code generator
@@ -85,11 +85,13 @@ dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
+//    compile group: 'com.typesafe.akka', name: 'akka-http-spray-json-experimental_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
+    compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: '2.7.5'
 
 //    compile group: 'com.google.inject', name: 'guice', version: 3.0
 //    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
