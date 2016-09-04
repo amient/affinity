@@ -32,6 +32,15 @@ import scala.collection.JavaConverters._
 
 abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[K, V] {
 
+  val producerProps = new Properties()
+  producerProps.put("bootstrap.servers", "localhost:9092")
+  producerProps.put("acks", "all")
+  producerProps.put("retries", "0")
+  producerProps.put("linger.ms", "0")
+  producerProps.put("key.serializer", classOf[ByteArraySerializer].getName)
+  producerProps.put("value.serializer", classOf[ByteArraySerializer].getName)
+  val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+
   def boot(isMaster: () => Boolean): Unit = {
 
     //TODO configure KafkaStorage via appConfig and replace prinln(s) with log.info
@@ -69,21 +78,10 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
       }
     } finally {
       consumer.close
+      println(s"Finished bootstrap, kafka topic: `$topic`, partition: $partition")
       //TODO after becoming a master there can only be termination because we're closing the consumer
     }
-
   }
-  println(s"Finished bootstrap, kafka topic: `$topic`, partition: $partition; preparing producer...")
-  val producerProps = new Properties()
-  producerProps.put("bootstrap.servers", "localhost:9092")
-  producerProps.put("acks", "all")
-  producerProps.put("retries", "0")
-  producerProps.put("linger.ms", "0")
-  producerProps.put("key.serializer", classOf[ByteArraySerializer].getName)
-  producerProps.put("value.serializer", classOf[ByteArraySerializer].getName)
-  val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
-
-  println(s"KafkaBackedMemStore Ready for kafka topic: `$topic`, partition: $partition")
 
   def write(kv: (Array[Byte], Array[Byte])) = {
     producer.send(new ProducerRecord(topic, partition, kv._1, kv._2))

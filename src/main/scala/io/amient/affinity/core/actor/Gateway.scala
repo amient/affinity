@@ -51,6 +51,8 @@ class Gateway(appConfig: Properties) extends Actor {
 
   val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
 
+  println(cluster.path)
+
   def describeRegions = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)

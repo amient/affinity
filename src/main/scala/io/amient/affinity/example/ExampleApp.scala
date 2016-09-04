@@ -25,6 +25,7 @@ import io.amient.affinity.example.service.ServiceNode
 object ExampleApp extends App {
 
   // singletons
+  ServiceNode.main(Seq("ExampleSystem", "2549", "127.0.0.1").toArray)
   ServiceNode.main(Seq("ExampleSystem", "2550", "127.0.0.1").toArray)
 
   // cluster leader(s)

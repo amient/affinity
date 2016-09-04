@@ -27,6 +27,8 @@ abstract class Service extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
+  val cluster = context.actorSelection("/user/controller/gateway/cluster")
+
   override def preStart(): Unit = {
     log.info("Starting service: " + self.path.name)
     context.parent ! Node.ServiceOnline(self)

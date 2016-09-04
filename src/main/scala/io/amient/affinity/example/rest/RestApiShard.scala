@@ -21,24 +21,19 @@ package io.amient.affinity.example.rest
 
 import java.util.Properties
 
-import akka.actor.{Props, Status}
-import akka.pattern.ask
+import akka.actor.Status
 import akka.util.Timeout
 import io.amient.affinity.core.actor.Service
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{AvroSerde, _}
-import io.amient.affinity.example.service.UserInputMediator
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 class RestApiShard(config: Properties) extends Service {
 
   final val DEFAULT_KEYSPACE = "graph"
 
   import context._
-
-  val cluster = context.actorSelection("/user/controller/gateway/cluster")
 
   abstract class AvroKafkaStorage[K <: AnyRef, V <:AnyRef ](topic: String, partition: Int, keyClass: Class[K], valueClass: Class[V])
     extends KafkaStorage[K, V](topic, partition) {

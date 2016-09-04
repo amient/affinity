@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example.service
 
-import java.util.Properties
+import java.util.{Properties, UUID}
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
@@ -67,7 +67,8 @@ object ServiceNode extends App {
 
     //TODO the fact that the node actor has a name "services" should be hidden behind the API - maybe refactor Controller to handle this as well
     val node = system.actorOf(Props(new Node(appConfig, coordinator, "services") {
-      context.actorOf(Props(new UserInputMediator), name = classOf[UserInputMediator].getName)
+      //TODO generalise and formalise the way names are generated for services
+      context.actorOf(Props(new UserInputMediator), classOf[UserInputMediator].getName)
     }), name = "services")
 
     //in case the process is stopped from outside

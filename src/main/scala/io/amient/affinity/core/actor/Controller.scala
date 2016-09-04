@@ -83,10 +83,9 @@ class Controller(appConfig: Properties) extends Actor {
           }
       }
 
-    case CreateGateway(gatewayProps/*handlerClass*/) =>
+    case CreateGateway(gatewayProps) =>
       try {
-        //context.watch(context.actorOf(Props(new Gateway(appConfig, handlerClass)), name = "gateway"))
-        context.watch(context.actorOf(gatewayProps))
+        context.watch(context.actorOf(gatewayProps, name = "gateway"))
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>
