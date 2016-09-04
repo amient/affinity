@@ -20,12 +20,16 @@
 package io.amient.util;
 
 import javax.xml.bind.DatatypeConverter;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 
-public abstract class JavaCryptoProof {
+public abstract class TimeCryptoProof {
 
     static private java.util.Random random = new SecureRandom();
+    private final byte[] salt;
 
     static public String toHex(byte[] bytes) {
         return DatatypeConverter.printHexBinary(bytes);
@@ -42,17 +46,47 @@ public abstract class JavaCryptoProof {
         return bytes;
     }
 
-    abstract protected byte[] sign(byte[] arg) throws Exception;
+    static public long utcInWholeMinutes(int offset) {
+        return ZonedDateTime.now(ZoneOffset.UTC).withNano(0).withSecond(0).toEpochSecond() + offset * 60;
+    }
 
-    public String sign(String arg) throws Exception {
+    public TimeCryptoProof(byte[] salt) {
+        this.salt = salt;
+    }
+
+    public TimeCryptoProof(String hexSalt) {
+        this.salt = fromHex(hexSalt);
+    }
+
+    final public String sign(String arg) throws Exception {
         return toHex(sign(arg.getBytes("UTF-8")));
     }
 
-    public void verify(String hash, byte[] arg) throws Exception {
-        assert (toHex(sign(arg)) == hash);
+    final public byte[] sign(byte[] arg) throws Exception {
+        return sign(arg, utcInWholeMinutes(0));
     }
 
-    public void verify(String hash, String arg) throws Exception {
-        verify(hash, arg.getBytes("UTF-8"));
+    private byte[] sign(byte[] arg, long utc) throws Exception {
+        ByteBuffer in = ByteBuffer.allocate(salt.length + 8 + arg.length);
+        in.put(salt);
+        in.putLong(utc);
+        in.put(arg);
+        in.flip();
+        return hash(in.array());
     }
+
+
+    final public void verify(String signature, String arg) throws Exception {
+        verify(fromHex(signature), arg.getBytes("UTF-8"));
+    }
+
+    final public void verify(byte[] signature, byte[] arg) throws Exception {
+        assert (sign(arg, utcInWholeMinutes(0)) == signature)
+                || (sign(arg, utcInWholeMinutes(-1)) == signature)
+                || sign(arg, utcInWholeMinutes(+1)) == signature;
+    }
+
+    abstract protected byte[] hash(byte[] input) throws Exception;
+
+
 }

@@ -16,11 +16,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.amient.affinity.core
+package io.amient.affinity.example.rest
 
 import java.io.StringWriter
 
-import akka.actor.ActorRef
+import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -29,13 +29,10 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
-trait HttpRequestMapper {
+trait HttpRequestHelper {
 
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
-
-  def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)
-           (implicit ctx: ExecutionContext): Unit
 
   def textValue(status: StatusCode, message: String): HttpResponse = {
     HttpResponse(status, entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, message))

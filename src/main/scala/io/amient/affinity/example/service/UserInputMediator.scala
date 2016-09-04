@@ -17,15 +17,25 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.example.service
 
-object SymmetricClusterApp extends App {
+import akka.actor.Status
+import io.amient.affinity.core.actor.Service
 
-  val numPartitions = "4"
+import scala.io.StdIn
 
-  SymmetricClusterNode.main(Seq("2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
-  SymmetricClusterNode.main(Seq("2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
-  // replicas
-//  SymmetricClusterNode.main(Seq("2553","127.0.0.1","8083", numPartitions,"1,3").toArray)
+class UserInputMediator extends Service {
+
+  override def receive: Receive = {
+    case greeting: String =>
+      require(greeting != null && !greeting.isEmpty, "User Mediator requires non-empty greeting")
+      print(s"'$greeting', please reply: ")
+      //IOException on the next line may result in this actor being restarted
+      sender ! StdIn.readLine()
+
+    case _ =>
+      //not a fault of this actor, sender's bad
+      sender ! Status.Failure(new IllegalArgumentException("UserInputMediator only understands String messages"))
+  }
 
 }

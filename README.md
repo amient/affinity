@@ -50,7 +50,7 @@ For debugging, a single node may be started with one region
 serving all 4 partitions byt starting `SymmetricClusterNode` with
 the following arguments:
 
-    2551 127.0.0.1 8081 4 0,1,2,3
+    ExampleSystem 2551 127.0.0.1 8081 4 0,1,2,3
 
 For pseudo-distributed mode, the `SymmetricClusterApp` can be launched
 which will run 2 nodes locally each taking 2 of the 4 partitions.

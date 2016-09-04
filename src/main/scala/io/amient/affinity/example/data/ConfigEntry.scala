@@ -21,7 +21,7 @@ package io.amient.affinity.example.data
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.data.AvroRecord
-import io.amient.util.JavaCryptoProofSHA256
+import io.amient.util.TimeCryptoProofSHA256
 import org.apache.avro.SchemaBuilder
 
 object ConfigEntry {
@@ -33,6 +33,6 @@ object ConfigEntry {
 }
 
 final case class ConfigEntry(val1: String, @JsonIgnore salt: String) extends AvroRecord(ConfigEntry.schema) {
-  @JsonIgnore val crypto = new JavaCryptoProofSHA256(salt)
+  @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
   override def hashCode(): Int = val1.hashCode()
 }

@@ -20,18 +20,20 @@
 package io.amient.affinity.core.actor
 
 import java.util.Properties
+import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, Status, Terminated}
+import akka.actor.{Actor, ActorRef, Props, Terminated}
 import akka.event.Logging
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.core.HttpRequestMapper
-import io.amient.affinity.core.cluster.Cluster
+import io.amient.affinity.core.cluster.{Cluster, Coordinator}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
+
+import scala.collection.JavaConverters._
 
 object Gateway {
 
@@ -39,37 +41,54 @@ object Gateway {
 
 }
 
-class Gateway(appConfig: Properties, handlerClass: Class[_ <: HttpRequestMapper]) extends Actor {
+class Gateway(appConfig: Properties) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
   import context.dispatcher
 
+  import Coordinator._
+
   val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
+
+  def describeRegions = {
+    val t = 60 seconds
+    implicit val timeout = Timeout(t)
+    Await.result(cluster ? GetRoutees, t).asInstanceOf[akka.routing.Routees].routees.map(_.toString)
+  }
+  private val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
+
+  def describeServices = services.asScala.map{ case (k,v) => (k.toString, v.map(_.path.toString))}
 
   context.watch(cluster)
 
-  val handler = handlerClass.newInstance()
-
   override def preStart(): Unit = {
-    Await.ready(context.actorSelection(cluster.path).resolveOne()(10 seconds), 10 seconds)
+    val t = 10 seconds
+    implicit val timeout = Timeout(t)
+    Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
     context.parent ! Controller.GatewayCreated()
   }
 
-  def receive = {
+  def service(actorClass:Class[_ <: Actor]): ActorRef = {
+    //TODO handle missing service properly
+    services.get(actorClass).head
+  }
 
-    //Handled http exchanges
-    case exchange: Gateway.HttpExchange => handler(exchange.request, exchange.promise, cluster)
+  def receive:  PartialFunction[Any, Unit] = {
 
-    //Management queries
-    case m: AddRoutee =>
-      log.info("Adding partition: " + m.routee)
-      cluster ! m
+    //Cluster Management queries
+    case AddService(s) =>
+      val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
+      val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
+      services.put(serviceClass, actors + s)
 
-    case m: RemoveRoutee =>
-      log.info("Removing partition: " + m.routee)
-      cluster ! m
+    case RemoveService(s) =>
+      val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
+      val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
+      services.put(serviceClass, actors - s)
 
+    case m: AddRoutee => cluster ! m
+    case m: RemoveRoutee => cluster ! m
     case m: GetRoutees =>
       val origin = sender()
       //TODO this timeout should be configurable as it dependes on the size of the cluster and coordinator implementation
@@ -78,8 +97,6 @@ class Gateway(appConfig: Properties, handlerClass: Class[_ <: HttpRequestMapper]
 
     case Terminated(cluster) =>
       throw new IllegalStateException("Cluster Actor terminated - must restart the gateway")
-
-    case _ => sender ! Status.Failure(new IllegalArgumentException)
 
   }
 

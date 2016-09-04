@@ -38,7 +38,11 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     TestKit.shutdownActorSystem(system)
   }
 
-  val testPartition = Props(new Partition {
+  val testPartition = Props(new Service {
+    override def preStart(): Unit = {
+      Thread.sleep(100)
+      super.preStart()
+    }
     override def receive: Receive = {
       case e: IllegalStateException => throw e
       case any =>
@@ -47,8 +51,8 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-      val partitions = scala.collection.mutable.Set[String]()
-      val coordinator = new TestCoordinator(partitions)
+      val services = scala.collection.mutable.Set[String]()
+      val coordinator = new TestCoordinator(services)
       val props = new Properties()
       val d = 1 second
       implicit val timeout = Timeout(d)
@@ -57,23 +61,23 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       props.put(Region.CONFIG_PARTITION_LIST, "0,1,2,3")
 
       system.actorOf(Props(new Region(props, coordinator, testPartition)), name = "region")
-      awaitCond (partitions.size == 4)
+      awaitCond (services.size == 4)
 
       //first stop Partition explicitly - it shouldn't be restarted
       import system.dispatcher
-      system.actorSelection(ActorPath.fromString(partitions.head)).resolveOne() onSuccess {
+      system.actorSelection(ActorPath.fromString(services.head)).resolveOne() onSuccess {
         case actorRef => system.stop(actorRef)
       }
-      awaitCond(partitions.size == 3)
+      awaitCond(services.size == 3)
 
       //now simulate error in one of the partitions
-      val partitionToFail = partitions.head
-      system.actorSelection(ActorPath.fromString(partitions.head)).resolveOne() onSuccess {
+      val partitionToFail = services.head
+      system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne() onSuccess {
         case actorRef => actorRef ! new IllegalStateException
       }
-      awaitCond(partitions.size == 2 && !partitions.contains(partitionToFail))
-      //it had a failure, it should be restarted
-      awaitCond(partitions.size == 3)
+      awaitCond(services.size == 2 && !services.contains(partitionToFail))
+//      it had a failure, it should be restarted
+      awaitCond(services.size == 3)
 
     }
   }

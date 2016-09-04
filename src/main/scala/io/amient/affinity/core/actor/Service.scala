@@ -21,27 +21,24 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.event.Logging
+import io.amient.affinity.core.actor.Node.{ServiceOffline, ServiceOnline}
 
-abstract class Partition extends Actor {
+abstract class Service extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
-  val partition = self.path.name.split("-").last.toInt
+  override def preStart(): Unit = {
+    log.info("Starting service: " + self.path.name)
+    context.parent ! Node.ServiceOnline(self)
+    super.preStart()
+  }
 
-  final override def postStop(): Unit = {
-    log.info("Committing Partition ChangeLog: " + self.path.name)
-    //TODO commit change log
-    //TODO clear state (if this is not a new instance)
-    context.parent ! Region.PartitionOffline(self)
+  override def postStop(): Unit = {
+    log.info("Stopping service: " + self.path.name)
+    context.parent ! ServiceOffline(self)
     super.postStop()
   }
 
-  final override def preStart(): Unit = {
-    log.info("Bootstrapping partition: " + self.path.name)
-    //TODO bootstrap data
-    Thread.sleep(1500)
-    context.parent ! Region.PartitionOnline(self)
-  }
 
 }
 

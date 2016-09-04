@@ -25,12 +25,12 @@ import io.amient.affinity.core.cluster.Coordinator
 class TestCoordinator(storage: scala.collection.mutable.Set[String]) extends Coordinator {
 
 //  @volatile private var watcher: ActorRef = null
-  override def watchRoutees(system: ActorSystem, watcher: ActorRef): Unit = {
+  override def watchRoutees(system: ActorSystem, group:String, watcher: ActorRef): Unit = {
 //    this.watcher = watcher
     ???
   }
 
-  override def register(actorPath: ActorPath): String = {
+  override def register(group:String, actorPath: ActorPath): String = {
     val handle = actorPath.toString
     storage.add(handle)
     handle

@@ -23,14 +23,15 @@ import java.util.Properties
 
 import akka.actor.{Actor, Props, Terminated}
 import akka.event.Logging
+import akka.routing.{AddRoutee, RemoveRoutee}
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.{HttpRequestMapper, HttpInterface}
+import io.amient.affinity.core.HttpInterface
 
 object Controller {
 
   final case class CreateRegion(handlerProps: Props)
 
-  final case class CreateGateway(rootHandlerClass: Class[_ <: HttpRequestMapper])
+  final case class CreateGateway(handlerProps: Props/*rootHandlerClass: Class[_ <: HttpRequestMapper]*/)
 
   final case class GatewayCreated()
 
@@ -82,9 +83,10 @@ class Controller(appConfig: Properties) extends Actor {
           }
       }
 
-    case CreateGateway(handlerClass) =>
+    case CreateGateway(gatewayProps/*handlerClass*/) =>
       try {
-        context.watch(context.actorOf(Props(new Gateway(appConfig, handlerClass)), name = "gateway"))
+        //context.watch(context.actorOf(Props(new Gateway(appConfig, handlerClass)), name = "gateway"))
+        context.watch(context.actorOf(gatewayProps))
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>
@@ -95,7 +97,8 @@ class Controller(appConfig: Properties) extends Actor {
 
     case GatewayCreated() =>
       try {
-        coordinator.watchRoutees(context.system, sender)
+        coordinator.watchRoutees(context.system, "regions", sender)
+        coordinator.watchRoutees(context.system, "services", sender)
         httpInterface.foreach(_.bind(sender))
 
       } catch {

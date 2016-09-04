@@ -17,28 +17,26 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.actor
+package io.amient.affinity.example.rest
 
 import java.util.Properties
 
 import akka.actor.{Props, Status}
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.example.data.AvroSerde
+import io.amient.affinity.core.actor.Service
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
-import io.amient.affinity.example.data._
+import io.amient.affinity.example.data.{AvroSerde, _}
+import io.amient.affinity.example.service.UserInputMediator
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class LocalHandler(config: Properties) extends Partition {
+class RestApiShard(config: Properties) extends Service {
 
   final val DEFAULT_KEYSPACE = "graph"
 
   import context._
-
-  val userInputMediator = actorOf(Props(new UserInputMediator))
 
   val cluster = context.actorSelection("/user/controller/gateway/cluster")
 
@@ -55,9 +53,12 @@ class LocalHandler(config: Properties) extends Partition {
     }
   }
 
+  //TODO it is a bit obscure that the partition is passed from Region via path component
+  val partition = self.path.name.split("-").last.toInt
+
   //partitioned memstore
-  val graph = new AvroKafkaStorage[Vertex, Component](topic = "graph", partition, classOf[Vertex], classOf[Component])
-    with MemStoreSimpleMap[Vertex, Component]
+  val graph = new AvroKafkaStorage[Vertex, Component](topic = "graph", partition,
+    classOf[Vertex], classOf[Component]) with MemStoreSimpleMap[Vertex, Component]
 
   //TODO provide function that can detected master-standby status changes
   graph.boot(() => true)
@@ -69,7 +70,9 @@ class LocalHandler(config: Properties) extends Partition {
     case (ts: Long, "ping") => sender ! (self.path.name, "pong")
 
     case (p: Int, "describe") =>
-      sender ! graph.iterator.map(_._2).toList
+      sender ! Map (
+        "partition" -> partition,
+        "graph" -> graph.iterator.map(_._2).toList)
 
     case Edge(source, target) => {
       (graph.get(source) match {
@@ -92,16 +95,6 @@ class LocalHandler(config: Properties) extends Partition {
         case controller => stop(controller)
       }
 
-    case (ts: Long, "collect-user-input") =>
-      implicit val timeout = Timeout(60 seconds)
-      val origin = sender()
-      val prompt = s"${parent.path.name} > "
-      userInputMediator ? prompt andThen {
-        case Success(userInput: String) =>
-          if (userInput == "error") origin ! Status.Failure(throw new RuntimeException(userInput))
-          else origin ! userInput
-        case Failure(e) => origin ! Status.Failure(e)
-      }
 
     case unknown => sender ! Status.Failure(new IllegalArgumentException(unknown.getClass.getName))
 

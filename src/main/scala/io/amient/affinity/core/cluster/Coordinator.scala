@@ -37,6 +37,10 @@ object Coordinator {
 
   final val CONFIG_COORDINATOR_CLASS = "coordinator.class"
 
+  final case class AddService(ref: ActorRef)
+
+  final case class RemoveService(ref: ActorRef)
+
   def fromProperties(appConfig: Properties): Coordinator = {
     val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
     val cls = Class.forName(className).asSubclass(classOf[Coordinator])
@@ -44,14 +48,19 @@ object Coordinator {
     constructor.newInstance(appConfig)
   }
 
+
 }
 
 trait Coordinator {
+
+  import Coordinator._
+
   /**
+    * @param group node type / group
     * @param actorPath of the actor that needs to managed as part of coordinated group
     * @return unique coordinator handle which points to the registered ActorPath
     */
-  def register(actorPath: ActorPath): String;
+  def register(group:String, actorPath: ActorPath): String
 
   /**
     * unregister previously registered ActorPath
@@ -69,7 +78,7 @@ trait Coordinator {
     * @param system  ActorSystem instance
     * @param watcher actor which will receive the messages
     */
-  def watchRoutees(system: ActorSystem, watcher: ActorRef): Unit
+  def watchRoutees(system: ActorSystem, group:String, watcher: ActorRef): Unit
 
   def close(): Unit
 
@@ -84,7 +93,11 @@ trait Coordinator {
     if (handles.containsKey(routeeHandle)) {
       val entry = handles.remove(routeeHandle)
       if (entry != null) {
-        watcher ! RemoveRoutee(ActorRefRoutee(entry))
+        if (entry.path.toStringWithoutAddress.startsWith("/user/controller/region")) {
+          watcher ! RemoveRoutee(ActorRefRoutee(entry))
+        } else {
+          watcher ! RemoveService(entry)
+        }
       }
     }
   }
@@ -99,7 +112,11 @@ trait Coordinator {
       case partitionActorRef =>
         if (!handles.containsKey(routeeHandle)) {
           handles.put(routeeHandle, partitionActorRef)
-          watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
+          if (partitionActorRef.path.toStringWithoutAddress.startsWith("/user/controller/region")) {
+            watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
+          } else {
+            watcher ! AddService(partitionActorRef)
+          }
         }
     }
   }
@@ -119,9 +136,9 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
   import ZkCoordinator._
 
   val zkConnect = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT, "localhost:2181")
-  val zkConnectTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, "6000").toInt
+  val zkConnectTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, "30000").toInt
   val zkSessionTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, "6000").toInt
-  val zkRoot = appConfig.getProperty(CONFIG_ZOOKEEPER_ROOT, "zookeeper")
+  val zkRoot = appConfig.getProperty(CONFIG_ZOOKEEPER_ROOT, "/akka")
 
   private val zk = new ZkClient(
     zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
@@ -130,29 +147,30 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
       override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
     })
 
-  if (!zk.exists(zkRoot)) {
-    zk.createPersistent(zkRoot, true)
-  }
+  if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
 
-  override def register(actorPath: ActorPath): String = {
-    zk.create(s"${zkRoot}/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
+  override def register(group:String, actorPath: ActorPath): String = {
+    val groupRoot = s"$zkRoot/$group"
+    if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
+    zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
   }
 
   override def unregister(handle: String) = zk.delete(handle)
 
   override def close(): Unit = zk.close()
 
-  override def watchRoutees(system: ActorSystem, watcher: ActorRef): Unit = {
+  override def watchRoutees(system: ActorSystem, group: String, watcher: ActorRef): Unit = {
+
+    val groupRoot = s"$zkRoot/$group"
 
     def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-
     def addRoutee(handle: String): Unit = {
-      val keyActorPath: String = zk.readData(s"${zkRoot}/$handle")
+      val keyActorPath: String = zk.readData(s"$groupRoot/$handle")
       addRouteeActor(system, watcher, handle, keyActorPath)
     }
 
-    zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
+    zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
       override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
         if (currentChilds != null) {
           val newList = listAsIndexedSeq(currentChilds)
@@ -164,7 +182,7 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
       }
     })
 
-    listAsIndexedSeq(zk.getChildren(zkRoot)).foreach(addRoutee(_))
+    listAsIndexedSeq(zk.getChildren(groupRoot)).foreach(addRoutee(_))
 
   }
 

@@ -17,25 +17,24 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.actor
+package io.amient.affinity.example
 
-import akka.actor.{Actor, Status}
+import io.amient.affinity.example.rest.RestApiNode
+import io.amient.affinity.example.service.ServiceNode
 
-import scala.io.StdIn
+object ExampleApp extends App {
+
+  // singletons
+  ServiceNode.main(Seq("ExampleSystem", "2550", "127.0.0.1").toArray)
+
+  // cluster leader(s)
+  val numPartitions = "4"
+  RestApiNode.main(Seq("ExampleSystem", "2551", "127.0.0.1","8081", numPartitions, "0,1,2,3").toArray)
 
 
-class UserInputMediator extends Actor {
-
-  override def receive: Receive = {
-    case greeting: String =>
-      require(greeting != null && !greeting.isEmpty, "User Mediator requires non-empty greeting")
-      print(s"'$greeting', please reply: ")
-      //IOException on the next line may result in this actor being restarted
-      sender ! StdIn.readLine()
-
-    case _ =>
-      //not a fault of this actor, sender's bad
-      sender ! Status.Failure(new IllegalArgumentException("UserInputMediator only understands String messages"))
-  }
+//  RestApiNode.main(Seq("ExampleSystem", "2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
+//  RestApiNode.main(Seq("ExampleSystem", "2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
+  // cluster stamdby(s)
+//  SymmetricClusterNode.main(Seq("2553","127.0.0.1","8083", numPartitions,"1,3").toArray)
 
 }

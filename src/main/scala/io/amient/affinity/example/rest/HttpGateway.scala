@@ -17,23 +17,29 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.example.rest
+
+import java.util.Properties
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.Uri.Path
+import akka.http.scaladsl.model.Uri.Path._
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.HttpRequestMapper
+import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{AvroSerde, ConfigEntry, Edge, Vertex}
-import io.amient.util.JavaCryptoProofSHA256
+import io.amient.affinity.example.service.UserInputMediator
 
+import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Promise}
 
-class RequestMapper extends HttpRequestMapper {
+class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with HttpRequestHelper {
+
+  import Gateway._
 
   //broadcast memstore
   val settings = new KafkaStorage[String, ConfigEntry](topic = "settings", 0)
@@ -50,71 +56,92 @@ class RequestMapper extends HttpRequestMapper {
   }
   //TODO provide a way for broadcasts to keep consuming new messages
   settings.boot(() => true)
-  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
-  settings.iterator.foreach(println)
+  //  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
 
-  def apply(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext) {
+  import context.dispatcher
 
-    request match {
-
-      //handlers without filter
-      case HttpRequest(GET, Uri.Path("/ping"), _, _, _) =>
-        implicit val timeout = Timeout(1 second)
-        val task = cluster ? (System.currentTimeMillis(), "ping")
-        fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-          case any => jsonValue(OK, any)
-        }
-
-      //handlers with filter
-      case _ => applyFiltered(request, response, cluster)
-
-    }
+  override def receive: Receive = super.receive orElse receiveWithoutFilter  orElse {
+    case exchange: HttpExchange => handleFiltered(exchange.request, exchange.promise, sender)
   }
 
-  def applyFiltered(request: HttpRequest, response: Promise[HttpResponse], cluster: ActorRef)(implicit ctx: ExecutionContext): Unit = {
+  private def receiveWithoutFilter: Receive = {
+
+    case HttpExchange(HttpRequest(GET, Uri(_, _, Slash(Segment("ping", Path.Empty)), _, _), _, _, _), response) =>
+      implicit val timeout = Timeout(1 second)
+      val task = cluster ? (System.currentTimeMillis(), "ping")
+      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+        case any => jsonValue(OK, any)
+      }
+
+    case HttpExchange(HttpRequest(GET, uri, _, _, _), response) if (uri.path == SingleSlash) =>
+
+      implicit val timeout = Timeout(1 second)
+      uri.query().get("p") match {
+        case None => response.success(jsonValue(OK, Map(
+          "services" -> describeServices,
+          "regions" -> describeRegions
+        )))
+
+        case Some(p) =>
+          val task = cluster ? (p.toInt, "describe")
+          fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+            case any => jsonValue(OK, any)
+          }
+      }
+  }
+
+  private def handleFiltered(request: HttpRequest, response: Promise[HttpResponse], sender: ActorRef): Unit = {
 
     //filter
     val query = request.uri.query().toMap
-    println(request.uri.fragment)
-    request.uri.fragment match {
-      case None => response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
-      case Some(sig) => {
-        sig.split(":") match {
-          case Array(k, s) => settings.get(k) match {
-            case None => response.success(errorValue(Unauthorized, ContentTypes.`application/json`, "Unauthorized"))
-            case Some(configEntry) =>
-              val arg = request.uri.toString
-              println(arg)
-              println(configEntry.crypto.sign(arg))
-          }
 
-          case _ => response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
-        }
-
-      }
-    }
+    val signature: Option[String] = None // query.get("signature") match {
+    //      case None =>
+    //        response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
+    //        None
+    //      case Some(sig) => {
+    //        sig.split(":") match {
+    //          case Array(k, clientSignature) => settings.get(k) match {
+    //            case None =>
+    //              response.success(errorValue(Unauthorized, ContentTypes.`application/json`, "Unauthorized"))
+    //              None
+    //            case Some(configEntry) =>
+    //              val arg = request.uri.path.toString
+    //              if (configEntry.crypto.sign(arg) != clientSignature) {
+    //                response.success(errorValue(Unauthorized, ContentTypes.`application/json`, "Unauthorized"))
+    //                None
+    //              } else {
+    //                Some(configEntry.crypto.sign(clientSignature))
+    //              }
+    //          }
+    //
+    //          case _ =>
+    //            response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
+    //            None
+    //        }
+    //
+    //      }
+    //    }
 
     //handlers
     if (!response.isCompleted) request match {
-      case HttpRequest(GET, uri, _, _, _) if (uri.path == Uri.Path("/")) =>
-        implicit val timeout = Timeout(1 second)
-        query.get("p") match {
-          case None => response.success(errorValue(BadRequest,
-            ContentTypes.`application/json`, "query string param p must be >=0"))
 
-          case Some(p) =>
-            val task = cluster ? (p.toInt, "describe")
-            fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-              case any => jsonValue(OK, any)
-            }
-        }
+      case HttpRequest(GET, Uri(_, _,
+      Slash(Segment("p", Slash(Segment("cons",
+      Slash(Segment(service,
+      Slash(Segment(person, Path.Empty)))))))), _, _), _, _, _) =>
+        response.success(jsonValue(OK, Map(
+          "signature" -> signature,
+          "service" -> service,
+          "person" -> person
+        )))
 
-      case HttpRequest(GET, Uri.Path("/fail"), _, _, _) =>
+      case HttpRequest(GET, Path("/fail"), _, _, _) =>
         implicit val timeout = Timeout(1 second)
         cluster ! new IllegalStateException
         response.success(HttpResponse(status = StatusCodes.Accepted))
 
-      case HttpRequest(GET, Uri.Path("/error"), _, _, _) =>
+      case HttpRequest(GET, Path("/error"), _, _, _) =>
         implicit val timeout = Timeout(1 second)
         val task = cluster ? "message-that-can't-be-handled"
         fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
@@ -135,7 +162,10 @@ class RequestMapper extends HttpRequestMapper {
 
       case HttpRequest(GET, uri, _, _, _) if (uri.path == Uri.Path("/connect")) =>
         implicit val timeout = Timeout(60 seconds)
-        val task = cluster ? (System.currentTimeMillis(), "collect-user-input")
+
+        val userInputMediator = service(classOf[UserInputMediator])
+
+        val task = userInputMediator ? "hello"
         fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
           case userInput: String =>
             val Array(start, end) = userInput.split(",").map(_.toInt)
