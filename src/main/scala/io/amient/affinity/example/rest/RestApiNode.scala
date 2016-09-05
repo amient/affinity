@@ -27,6 +27,7 @@ import io.amient.affinity.core.HttpInterface
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion}
 import io.amient.affinity.core.actor.{Controller, Node, Region}
 import io.amient.affinity.core.cluster.{Cluster, Coordinator, ZkCoordinator}
+import io.amient.affinity.example.rest.handler._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -63,8 +64,14 @@ object RestApiNode extends App {
     val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
 
     //this cluster is symmetric - all nodes serve both as Gateways and Regions
-    controller ! CreateGateway(Props(new HttpGateway(appConfig)))
-    controller ! CreateRegion(Props(new RestApiShard(appConfig)))
+    controller ! CreateGateway(Props(new HttpGateway(appConfig)
+      with Describe
+      with Ping
+      with Fail
+      with Connect
+      with Access
+    ))
+    controller ! CreateRegion(Props(new RestApiPartition(appConfig)))
 
     //in case the process is stopped from outside
     sys.addShutdownHook {

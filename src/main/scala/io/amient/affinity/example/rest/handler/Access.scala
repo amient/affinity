@@ -17,30 +17,23 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.example.rest.handler
 
-import akka.actor.Actor
-import akka.event.Logging
-import io.amient.affinity.core.actor.Node.{ServiceOffline, ServiceOnline}
+import akka.http.scaladsl.model.HttpMethods._
+import akka.http.scaladsl.model.StatusCodes._
+import io.amient.affinity.example.rest.HttpGateway
 
-trait Service extends Actor {
+trait Access extends HttpGateway  {
 
-  val log = Logging.getLogger(context.system, this)
+  abstract override def receive: Receive = super.receive orElse {
 
-  val cluster = context.actorSelection("/user/controller/gateway/cluster")
+    case AUTH(GET, PATH("p", "access", service, person), query, signature, response) =>
+      response.success(jsonValue(OK, Map(
+        "signature" -> signature,
+        "service" -> service,
+        "person" -> person
+      )))
 
-  override def preStart(): Unit = {
-    log.info("Starting service: " + self.path.name)
-    context.parent ! Node.ServiceOnline(self)
-    super.preStart()
+    //TODO 404 Not   case HttpExchange(request, response) => response.success(htmlValue(NotFound, "Haven't got that"))
   }
-
-  override def postStop(): Unit = {
-    log.info("Stopping service: " + self.path.name)
-    context.parent ! ServiceOffline(self)
-    super.postStop()
-  }
-
-
 }
-

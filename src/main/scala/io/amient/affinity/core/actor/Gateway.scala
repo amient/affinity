@@ -22,18 +22,22 @@ package io.amient.affinity.core.actor
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Props, Terminated}
+import akka.actor.{Actor, ActorRef, Terminated}
 import akka.event.Logging
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.Uri.Path
+import akka.http.scaladsl.model.Uri.Path._
+import akka.http.scaladsl.model.{HttpMethod, HttpRequest, HttpResponse, Uri}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.core.cluster.{Cluster, Coordinator}
+import io.amient.affinity.core.actor.Gateway.HttpExchange
+import io.amient.affinity.core.cluster.Cluster
+import io.amient.affinity.core.cluster.Coordinator.{AddService, RemoveService}
 
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
-
-import scala.collection.JavaConverters._
 
 object Gateway {
 
@@ -43,31 +47,25 @@ object Gateway {
 
 class Gateway(appConfig: Properties) extends Actor {
 
+  protected val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
+
   val log = Logging.getLogger(context.system, this)
-
-  import context.dispatcher
-
-  import Coordinator._
 
   val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
 
-  println(cluster.path)
+  def describeServices = services.asScala.map{ case (k,v) => (k.toString, v.map(_.path.toString))}
 
   def describeRegions = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
     Await.result(cluster ? GetRoutees, t).asInstanceOf[akka.routing.Routees].routees.map(_.toString)
   }
-  private val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
-
-  def describeServices = services.asScala.map{ case (k,v) => (k.toString, v.map(_.path.toString))}
-
-  context.watch(cluster)
 
   override def preStart(): Unit = {
     val t = 10 seconds
     implicit val timeout = Timeout(t)
     Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
+    context.watch(cluster)
     context.parent ! Controller.GatewayCreated()
   }
 
@@ -76,7 +74,33 @@ class Gateway(appConfig: Properties) extends Actor {
     services.get(actorClass).head
   }
 
-  def receive:  PartialFunction[Any, Unit] = {
+  object HTTP {
+    def unapply(exchange: HttpExchange): Option[(HttpMethod, Uri.Path, Uri.Query, Promise[HttpResponse])] = {
+      Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
+    }
+  }
+
+  object PATH {
+    def unapplySeq(path: Path): Option[Seq[String]] = {
+      @tailrec
+      def r(p: Path, acc: Seq[String] = Seq()): Seq[String] =
+        if (p.startsWithSlash) r(p.tail, acc)
+        else if (p.tail.isEmpty) acc :+ p.head.toString
+        else r(p.tail, acc :+ p.head.toString)
+
+      Some(r(path))
+    }
+  }
+
+  object QUERY {
+    def unapplySeq(query: Uri.Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
+  }
+
+  import context.dispatcher
+
+  def receive: Receive = {
+
+    //case HttpExchange(request, response) => response.success(HttpResponse(status = NotFound))
 
     //Cluster Management queries
     case AddService(s) =>

@@ -23,15 +23,14 @@ import java.util.Properties
 
 import akka.actor.{Actor, Props, Terminated}
 import akka.event.Logging
-import akka.routing.{AddRoutee, RemoveRoutee}
-import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.HttpInterface
+import io.amient.affinity.core.cluster.Coordinator
 
 object Controller {
 
   final case class CreateRegion(handlerProps: Props)
 
-  final case class CreateGateway(handlerProps: Props/*rootHandlerClass: Class[_ <: HttpRequestMapper]*/)
+  final case class CreateGateway(handlerProps: Props)
 
   final case class GatewayCreated()
 

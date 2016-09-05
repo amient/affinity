@@ -29,7 +29,7 @@ import io.amient.affinity.example.data.{AvroSerde, _}
 
 import scala.concurrent.duration._
 
-class RestApiShard(config: Properties) extends Service {
+class RestApiPartition(config: Properties) extends Service {
 
   final val DEFAULT_KEYSPACE = "graph"
 

@@ -46,13 +46,13 @@ partitions which can be created from kafka installation home dir:
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --create --topic graph \
         --partitions 4 --replication-factor 2 --config cleanup.policy=compact
     
-For debugging, a single node may be started with one region
-serving all 4 partitions byt starting `SymmetricClusterNode` with
+A single node may be started with one region
+serving all 4 partitions byt starting `RestApiNode` with
 the following arguments:
 
     ExampleSystem 2551 127.0.0.1 8081 4 0,1,2,3
 
-For pseudo-distributed mode, the `SymmetricClusterApp` can be launched
+For pseudo-distributed mode, the `ExampleApp` can be launched
 which will run 2 nodes locally each taking 2 of the 4 partitions.
 
 

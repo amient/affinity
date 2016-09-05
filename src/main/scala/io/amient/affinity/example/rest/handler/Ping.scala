@@ -17,30 +17,31 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.example.rest.handler
 
-import akka.actor.Actor
-import akka.event.Logging
-import io.amient.affinity.core.actor.Node.{ServiceOffline, ServiceOnline}
+import akka.http.scaladsl.model.ContentTypes
+import akka.http.scaladsl.model.HttpMethods._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.Uri.Path
+import akka.http.scaladsl.model.Uri.Path._
+import akka.pattern.ask
+import akka.util.Timeout
+import io.amient.affinity.example.rest.{HttpGateway}
 
-trait Service extends Actor {
+import scala.concurrent.duration._
 
-  val log = Logging.getLogger(context.system, this)
+trait Ping extends HttpGateway {
 
-  val cluster = context.actorSelection("/user/controller/gateway/cluster")
+  import context.dispatcher
 
-  override def preStart(): Unit = {
-    log.info("Starting service: " + self.path.name)
-    context.parent ! Node.ServiceOnline(self)
-    super.preStart()
+  abstract override def receive: Receive = super.receive orElse {
+
+    case HTTP(GET, Slash(Segment("ping", Path.Empty)), _, response) =>
+      implicit val timeout = Timeout(1 second)
+      val task = cluster ? (System.currentTimeMillis(), "ping")
+      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+        case any => jsonValue(OK, any)
+      }
   }
-
-  override def postStop(): Unit = {
-    log.info("Stopping service: " + self.path.name)
-    context.parent ! ServiceOffline(self)
-    super.postStop()
-  }
-
 
 }
-
