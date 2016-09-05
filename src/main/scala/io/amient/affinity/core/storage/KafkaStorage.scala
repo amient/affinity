@@ -44,7 +44,7 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
   def boot(isMaster: () => Boolean): Unit = {
 
     //TODO configure KafkaStorage via appConfig and replace prinln(s) with log.info
-    println(s"Bootstrapping memstore partition from kafka topic: `$topic`, partition: $partition")
+    println(s"`$topic` topic bootstrapping memstore partition $partition")
     val consumerProps = new Properties()
     consumerProps.put("bootstrap.servers", "localhost:9092")
     consumerProps.put("enable.auto.commit", "false")
@@ -59,7 +59,7 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
       consumer.seekToEnd(consumerPartitions)
       val records = consumer.poll(1000L)
       val lastOffset = consumer.position(tp)
-      println(s"Latest offset in kafka topic: `$topic`, partition: $partition, offset: $lastOffset")
+      println(s"`$topic` kafka topic, partition: $partition, latest offset: $lastOffset")
 
       consumer.seekToBeginning(consumerPartitions)
       val continue = new AtomicBoolean(true)
@@ -78,7 +78,7 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
       }
     } finally {
       consumer.close
-      println(s"Finished bootstrap, kafka topic: `$topic`, partition: $partition")
+      println(s"`$topic`, partition $partition bootstrap completed")
       //TODO after becoming a master there can only be termination because we're closing the consumer
     }
   }

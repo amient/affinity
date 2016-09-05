@@ -23,12 +23,11 @@ import java.io.StringWriter
 import java.util.Properties
 
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpEntity, _}
 import akka.http.scaladsl.model.Uri._
+import akka.http.scaladsl.model.{HttpEntity, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.amient.affinity.core.actor.Gateway
-import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{AvroSerde, ConfigEntry}
 
@@ -52,36 +51,29 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
   }
   //TODO provide a way for broadcasts to keep consuming new messages
   settings.boot(() => true)
-//  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
+
+  //  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
 
   object AUTH {
 
-    def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, String, Promise[HttpResponse])] = {
-      val request = exchange.request
-      val response = exchange.promise
-      request.uri.query().get("signature") match {
-        case None =>
-          response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
-          None
+    def unapply(query: Query): Option[(Query, String)] = {
+      query.get("signature") match {
+        case None => None
         case Some(sig) => {
           sig.split(":") match {
             case Array(k, clientSignature) => settings.get(k) match {
-              case None =>
-                response.success(errorValue(Unauthorized, ContentTypes.`application/json`, "Unauthorized"))
-                None
+              case None => None
               case Some(configEntry) =>
-//                val arg = request.uri.path.toString
-//                if (configEntry.crypto.sign(arg) != clientSignature) {
-//                  response.success(errorValue(Unauthorized, ContentTypes.`application/json`, "Unauthorized"))
-//                  None
-//                } else {
-                  val signature = configEntry.crypto.sign(clientSignature)
-                  Some(request.method, request.uri.path, request.uri.query(), signature, response)
-//                }
+                //                val arg = request.uri.path.toString
+                //                if (configEntry.crypto.sign(arg) != clientSignature) {
+                //                  exchange.status = Some(Unauthorized)
+                //                  None
+                //                } else {
+                val signature = configEntry.crypto.sign(clientSignature)
+                Some(query, signature)
+              //                }
             }
-            case _ =>
-              response.success(errorValue(Forbidden, ContentTypes.`application/json`, "Forbidden"))
-              None
+            case _ => None
           }
         }
       }
@@ -116,29 +108,28 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
     }
   }
 
+
   def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(handleErrors(future, ct, f))
+    promise.completeWith(future map (f) recover {
+      case e: IllegalArgumentException => e.printStackTrace(); handleError(StatusCodes.NotImplemented)
+      case NonFatal(e) => e.printStackTrace(); handleError(StatusCodes.InternalServerError)
+      case e => e.printStackTrace(); handleError(ServiceUnavailable)
+
+    })
   }
 
-  def handleErrors(future: Future[Any], ct: ContentType, f: Any => HttpResponse)
-                  (implicit ctx: ExecutionContext): Future[HttpResponse] = {
-    future map (f) recover {
-      case e: IllegalArgumentException =>
-        e.printStackTrace() //log.error("Gateway contains bug! ", e)
-        errorValue(InternalServerError, ct, "Eeek! We have a bug..")
+  override def handleError(status: StatusCode): HttpResponse = handleError(status, ContentTypes.`application/json`)
 
-      case NonFatal(e) =>
-        e.printStackTrace() //log.error("Cluster encountered failure ", e.getMessage)
-        errorValue(InternalServerError, ct, "Well, something went wrong but we should be back..")
-
-      case e =>
-        errorValue(InternalServerError, ct, "Something is seriously wrong with our servers..")
+  def handleError(status: StatusCode, ct: ContentType = ContentTypes.`application/json`): HttpResponse = {
+    status match {
+      case Forbidden => errorValue(Forbidden, ct, "Forbidden")
+      case Unauthorized => errorValue(Unauthorized, ct, "Unauthorized")
+      case NotFound => errorValue(NotFound, ct, "Haven't got that")
+      case NotImplemented => errorValue(NotImplemented, ct, "Eeek! We have a bug..")
+      case ServiceUnavailable => errorValue(ServiceUnavailable, ct, "Something is seriously wrong with our servers..")
+      case _ => errorValue(InternalServerError, ct, "Well, something went wrong but we should be back..")
     }
-  }
-
-  override def notFound(request: HttpRequest, response: Promise[HttpResponse]): Unit = {
-    response.success(htmlValue(NotFound, "Haven't got that"))
   }
 
 }

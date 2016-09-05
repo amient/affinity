@@ -22,10 +22,11 @@ package io.amient.affinity.core.actor
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Terminated}
 import akka.event.Logging
-import akka.http.scaladsl.model.Uri.Path
-import akka.http.scaladsl.model.{HttpMethod, HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.Uri.{Path, Query}
+import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
@@ -52,29 +53,33 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
   val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
 
-  def describeServices = services.asScala.map{ case (k,v) => (k.toString, v.map(_.path.toString))}
+  def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }
 
   def describeRegions = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
-    Await.result(cluster ? GetRoutees, t).asInstanceOf[akka.routing.Routees].routees.map(_.toString)
+    Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString)
   }
 
   override def preStart(): Unit = {
     val t = 10 seconds
     implicit val timeout = Timeout(t)
     Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
-//    context.watch(cluster)
+    //    context.watch(cluster)
     context.parent ! Controller.GatewayCreated()
   }
 
-  def service(actorClass:Class[_ <: Actor]): ActorRef = {
+  override def postStop(): Unit = {
+    super.postStop()
+  }
+
+  def service(actorClass: Class[_ <: Actor]): ActorRef = {
     //TODO handle missing service properly
     services.get(actorClass).head
   }
 
   object HTTP {
-    def unapply(exchange: HttpExchange): Option[(HttpMethod, Uri.Path, Uri.Query, Promise[HttpResponse])] = {
+    def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = {
       Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
     }
   }
@@ -83,7 +88,8 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     def unapplySeq(path: Path): Option[Seq[String]] = {
       @tailrec
       def r(p: Path, acc: Seq[String] = Seq()): Seq[String] =
-        if (p.startsWithSlash) r(p.tail, acc)
+        if (p.isEmpty) acc
+        else if (p.startsWithSlash) r(p.tail, acc)
         else if (p.tail.isEmpty) acc :+ p.head.toString
         else r(p.tail, acc :+ p.head.toString)
 
@@ -91,13 +97,23 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     }
   }
 
+  object INT {
+    def unapply(any: Any): Option[Int] = {
+      try {
+        Some(Integer.parseInt(any.toString))
+      } catch {
+        case e: NumberFormatException => None
+      }
+    }
+  }
+
   object QUERY {
-    def unapplySeq(query: Uri.Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
+    def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
   }
 
   import context.dispatcher
 
-  def notFound(request: HttpRequest, response: Promise[HttpResponse]): Unit
+  def handleError(status: StatusCode): HttpResponse
 
   def handle: Receive = {
     case null =>
@@ -105,17 +121,17 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
   final def receive: Receive = handle orElse {
 
-    case HttpExchange(request, response) => notFound(request, response)
+    case e: HttpExchange => e.promise.success(handleError(NotFound))
 
     //Cluster Management queries
     case AddService(s) =>
-      log.info("ADDING SERVICE " + s)
+      log.info("Adding Service " + s)
       val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
       val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
       services.put(serviceClass, actors + s)
 
     case RemoveService(s) =>
-      log.info("REMOVING SERVICE " + s +", SENDER: " + sender)
+      log.info("Removeing Service" + s)
       val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
       val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
       services.put(serviceClass, actors - s)
@@ -129,9 +145,9 @@ abstract class Gateway(appConfig: Properties) extends Actor {
         case routees => origin ! routees
       }
 
-//    case Terminated(cluster) =>
-//      FIXME sometimes this doesn't restart the gateway
-//      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + cluster)
+    case Terminated(cluster) =>
+      //          FIXME sometimes this doesn't restart the gateway
+      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + cluster)
 
   }
 

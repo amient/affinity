@@ -108,6 +108,7 @@ class Controller(appConfig: Properties) extends Actor {
       }
 
     case Terminated(gateway) =>
+      //TODO coordinator.unwatch(the listener returned by GatewayCreated() => watchRoutees)
       log.info("Terminated(gateway) shutting down http interface")
       try {
         httpInterface.foreach(_.close)

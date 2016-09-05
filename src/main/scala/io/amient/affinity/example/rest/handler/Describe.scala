@@ -36,7 +36,7 @@ trait Describe extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, SingleSlash, QUERY(("p", p)), response) =>
+    case HTTP(GET, PATH(INT(p)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (p.toInt, "describe")
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {

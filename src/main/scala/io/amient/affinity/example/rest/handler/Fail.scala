@@ -34,17 +34,17 @@ trait Fail extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH("fail", partition), _, response) =>
+    case HTTP(GET, PATH("fail", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = cluster ? (partition.toInt, new IllegalStateException(System.currentTimeMillis.toString))
+      val task = cluster ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
         case any => HttpResponse(status = StatusCodes.Accepted)
       }
 
 
-    case HTTP(GET, PATH("error", partition), _, response) =>
+    case HTTP(GET, PATH("bug", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = cluster ? (partition.toInt, "message-that-can't-be-handled")
+      val task = cluster ? (partition, "message-that-can't-be-handled")
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
         case any => jsonValue(OK, any)
       }

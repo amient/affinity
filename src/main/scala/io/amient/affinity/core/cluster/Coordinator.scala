@@ -105,12 +105,13 @@ trait Coordinator {
   protected def addRouteeActor(system: ActorSystem,
                                watcher: ActorRef,
                                routeeHandle: String,
-                               routeePath: String): Unit = {
+                               routeePath: String,
+                               force: Boolean = false): Unit = {
     import system.dispatcher
     implicit val timeout = new Timeout(24 hours)
     system.actorSelection(routeePath).resolveOne() onSuccess  {
       case partitionActorRef =>
-        if (!handles.containsKey(routeeHandle)) {
+        if (force || !handles.containsKey(routeeHandle)) {
           handles.put(routeeHandle, partitionActorRef)
           if (partitionActorRef.path.toStringWithoutAddress.startsWith("/user/controller/region")) {
             watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
@@ -163,15 +164,15 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
 
     def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-    def addRoutee(handle: String): Unit = addRouteeActor(system, watcher, handle, zk.readData(handle))
-
     val groupRoot = s"$zkRoot/$group"
 
     zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
       override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
         if (currentChilds != null) {
           val newHandles = listAsIndexedSeq(currentChilds).map(id => s"$parentPath/$id")
-          newHandles.foreach(addRoutee(_))
+          newHandles.foreach { handle =>
+            addRouteeActor(system, watcher, handle, zk.readData(handle), force = false)
+          }
           getAllHandles.filter(id => id.startsWith(parentPath) && !newHandles.contains(id)).foreach{ handle =>
             removeRoutee(watcher, handle)
           }
@@ -179,8 +180,9 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
       }
     })
 
-    listAsIndexedSeq(zk.getChildren(groupRoot)).foreach(id => addRoutee(s"$groupRoot/$id"))
-
+    listAsIndexedSeq(zk.getChildren(groupRoot)).map(id => s"$groupRoot/$id").foreach{ handle =>
+      addRouteeActor(system, watcher, handle, zk.readData(handle), force = true)
+    }
   }
 
 }
