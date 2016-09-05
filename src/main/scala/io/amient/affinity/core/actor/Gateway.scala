@@ -22,10 +22,9 @@ package io.amient.affinity.core.actor
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Actor, ActorRef}
 import akka.event.Logging
 import akka.http.scaladsl.model.Uri.Path
-import akka.http.scaladsl.model.Uri.Path._
 import akka.http.scaladsl.model.{HttpMethod, HttpRequest, HttpResponse, Uri}
 import akka.pattern.ask
 import akka.routing._
@@ -45,7 +44,7 @@ object Gateway {
 
 }
 
-class Gateway(appConfig: Properties) extends Actor {
+abstract class Gateway(appConfig: Properties) extends Actor {
 
   protected val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
 
@@ -65,7 +64,7 @@ class Gateway(appConfig: Properties) extends Actor {
     val t = 10 seconds
     implicit val timeout = Timeout(t)
     Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
-    context.watch(cluster)
+//    context.watch(cluster)
     context.parent ! Controller.GatewayCreated()
   }
 
@@ -98,17 +97,25 @@ class Gateway(appConfig: Properties) extends Actor {
 
   import context.dispatcher
 
-  def receive: Receive = {
+  def notFound(request: HttpRequest, response: Promise[HttpResponse]): Unit
 
-    //case HttpExchange(request, response) => response.success(HttpResponse(status = NotFound))
+  def handle: Receive = {
+    case null =>
+  }
+
+  final def receive: Receive = handle orElse {
+
+    case HttpExchange(request, response) => notFound(request, response)
 
     //Cluster Management queries
     case AddService(s) =>
+      log.info("ADDING SERVICE " + s)
       val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
       val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
       services.put(serviceClass, actors + s)
 
     case RemoveService(s) =>
+      log.info("REMOVING SERVICE " + s +", SENDER: " + sender)
       val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
       val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
       services.put(serviceClass, actors - s)
@@ -117,12 +124,14 @@ class Gateway(appConfig: Properties) extends Actor {
     case m: RemoveRoutee => cluster ! m
     case m: GetRoutees =>
       val origin = sender()
-      //TODO this timeout should be configurable as it dependes on the size of the cluster and coordinator implementation
       implicit val timeout = Timeout(60 seconds)
-      cluster ? m onSuccess { case routees => origin ! routees }
+      cluster ? m onSuccess {
+        case routees => origin ! routees
+      }
 
-    case Terminated(cluster) =>
-      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway")
+//    case Terminated(cluster) =>
+//      FIXME sometimes this doesn't restart the gateway
+//      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + cluster)
 
   }
 

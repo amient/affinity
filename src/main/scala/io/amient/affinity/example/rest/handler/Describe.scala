@@ -34,9 +34,9 @@ trait Describe extends HttpGateway {
 
   import context.dispatcher
 
-  abstract override def receive: Receive = super.receive orElse {
+  abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, SingleSlash, QUERY(("p", p), ("r", r)), response) =>
+    case HTTP(GET, SingleSlash, QUERY(("p", p)), response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (p.toInt, "describe")
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {

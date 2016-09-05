@@ -22,18 +22,11 @@ package io.amient.affinity.example.rest
 import java.util.Properties
 
 import akka.actor.Status
-import akka.util.Timeout
 import io.amient.affinity.core.actor.Service
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{AvroSerde, _}
 
-import scala.concurrent.duration._
-
 class RestApiPartition(config: Properties) extends Service {
-
-  final val DEFAULT_KEYSPACE = "graph"
-
-  import context._
 
   abstract class AvroKafkaStorage[K <: AnyRef, V <:AnyRef ](topic: String, partition: Int, keyClass: Class[K], valueClass: Class[V])
     extends KafkaStorage[K, V](topic, partition) {
@@ -60,7 +53,7 @@ class RestApiPartition(config: Properties) extends Service {
 
   override def receive = {
 
-    case stateError: IllegalStateException => throw stateError
+    case (p: Int, stateError: IllegalStateException) => throw stateError
 
     case (ts: Long, "ping") => sender ! (self.path.name, "pong")
 
@@ -82,14 +75,6 @@ class RestApiPartition(config: Properties) extends Service {
         }
       }
     }
-
-    case (p: Int, "kill-node") =>
-      log.warning("killing the entire node " + system.name)
-      implicit val timeout = Timeout(10 seconds)
-      actorSelection("/user").resolveOne().onSuccess {
-        case controller => stop(controller)
-      }
-
 
     case unknown => sender ! Status.Failure(new IllegalArgumentException(unknown.getClass.getName))
 

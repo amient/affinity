@@ -21,7 +21,6 @@ package io.amient.affinity.example.rest.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
@@ -33,30 +32,21 @@ trait Fail extends HttpGateway {
 
   import context.dispatcher
 
-  abstract override def receive: Receive = super.receive orElse {
+  abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, Path("/fail"), _, response) =>
+    case HTTP(GET, PATH("fail", partition), _, response) =>
       implicit val timeout = Timeout(1 second)
-      cluster ! new IllegalStateException
-      response.success(HttpResponse(status = StatusCodes.Accepted))
-
-    case HTTP(GET, Path("/error"), _, response) =>
-      implicit val timeout = Timeout(1 second)
-      val task = cluster ? "message-that-can't-be-handled"
+      val task = cluster ? (partition.toInt, new IllegalStateException(System.currentTimeMillis.toString))
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-        case any => jsonValue(OK, any)
+        case any => HttpResponse(status = StatusCodes.Accepted)
       }
 
-    case HTTP(GET, Uri.Path("/kill"), query, response) =>
+
+    case HTTP(GET, PATH("error", partition), _, response) =>
       implicit val timeout = Timeout(1 second)
-      query.get("p") match {
-        case Some(p) if (p.toInt >= 0) =>
-          val task = cluster ? (p.toInt, "kill-node")
-          fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-            case any => HttpResponse(status = StatusCodes.Accepted)
-          }
-        case _ => response.success(errorValue(BadRequest,
-          ContentTypes.`application/json`, "query string param p is required and must be >=0"))
+      val task = cluster ? (partition.toInt, "message-that-can't-be-handled")
+      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+        case any => jsonValue(OK, any)
       }
 
   }

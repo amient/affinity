@@ -136,4 +136,9 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
         errorValue(InternalServerError, ct, "Something is seriously wrong with our servers..")
     }
   }
+
+  override def notFound(request: HttpRequest, response: Promise[HttpResponse]): Unit = {
+    response.success(htmlValue(NotFound, "Haven't got that"))
+  }
+
 }

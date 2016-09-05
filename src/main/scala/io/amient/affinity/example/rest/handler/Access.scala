@@ -25,7 +25,7 @@ import io.amient.affinity.example.rest.HttpGateway
 
 trait Access extends HttpGateway  {
 
-  abstract override def receive: Receive = super.receive orElse {
+  abstract override def handle: Receive = super.handle orElse {
 
     case AUTH(GET, PATH("p", "access", service, person), query, signature, response) =>
       response.success(jsonValue(OK, Map(
@@ -33,7 +33,5 @@ trait Access extends HttpGateway  {
         "service" -> service,
         "person" -> person
       )))
-
-    //TODO 404 Not   case HttpExchange(request, response) => response.success(htmlValue(NotFound, "Haven't got that"))
   }
 }

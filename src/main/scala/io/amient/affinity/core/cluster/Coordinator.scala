@@ -161,28 +161,25 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
 
   override def watchRoutees(system: ActorSystem, group: String, watcher: ActorRef): Unit = {
 
-    val groupRoot = s"$zkRoot/$group"
-
     def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-    def addRoutee(handle: String): Unit = {
-      val keyActorPath: String = zk.readData(s"$groupRoot/$handle")
-      addRouteeActor(system, watcher, handle, keyActorPath)
-    }
+    def addRoutee(handle: String): Unit = addRouteeActor(system, watcher, handle, zk.readData(handle))
+
+    val groupRoot = s"$zkRoot/$group"
 
     zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
       override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
         if (currentChilds != null) {
-          val newList = listAsIndexedSeq(currentChilds)
-          newList.foreach(addRoutee(_))
-          getAllHandles.filter(!newList.contains(_)).foreach{ handle =>
+          val newHandles = listAsIndexedSeq(currentChilds).map(id => s"$parentPath/$id")
+          newHandles.foreach(addRoutee(_))
+          getAllHandles.filter(id => id.startsWith(parentPath) && !newHandles.contains(id)).foreach{ handle =>
             removeRoutee(watcher, handle)
           }
         }
       }
     })
 
-    listAsIndexedSeq(zk.getChildren(groupRoot)).foreach(addRoutee(_))
+    listAsIndexedSeq(zk.getChildren(groupRoot)).foreach(id => addRoutee(s"$groupRoot/$id"))
 
   }
 

@@ -39,6 +39,7 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
 
   override def preStart(): Unit = {
+    log.info("STARTING REGION")
     for (p <- partitionList) {
       context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
     }

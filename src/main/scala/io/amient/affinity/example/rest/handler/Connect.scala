@@ -35,9 +35,9 @@ trait Connect extends HttpGateway {
 
   import context.dispatcher
 
-  abstract override def receive: Receive = super.receive orElse {
+  abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, Path("/connect"), query, response) =>
+    case HTTP(GET, PATH("connect"), query, response) =>
       implicit val timeout = Timeout(60 seconds)
 
       val userInputMediator = service(classOf[UserInputMediator])
