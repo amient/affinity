@@ -65,7 +65,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     val t = 10 seconds
     implicit val timeout = Timeout(t)
     Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
-    //    context.watch(cluster)
+    context.watch(cluster)
     context.parent ! Controller.GatewayCreated()
   }
 

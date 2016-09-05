@@ -22,7 +22,6 @@ package io.amient.affinity.example.rest.handler
 import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.Uri.Path
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.example.data.{Edge, Vertex}

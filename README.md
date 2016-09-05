@@ -1,12 +1,11 @@
 # Design Goals 
 
- - library for building stateful, horizontally scalable REST APIs
- - must be fault-tolerant
- - must be horizontally scalable
- - zero-downtime should be possible
+ - library for building stateful, scalable REST APIs
  - can be attached to stream-processing systems 
- - currently a prototype but should become a library 
-
+ - fault-tolerance build on top of a distributed-log
+ - horizontally scalable
+ - zero-downtime possible
+ 
 # Architecture
  
 
@@ -30,6 +29,7 @@
  - the first one that registers with coordinator will be a `master`
  - the others will become `standby` 
 ... 
+
 
 
 

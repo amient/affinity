@@ -43,6 +43,11 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
     for (p <- partitionList) {
       context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
     }
+    super.preStart()
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
   }
 
 }
