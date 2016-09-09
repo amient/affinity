@@ -18,14 +18,18 @@
  */
 
 package io.amient.affinity.example.data
-import org.apache.avro.Schema
 
-//TODO declarative schema evolution
-class AvroSerde extends io.amient.affinity.core.data.AvroSerde {
-  override def register: Seq[(Class[_], Schema)] = Seq (
-    classOf[Vertex] -> Vertex.schema,
-    classOf[Edge] -> Edge.schema,
-    classOf[Component] -> Component.schema,
-    classOf[ConfigEntry] -> ConfigEntry.schema
-  )
+import io.amient.affinity.core.storage.KafkaStorage
+
+abstract class AvroKafkaStorage[K <: AnyRef, V <:AnyRef ](topic: String, partition: Int, keyClass: Class[K], valueClass: Class[V])
+  extends KafkaStorage[K, V](topic, partition) {
+  val serde = new AvroSerde()
+
+  override def serialize: (K, V) => (Array[Byte], Array[Byte]) = (k, v) => {
+    (serde.toBytes(k), serde.toBytes(v))
+  }
+
+  override def deserialize: (Array[Byte], Array[Byte]) => (K, V) = (k, v) => {
+    (serde.fromBytes(k, keyClass), serde.fromBytes(v, valueClass))
+  }
 }

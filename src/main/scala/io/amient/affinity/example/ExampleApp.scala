@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example
 
-import io.amient.affinity.example.rest.RestApiNode
+import io.amient.affinity.example.rest.ApiNode
 import io.amient.affinity.example.service.ServiceNode
 
 object ExampleApp extends App {
@@ -30,7 +30,7 @@ object ExampleApp extends App {
 
   // cluster leader(s)
   val numPartitions = "4"
-  RestApiNode.main(Seq("ExampleSystem", "2551", "127.0.0.1","8081", numPartitions, "0,1,2,3").toArray)
+  ApiNode.main(Seq("ExampleSystem", "2551", "127.0.0.1","8081", numPartitions, "0,1,2,3").toArray)
 
 
 //  RestApiNode.main(Seq("ExampleSystem", "2551","127.0.0.1","8081", numPartitions, "0,2").toArray)

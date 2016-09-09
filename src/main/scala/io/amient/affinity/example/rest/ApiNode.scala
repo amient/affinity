@@ -33,7 +33,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-object RestApiNode extends App {
+object ApiNode extends App {
 
   try {
     require(args.length >= 6)
@@ -71,7 +71,7 @@ object RestApiNode extends App {
       with Connect
       with Access
     ))
-    controller ! CreateRegion(Props(new RestApiPartition(appConfig)))
+    controller ! CreateRegion(Props(new ApiPartition(appConfig)))
 
     //in case the process is stopped from outside
     sys.addShutdownHook {

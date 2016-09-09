@@ -52,7 +52,7 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
   //TODO provide a way for broadcasts to keep consuming new messages
   settings.boot(() => true)
 
-  //  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
+  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
 
   object AUTH {
 
@@ -106,6 +106,10 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
       case ContentTypes.`application/json` => jsonValue(errorStatus, Map("error" -> message))
       case _ => textValue(errorStatus, "error: " + message)
     }
+  }
+
+  def redirect(status: StatusCode, uri: Uri): HttpResponse = {
+    HttpResponse(status, headers = List(headers.Location(uri)))
   }
 
 

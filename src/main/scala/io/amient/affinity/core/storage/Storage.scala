@@ -26,16 +26,24 @@ trait Storage[K,V] extends MemStore[K, V] {
     */
   def boot(becomeMaster: () => Boolean): Unit
 
-  override def put(key: K, value: Option[V]): Unit = value match {
-    case None => if (remove_(key)) {
-      write(serialize(key, null.asInstanceOf[V]))
-    }
-    case Some(data) => if (update_(key, data)) {
-      write(serialize(key, data))
-    }
+  /**
+    * Storage offers only simple blocking put so that the mutations do not escape single-threaded actor
+    * context from which it is called
+    * @param key
+    * @param value if None is given as value the key will be removed from the underlying storage
+    *              otherwise the key will be updated with the value
+    */
+  final def put(key: K, value: Option[V]): Unit = value match {
+    case None => if (remove(key)) write(serialize(key, null.asInstanceOf[V])).get()
+    case Some(data) => if (update(key, data)) write(serialize(key, data)).get()
   }
 
-  def write(kv: (Array[Byte], Array[Byte]))
+
+  /**
+    * @param kv key value pair to write
+    * @return Future with metadata returned by the underlying implementation
+    */
+  def write(kv: (Array[Byte], Array[Byte])): java.util.concurrent.Future[_]
   def serialize: (K,V) => (Array[Byte], Array[Byte])
   def deserialize: (Array[Byte], Array[Byte]) => (K,V)
 }

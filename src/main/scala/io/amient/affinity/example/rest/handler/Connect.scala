@@ -19,12 +19,13 @@
 
 package io.amient.affinity.example.rest.handler
 
-import akka.http.scaladsl.model.ContentTypes
+import akka.actor.Status
+import akka.http.scaladsl.model.{ContentTypes, Uri}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.example.data.{Edge, Vertex}
+import io.amient.affinity.example.data.{Component, Edge, Vertex}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.UserInputMediator
 
@@ -34,25 +35,46 @@ trait Connect extends HttpGateway {
 
   import context.dispatcher
 
+  implicit val timeout = Timeout(10 seconds)
+
   abstract override def handle: Receive = super.handle orElse {
 
+
+    case HTTP(GET, PATH("com", INT(id), INT(id2)), query, response) =>
+      val source = Vertex(id)
+      val target = Vertex(id2)
+      val task = cluster ? Component(source, Set(target))
+      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+        case Status.Success => redirect(SeeOther, Uri(s"/com/$id"))
+        case false => errorValue(Conflict, ContentTypes.`application/json`, "already connected")
+      }
+
+    case HTTP(GET, PATH("com", INT(id)), query, response) =>
+      val task = cluster ? Vertex(id)
+      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+        case Some(component) => jsonValue(OK, component)
+        case None => errorValue(NotFound, ContentTypes.`application/json`, "Vertex not found")
+      }
+
     case HTTP(GET, PATH("connect"), query, response) =>
-      implicit val timeout = Timeout(60 seconds)
 
       val userInputMediator = service(classOf[UserInputMediator])
 
-      val task = userInputMediator ? "hello"
-      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+      userInputMediator ? "hello" onSuccess {
         case userInput: String =>
+          println("user input " + userInput)
           val Array(start, end) = userInput.split(",").map(_.toInt)
-          val source = Vertex(start, "A")
-          val target = Vertex(end, "B")
-          cluster ! Edge(source, target)
-          jsonValue(OK, s"Connecting vertex $start with $end")
-
-        case s => errorValue(NotAcceptable,
-          ContentTypes.`application/json`, "Can't give you that: " + s.getClass)
+          val source = Vertex(start)
+          val target = Vertex(end)
+          response.success(jsonValue(OK, source + " " + target))
+//          val task = cluster ? Edge(source, target)
+//          fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+//            case true => redirect(SeeOther, Uri("/vertex/" + source))
+//            case false => errorValue(NotAcceptable, ContentTypes.`application/json`, "could not update graph")
+//          }
       }
+
+
   }
 
 }

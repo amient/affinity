@@ -24,13 +24,13 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
 
 import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import scala.collection.JavaConverters._
 
-abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[K, V] {
+abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage[K, V] {
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", "localhost:9092")
@@ -57,7 +57,7 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
       val consumerPartitions = util.Arrays.asList(tp)
       consumer.assign(consumerPartitions)
       consumer.seekToEnd(consumerPartitions)
-      val records = consumer.poll(1000L)
+      consumer.poll(1000L)
       val lastOffset = consumer.position(tp)
       println(s"`$topic` kafka topic, partition: $partition, latest offset: $lastOffset")
 
@@ -68,8 +68,8 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
         for (r <- records.iterator().asScala) {
           val (key, value) = deserialize(r.key(), r.value())
           r.value() match {
-            case null => remove_(key)
-            case any  => update_(key, value)
+            case null => remove(key)
+            case any => update(key, value)
           }
         }
         if (consumer.position(tp) >= lastOffset) {
@@ -83,10 +83,9 @@ abstract class KafkaStorage[K,V](topic: String, partition :Int) extends Storage[
     }
   }
 
-  def write(kv: (Array[Byte], Array[Byte])) = {
+  def write(kv: (Array[Byte], Array[Byte])): java.util.concurrent.Future[RecordMetadata] = {
     producer.send(new ProducerRecord(topic, partition, kv._1, kv._2))
   }
-
 
 
 }

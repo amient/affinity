@@ -38,14 +38,17 @@
 ## Example Graph API
 
 This example demonstrates a graph data served via API which
-maintains connected-components constant time read characterstics.
+maintains connected-components constant time read characteristics.
 
 The underlying topic which back the mem store should have 4 
 partitions which can be created from kafka installation home dir:
  
-    ./bin/kafka-topics.sh --zookeeper localhost:2181 --create --topic graph \
-        --partitions 4 --replication-factor 2 --config cleanup.policy=compact
+    ./bin/kafka-topics.sh --zookeeper localhost:2181 --topic graph \
+        --create --partitions 4 --replication-factor 2 --config cleanup.policy=compact
     
+    ./bin/kafka-topics.sh --zookeeper localhost:2181 --topic settings \ 
+        --create --partitions 1 --replication-factor 2 --config cleanup.policy=compact
+
 A single node may be started with one region
 serving all 4 partitions byt starting `RestApiNode` with
 the following arguments:

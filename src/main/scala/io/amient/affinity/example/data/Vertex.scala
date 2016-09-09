@@ -26,10 +26,9 @@ object Vertex {
   val schema = SchemaBuilder.record("Vertex")
     .namespace("io.amient.affinity.example.data").fields()
     .name("id").`type`().intType().noDefault()
-    .name("cat").`type`().stringType().noDefault()
     .endRecord()
 }
 
-final case class Vertex(id: Int, cat: String) extends AvroRecord(Vertex.schema) {
+final case class Vertex(id: Int) extends AvroRecord(Vertex.schema) {
   override def hashCode(): Int = id.hashCode()
 }

@@ -27,11 +27,11 @@ trait MemStoreSimpleMap[K,V] extends MemStore[K,V] {
 
   override def iterator = internal.iterator
 
-  override protected def update_(key: K, value: V): Boolean = internal.put(key, value) match {
+  override protected def update(key: K, value: V): Boolean = internal.put(key, value) match {
     case None => true
     case Some(prev) if (prev != value) => true
     case _ => false
   }
 
-  override protected def remove_(key: K): Boolean = internal.remove(key).isDefined
+  override protected def remove(key: K): Boolean = internal.remove(key).isDefined
 }
