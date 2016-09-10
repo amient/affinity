@@ -41,7 +41,8 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   override def preStart(): Unit = {
     log.info("STARTING REGION")
     for (p <- partitionList) {
-      context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
+      //TODO remove pinned-dispatcher; for testing only
+      context.actorOf(partitionProps.withDispatcher("pinned-dispatcher"), name = System.nanoTime() + "-" + p)
     }
     super.preStart()
   }

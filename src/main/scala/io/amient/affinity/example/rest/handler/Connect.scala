@@ -19,13 +19,12 @@
 
 package io.amient.affinity.example.rest.handler
 
-import akka.actor.Status
-import akka.http.scaladsl.model.{ContentTypes, Uri}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{ContentTypes, Uri}
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.example.data.{Component, Edge, Vertex}
+import io.amient.affinity.example.data.{Component, Vertex}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.UserInputMediator
 
@@ -39,13 +38,12 @@ trait Connect extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-
     case HTTP(GET, PATH("com", INT(id), INT(id2)), query, response) =>
       val source = Vertex(id)
       val target = Vertex(id2)
       val task = cluster ? Component(source, Set(target))
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-        case Status.Success => redirect(SeeOther, Uri(s"/com/$id"))
+        case true => redirect(SeeOther, Uri(s"/com/$id"))
         case false => errorValue(Conflict, ContentTypes.`application/json`, "already connected")
       }
 

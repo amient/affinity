@@ -6,28 +6,13 @@ ext {
     javaVersion = '1.8'
     scalaVersion = '2.11.7'
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
-    akkaVersion = '2.4.9-RC2'
+    akkaVersion = '2.4.10'
     zkClientVersion = '0.9'
     rocksDbVersion = '4.9.0'
     kafkaClientVersion = '0.10.0.1'
     avroVersion = '1.8.1'
     jacksonVersion = '2.7.5'
 }
-
-//avro code generator
-//buildscript {
-//    repositories {
-//        maven {
-//            url "https://plugins.gradle.org/m2/"
-//        }
-//    }
-//    dependencies {
-//        classpath "com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0"
-//    }
-//}
-//apply plugin: "com.commercehub.gradle.plugin.avro"
-//avro code generator
-
 
 apply plugin: 'java'
 apply plugin: 'scala'

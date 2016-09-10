@@ -22,15 +22,9 @@ package io.amient.affinity.example.rest
 import java.util.Properties
 
 import akka.actor.Status
-import akka.pattern.ask
-import akka.util.Timeout
 import io.amient.affinity.core.actor.Service
 import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.example.data.{Component, _}
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 class ApiPartition(config: Properties) extends Service {
 
@@ -43,8 +37,6 @@ class ApiPartition(config: Properties) extends Service {
 
   //TODO provide function that can detect master-standby status changes
   graph.boot(() => true)
-
-  import context.dispatcher
 
   override def receive = {
 
@@ -60,38 +52,30 @@ class ApiPartition(config: Properties) extends Service {
     case vertex: Vertex => sender ! graph.get(vertex)
 
     case component@Component(vertex, edges) =>
-      println(vertex + " -> " + edges)
       graph.get(vertex) match {
-        case Some(existing) if (existing.edges.forall(component.edges.contains)) =>
-          println("$-")
-          sender ! Status.Success
+        case Some(existing) if (existing.edges.forall(edges.contains)) =>
+          sender ! false
 
         case None =>
           graph.put(vertex, Some(component))
-          edges.foreach{edge =>
-            println(edges)
-            cluster ! Component(edge, Set(vertex))
-          }
-          println("$OK")
-          sender ! Status.Success
+          edges.foreach { edge => cluster ! Component(edge, Set(vertex)) }
+          sender ! true
 
         case Some(existing) =>
           val additionalEdges = edges.diff(existing.edges)
           if (additionalEdges.isEmpty) {
-            println("$-")
             sender ! false
           } else {
-            println("$OK")
             println(vertex + " additional edges: " + additionalEdges)
             println(vertex + " existing edges: " + existing.edges)
             graph.put(vertex, Some(Component(vertex, existing.edges ++ additionalEdges)))
-//            existing.edges.foreach { connected =>
-//              cluster ! Component(connected, additionalEdges)
-//            }
-//            additionalEdges.foreach { connected =>
-//              cluster ! Component(connected, Set(vertex))
-//            }
-            sender ! Status.Success
+            //            existing.edges.foreach { connected =>
+            //              cluster ! Component(connected, additionalEdges)
+            //            }
+            //            additionalEdges.foreach { connected =>
+            //              cluster ! Component(connected, Set(vertex))
+            //            }
+            sender ! true
           }
       }
 

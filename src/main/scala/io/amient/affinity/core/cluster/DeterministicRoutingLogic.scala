@@ -57,6 +57,8 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       case v => partition(v)
     }
 
+    //println(s"routing $message to partition $p")
+
     //TODO test the suspended scenario
     if (!currentRouteMap.containsKey(p)) throw new IllegalStateException(
       s"Partition `$p` is not represented by any Actor - " +
