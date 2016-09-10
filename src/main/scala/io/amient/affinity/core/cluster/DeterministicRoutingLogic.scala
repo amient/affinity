@@ -34,7 +34,7 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
     (math.abs(key.hashCode()) match {
       case Int.MinValue => 0
       case a => a
-    })  % numPartitions
+    }) % numPartitions
   }
 
   def select(message: Any, routees: immutable.IndexedSeq[Routee]): Routee = {
@@ -57,7 +57,7 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       case v => partition(v)
     }
 
-    //println(s"routing $message to partition $p")
+    //    println(s"routing $message to partition $p")
 
     //TODO test the suspended scenario
     if (!currentRouteMap.containsKey(p)) throw new IllegalStateException(

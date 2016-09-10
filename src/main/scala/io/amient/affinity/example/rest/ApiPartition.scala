@@ -66,21 +66,15 @@ class ApiPartition(config: Properties) extends Service {
           if (additionalEdges.isEmpty) {
             sender ! false
           } else {
-            println(vertex + " additional edges: " + additionalEdges)
-            println(vertex + " existing edges: " + existing.edges)
             graph.put(vertex, Some(Component(vertex, existing.edges ++ additionalEdges)))
-            //            existing.edges.foreach { connected =>
-            //              cluster ! Component(connected, additionalEdges)
-            //            }
-            //            additionalEdges.foreach { connected =>
-            //              cluster ! Component(connected, Set(vertex))
-            //            }
+            existing.edges.foreach { connected =>
+              cluster ! Component(connected, additionalEdges)
+            }
+            additionalEdges.foreach { connected =>
+              cluster ! Component(connected, Set(vertex))
+            }
             sender ! true
           }
       }
-
-
-    case unknown => sender ! Status.Failure(new IllegalArgumentException(unknown.getClass.getName))
-
   }
 }
