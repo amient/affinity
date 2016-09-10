@@ -22,9 +22,15 @@ package io.amient.affinity.example.rest
 import java.util.Properties
 
 import akka.actor.Status
+import akka.pattern.ask
+import akka.util.Timeout
 import io.amient.affinity.core.actor.Service
 import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.example.data.{Component, _}
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 class ApiPartition(config: Properties) extends Service {
 
@@ -38,11 +44,13 @@ class ApiPartition(config: Properties) extends Service {
   //TODO provide function that can detect master-standby status changes
   graph.boot(() => true)
 
+  import context.dispatcher
+
+  implicit val timeout = Timeout(10 seconds)
+
   override def receive = {
 
     case (p: Int, stateError: IllegalStateException) => throw stateError
-
-    case (ts: Long, "ping") => sender ! (self.path.name, "pong")
 
     case (p: Int, "describe") =>
       sender ! Map(
@@ -53,28 +61,66 @@ class ApiPartition(config: Properties) extends Service {
 
     case component@Component(vertex, edges) =>
       graph.get(vertex) match {
-        case Some(existing) if (existing.edges.forall(edges.contains)) =>
-          sender ! false
+        case Some(existing) if (existing.edges.forall(edges.contains)) => sender ! false
 
-        case None =>
+        case None => try {
           graph.put(vertex, Some(component))
-          edges.foreach { edge => cluster ! Component(edge, Set(vertex)) }
-          sender ! true
 
-        case Some(existing) =>
+          val propagate = edges.toList.map {
+            cluster ? Component(_, Set(vertex))
+          }.map(_ map {
+            case _ => true
+          } recover {
+            case t: Throwable => false
+          })
+
+          val origin = sender
+          for (success <- Future.sequence(propagate)) {
+            if (!success.forall(_ == true)) {
+              //compensate failure - TODO use atomic version operation on the graph because this is async and some other call may have modified the component
+              graph.put(vertex, None)
+              //TODO compensate those calls that succeeded during propagation
+              origin ! Status.Failure(new IllegalStateException("propagation failed on new component - attempting to compensate"))
+            } else {
+              origin ! true
+            }
+          }
+        } catch {
+          case NonFatal(e) => sender ! Status.Failure(e)
+        }
+
+        case Some(existing) => try {
           val additionalEdges = edges.diff(existing.edges)
           if (additionalEdges.isEmpty) {
             sender ! false
           } else {
             graph.put(vertex, Some(Component(vertex, existing.edges ++ additionalEdges)))
-            existing.edges.foreach { connected =>
-              cluster ! Component(connected, additionalEdges)
+
+            val propagate = existing.edges.toList.map {
+              cluster ? Component(_, additionalEdges)
+            } ++ additionalEdges.toList.map {
+              cluster ? Component(_, Set(vertex))
+            } map(_ map {
+              case _ => true
+            } recover {
+              case t: Throwable => false
+            })
+
+            val origin = sender
+            for (success <- Future.sequence(propagate)) {
+              if (!success.forall(_ == true)) {
+                //compensate failure - TODO use atomic version operation on the graph because this is async and some other call may have modified the component
+                graph.put(vertex, Some(existing))
+                //TODO compensate those calls that succeeded during propagation
+                origin ! Status.Failure(new IllegalStateException("propagation failed on existing component - attempting to compensate"))
+              } else {
+                origin ! true
+              }
             }
-            additionalEdges.foreach { connected =>
-              cluster ! Component(connected, Set(vertex))
-            }
-            sender ! true
           }
+        } catch {
+          case NonFatal(e) => sender ! Status.Failure(e)
+        }
       }
   }
 }

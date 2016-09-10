@@ -19,27 +19,15 @@
 
 package io.amient.affinity.example.rest.handler
 
-import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.pattern.ask
-import akka.util.Timeout
 import io.amient.affinity.example.rest.HttpGateway
-
-import scala.concurrent.duration._
 
 trait Ping extends HttpGateway {
 
-  import context.dispatcher
-
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH("ping"), _, response) =>
-      implicit val timeout = Timeout(1 second)
-      val task = cluster ? (System.currentTimeMillis(), "ping")
-      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-        case any => jsonValue(OK, any)
-      }
+    case HTTP(GET, PATH("ping"), _, response) => response.success(jsonValue(OK, "pong"))
   }
 
 }

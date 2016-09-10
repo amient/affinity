@@ -19,6 +19,7 @@
 
 package io.amient.affinity.example.rest.handler
 
+import akka.actor.Status
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{ContentTypes, Uri}
@@ -44,7 +45,7 @@ trait Connect extends HttpGateway {
       val task = cluster ? Component(source, Set(target))
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
         case true => redirect(SeeOther, Uri(s"/com/$id"))
-        case false => errorValue(Conflict, ContentTypes.`application/json`, "already connected")
+        case false => redirect(MovedPermanently, Uri(s"/com/$id"))
       }
 
     case HTTP(GET, PATH("com", INT(id)), query, response) =>
@@ -54,24 +55,11 @@ trait Connect extends HttpGateway {
         case None => errorValue(NotFound, ContentTypes.`application/json`, "Vertex not found")
       }
 
-    case HTTP(GET, PATH("connect"), query, response) =>
-
+    case HTTP(GET, PATH("delegate"), query, response) =>
       val userInputMediator = service(classOf[UserInputMediator])
-
       userInputMediator ? "hello" onSuccess {
-        case userInput: String =>
-          println("user input " + userInput)
-          val Array(start, end) = userInput.split(",").map(_.toInt)
-          val source = Vertex(start)
-          val target = Vertex(end)
-          response.success(jsonValue(OK, source + " " + target))
-//          val task = cluster ? Edge(source, target)
-//          fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-//            case true => redirect(SeeOther, Uri("/vertex/" + source))
-//            case false => errorValue(NotAcceptable, ContentTypes.`application/json`, "could not update graph")
-//          }
+        case userInput: String => response.success(htmlValue(OK, userInput))
       }
-
 
   }
 
