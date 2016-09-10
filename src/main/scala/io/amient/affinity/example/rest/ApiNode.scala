@@ -21,16 +21,11 @@ package io.amient.affinity.example.rest
 
 import java.util.Properties
 
-import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.HttpInterface
-import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion}
-import io.amient.affinity.core.actor.{Controller, Node, Region}
-import io.amient.affinity.core.cluster.{Cluster, Coordinator, ZkCoordinator}
+import io.amient.affinity.core.actor.{Container, Region}
+import io.amient.affinity.core.cluster.{Cluster, Coordinator, Node, ZkCoordinator}
 import io.amient.affinity.example.rest.handler._
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object ApiNode extends App {
@@ -46,38 +41,30 @@ object ApiNode extends App {
     val partitionList = args(5) // coma-separated list of partitions assigned to this node
     val zkConnect = if (args.length > 6) args(6) else "localhost:2181"
 
-    val appConfig = new Properties()
-    appConfig.put(HttpInterface.CONFIG_HTTP_HOST, host)
-    appConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
-    appConfig.put(Cluster.CONFIG_NUM_PARTITIONS, numPartitions.toString)
-    appConfig.put(Node.CONFIG_AKKA_HOST, host)
-    appConfig.put(Node.CONFIG_AKKA_PORT, akkaPort.toString)
-    appConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
-    appConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
-    appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+    val affinityConfig = new Properties()
+    affinityConfig.put(HttpInterface.CONFIG_HTTP_HOST, host)
+    affinityConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
+    affinityConfig.put(Cluster.CONFIG_NUM_PARTITIONS, numPartitions.toString)
+    affinityConfig.put(Container.CONFIG_AKKA_SYSTEM, actorSystemName)
+    affinityConfig.put(Container.CONFIG_AKKA_HOST, host)
+    affinityConfig.put(Container.CONFIG_AKKA_PORT, akkaPort.toString)
+    affinityConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
+    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
+    affinityConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
 
-    val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-      .withFallback(ConfigFactory.load("example"))
+    //this API cluster is symmetric - all nodes serve both as Gateways and Regions
+    new Node(affinityConfig) {
 
-    implicit val system = ActorSystem(actorSystemName, systemConfig)
+      startRegion(new ApiPartition(affinityConfig))
 
-    val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
+      startGateway(new HttpGateway(affinityConfig)
+        with Describe
+        with Ping
+        with Fail
+        with Connect
+        with Access
+      )
 
-    //this cluster is symmetric - all nodes serve both as Gateways and Regions
-    controller ! CreateGateway(Props(new HttpGateway(appConfig)
-      with Describe
-      with Ping
-      with Fail
-      with Connect
-      with Access
-    ))
-    controller ! CreateRegion(Props(new ApiPartition(appConfig)))
-
-    //in case the process is stopped from outside
-    sys.addShutdownHook {
-      system.terminate()
-      //we cannot use the future returned by system.terminate() because shutdown may have already been invoked
-      Await.ready(system.whenTerminated, 30 seconds) // TODO shutdown timeout by configuration
     }
 
   } catch {

@@ -32,6 +32,8 @@ object Controller {
 
   final case class CreateGateway(handlerProps: Props)
 
+  final case class CreateServiceContainer(services: Seq[Props])
+
   final case class GatewayCreated()
 
 }
@@ -70,6 +72,21 @@ class Controller(appConfig: Properties) extends Actor {
   }
 
   override def receive: Receive = {
+
+    case CreateServiceContainer(services) =>
+      try {
+        context.actorOf(Props(new Container(appConfig, coordinator, "services") {
+          services.foreach { serviceProps =>
+            context.actorOf(serviceProps, serviceProps.actorClass().getName)
+          }
+        }), name = "services")
+      } catch {
+        case e: Throwable =>
+          system.terminate() onComplete { _ =>
+            e.printStackTrace()
+            System.exit(11)
+          }
+      }
 
     case CreateRegion(partitionProps) =>
       try {

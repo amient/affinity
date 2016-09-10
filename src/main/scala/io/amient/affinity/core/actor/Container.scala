@@ -21,15 +21,14 @@ package io.amient.affinity.core.actor
 
 import java.util.Properties
 
-import akka.actor.{Actor, ActorPath, ActorRef, Props}
+import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
 import io.amient.affinity.core.cluster.Coordinator
 
-import scala.reflect.ClassTag
-
-object Node {
+object Container {
   final val CONFIG_AKKA_HOST = "gateway.akka.host"
   final val CONFIG_AKKA_PORT = "gateway.akka.port"
+  final val CONFIG_AKKA_SYSTEM = "gateway.akka.system.name"
 
   case class ServiceOnline(partition: ActorRef)
 
@@ -37,11 +36,11 @@ object Node {
 
 }
 
-class Node(appConfig: Properties, coordinator: Coordinator, group: String) extends Actor {
+class Container(appConfig: Properties, coordinator: Coordinator, group: String) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
-  import Node._
+  import Container._
 
   val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT, "2552").toInt
   val akkaAddress = appConfig.getProperty(CONFIG_AKKA_HOST, null) match {
@@ -50,10 +49,6 @@ class Node(appConfig: Properties, coordinator: Coordinator, group: String) exten
   }
 
   private val services = scala.collection.mutable.Map[ActorRef, String]()
-
-  protected def register[T <: Service](creator: => T)(implicit tag: ClassTag[T]) = {
-    context.actorOf(Props(creator), tag.runtimeClass.getName)
-  }
 
   override def postStop(): Unit = {
     services.foreach { case (ref, handle) =>

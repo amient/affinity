@@ -21,7 +21,7 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.event.Logging
-import io.amient.affinity.core.actor.Node.{ServiceOffline, ServiceOnline}
+import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
 
 trait Service extends Actor {
 

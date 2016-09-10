@@ -19,15 +19,11 @@
 
 package io.amient.affinity.example.service
 
-import java.util.{Properties, UUID}
+import java.util.Properties
 
-import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
-import io.amient.affinity.core.actor.Node
-import io.amient.affinity.core.cluster.{Coordinator, ZkCoordinator}
+import io.amient.affinity.core.actor.Container
+import io.amient.affinity.core.cluster.{Coordinator, Node, ZkCoordinator}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object ServiceNode extends App {
@@ -40,41 +36,19 @@ object ServiceNode extends App {
     val host = args(2)
     val zkConnect = if (args.length > 3) args(3) else "localhost:2181"
 
-    val appConfig = new Properties()
-    appConfig.put(Node.CONFIG_AKKA_HOST, host)
-    appConfig.put(Node.CONFIG_AKKA_PORT, akkaPort.toString)
-    appConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
-    appConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+    val affinityConfig = new Properties()
+    affinityConfig.put(Container.CONFIG_AKKA_SYSTEM, actorSystemName)
+    affinityConfig.put(Container.CONFIG_AKKA_HOST, host)
+    affinityConfig.put(Container.CONFIG_AKKA_PORT, akkaPort.toString)
+    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
+    affinityConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
 
-    val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-      .withFallback(ConfigFactory.load("example"))
+    new Node(affinityConfig) {
 
-    //TODO this should be also probably hidden by extending Node which could have simply main method
-    implicit val system = ActorSystem(actorSystemName, systemConfig)
+      startServices{
+        new UserInputMediator
+      }
 
-    import system.dispatcher
-
-    //TODO coordinator construction is leaked here - Controller should be responsilbe for this
-    val coordinator = try {
-      Coordinator.fromProperties(appConfig)
-    } catch {
-      case e: Throwable =>
-        system.terminate() onComplete { _ =>
-          e.printStackTrace()
-          System.exit(10)
-        }
-        throw e
-    }
-
-    val node = system.actorOf(Props(new Node(appConfig, coordinator, "services") {
-      register(new UserInputMediator)
-    }), name = "singleton")
-
-    //in case the process is stopped from outside
-    sys.addShutdownHook {
-      system.terminate()
-      //we cannot use the future returned by system.terminate() because shutdown may have already been invoked
-      Await.ready(system.whenTerminated, 30 seconds) // TODO shutdown timeout by configuration
     }
 
   } catch {

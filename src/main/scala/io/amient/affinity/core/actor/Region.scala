@@ -30,7 +30,7 @@ object Region {
 }
 
 class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Props)
-  extends Node(appConfig: Properties, coordinator: Coordinator, "regions") {
+  extends Container(appConfig: Properties, coordinator: Coordinator, "regions") {
 
   override val log = Logging.getLogger(context.system, this)
 
