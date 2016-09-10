@@ -21,9 +21,11 @@ package io.amient.affinity.core.actor
 
 import java.util.Properties
 
-import akka.actor.{Actor, ActorPath, ActorRef}
+import akka.actor.{Actor, ActorPath, ActorRef, Props}
 import akka.event.Logging
 import io.amient.affinity.core.cluster.Coordinator
+
+import scala.reflect.ClassTag
 
 object Node {
   final val CONFIG_AKKA_HOST = "gateway.akka.host"
@@ -48,6 +50,10 @@ class Node(appConfig: Properties, coordinator: Coordinator, group: String) exten
   }
 
   private val services = scala.collection.mutable.Map[ActorRef, String]()
+
+  protected def register[T <: Service](creator: => T)(implicit tag: ClassTag[T]) = {
+    context.actorOf(Props(creator), tag.runtimeClass.getName)
+  }
 
   override def postStop(): Unit = {
     services.foreach { case (ref, handle) =>

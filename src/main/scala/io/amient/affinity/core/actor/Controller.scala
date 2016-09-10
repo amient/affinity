@@ -28,7 +28,7 @@ import io.amient.affinity.core.cluster.Coordinator
 
 object Controller {
 
-  final case class CreateRegion(handlerProps: Props)
+  final case class CreateRegion(partitionProps: Props)
 
   final case class CreateGateway(handlerProps: Props)
 
@@ -71,9 +71,9 @@ class Controller(appConfig: Properties) extends Actor {
 
   override def receive: Receive = {
 
-    case CreateRegion(handlerProps) =>
+    case CreateRegion(partitionProps) =>
       try {
-        context.actorOf(Props(new Region(appConfig, coordinator, handlerProps)), name = "region")
+        context.actorOf(Props(new Region(appConfig, coordinator, partitionProps)), name = "region")
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>

@@ -19,40 +19,15 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.Properties
-
-import akka.actor.Props
 import akka.event.Logging
-import io.amient.affinity.core.cluster.Coordinator
 
-object Region {
-  final val CONFIG_PARTITION_LIST = "partition.list"
-}
-
-class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Props)
-  extends Node(appConfig: Properties, coordinator: Coordinator, "regions") {
+trait Partition extends Service {
 
   override val log = Logging.getLogger(context.system, this)
 
-  import Region._
-
-  val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
-
-  override def preStart(): Unit = {
-    log.info("STARTING REGION")
-    for (p <- partitionList) {
-      /**
-        * partition actor name format <timestamp>-<parition-id> is relied upon by DeterministicRoutingLogic
-        * as well as Partition
-        */
-      context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
-    }
-    super.preStart()
-  }
-
-  override def postStop(): Unit = {
-    super.postStop()
-  }
+  /**
+    * physical partition id - this is read from the fragment of the Partition Actor Path Name assigned by the Region
+    */
+  val partition = self.path.name.split("-").last.toInt
 
 }
-

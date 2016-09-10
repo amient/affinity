@@ -24,7 +24,7 @@ import java.util.Properties
 import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Service
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.example.data.{Component, _}
 
@@ -32,10 +32,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-class ApiPartition(config: Properties) extends Service {
-
-  //TODO it is a bit obscure that the partition is passed from Region via path component
-  val partition = self.path.name.split("-").last.toInt
+class ApiPartition(config: Properties) extends Partition {
 
   //partitioned memstore
   val graph = new AvroKafkaStorage[Vertex, Component](topic = "graph", partition,

@@ -49,11 +49,12 @@ object ServiceNode extends App {
     val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
       .withFallback(ConfigFactory.load("example"))
 
-
+    //TODO this should be also probably hidden by extending Node which could have simply main method
     implicit val system = ActorSystem(actorSystemName, systemConfig)
 
     import system.dispatcher
 
+    //TODO coordinator construction is leaked here - Controller should be responsilbe for this
     val coordinator = try {
       Coordinator.fromProperties(appConfig)
     } catch {
@@ -65,11 +66,9 @@ object ServiceNode extends App {
         throw e
     }
 
-    //TODO the fact that the node actor has a name "services" should be hidden behind the API - maybe refactor Controller to handle this as well
     val node = system.actorOf(Props(new Node(appConfig, coordinator, "services") {
-      //TODO generalise and formalise the way names are generated for services
-      context.actorOf(Props(new UserInputMediator), classOf[UserInputMediator].getName)
-    }), name = "services")
+      register(new UserInputMediator)
+    }), name = "singleton")
 
     //in case the process is stopped from outside
     sys.addShutdownHook {

@@ -19,7 +19,6 @@
 
 package io.amient.affinity.example.rest.handler
 
-import akka.actor.Status
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{ContentTypes, Uri}

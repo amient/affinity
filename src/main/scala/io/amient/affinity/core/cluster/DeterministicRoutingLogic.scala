@@ -45,8 +45,11 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
           currentRouteMap.clear()
           routees.foreach {
             case actorRefRoutee: ActorRefRoutee =>
-              //TODO same obscure naming used to extract partition id
-              currentRouteMap.put(actorRefRoutee.ref.path.name.split("-")(1).toInt, actorRefRoutee)
+              /**
+                * relying on Region to assign partition name fragment ending with physical partition id
+                */
+              val partition = actorRefRoutee.ref.path.name.split("-")(1).toInt
+              currentRouteMap.put(partition, actorRefRoutee)
           }
           prevRoutees = routees
         }

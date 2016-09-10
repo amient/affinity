@@ -31,7 +31,7 @@ trait Service extends Actor {
 
   override def preStart(): Unit = {
     log.info("Starting service: " + self.path.name)
-    context.parent ! Node.ServiceOnline(self)
+    context.parent ! ServiceOnline(self)
     super.preStart()
   }
 
