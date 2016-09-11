@@ -34,7 +34,4 @@ final case class Component(val key: Vertex, val edges: Set[Vertex])
   extends AvroRecord(Component.schema) {
 
   override def hashCode(): Int = key.hashCode
-
-  override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[Component] &&
-    obj.asInstanceOf[Component].key == key && obj.asInstanceOf[Component].edges == edges
 }

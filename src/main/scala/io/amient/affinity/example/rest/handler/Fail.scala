@@ -34,6 +34,8 @@ trait Fail extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
+    case HTTP(GET, PATH("kill"), _, response) => context.system.terminate()
+
     case HTTP(GET, PATH("fail", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, new IllegalStateException(System.currentTimeMillis.toString))

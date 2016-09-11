@@ -32,7 +32,4 @@ object Edge {
 final case class Edge(source: Vertex, target: Vertex) extends AvroRecord(Edge.schema) {
   override def hashCode(): Int = source.hashCode()
 
-  override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[Edge] &&
-    obj.asInstanceOf[Edge].source == source && obj.asInstanceOf[Edge].target == target
-
 }

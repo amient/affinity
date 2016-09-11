@@ -26,7 +26,7 @@ abstract class AvroKafkaStorage[K <: AnyRef, V <:AnyRef ](topic: String, partiti
   val serde = new AvroSerde()
 
   override def serialize: (K, V) => (Array[Byte], Array[Byte]) = (k, v) => {
-    (serde.toBytes(k), serde.toBytes(v))
+    (serde.toBinary(k), serde.toBinary(v))
   }
 
   override def deserialize: (Array[Byte], Array[Byte]) => (K, V) = (k, v) => {

@@ -36,6 +36,4 @@ final case class ConfigEntry(val1: String, @JsonIgnore salt: String) extends Avr
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
   override def hashCode(): Int = val1.hashCode()
 
-  override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[ConfigEntry] &&
-    obj.asInstanceOf[ConfigEntry].val1 == val1 && obj.asInstanceOf[ConfigEntry].salt == salt
 }

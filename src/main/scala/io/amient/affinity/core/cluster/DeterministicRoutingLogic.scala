@@ -41,18 +41,18 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
 
     if (!prevRoutees.eq(routees)) {
       prevRoutees.synchronized {
-        if (!prevRoutees.eq(routees)) {
-          currentRouteMap.clear()
-          routees.foreach {
-            case actorRefRoutee: ActorRefRoutee =>
-              /**
-                * relying on Region to assign partition name fragment ending with physical partition id
-                */
-              val partition = actorRefRoutee.ref.path.name.split("-")(1).toInt
-              currentRouteMap.put(partition, actorRefRoutee)
+          if (!prevRoutees.eq(routees)) {
+            currentRouteMap.clear()
+            routees.foreach {
+              case actorRefRoutee: ActorRefRoutee =>
+                /**
+                  * relying on Region to assign partition name equal to physical partition id
+                  */
+                val partition = actorRefRoutee.ref.path.name.toInt
+                currentRouteMap.put(partition, actorRefRoutee)
+            }
+            prevRoutees = routees
           }
-          prevRoutees = routees
-        }
       }
     }
     val p = message match {

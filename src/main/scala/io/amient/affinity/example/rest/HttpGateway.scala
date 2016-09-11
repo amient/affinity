@@ -42,7 +42,7 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
     val serde = new AvroSerde()
 
     override def serialize: (String, ConfigEntry) => (Array[Byte], Array[Byte]) = (k, v) => {
-      (if (k == null) null else k.getBytes(), serde.toBytes(v))
+      (if (k == null) null else k.getBytes(), serde.toBinary(v))
     }
 
     override def deserialize: (Array[Byte], Array[Byte]) => (String, ConfigEntry) = (k, v) => {
@@ -116,6 +116,7 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
   def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
     promise.completeWith(future map (f) recover {
+      case e: NoSuchElementException => handleError(StatusCodes.NotFound)
       case e: IllegalArgumentException => e.printStackTrace(); handleError(StatusCodes.NotImplemented)
       case NonFatal(e) => e.printStackTrace(); handleError(StatusCodes.InternalServerError)
       case e => e.printStackTrace(); handleError(ServiceUnavailable)

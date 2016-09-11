@@ -54,7 +54,10 @@ class ApiPartition(config: Properties) extends Partition {
         "partition" -> partition,
         "graph" -> graph.iterator.map(_._2).toList)
 
-    case vertex: Vertex => sender ! graph.get(vertex)
+    case vertex: Vertex => graph.get(vertex) match {
+      case None => sender ! Status.Failure(new NoSuchElementException)
+      case Some(component) => sender ! component
+    }
 
     case component@Component(vertex, edges) =>
       graph.get(vertex) match {

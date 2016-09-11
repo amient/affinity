@@ -32,7 +32,4 @@ object Vertex {
 final case class Vertex(id: Int) extends AvroRecord(Vertex.schema) {
   override def hashCode(): Int = id.hashCode()
 
-  override def equals(obj: scala.Any): Boolean = obj.isInstanceOf[Vertex] &&
-    obj.asInstanceOf[Vertex].id == id
-
 }

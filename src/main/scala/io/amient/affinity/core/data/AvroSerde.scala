@@ -28,8 +28,8 @@ abstract class AvroSerde extends JSerializer {
     cls -> i
   }.toMap
 
-  val reg2: Map[Int, Schema] = register.zipWithIndex.map { case ((cls, schema), i) =>
-    i -> schema
+  val reg2: Map[Int, (Class[_], Schema)] = register.zipWithIndex.map { case ((cls, schema), i) =>
+    i -> (cls, schema)
   }.toMap
 
   def register: Seq[(Class[_], Schema)]
@@ -37,24 +37,25 @@ abstract class AvroSerde extends JSerializer {
   override def identifier: Int = 21
 
   override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = {
-    fromBytes(bytes, manifest.asSubclass(classOf[AnyRef]))
+    AvroRecord.read(bytes, (schemaId: Int) => reg2(schemaId))
   }
 
-  override def toBinary(o: AnyRef): Array[Byte] = toBytes(o)
-
-  override def includeManifest: Boolean = false
-
-  def toBytes[T](obj: T): Array[Byte] = {
+  override def toBinary(obj: AnyRef): Array[Byte] = {
     if (obj == null) null else reg1.get(obj.getClass) match {
       case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
       case Some(schemaId) =>
-        val schema = reg2(schemaId)
+        val schema = reg2(schemaId)._2
         AvroRecord.write(obj, schema, schemaId)
     }
   }
 
+  override def includeManifest: Boolean = false
+
+
   def fromBytes[T <: AnyRef](bytes: Array[Byte], cls: Class[T]): T = {
-    AvroRecord.read(bytes, cls, (schemaId: Int) => reg2(schemaId))
+    if (bytes == null) null.asInstanceOf[T] else {
+      AvroRecord.read(bytes, cls, (schemaId: Int) => reg2(schemaId))
+    }
   }
 
 

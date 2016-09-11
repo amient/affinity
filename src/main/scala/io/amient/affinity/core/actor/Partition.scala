@@ -26,8 +26,8 @@ trait Partition extends Service {
   override val log = Logging.getLogger(context.system, this)
 
   /**
-    * physical partition id - this is read from the fragment of the Partition Actor Path Name assigned by the Region
+    * physical partition id - this is read from the name of the Partition Actor; assigned by the Region
     */
-  val partition = self.path.name.split("-").last.toInt
+  val partition = self.path.name.toInt
 
 }

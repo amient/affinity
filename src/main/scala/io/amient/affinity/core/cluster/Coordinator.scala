@@ -32,6 +32,7 @@ import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 object Coordinator {
 
@@ -56,11 +57,11 @@ trait Coordinator {
   import Coordinator._
 
   /**
-    * @param group node type / group
+    * @param group     node type / group
     * @param actorPath of the actor that needs to managed as part of coordinated group
     * @return unique coordinator handle which points to the registered ActorPath
     */
-  def register(group:String, actorPath: ActorPath): String
+  def register(group: String, actorPath: ActorPath): String
 
   /**
     * unregister previously registered ActorPath
@@ -78,7 +79,7 @@ trait Coordinator {
     * @param system  ActorSystem instance
     * @param watcher actor which will receive the messages
     */
-  def watchRoutees(system: ActorSystem, group:String, watcher: ActorRef): Unit
+  def watchRoutees(system: ActorSystem, group: String, watcher: ActorRef): Unit
 
   def close(): Unit
 
@@ -93,8 +94,16 @@ trait Coordinator {
     if (handles.containsKey(routeeHandle)) {
       val entry = handles.remove(routeeHandle)
       if (entry != null) {
-        if (entry.path.toStringWithoutAddress.startsWith("/user/controller/region")) {
+        val relPath = entry.path.toStringWithoutAddress
+        if (relPath.startsWith("/user/controller/region")) {
           watcher ! RemoveRoutee(ActorRefRoutee(entry))
+          val replicas = handles.asScala.filter(_._2.path.toStringWithoutAddress == relPath)
+          if (replicas.size > 0) {
+            val newLeader = replicas.minBy(_._1)
+            watcher ! AddRoutee(ActorRefRoutee(newLeader._2))
+          } else {
+            //TODO last replica removed - no leader available
+          }
         } else {
           watcher ! RemoveService(entry)
         }
@@ -108,16 +117,28 @@ trait Coordinator {
                                routeePath: String,
                                force: Boolean = false): Unit = {
     import system.dispatcher
-    implicit val timeout = new Timeout(24 hours)
-    system.actorSelection(routeePath).resolveOne() onSuccess  {
-      case partitionActorRef =>
+    val t = 24 hours
+    implicit val timeout = new Timeout(t)
+    system.actorSelection(routeePath).resolveOne() onComplete {
+      case Failure(e) => e.printStackTrace() //TODO handle this by recursive retry few times and than exit the system
+      case Success(partitionActorRef) =>
         if (force || !handles.containsKey(routeeHandle)) {
-          handles.put(routeeHandle, partitionActorRef)
-          if (partitionActorRef.path.toStringWithoutAddress.startsWith("/user/controller/region")) {
-            watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
+          val relPath = partitionActorRef.path.toStringWithoutAddress
+          if (relPath.startsWith("/user/controller/region")) {
+            val replicas = handles.asScala.filter(_._2.path.toStringWithoutAddress == relPath)
+            if (replicas.size > 0) {
+              val (leaderHandle, leaderActorRef) = replicas.minBy(_._1)
+              if (routeeHandle < leaderHandle) {
+                watcher ! RemoveRoutee(ActorRefRoutee(leaderActorRef))
+                watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
+              }
+            } else {
+              watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
+            }
           } else {
             watcher ! AddService(partitionActorRef)
           }
+          handles.put(routeeHandle, partitionActorRef)
         }
     }
   }
@@ -150,7 +171,7 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
 
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
 
-  override def register(group:String, actorPath: ActorPath): String = {
+  override def register(group: String, actorPath: ActorPath): String = {
     val groupRoot = s"$zkRoot/$group"
     if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
     zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
@@ -173,14 +194,14 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
           newHandles.foreach { handle =>
             addRouteeActor(system, watcher, handle, zk.readData(handle), force = false)
           }
-          getAllHandles.filter(id => id.startsWith(parentPath) && !newHandles.contains(id)).foreach{ handle =>
+          getAllHandles.filter(id => id.startsWith(parentPath) && !newHandles.contains(id)).foreach { handle =>
             removeRoutee(watcher, handle)
           }
         }
       }
     })
 
-    listAsIndexedSeq(zk.getChildren(groupRoot)).map(id => s"$groupRoot/$id").foreach{ handle =>
+    listAsIndexedSeq(zk.getChildren(groupRoot)).map(id => s"$groupRoot/$id").foreach { handle =>
       addRouteeActor(system, watcher, handle, zk.readData(handle), force = true)
     }
   }

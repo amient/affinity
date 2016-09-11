@@ -40,12 +40,12 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
   override def preStart(): Unit = {
     log.info("STARTING REGION")
-    for (p <- partitionList) {
+    for (partition <- partitionList) {
       /**
-        * partition actor name format <timestamp>-<parition-id> is relied upon by DeterministicRoutingLogic
+        * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
         * as well as Partition
         */
-      context.actorOf(partitionProps, name = System.nanoTime() + "-" + p)
+        context.actorOf(partitionProps, name = partition.toString )
     }
     super.preStart()
   }

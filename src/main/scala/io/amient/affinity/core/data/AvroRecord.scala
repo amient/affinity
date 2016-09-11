@@ -64,15 +64,27 @@ object AvroRecord {
     readRecord(record, cls).asInstanceOf[T]
   }
 
-  def read[T](bytes: Array[Byte], cls: Class[T], schemaRegistry: (Int) => Schema): T = {
+  def read[T](bytes: Array[Byte], cls: Class[T], schemaRegistry: (Int) => (Class[_], Schema)): T = {
     if (bytes == null) null.asInstanceOf[T] else {
       val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
       val schemaId = decoder.readInt()
       require(schemaId >= 0)
-      val schema = schemaRegistry(schemaId)
+      val (cls2, schema) = schemaRegistry(schemaId)
       read(bytes, cls, schema, decoder)
     }
   }
+
+  def read(bytes: Array[Byte], schemaRegistry: (Int) => (Class[_], Schema)): AnyRef = {
+    if (bytes == null) null.asInstanceOf[AnyRef] else {
+      val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
+      val schemaId = decoder.readInt()
+      require(schemaId >= 0)
+      val (cls, schema) = schemaRegistry(schemaId)
+      read(bytes, cls, schema, decoder).asInstanceOf[AnyRef]
+    }
+  }
+
+
 
   private val cache = scala.collection.mutable.Map[String, Class[_]]()
   private def readDatum(datum: Any, cls: Class[_], schema: Schema): AnyRef = {
@@ -136,15 +148,15 @@ object AvroRecord {
 
 }
 
-abstract class AvroRecord(@JsonIgnore schema: Schema) extends SpecificRecord {
+abstract class AvroRecord(@JsonIgnore schema: Schema) extends SpecificRecord with java.io.Serializable {
 
   private val schemaFields = schema.getFields
   private val params = getClass.getConstructors()(0).getParameters
   require(params.length == schemaFields.size,
     s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
 
-  private val declaredFields = getClass.getDeclaredFields
-  private val fields = params.zipWithIndex.map { case (param, pos) => {
+  @transient private val declaredFields = getClass.getDeclaredFields
+  @transient private val fields = params.zipWithIndex.map { case (param, pos) => {
     val field = declaredFields(pos)
     require(param.getType == field.getType,
       s"field `${field.getType}` at position $pos doesn't match expected `$param`")
