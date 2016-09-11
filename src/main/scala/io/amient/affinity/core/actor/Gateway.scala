@@ -32,7 +32,7 @@ import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.cluster.Cluster
-import io.amient.affinity.core.cluster.Coordinator.{AddService, RemoveService}
+import io.amient.affinity.core.cluster.Coordinator.{AddLeader, RemoveLeader}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -75,7 +75,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
   def service(actorClass: Class[_ <: Actor]): ActorRef = {
     //TODO handle missing service properly
-    services.get(actorClass).head
+    services.get(actorClass).head // TODO round-robin or routing for services ?
   }
 
   object HTTP {
@@ -124,25 +124,24 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     case e: HttpExchange => e.promise.success(handleError(NotFound))
 
     //Cluster Management queries
-    case AddService(s) =>
-      log.info("Adding Service " + s)
-      val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
-      val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
-      services.put(serviceClass, actors + s)
+    case AddLeader(group, ref) =>
+      group match {
+        case "regions" => cluster ! AddRoutee(ActorRefRoutee(ref))
+        case "services" =>
+          log.info("Adding Service " + ref)
+          val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
+          val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
+          services.put(serviceClass, actors + ref)
+      }
 
-    case RemoveService(s) =>
-      log.info("Removeing Service" + s)
-      val serviceClass = Class.forName(s.path.name).asSubclass(classOf[Actor])
-      val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
-      services.put(serviceClass, actors - s)
-
-    case m: AddRoutee => cluster ! m
-    case m: RemoveRoutee => cluster ! m
-    case m: GetRoutees =>
-      val origin = sender()
-      implicit val timeout = Timeout(60 seconds)
-      cluster ? m onSuccess {
-        case routees => origin ! routees
+    case RemoveLeader(group, ref) =>
+      group match {
+        case "regions" => cluster ! RemoveRoutee(ActorRefRoutee(ref))
+        case "services" =>
+          log.info("Removeing Service" + ref)
+          val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
+          val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
+          services.put(serviceClass, actors - ref)
       }
 
     case Terminated(cluster) =>

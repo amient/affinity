@@ -23,7 +23,9 @@ import java.util.Properties
 
 import akka.actor.Props
 import akka.event.Logging
+import io.amient.affinity.core.actor.Service.{BecomeLeader, UnbecomeLeader}
 import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.cluster.Coordinator.{AddLeader, RemoveLeader}
 
 object Region {
   final val CONFIG_PARTITION_LIST = "partition.list"
@@ -36,11 +38,12 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
   import Region._
 
-  val partitionList = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
+  val partitions = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
 
   override def preStart(): Unit = {
     log.info("STARTING REGION")
-    for (partition <- partitionList) {
+    coordinator.watchRoutees(self)
+    for (partition <- partitions) {
       /**
         * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
         * as well as Partition
@@ -52,6 +55,11 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
   override def postStop(): Unit = {
     super.postStop()
+  }
+
+  override def receive: Receive = super.receive orElse {
+    case AddLeader(group, ref) if (group == "regions" && partitions.contains(ref.path.name.toInt)) => ref ! BecomeLeader()
+    case RemoveLeader(group, ref) if (group == "regions" && partitions.contains(ref.path.name.toInt)) => ref ! UnbecomeLeader()
   }
 
 }

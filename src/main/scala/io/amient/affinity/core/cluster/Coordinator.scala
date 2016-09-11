@@ -21,10 +21,8 @@ package io.amient.affinity.core.cluster
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
-import akka.routing.{ActorRefRoutee, AddRoutee, RemoveRoutee}
 import akka.util.Timeout
 import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
@@ -38,30 +36,38 @@ object Coordinator {
 
   final val CONFIG_COORDINATOR_CLASS = "coordinator.class"
 
-  final case class AddService(ref: ActorRef)
+  final case class AddLeader(group: String, ref: ActorRef)
 
-  final case class RemoveService(ref: ActorRef)
+  final case class RemoveLeader(group: String, ref: ActorRef)
 
-  def fromProperties(appConfig: Properties): Coordinator = {
+  def fromProperties(system: ActorSystem, group: String, appConfig: Properties): Coordinator = {
     val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
     val cls = Class.forName(className).asSubclass(classOf[Coordinator])
-    val constructor = cls.getConstructor(classOf[Properties])
-    constructor.newInstance(appConfig)
+    val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Properties])
+    constructor.newInstance(system, group, appConfig)
   }
-
-
 }
 
-trait Coordinator {
+/**
+  * @param group coordinated group name
+  */
+abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   import Coordinator._
 
   /**
-    * @param group     node type / group
+    * internal data structure
+    */
+  private val handles = scala.collection.mutable.Map[String, ActorRef]()
+
+  private val watchers = scala.collection.mutable.ListBuffer[ActorRef]()
+
+
+  /**
     * @param actorPath of the actor that needs to managed as part of coordinated group
     * @return unique coordinator handle which points to the registered ActorPath
     */
-  def register(group: String, actorPath: ActorPath): String
+  def register(actorPath: ActorPath): String
 
   /**
     * unregister previously registered ActorPath
@@ -76,74 +82,78 @@ trait Coordinator {
     * call addRouteeActor() and removeRouteeActor() methods when respective
     * changes occur.
     *
-    * @param system  ActorSystem instance
     * @param watcher actor which will receive the messages
     */
-  def watchRoutees(system: ActorSystem, group: String, watcher: ActorRef): Unit
-
-  def close(): Unit
-
-  /**
-    * internal data structure
-    */
-  private val handles = new ConcurrentHashMap[String, ActorRef]()
-
-  def getAllHandles: Set[String] = handles.keySet().asScala.toSet
-
-  protected def removeRoutee(watcher: ActorRef, routeeHandle: String): Unit = {
-    if (handles.containsKey(routeeHandle)) {
-      val entry = handles.remove(routeeHandle)
-      if (entry != null) {
-        val relPath = entry.path.toStringWithoutAddress
-        if (relPath.startsWith("/user/controller/region")) {
-          watcher ! RemoveRoutee(ActorRefRoutee(entry))
-          val replicas = handles.asScala.filter(_._2.path.toStringWithoutAddress == relPath)
-          if (replicas.size > 0) {
-            val newLeader = replicas.minBy(_._1)
-            watcher ! AddRoutee(ActorRefRoutee(newLeader._2))
-          } else {
-            //TODO last replica removed - no leader available
-          }
-        } else {
-          watcher ! RemoveService(entry)
-        }
+  def watchRoutees(watcher: ActorRef): Unit = {
+    synchronized {
+      watchers += watcher
+      handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
+        val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
+        val (leaderHandle, leaderActorRef) = replicas.minBy(_._1)
+        watcher ! AddLeader(group, leaderActorRef)
       }
     }
   }
 
-  protected def addRouteeActor(system: ActorSystem,
-                               watcher: ActorRef,
-                               routeeHandle: String,
-                               routeePath: String,
-                               force: Boolean = false): Unit = {
+  def close(): Unit
+
+  final protected def updateMembers(newState: Map[String, String]) = {
+    synchronized {
+      newState.foreach { case (handle, actorPath) => if (!handles.keySet.contains(handle))
+        addRouteeActor(handle, actorPath, force = false)
+      }
+      handles.keySet.filter(!newState.contains(_)).foreach { handle =>
+        removeRoutee(handle)
+      }
+    }
+  }
+
+  private def notifyWatchers(arg: Any): Unit = synchronized {
+    watchers.foreach(_ ! arg)
+  }
+
+  private def removeRoutee(routeeHandle: String): Unit = {
+    if (handles.contains(routeeHandle)) {
+      handles.remove(routeeHandle) match {
+        case None =>
+        case Some(entry) =>
+          notifyWatchers(RemoveLeader(group, entry))
+          val replicas = handles.filter(_._2.path.toStringWithoutAddress == entry.path.toStringWithoutAddress)
+          if (replicas.size > 0) {
+            val newLeader = replicas.minBy(_._1)
+            notifyWatchers(AddLeader(group, newLeader._2))
+          } else {
+            //TODO last replica removed - no leader available
+          }
+      }
+    }
+  }
+
+  private def addRouteeActor(routeeHandle: String,
+                             routeePath: String,
+                             force: Boolean = false): Unit = {
     import system.dispatcher
     val t = 24 hours
     implicit val timeout = new Timeout(t)
     system.actorSelection(routeePath).resolveOne() onComplete {
-      case Failure(e) => e.printStackTrace() //TODO handle this by recursive retry few times and than exit the system
+      case Failure(e) => //TODO handle this by recursive retry few times and than exit the system
       case Success(partitionActorRef) =>
-        if (force || !handles.containsKey(routeeHandle)) {
+        if (force || !handles.contains(routeeHandle)) {
           val relPath = partitionActorRef.path.toStringWithoutAddress
-          if (relPath.startsWith("/user/controller/region")) {
-            val replicas = handles.asScala.filter(_._2.path.toStringWithoutAddress == relPath)
-            if (replicas.size > 0) {
-              val (leaderHandle, leaderActorRef) = replicas.minBy(_._1)
-              if (routeeHandle < leaderHandle) {
-                watcher ! RemoveRoutee(ActorRefRoutee(leaderActorRef))
-                watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
-              }
-            } else {
-              watcher ! AddRoutee(ActorRefRoutee(partitionActorRef))
+          val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
+          handles.put(routeeHandle, partitionActorRef)
+          if (replicas.size > 0) {
+            val (leaderHandle, leaderActorRef) = replicas.minBy(_._1)
+            if (routeeHandle < leaderHandle) {
+              notifyWatchers(RemoveLeader(group, leaderActorRef))
+              notifyWatchers(AddLeader(group, partitionActorRef))
             }
           } else {
-            watcher ! AddService(partitionActorRef)
+            notifyWatchers(AddLeader(group, partitionActorRef))
           }
-          handles.put(routeeHandle, partitionActorRef)
         }
     }
   }
-
-
 }
 
 object ZkCoordinator {
@@ -153,7 +163,7 @@ object ZkCoordinator {
   final val CONFIG_ZOOKEEPER_ROOT = "coordinator.zookeeper.root"
 }
 
-class ZkCoordinator(appConfig: Properties) extends Coordinator {
+class ZkCoordinator(system: ActorSystem, group: String, appConfig: Properties) extends Coordinator(system, group) {
 
   import ZkCoordinator._
 
@@ -161,6 +171,7 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
   val zkConnectTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, "30000").toInt
   val zkSessionTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, "6000").toInt
   val zkRoot = appConfig.getProperty(CONFIG_ZOOKEEPER_ROOT, "/akka")
+  val groupRoot = s"$zkRoot/$group"
 
   private val zk = new ZkClient(
     zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
@@ -171,8 +182,7 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
 
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
 
-  override def register(group: String, actorPath: ActorPath): String = {
-    val groupRoot = s"$zkRoot/$group"
+  override def register(actorPath: ActorPath): String = {
     if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
     zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
   }
@@ -181,29 +191,17 @@ class ZkCoordinator(appConfig: Properties) extends Coordinator {
 
   override def close(): Unit = zk.close()
 
-  override def watchRoutees(system: ActorSystem, group: String, watcher: ActorRef): Unit = {
 
-    def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
+  private def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-    val groupRoot = s"$zkRoot/$group"
-
-    zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
-      override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
-        if (currentChilds != null) {
-          val newHandles = listAsIndexedSeq(currentChilds).map(id => s"$parentPath/$id")
-          newHandles.foreach { handle =>
-            addRouteeActor(system, watcher, handle, zk.readData(handle), force = false)
-          }
-          getAllHandles.filter(id => id.startsWith(parentPath) && !newHandles.contains(id)).foreach { handle =>
-            removeRoutee(watcher, handle)
-          }
-        }
+  zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
+    override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
+      if (currentChilds != null) {
+        val newHandles = listAsIndexedSeq(currentChilds).map(id => s"$parentPath/$id")
+        val newState = newHandles.map(handle => (handle, zk.readData(handle).asInstanceOf[String]))
+        updateMembers(newState.toMap)
       }
-    })
-
-    listAsIndexedSeq(zk.getChildren(groupRoot)).map(id => s"$groupRoot/$id").foreach { handle =>
-      addRouteeActor(system, watcher, handle, zk.readData(handle), force = true)
     }
-  }
+  })
 
 }

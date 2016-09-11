@@ -25,6 +25,8 @@ trait MemStore[K, V] {
 
   def iterator: Iterator[(K,V)]
 
+  def size: Long
+
   protected def update(key: K, value: V): Boolean
 
   protected def remove(key: K): Boolean

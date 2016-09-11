@@ -61,7 +61,7 @@ class Container(appConfig: Properties, coordinator: Coordinator, group: String) 
   override def receive: Receive = {
     case ServiceOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
-      val handle = coordinator.register(group, partitionActorPath)
+      val handle = coordinator.register(partitionActorPath)
       log.info(s"Service online: handle=$handle, path=${partitionActorPath}")
       services += (ref -> handle)
 

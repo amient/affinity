@@ -57,7 +57,7 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
       val consumerPartitions = util.Arrays.asList(tp)
       consumer.assign(consumerPartitions)
       consumer.seekToEnd(consumerPartitions)
-      consumer.poll(1000L)
+      consumer.poll(50L)
       val lastOffset = consumer.position(tp)
       println(s"`$topic` kafka topic, partition: $partition, latest offset: $lastOffset")
 

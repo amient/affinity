@@ -49,8 +49,19 @@ class Controller(appConfig: Properties) extends Actor {
   //controller terminates the system so cannot use system.dispatcher for Futures execution
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  val coordinator = try {
-    Coordinator.fromProperties(appConfig)
+  val regionCoordinator = try {
+    Coordinator.fromProperties(system, "regions", appConfig)
+  } catch {
+    case e: Throwable =>
+      system.terminate() onComplete { _ =>
+        e.printStackTrace()
+        System.exit(10)
+      }
+      throw e
+  }
+
+  val serviceCoordinator = try {
+    Coordinator.fromProperties(system, "services", appConfig)
   } catch {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
@@ -75,7 +86,7 @@ class Controller(appConfig: Properties) extends Actor {
 
     case CreateServiceContainer(services) =>
       try {
-        context.actorOf(Props(new Container(appConfig, coordinator, "services") {
+        context.actorOf(Props(new Container(appConfig, serviceCoordinator, "services") {
           services.foreach { serviceProps =>
             context.actorOf(serviceProps, serviceProps.actorClass().getName)
           }
@@ -90,7 +101,7 @@ class Controller(appConfig: Properties) extends Actor {
 
     case CreateRegion(partitionProps) =>
       try {
-        context.actorOf(Props(new Region(appConfig, coordinator, partitionProps)), name = "region")
+        context.actorOf(Props(new Region(appConfig, regionCoordinator, partitionProps)), name = "region")
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>
@@ -112,8 +123,8 @@ class Controller(appConfig: Properties) extends Actor {
 
     case GatewayCreated() =>
       try {
-        coordinator.watchRoutees(context.system, "regions", sender)
-        coordinator.watchRoutees(context.system, "services", sender)
+        regionCoordinator.watchRoutees(sender)
+        serviceCoordinator.watchRoutees(sender)
         httpInterface.foreach(_.bind(sender))
 
       } catch {

@@ -23,11 +23,17 @@ import akka.actor.Actor
 import akka.event.Logging
 import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
 
+object Service {
+  case class UnbecomeLeader()
+  case class BecomeLeader()
+}
 trait Service extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
   val cluster = context.actorSelection("/user/controller/gateway/cluster")
+
+  import Service._
 
   override def preStart(): Unit = {
     log.info("Starting service: " + self.path.name)
@@ -41,6 +47,14 @@ trait Service extends Actor {
     super.postStop()
   }
 
+  final override def receive: Receive = receiveService orElse {
+    case BecomeLeader() =>
+      //TODO call protected method for becoming a leader
+    case UnbecomeLeader() =>
+      //TODO call protected method for unbecoming a leader
+  }
+
+  def receiveService: Receive
 
 }
 

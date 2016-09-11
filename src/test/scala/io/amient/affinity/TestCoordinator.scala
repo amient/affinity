@@ -22,15 +22,9 @@ package io.amient.affinity
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import io.amient.affinity.core.cluster.Coordinator
 
-class TestCoordinator(storage: scala.collection.mutable.Set[String]) extends Coordinator {
+class TestCoordinator(system: ActorSystem, storage: scala.collection.mutable.Set[String]) extends Coordinator(system, "test") {
 
-//  @volatile private var watcher: ActorRef = null
-  override def watchRoutees(system: ActorSystem, group:String, watcher: ActorRef): Unit = {
-//    this.watcher = watcher
-    ???
-  }
-
-  override def register(group:String, actorPath: ActorPath): String = {
+  override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
     storage.add(handle)
     handle

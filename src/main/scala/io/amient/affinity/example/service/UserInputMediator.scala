@@ -26,7 +26,7 @@ import scala.io.StdIn
 
 class UserInputMediator extends Service {
 
-  override def receive: Receive = {
+  override def receiveService: Receive = {
     case greeting: String =>
       require(greeting != null && !greeting.isEmpty, "User Mediator requires non-empty greeting")
       print(s"'$greeting', please reply: ")

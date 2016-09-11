@@ -43,7 +43,7 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       Thread.sleep(100)
       super.preStart()
     }
-    override def receive: Receive = {
+    override def receiveService: Receive = {
       case e: IllegalStateException => throw e
       case any =>
     }
@@ -52,7 +52,7 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
       val services = scala.collection.mutable.Set[String]()
-      val coordinator = new TestCoordinator(services)
+      val coordinator = new TestCoordinator(system, services)
       val props = new Properties()
       val d = 1 second
       implicit val timeout = Timeout(d)

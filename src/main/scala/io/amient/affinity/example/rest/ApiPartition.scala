@@ -45,14 +45,16 @@ class ApiPartition(config: Properties) extends Partition {
 
   implicit val timeout = Timeout(10 seconds)
 
-  override def receive = {
+  override def receiveService: Receive = {
 
     case (p: Int, stateError: IllegalStateException) => throw stateError
 
     case (p: Int, "describe") =>
       sender ! Map(
         "partition" -> partition,
-        "graph" -> graph.iterator.map(_._2).toList)
+        "graph" -> Map(
+          "size" -> graph.size
+        ))
 
     case vertex: Vertex => graph.get(vertex) match {
       case None => sender ! Status.Failure(new NoSuchElementException)
