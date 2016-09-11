@@ -41,7 +41,7 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
   producerProps.put("value.serializer", classOf[ByteArraySerializer].getName)
   val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
-  def boot(isMaster: () => Boolean): Unit = {
+  def boot(isLeader: () => Boolean): Unit = {
 
     //TODO configure KafkaStorage via appConfig and replace prinln(s) with log.info
     println(s"`$topic` topic bootstrapping memstore partition $partition")
@@ -73,7 +73,7 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
           }
         }
         if (consumer.position(tp) >= lastOffset) {
-          if (isMaster()) continue.set(false)
+          if (isLeader()) continue.set(false)
         }
       }
     } finally {
