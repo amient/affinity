@@ -28,7 +28,7 @@ In the most consistent setup, master takes all reads and writes
 and records each write in the storage change log while reads
 come directly from the in-memory data set.
 After storage has accepted the write, master updates its own 
-in-memory state - this way the level of write consistency can
+in-memory state - this way the level of data loss acceptance can
 be controlled by simply configuring the appropriate ack level
 in the underlying storage.
 
