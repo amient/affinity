@@ -19,7 +19,11 @@
 
 package io.amient.affinity.core.actor
 
+import java.util.concurrent.CopyOnWriteArrayList
+
 import akka.event.Logging
+import io.amient.affinity.core.storage.Storage
+import scala.collection.JavaConverters._
 
 trait Partition extends Service {
 
@@ -29,5 +33,33 @@ trait Partition extends Service {
     * physical partition id - this is read from the name of the Partition Actor;  assigned by the Region
     */
   val partition = self.path.name.toInt
+
+  private val storageRegistry = new CopyOnWriteArrayList[Storage[_, _]]()
+
+  def storage[K, V](creator: => Storage[K, V]): Storage[K, V] = {
+    val storage: Storage[K, V] = creator
+    storage.boot()
+    storageRegistry.add(storage)
+    storage
+  }
+
+  override protected def onBecomeMaster: Unit = {
+    storageRegistry.asScala.foreach { storage =>
+      storage.untail()
+    }
+  }
+
+  override protected def onBecomeStandby: Unit = {
+    storageRegistry.asScala.foreach { storage =>
+      storage.tail()
+    }
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    storageRegistry.asScala.foreach { storage =>
+      storage.close()
+    }
+  }
 
 }

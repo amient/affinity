@@ -27,7 +27,7 @@ object ExampleApp extends App {
   // singletons
   ServiceNode.main(Seq("ExampleSystem", "2550", "127.0.0.1").toArray)
 
-  // cluster leader(s)
+  // cluster master(s)
   val numPartitions = "4"
   ApiNode.main(Seq("ExampleSystem", "2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
   ApiNode.main(Seq("ExampleSystem", "2552","127.0.0.1","8082", numPartitions, "1,3").toArray)

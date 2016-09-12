@@ -24,7 +24,7 @@ import java.util.Properties
 import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.{Container, Partition}
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{Component, _}
 
@@ -35,27 +35,8 @@ import scala.util.control.NonFatal
 class ApiPartition(config: Properties) extends Partition {
 
   //partitioned memstore
-  val graph = new KafkaStorage[Vertex, Component](topic = "graph", partition) with MemStoreSimpleMap[Vertex, Component]
-
-
-  //TODO boot and tail
-  graph.boot()
-
-  override def onBecomeLeader: Unit = {
-    println(config.getProperty(Container.CONFIG_AKKA_PORT) +  s" became leader for partition $partition")
-    //TODO stop tailing or nothing
-  }
-
-  override def onUnbecomeLeader: Unit = {
-    println(config.getProperty(Container.CONFIG_AKKA_PORT) +  s" no longer a leader for partition $partition")
-    //TODO start or continue tailing
-  }
-
-  override def postStop(): Unit = {
-    super.postStop()
-    //TODO stop tailing and shutdown
-    graph.close()
-  }
+  val graph = storage(new KafkaStorage[Vertex, Component](topic = "graph", partition)
+    with MemStoreSimpleMap[Vertex, Component])
 
   import context.dispatcher
 
@@ -118,7 +99,7 @@ class ApiPartition(config: Properties) extends Partition {
               cluster ? Component(_, additionalEdges)
             } ++ additionalEdges.toList.map {
               cluster ? Component(_, Set(vertex))
-            } map(_ map {
+            } map (_ map {
               case _ => true
             } recover {
               case t: Throwable => false

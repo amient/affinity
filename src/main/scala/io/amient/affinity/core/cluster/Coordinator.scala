@@ -37,9 +37,9 @@ object Coordinator {
 
   final val CONFIG_COORDINATOR_CLASS = "coordinator.class"
 
-  final case class AddLeader(group: String, ref: ActorRef)
+  final case class AddMaster(group: String, ref: ActorRef)
 
-  final case class RemoveLeader(group: String, ref: ActorRef)
+  final case class RemoveMaster(group: String, ref: ActorRef)
 
   def fromProperties(system: ActorSystem, group: String, appConfig: Properties): Coordinator = {
     val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
@@ -90,8 +90,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       watchers += watcher
       handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
         val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
-        val (leaderHandle, leaderActorRef) = replicas.minBy(_._1)
-        watcher ! AddLeader(group, leaderActorRef)
+        val (masterHandle, masterActorRef) = replicas.minBy(_._1)
+        watcher ! AddMaster(group, masterActorRef)
       }
     }
   }
@@ -117,14 +117,14 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     if (handles.contains(routeeHandle)) {
       handles.remove(routeeHandle) match {
         case None =>
-        case Some(leader) =>
-          notifyWatchers(RemoveLeader(group, leader))
-          val replicas = handles.filter(_._2.path.toStringWithoutAddress == leader.path.toStringWithoutAddress)
+        case Some(master) =>
+          notifyWatchers(RemoveMaster(group, master))
+          val replicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
           if (replicas.size > 0) {
-            val newLeader = replicas.minBy(_._1)
-            notifyWatchers(AddLeader(group, newLeader._2))
+            val newMaster = replicas.minBy(_._1)
+            notifyWatchers(AddMaster(group, newMaster._2))
           } else {
-            //TODO last replica removed - no leader available
+            //TODO last replica removed - no master available
           }
       }
     }
@@ -142,13 +142,13 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
         handles.put(routeeHandle, routeeRef)
         if (replicas.size > 0) {
-          val (currentLeaderHandle, currentLeader) = replicas.minBy(_._1)
-          if (routeeHandle < currentLeaderHandle) {
-            notifyWatchers(RemoveLeader(group, currentLeader))
-            notifyWatchers(AddLeader(group, routeeRef))
+          val (currentMasterHandle, currentMasterActorRef) = replicas.minBy(_._1)
+          if (routeeHandle < currentMasterHandle) {
+            notifyWatchers(RemoveMaster(group, currentMasterActorRef))
+            notifyWatchers(AddMaster(group, routeeRef))
           }
         } else {
-          notifyWatchers(AddLeader(group, routeeRef))
+          notifyWatchers(AddMaster(group, routeeRef))
         }
       }
     } catch {

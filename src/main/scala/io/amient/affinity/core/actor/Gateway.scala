@@ -32,7 +32,7 @@ import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.cluster.Cluster
-import io.amient.affinity.core.cluster.Coordinator.{AddLeader, RemoveLeader}
+import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -58,7 +58,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
   def describeRegions = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
-    Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString)
+    Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString).toList.sorted
   }
 
   override def preStart(): Unit = {
@@ -122,7 +122,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     case e: HttpExchange => e.promise.success(handleError(NotFound))
 
     //Cluster Management queries
-    case AddLeader(group, ref) =>
+    case AddMaster(group, ref) =>
       group match {
         case "regions" => cluster ! AddRoutee(ActorRefRoutee(ref))
         case "services" =>
@@ -132,7 +132,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
           services.put(serviceClass, actors + ref)
       }
 
-    case RemoveLeader(group, ref) =>
+    case RemoveMaster(group, ref) =>
       group match {
         case "regions" => cluster ! RemoveRoutee(ActorRefRoutee(ref))
         case "services" =>

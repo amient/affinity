@@ -21,7 +21,6 @@ package io.amient.affinity.core.storage
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.atomic.AtomicBoolean
 
 import io.amient.affinity.example.data.AvroSerde
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -46,7 +45,9 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
   producerProps.put("value.serializer", valueSerde)
   val kafkaProducer = new KafkaProducer[K, V](producerProps)
 
-  val doTail = new AtomicBoolean(true)
+  @volatile private var tailing = true
+
+  @volatile private var booted = false
 
   private val consumer = new Thread {
 
@@ -73,15 +74,10 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
           kafkaConsumer.poll(50L)
           val lastOffset = kafkaConsumer.position(tp)
           kafkaConsumer.seek(tp, bootOffset)
-          if (doTail.get) {
-            println(s"tailing memstore topic `$topic` partition $partition from offset [$bootOffset through $lastOffset to ...]")
-          } else {
-            println(s"booting memstore topic `$topic` partition $partition from offset [$bootOffset to $lastOffset]")
-          }
 
-          val isConsuming = new AtomicBoolean(true)
+          var keepConsuming = true
 
-          while (isConsuming.get) {
+          while (keepConsuming) {
 
             if (isInterrupted) throw new InterruptedException
 
@@ -93,21 +89,26 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
                 update(r.key, r.value)
               }
             }
-            if (!doTail.get) {
+            if (!booted) {
               if (kafkaConsumer.position(tp) >= lastOffset) {
-                isConsuming.set(false)
+                synchronized {
+                  booted = true
+                  println(s"`$topic`, partition $partition bootstrap completed")
+                  notify()
+                }
               }
+            } else if (!tailing) {
+              keepConsuming = false
             }
           }
 
           synchronized {
-            if (!doTail.get) {
-              println(s"`$topic`, partition $partition bootstrap completed")
-              notify()
-            }
-            notify
-            wait
+            notify()
+            println(s"`$topic`, partition $partition suspending tail consumption")
+            wait()
           }
+
+          println(s"`$topic`, partition $partition resuming tail consumption")
 
         }
       } catch {
@@ -116,26 +117,41 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
     }
   }
 
-  def boot(): Unit = {
+  private[core] def boot(): Unit = {
+
     consumer.start()
+
     consumer.synchronized {
-      doTail.set(false)
-      consumer.wait()
+      if (!booted) {
+        consumer.wait()
+      }
     }
   }
 
-  def tail(): Unit = {
-//    consumer.synchronized {
-//      doTail.set(true)
-//      consumer.notify
-//    }
+  private[core] def untail(): Unit = {
+    consumer.synchronized {
+      if (tailing) {
+        tailing = false
+        consumer.wait()
+      }
+    }
   }
 
-  def close(): Unit = {
+  private[core] def tail(): Unit = {
+    consumer.synchronized {
+      if (!tailing) {
+        tailing = true
+        consumer.notify
+      }
+    }
+  }
+
+  private[core] def close(): Unit = {
+    //stop tailing and shutdown
     try {
-      kafkaProducer.close()
-    } finally {
       consumer.interrupt()
+    } finally {
+      kafkaProducer.close()
     }
   }
 

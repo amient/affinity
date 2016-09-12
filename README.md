@@ -17,20 +17,29 @@
  - akka http as the main interface
  - zookeeper for distributed coordiation
 
-## State Management 
+## State Management
 
- - kafka (or other) as a fault-tolerant distributed log 
- - pluggable embedded storage with default to RocksDB
-...
+All data is stored in the physical storage in the form
+of change log, e.g. Kafka compacted topic. Each physical partition
+can have multiple active API Partitions, one of which is 
+always a master and the remainder are standby(s). 
 
-## Zero-Downtime 
+In the most consistent setup, master takes all reads and writes 
+and records each write in the storage change log while reads
+come directly from the in-memory data set.
+After storage has accepted the write, master updates its own 
+in-memory state - this way the level of write consistency can
+be controlled by simply configuring the appropriate ack level
+in the underlying storage.
 
- - multiple nodes can be launched serving the same partition
- - the first one that registers with coordinator will be a `master`
- - the others will become `standby` 
-... 
+Standby(s) tail the changelog continuously and keep their 
+in-memory state up-to-date. In in the event of master failure, 
+one of the standby(s) is picked to be the new master. This way
+zero-downtime is possible for both failures as well as upgrades.
 
-
+In cases where eventual read consistency is sufficient, standby(s) 
+can also be used as read replicas (this is currently not implemented
+but the design is expecting this to come in future).
 
 
 # Examples

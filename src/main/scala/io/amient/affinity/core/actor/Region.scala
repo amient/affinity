@@ -21,11 +21,11 @@ package io.amient.affinity.core.actor
 
 import java.util.Properties
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
 import akka.event.Logging
-import io.amient.affinity.core.actor.Service.{BecomeLeader, UnbecomeLeader}
+import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.{AddLeader, RemoveLeader}
+import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
 
 object Region {
   final val CONFIG_PARTITION_LIST = "partition.list"
@@ -40,17 +40,16 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
   val partitions = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
 
-  private val partitionRefs = for (partition <- partitions) yield {
-    /**
-      * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
-      * as well as Partition
-      */
-    context.actorOf(partitionProps, name = partition.toString )
-  }
-
   override def preStart(): Unit = {
     log.info("STARTING REGION")
     coordinator.watchRoutees(self)
+    for (partition <- partitions) {
+      /**
+        * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
+        * as well as Partition
+        */
+      context.actorOf(partitionProps, name = partition.toString )
+    }
     super.preStart()
   }
 
@@ -59,8 +58,8 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   }
 
   override def receive: Receive = super.receive orElse {
-    case AddLeader(group, ref) if (group == "regions" && partitionRefs.contains(ref)) => ref ! BecomeLeader()
-    case RemoveLeader(group, ref) if (group == "regions" && partitionRefs.contains(ref)) => ref ! UnbecomeLeader()
+    case AddMaster(group, ref) if (ref.path.address.hasLocalScope) => ref ! BecomeMaster()
+    case RemoveMaster(group, ref)  if (ref.path.address.hasLocalScope) => ref ! BecomeStandby()
   }
 
 }

@@ -24,8 +24,8 @@ import akka.event.Logging
 import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
 
 object Service {
-  case class UnbecomeLeader()
-  case class BecomeLeader()
+  case class BecomeStandby()
+  case class BecomeMaster()
 }
 trait Service extends Actor {
 
@@ -35,11 +35,9 @@ trait Service extends Actor {
 
   import Service._
 
-  @volatile private var isLeader = false
+  protected def onBecomeMaster: Unit = ()
 
-  def onBecomeLeader: Unit = ()
-
-  def onUnbecomeLeader: Unit = ()
+  protected def onBecomeStandby: Unit = ()
 
   override def preStart(): Unit = {
     log.info("Starting service: " + self.path.name)
@@ -54,13 +52,8 @@ trait Service extends Actor {
   }
 
   final override def receive: Receive = receiveService orElse {
-    case BecomeLeader() =>
-      isLeader = true
-      onBecomeLeader
-
-    case UnbecomeLeader() =>
-      isLeader = false
-      onUnbecomeLeader
+    case BecomeMaster() => onBecomeMaster
+    case BecomeStandby() => onBecomeStandby
   }
 
   def receiveService: Receive
