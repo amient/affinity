@@ -111,8 +111,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
   }
 
-  import context.dispatcher
-
   def handleError(status: StatusCode): HttpResponse
 
   def handle: Receive = {
@@ -145,7 +143,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
       }
 
     case Terminated(cluster) =>
-      //          FIXME sometimes this doesn't restart the gateway
       throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + cluster)
 
   }

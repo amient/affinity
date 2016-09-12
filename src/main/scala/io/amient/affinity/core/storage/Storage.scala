@@ -21,10 +21,11 @@ package io.amient.affinity.core.storage
 
 trait Storage[K,V] extends MemStore[K, V] {
 
-  /**
-    * @param becomeMaster a function that can check whether this instance should become master, otherwise standby
-    */
-  def boot(becomeMaster: () => Boolean): Unit
+  def boot(): Unit
+
+  def tail(): Unit
+
+  def close(): Unit
 
   /**
     * Storage offers only simple blocking put so that the mutations do not escape single-threaded actor
@@ -34,16 +35,16 @@ trait Storage[K,V] extends MemStore[K, V] {
     *              otherwise the key will be updated with the value
     */
   final def put(key: K, value: Option[V]): Unit = value match {
-    case None => if (remove(key)) write(serialize(key, null.asInstanceOf[V])).get()
-    case Some(data) => if (update(key, data)) write(serialize(key, data)).get()
+    case None => if (remove(key)) write(key, null.asInstanceOf[V]).get()
+    case Some(data) => if (update(key, data)) write(key, data).get()
   }
 
 
   /**
-    * @param kv key value pair to write
+    * @param key of the pair
+    * @param value of the pair
     * @return Future with metadata returned by the underlying implementation
     */
-  def write(kv: (Array[Byte], Array[Byte])): java.util.concurrent.Future[_]
-  def serialize: (K,V) => (Array[Byte], Array[Byte])
-  def deserialize: (Array[Byte], Array[Byte]) => (K,V)
+  def write(key: K, value: V): java.util.concurrent.Future[_]
+
 }

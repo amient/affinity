@@ -17,19 +17,36 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.core.storage
 
-import io.amient.affinity.core.storage.KafkaStorage
+import java.util.concurrent.ConcurrentHashMap
 
-abstract class AvroKafkaStorage[K <: AnyRef, V <:AnyRef ](topic: String, partition: Int, keyClass: Class[K], valueClass: Class[V])
-  extends KafkaStorage[K, V](topic, partition) {
-  val serde = new AvroSerde()
+trait MemStoreConcurrentMap[K,V] extends MemStore[K,V] {
 
-  override def serialize: (K, V) => (Array[Byte], Array[Byte]) = (k, v) => {
-    (serde.toBinary(k), serde.toBinary(v))
+  private val internal = new ConcurrentHashMap[K, V]()
+
+  override def get(key: K): Option[V] = internal.get(key) match {
+    case null => None
+    case other => Some(other)
   }
 
-  override def deserialize: (Array[Byte], Array[Byte]) => (K, V) = (k, v) => {
-    (serde.fromBytes(k, keyClass), serde.fromBytes(v, valueClass))
+  override def iterator = new Iterator[(K,V)] {
+    val it = internal.entrySet().iterator()
+
+    override def hasNext: Boolean = it.hasNext
+
+    override def next(): (K, V) = it.next match {
+      case entry => (entry.getKey, entry.getValue)
+    }
   }
+
+  override def size: Long = internal.size
+
+  override protected def update(key: K, value: V): Boolean = internal.put(key, value) match {
+    case null => true
+    case prev if (prev != value) => true
+    case _ => false
+  }
+
+  override protected def remove(key: K): Boolean = internal.remove(key) != null
 }

@@ -29,6 +29,7 @@ import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -116,9 +117,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     if (handles.contains(routeeHandle)) {
       handles.remove(routeeHandle) match {
         case None =>
-        case Some(entry) =>
-          notifyWatchers(RemoveLeader(group, entry))
-          val replicas = handles.filter(_._2.path.toStringWithoutAddress == entry.path.toStringWithoutAddress)
+        case Some(leader) =>
+          notifyWatchers(RemoveLeader(group, leader))
+          val replicas = handles.filter(_._2.path.toStringWithoutAddress == leader.path.toStringWithoutAddress)
           if (replicas.size > 0) {
             val newLeader = replicas.minBy(_._1)
             notifyWatchers(AddLeader(group, newLeader._2))
@@ -132,27 +133,28 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   private def addRouteeActor(routeeHandle: String,
                              routeePath: String,
                              force: Boolean = false): Unit = {
-    import system.dispatcher
-    val t = 24 hours
+    val t = 6 seconds
     implicit val timeout = new Timeout(t)
-    system.actorSelection(routeePath).resolveOne() onComplete {
-      case Failure(e) => //TODO handle this by recursive retry few times and than exit the system
-      case Success(partitionActorRef) =>
-        if (force || !handles.contains(routeeHandle)) {
-          val relPath = partitionActorRef.path.toStringWithoutAddress
-          val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
-          handles.put(routeeHandle, partitionActorRef)
-          if (replicas.size > 0) {
-            val (leaderHandle, leaderActorRef) = replicas.minBy(_._1)
-            if (routeeHandle < leaderHandle) {
-              notifyWatchers(RemoveLeader(group, leaderActorRef))
-              notifyWatchers(AddLeader(group, partitionActorRef))
-            }
-          } else {
-            notifyWatchers(AddLeader(group, partitionActorRef))
+    try {
+      val routeeRef = Await.result(system.actorSelection(routeePath).resolveOne(), t)
+      if (force || !handles.contains(routeeHandle)) {
+        val relPath = routeeRef.path.toStringWithoutAddress
+        val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
+        handles.put(routeeHandle, routeeRef)
+        if (replicas.size > 0) {
+          val (currentLeaderHandle, currentLeader) = replicas.minBy(_._1)
+          if (routeeHandle < currentLeaderHandle) {
+            notifyWatchers(RemoveLeader(group, currentLeader))
+            notifyWatchers(AddLeader(group, routeeRef))
           }
+        } else {
+          notifyWatchers(AddLeader(group, routeeRef))
         }
+      }
+    } catch {
+      case e: Throwable => e.printStackTrace() //TODO handle this by recursive retry few times and than exit the system
     }
+
   }
 }
 

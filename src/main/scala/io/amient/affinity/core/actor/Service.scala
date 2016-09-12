@@ -35,6 +35,12 @@ trait Service extends Actor {
 
   import Service._
 
+  @volatile private var isLeader = false
+
+  def onBecomeLeader: Unit = ()
+
+  def onUnbecomeLeader: Unit = ()
+
   override def preStart(): Unit = {
     log.info("Starting service: " + self.path.name)
     context.parent ! ServiceOnline(self)
@@ -49,9 +55,12 @@ trait Service extends Actor {
 
   final override def receive: Receive = receiveService orElse {
     case BecomeLeader() =>
-      //TODO call protected method for becoming a leader
+      isLeader = true
+      onBecomeLeader
+
     case UnbecomeLeader() =>
-      //TODO call protected method for unbecoming a leader
+      isLeader = false
+      onUnbecomeLeader
   }
 
   def receiveService: Receive

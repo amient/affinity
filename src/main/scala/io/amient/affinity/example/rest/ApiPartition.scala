@@ -24,8 +24,8 @@ import java.util.Properties
 import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.core.storage.MemStoreSimpleMap
+import io.amient.affinity.core.actor.{Container, Partition}
+import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{Component, _}
 
 import scala.concurrent.Future
@@ -35,11 +35,27 @@ import scala.util.control.NonFatal
 class ApiPartition(config: Properties) extends Partition {
 
   //partitioned memstore
-  val graph = new AvroKafkaStorage[Vertex, Component](topic = "graph", partition,
-    classOf[Vertex], classOf[Component]) with MemStoreSimpleMap[Vertex, Component]
+  val graph = new KafkaStorage[Vertex, Component](topic = "graph", partition) with MemStoreSimpleMap[Vertex, Component]
 
-  //TODO provide function that can detect master-standby status changes
-  graph.boot(() => true)
+
+  //TODO boot and tail
+  graph.boot()
+
+  override def onBecomeLeader: Unit = {
+    println(config.getProperty(Container.CONFIG_AKKA_PORT) +  s" became leader for partition $partition")
+    //TODO stop tailing or nothing
+  }
+
+  override def onUnbecomeLeader: Unit = {
+    println(config.getProperty(Container.CONFIG_AKKA_PORT) +  s" no longer a leader for partition $partition")
+    //TODO start or continue tailing
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    //TODO stop tailing and shutdown
+    graph.close()
+  }
 
   import context.dispatcher
 
@@ -125,4 +141,5 @@ class ApiPartition(config: Properties) extends Partition {
         }
       }
   }
+
 }

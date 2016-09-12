@@ -17,19 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.example
 
+import io.amient.affinity.example.rest.ApiNode
 
-import org.apache.avro.Schema
+object SmallExampleApp  extends App {
 
-class AvroSerde extends io.amient.affinity.core.data.AvroSerde  {
+  // singletons
+  //ServiceNode.main(Seq("ExampleSystem", "2550", "127.0.0.1").toArray)
 
-  override def register: Seq[(Class[_], Schema)] = Seq (
-    classOf[Vertex] -> Vertex.schema,
-    classOf[Edge] -> Edge.schema,
-    classOf[Component] -> Component.schema,
-    classOf[ConfigEntry] -> ConfigEntry.schema
-  )
-
+  val numPartitions = "4"
+  ApiNode.main(Seq("ExampleSystem", "2551","127.0.0.1","8081", numPartitions, "0,1,2,3").toArray)
+  ApiNode.main(Seq("ExampleSystem", "2552","127.0.0.1","8082", numPartitions, "0,1,2,3").toArray)
 
 }

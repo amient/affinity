@@ -26,13 +26,13 @@ import io.amient.affinity.example.rest.HttpGateway
 trait Access extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
-
-    case HTTP(GET, PATH("p", "access", service, person), AUTH(query, signature), response) =>
-      response.success(jsonValue(OK, Map(
-        "signature" -> signature,
-        "service" -> service,
-        "person" -> person
-      )))
+//
+//    case HTTP(GET, PATH("p", "access", service, person), AUTH(query, signature), response) =>
+//      response.success(jsonValue(OK, Map(
+//        "signature" -> signature,
+//        "service" -> service,
+//        "person" -> person
+//      )))
 
     case HTTP(GET, PATH("p", "access", service, person), _ , response) =>
       response.success(handleError(Unauthorized))

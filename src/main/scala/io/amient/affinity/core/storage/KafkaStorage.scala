@@ -23,70 +23,124 @@ import java.util
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
 
+import io.amient.affinity.example.data.AvroSerde
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import scala.collection.JavaConverters._
 
 abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage[K, V] {
+
+  //TODO configure KafkaStorage via appConfig and replace prinln(s) with log.info
+  val keySerde = classOf[AvroSerde].getName
+  val valueSerde = classOf[AvroSerde].getName
+  //TODO provide serde via appConfig
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", "localhost:9092")
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")
-  producerProps.put("key.serializer", classOf[ByteArraySerializer].getName)
-  producerProps.put("value.serializer", classOf[ByteArraySerializer].getName)
-  val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+  producerProps.put("key.serializer", keySerde)
+  producerProps.put("value.serializer", valueSerde)
+  val kafkaProducer = new KafkaProducer[K, V](producerProps)
 
-  def boot(isLeader: () => Boolean): Unit = {
+  val doTail = new AtomicBoolean(true)
 
-    //TODO configure KafkaStorage via appConfig and replace prinln(s) with log.info
-    println(s"`$topic` topic bootstrapping memstore partition $partition")
+  private val consumer = new Thread {
+
     val consumerProps = new Properties()
     consumerProps.put("bootstrap.servers", "localhost:9092")
     consumerProps.put("enable.auto.commit", "false")
-    consumerProps.put("key.deserializer", classOf[ByteArrayDeserializer].getName)
-    consumerProps.put("value.deserializer", classOf[ByteArrayDeserializer].getName)
+    consumerProps.put("key.deserializer", keySerde)
+    consumerProps.put("value.deserializer", valueSerde)
+    val kafkaConsumer = new KafkaConsumer[K, V](consumerProps)
+    val tp = new TopicPartition(topic, partition)
+    val consumerPartitions = util.Arrays.asList(tp)
+    kafkaConsumer.assign(consumerPartitions)
+    kafkaConsumer.seekToBeginning(consumerPartitions)
 
-    val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
-    try {
-      val tp = new TopicPartition(topic, partition)
-      val consumerPartitions = util.Arrays.asList(tp)
-      consumer.assign(consumerPartitions)
-      consumer.seekToEnd(consumerPartitions)
-      consumer.poll(50L)
-      val lastOffset = consumer.position(tp)
-      println(s"`$topic` kafka topic, partition: $partition, latest offset: $lastOffset")
+    override def run(): Unit = {
 
-      consumer.seekToBeginning(consumerPartitions)
-      val continue = new AtomicBoolean(true)
-      while (continue.get) {
-        val records = consumer.poll(1000)
-        for (r <- records.iterator().asScala) {
-          val (key, value) = deserialize(r.key(), r.value())
-          r.value() match {
-            case null => remove(key)
-            case any => update(key, value)
+      try {
+        while (true) {
+
+          if (isInterrupted) throw new InterruptedException
+
+          val bootOffset = kafkaConsumer.position(tp)
+          kafkaConsumer.seekToEnd(consumerPartitions)
+          kafkaConsumer.poll(50L)
+          val lastOffset = kafkaConsumer.position(tp)
+          kafkaConsumer.seek(tp, bootOffset)
+          if (doTail.get) {
+            println(s"tailing memstore topic `$topic` partition $partition from offset [$bootOffset through $lastOffset to ...]")
+          } else {
+            println(s"booting memstore topic `$topic` partition $partition from offset [$bootOffset to $lastOffset]")
           }
+
+          val isConsuming = new AtomicBoolean(true)
+
+          while (isConsuming.get) {
+
+            if (isInterrupted) throw new InterruptedException
+
+            val records = kafkaConsumer.poll(1000)
+            for (r <- records.iterator().asScala) {
+              if (r.value == null) {
+                remove(r.key)
+              } else {
+                update(r.key, r.value)
+              }
+            }
+            if (!doTail.get) {
+              if (kafkaConsumer.position(tp) >= lastOffset) {
+                isConsuming.set(false)
+              }
+            }
+          }
+
+          synchronized {
+            if (!doTail.get) {
+              println(s"`$topic`, partition $partition bootstrap completed")
+              notify()
+            }
+            notify
+            wait
+          }
+
         }
-        if (consumer.position(tp) >= lastOffset) {
-          if (isLeader()) continue.set(false)
-        }
+      } catch {
+        case e: InterruptedException => kafkaConsumer.close()
       }
-    } finally {
-      consumer.close
-      println(s"`$topic`, partition $partition bootstrap completed")
-      //TODO after becoming a master there can only be termination because we're closing the consumer
     }
   }
 
-  def write(kv: (Array[Byte], Array[Byte])): java.util.concurrent.Future[RecordMetadata] = {
-    producer.send(new ProducerRecord(topic, partition, kv._1, kv._2))
+  def boot(): Unit = {
+    consumer.start()
+    consumer.synchronized {
+      doTail.set(false)
+      consumer.wait()
+    }
   }
 
+  def tail(): Unit = {
+//    consumer.synchronized {
+//      doTail.set(true)
+//      consumer.notify
+//    }
+  }
+
+  def close(): Unit = {
+    try {
+      kafkaProducer.close()
+    } finally {
+      consumer.interrupt()
+    }
+  }
+
+  def write(key: K, value: V): java.util.concurrent.Future[RecordMetadata] = {
+    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
+  }
 
 }
-

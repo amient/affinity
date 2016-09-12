@@ -28,7 +28,7 @@ import akka.http.scaladsl.model.{HttpEntity, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.amient.affinity.core.actor.Gateway
-import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
+import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
 import io.amient.affinity.example.data.{AvroSerde, ConfigEntry}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -37,48 +37,48 @@ import scala.util.control.NonFatal
 class HttpGateway(appConfig: Properties) extends Gateway(appConfig) {
 
   //broadcast memstore
-  val settings = new KafkaStorage[String, ConfigEntry](topic = "settings", 0)
-    with MemStoreSimpleMap[String, ConfigEntry] {
-    val serde = new AvroSerde()
-
-    override def serialize: (String, ConfigEntry) => (Array[Byte], Array[Byte]) = (k, v) => {
-      (if (k == null) null else k.getBytes(), serde.toBinary(v))
-    }
-
-    override def deserialize: (Array[Byte], Array[Byte]) => (String, ConfigEntry) = (k, v) => {
-      (if (k == null) null else new String(k), serde.fromBytes(v, classOf[ConfigEntry]))
-    }
-  }
+//  val settings = new KafkaStorage[String, ConfigEntry](topic = "settings", 0)
+//    with MemStoreConcurrentMap[String, ConfigEntry] {
+//    val serde = new AvroSerde()
+//
+//    override def serialize: (String, ConfigEntry) => (Array[Byte], Array[Byte]) = (k, v) => {
+//      (if (k == null) null else k.getBytes(), serde.toBinary(v))
+//    }
+//
+//    override def deserialize: (Array[Byte], Array[Byte]) => (String, ConfigEntry) = (k, v) => {
+//      (if (k == null) null else new String(k), serde.fromBytes(v, classOf[ConfigEntry]))
+//    }
+//  }
   //TODO provide a way for broadcasts to keep consuming new messages
-  settings.boot(() => true)
+//  settings.boot()
+//  settings.tail()
+  //settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
 
-  settings.put("key1", Some(ConfigEntry("Some Key 1", "565BFA18808821339115A00FA61976B9")))
-
-  object AUTH {
-
-    def unapply(query: Query): Option[(Query, String)] = {
-      query.get("signature") match {
-        case None => None
-        case Some(sig) => {
-          sig.split(":") match {
-            case Array(k, clientSignature) => settings.get(k) match {
-              case None => None
-              case Some(configEntry) =>
-                //                val arg = request.uri.path.toString
-                //                if (configEntry.crypto.sign(arg) != clientSignature) {
-                //                  exchange.status = Some(Unauthorized)
-                //                  None
-                //                } else {
-                val signature = configEntry.crypto.sign(clientSignature)
-                Some(query, signature)
-              //                }
-            }
-            case _ => None
-          }
-        }
-      }
-    }
-  }
+//  object AUTH {
+//
+//    def unapply(query: Query): Option[(Query, String)] = {
+//      query.get("signature") match {
+//        case None => None
+//        case Some(sig) => {
+//          sig.split(":") match {
+//            case Array(k, clientSignature) => settings.get(k) match {
+//              case None => None
+//              case Some(configEntry) =>
+//                //                val arg = request.uri.path.toString
+//                //                if (configEntry.crypto.sign(arg) != clientSignature) {
+//                //                  exchange.status = Some(Unauthorized)
+//                //                  None
+//                //                } else {
+//                val signature = configEntry.crypto.sign(clientSignature)
+//                Some(query, signature)
+//              //                }
+//            }
+//            case _ => None
+//          }
+//        }
+//      }
+//    }
+//  }
 
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)

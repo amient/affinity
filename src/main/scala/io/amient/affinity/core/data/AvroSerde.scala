@@ -19,10 +19,13 @@
 
 package io.amient.affinity.core.data
 
+import java.util
+
 import akka.serialization.JSerializer
 import org.apache.avro.Schema
+import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 
-abstract class AvroSerde extends JSerializer {
+abstract class AvroSerde extends JSerializer with Serializer[Any] with Deserializer[Any]{
 
   val reg1: Map[Class[_], Int] = register.zipWithIndex.map { case ((cls, schema), i) =>
     cls -> i
@@ -36,25 +39,32 @@ abstract class AvroSerde extends JSerializer {
 
   override def identifier: Int = 21
 
-  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = {
+  override def includeManifest: Boolean = false
+
+  override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj)
+
+  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes)
+
+  override def serialize(topic: String, data: scala.Any): Array[Byte] = toBytes(data)
+
+  override def deserialize(topic: String, data: Array[Byte]): Any = fromBytes(data)
+
+  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = ()
+
+  override def close(): Unit = ()
+
+  //TODO declarative schema evolution that can be replaced by schema registry at later point
+
+  private def fromBytes(bytes: Array[Byte]): AnyRef = {
     AvroRecord.read(bytes, (schemaId: Int) => reg2(schemaId))
   }
 
-  override def toBinary(obj: AnyRef): Array[Byte] = {
+  private def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null else reg1.get(obj.getClass) match {
       case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
       case Some(schemaId) =>
         val schema = reg2(schemaId)._2
         AvroRecord.write(obj, schema, schemaId)
-    }
-  }
-
-  override def includeManifest: Boolean = false
-
-
-  def fromBytes[T <: AnyRef](bytes: Array[Byte], cls: Class[T]): T = {
-    if (bytes == null) null.asInstanceOf[T] else {
-      AvroRecord.read(bytes, cls, (schemaId: Int) => reg2(schemaId))
     }
   }
 
