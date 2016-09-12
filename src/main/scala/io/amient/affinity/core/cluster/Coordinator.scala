@@ -115,14 +115,19 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private def removeRoutee(routeeHandle: String): Unit = {
     if (handles.contains(routeeHandle)) {
-      handles.remove(routeeHandle) match {
+      handles.get(routeeHandle) match {
         case None =>
         case Some(master) =>
+          val currentReplicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
+          val currentMaster = currentReplicas.minBy(_._1)
+          handles.remove(routeeHandle)
           notifyWatchers(RemoveMaster(group, master))
           val replicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
           if (replicas.size > 0) {
             val newMaster = replicas.minBy(_._1)
-            notifyWatchers(AddMaster(group, newMaster._2))
+            if (currentMaster != newMaster) {
+              notifyWatchers(AddMaster(group, newMaster._2))
+            }
           } else {
             //TODO last replica removed - no master available
           }

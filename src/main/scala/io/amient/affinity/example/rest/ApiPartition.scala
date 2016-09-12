@@ -34,9 +34,9 @@ import scala.util.control.NonFatal
 
 class ApiPartition(config: Properties) extends Partition {
 
-  //partitioned memstore
-  val graph = storage(new KafkaStorage[Vertex, Component](topic = "graph", partition)
-    with MemStoreSimpleMap[Vertex, Component])
+  val graph = storage {
+    new KafkaStorage[Vertex, Component](topic = "graph", partition) with MemStoreSimpleMap[Vertex, Component]
+  }
 
   import context.dispatcher
 
