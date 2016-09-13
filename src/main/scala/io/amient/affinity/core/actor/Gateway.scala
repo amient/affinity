@@ -85,13 +85,9 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     }
   }
 
-  object HTTP_BASIC {
-    def unapply(e: HttpExchange): Option[(HttpMethod, Path, Query, (Option[BasicHttpCredentials], Promise[HttpResponse]))] = {
-      val x: Option[Authorization] = e.request.header[Authorization]
-      val httpBasicCredentials = for {
-        Authorization(credentials@BasicHttpCredentials(user, pass)) <- e.request.header[Authorization]
-      } yield credentials
-      Some(e.request.method, e.request.uri.path, e.request.uri.query(), (httpBasicCredentials, e.promise))
+  object HTTP_AUTH {
+    def unapply(e: HttpExchange): Option[(HttpMethod, Path, Query, (Option[Authorization], Promise[HttpResponse]))] = {
+      Some(e.request.method, e.request.uri.path, e.request.uri.query(), (e.request.header[Authorization], e.promise))
     }
   }
 

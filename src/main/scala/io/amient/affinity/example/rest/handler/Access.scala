@@ -28,7 +28,6 @@ import io.amient.util.TimeCryptoProof
 
 trait Access extends HttpGateway {
 
-
   abstract override def handle: Receive = super.handle orElse {
 
     case HTTP(GET, PATH("p", "access", service, person), AUTH_STATELESS(query, signature), response) =>
@@ -41,7 +40,7 @@ trait Access extends HttpGateway {
       response.success(handleError(Unauthorized))
 
 
-    case HTTP_BASIC(GET, PATH("settings"), _, AUTH_ADMIN(credentials, response)) =>
+    case HTTP_AUTH(GET, PATH("settings"), _, AUTH_ADMIN(credentials, response)) =>
       response.success {
         jsonValue(OK, Map(
           "credentials" -> credentials,
@@ -50,7 +49,7 @@ trait Access extends HttpGateway {
       }
 
 
-    case HTTP_BASIC(GET, PATH("settings", "add"), QUERY(("key", key)), AUTH_ADMIN(credentials, response)) =>
+    case HTTP_AUTH(GET, PATH("settings", "add"), QUERY(("key", key)), AUTH_ADMIN(credentials, response)) =>
       response.success {
         settings.get(key) match {
           case Some(otherKey) => errorValue(BadRequest, ContentTypes.`application/json`, "That key already exists")

@@ -22,7 +22,7 @@ package io.amient.affinity.example.rest
 import java.io.StringWriter
 import java.util.Properties
 
-import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpChallenge}
+import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
 import akka.http.scaladsl.model.{HttpEntity, _}
@@ -46,27 +46,31 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorSt
       with MemStoreConcurrentMap[String, ConfigEntry]
   }
 
+  settings.put("admin", None)
+
 
   object AUTH_ADMIN {
 
     val adminConfig = settings.get("admin")
 
-    def unapply(responseWithCredentials: (Option[BasicHttpCredentials], Promise[HttpResponse])) = {
+    def unapply(responseWithCredentials: (Option[Authorization], Promise[HttpResponse])) = {
+      val (auth, response) = responseWithCredentials
+      val credentials = for ( Authorization(c @ BasicHttpCredentials(username, password)) <- auth) yield c
       adminConfig match {
         case None =>
-          responseWithCredentials match {
-            case (Some(BasicHttpCredentials(username, newAdminPassword)), response) if (username == "admin") =>
+          credentials match {
+            case Some(BasicHttpCredentials(username, newAdminPassword)) if (username == "admin") =>
               settings.put("admin", Some(ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))))
               Some(responseWithCredentials)
-            case (_, response) => response.success(HttpResponse(
+            case _ => response.success(HttpResponse(
               Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
               None
           }
-        case Some(ConfigEntry(any, adminPassword)) => responseWithCredentials match {
-          case (Some(BasicHttpCredentials(username, password)), _)
+        case Some(ConfigEntry(any, adminPassword)) => credentials match {
+          case Some(BasicHttpCredentials(username, password))
             if (username == "admin" && TimeCryptoProof.toHex(password.getBytes) == adminPassword) =>
             Some(responseWithCredentials)
-          case (_, response) =>
+          case _ =>
             response.success(HttpResponse(Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", None)))))
             None
         }
