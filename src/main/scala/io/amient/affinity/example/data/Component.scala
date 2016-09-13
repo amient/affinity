@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example.data
 
-import io.amient.affinity.core.data.AvroRecord
+import io.amient.affinity.core.data.avro.AvroRecord
 import org.apache.avro.SchemaBuilder
 
 object Component {

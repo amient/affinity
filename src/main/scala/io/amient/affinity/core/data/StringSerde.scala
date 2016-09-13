@@ -17,23 +17,13 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.core.data
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.data.avro.AvroRecord
-import io.amient.util.TimeCryptoProofSHA256
-import org.apache.avro.SchemaBuilder
+class StringSerde extends Serde {
 
-object ConfigEntry {
-  val schema = SchemaBuilder.record("ConfigEntry")
-    .namespace("io.amient.affinity.example.data").fields()
-    .name("val1").`type`().stringType().noDefault()
-    .name("salt").`type`().stringType().noDefault()
-    .endRecord()
-}
+  override protected def fromBytes(bytes: Array[Byte]): AnyRef = new String(bytes, "UTF-8")
 
-final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord(ConfigEntry.schema) {
-  @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
-  override def hashCode(): Int = description.hashCode()
+  override protected def toBytes(obj: Any): Array[Byte] = obj.asInstanceOf[String].getBytes("UTF-8")
 
+  override def identifier: Int = 21
 }

@@ -1,5 +1,6 @@
 package io.amient.affinity.core.data
 
+import io.amient.affinity.core.data.avro.AvroRecord
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
 

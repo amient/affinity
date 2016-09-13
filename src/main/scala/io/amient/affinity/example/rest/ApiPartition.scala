@@ -25,6 +25,7 @@ import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.actor.Partition
+import io.amient.affinity.example.data.MyAvroSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{Component, _}
 
@@ -34,8 +35,9 @@ import scala.util.control.NonFatal
 
 class ApiPartition(config: Properties) extends Partition {
 
-  val graph = storage {
-    new KafkaStorage[Vertex, Component](topic = "graph", partition) with MemStoreSimpleMap[Vertex, Component]
+  val graph = state {
+    new KafkaStorage[Vertex, Component](topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
+      with MemStoreSimpleMap[Vertex, Component]
   }
 
   import context.dispatcher

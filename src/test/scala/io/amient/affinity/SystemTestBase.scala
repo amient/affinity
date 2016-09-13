@@ -17,19 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity
 
-
-import org.apache.avro.Schema
-
-class AvroSerde extends io.amient.affinity.core.data.AvroSerde  {
-
-  override def register: Seq[(Class[_], Schema)] = Seq (
-    classOf[Vertex] -> Vertex.schema,
-    classOf[Edge] -> Edge.schema,
-    classOf[Component] -> Component.schema,
-    classOf[ConfigEntry] -> ConfigEntry.schema
-  )
-
+class SystemTestBase {
+  //TODO start zookeeper, start kafka, start node with region and gateway and provide method for rest calls
 
 }

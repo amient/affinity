@@ -43,6 +43,8 @@ object ServiceNode extends App {
     affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
     affinityConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
 
+
+
     new Node(affinityConfig) {
 
       startServices{

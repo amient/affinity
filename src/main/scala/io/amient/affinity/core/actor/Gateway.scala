@@ -27,6 +27,7 @@ import akka.event.Logging
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.{BasicHttpCredentials, _}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
@@ -84,6 +85,17 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     }
   }
 
+  object HTTP_BASIC {
+    def unapply(e: HttpExchange): Option[(HttpMethod, Path, Query, (Option[BasicHttpCredentials], Promise[HttpResponse]))] = {
+      val x: Option[Authorization] = e.request.header[Authorization]
+      val httpBasicCredentials = for {
+        Authorization(credentials@BasicHttpCredentials(user, pass)) <- e.request.header[Authorization]
+      } yield credentials
+      Some(e.request.method, e.request.uri.path, e.request.uri.query(), (httpBasicCredentials, e.promise))
+    }
+  }
+
+
   object PATH {
     def unapplySeq(path: Path): Option[Seq[String]] = {
       @tailrec
@@ -137,10 +149,10 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     case RemoveMaster(group, ref) =>
       group match {
         case "regions" =>
-          println("removing master " + ref)
+          println("Removing master " + ref)
           cluster ! RemoveRoutee(ActorRefRoutee(ref))
         case "services" =>
-          log.info("Removeing Service" + ref)
+          log.info("Removing Service" + ref)
           val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
           val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
           services.put(serviceClass, actors - ref)

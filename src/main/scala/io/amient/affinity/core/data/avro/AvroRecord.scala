@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.data
+package io.amient.affinity.core.data.avro
 
 import java.io.ByteArrayOutputStream
 
@@ -129,7 +129,6 @@ object AvroRecord {
         } else {
           iterable
         }
-      //TODO Avro Union to Scala conversion
       case UNION=> throw new NotImplementedError("Avro Unions are not supported")
     }
   }

@@ -123,8 +123,8 @@ class Controller(appConfig: Properties) extends Actor {
 
     case GatewayCreated() =>
       try {
-        regionCoordinator.watchRoutees(sender)
-        serviceCoordinator.watchRoutees(sender)
+        regionCoordinator.watch(sender)
+        serviceCoordinator.watch(sender)
         httpInterface.foreach(_.bind(sender))
 
       } catch {
@@ -136,8 +136,9 @@ class Controller(appConfig: Properties) extends Actor {
       }
 
     case Terminated(gateway) =>
-      //TODO coordinator.unwatch(the listener returned by GatewayCreated() => watchRoutees)
       log.info("Terminated(gateway) shutting down http interface")
+      regionCoordinator.unwatch(gateway)
+      serviceCoordinator.unwatch(gateway)
       try {
         httpInterface.foreach(_.close)
       } finally {

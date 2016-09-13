@@ -21,20 +21,44 @@ package io.amient.affinity.example.rest.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model._
+import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
+import io.amient.util.TimeCryptoProof
 
 trait Access extends HttpGateway {
 
-  abstract override def handle: Receive = super.handle orElse {
-//
-//    case HTTP(GET, PATH("p", "access", service, person), AUTH(query, signature), response) =>
-//      response.success(jsonValue(OK, Map(
-//        "signature" -> signature,
-//        "service" -> service,
-//        "person" -> person
-//      )))
 
-    case HTTP(GET, PATH("p", "access", service, person), _ , response) =>
+  abstract override def handle: Receive = super.handle orElse {
+
+    case HTTP(GET, PATH("p", "access", service, person), AUTH_STATELESS(query, signature), response) =>
+      response.success(jsonValue(OK, Map(
+        "signature" -> signature,
+        "service" -> service,
+        "person" -> person
+      )))
+    case HTTP(GET, PATH("p", "access", service, person), _, response) =>
       response.success(handleError(Unauthorized))
+
+
+    case HTTP_BASIC(GET, PATH("settings"), _, AUTH_ADMIN(credentials, response)) =>
+      response.success {
+        jsonValue(OK, Map(
+          "credentials" -> credentials,
+          "settings" -> settings.iterator.toMap
+        ))
+      }
+
+
+    case HTTP_BASIC(GET, PATH("settings", "add"), QUERY(("key", key)), AUTH_ADMIN(credentials, response)) =>
+      response.success {
+        settings.get(key) match {
+          case Some(otherKey) => errorValue(BadRequest, ContentTypes.`application/json`, "That key already exists")
+          case None =>
+            val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
+            settings.put(key, Some(ConfigEntry(key, salt)))
+            redirect(SeeOther, Uri("/settings"))
+        }
+      }
   }
 }

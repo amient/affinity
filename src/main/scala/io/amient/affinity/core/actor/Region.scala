@@ -42,7 +42,7 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
   override def preStart(): Unit = {
     log.info("STARTING REGION")
-    coordinator.watchRoutees(self)
+    coordinator.watch(self)
     for (partition <- partitions) {
       /**
         * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic

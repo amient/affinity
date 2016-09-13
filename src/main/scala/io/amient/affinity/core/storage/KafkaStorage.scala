@@ -22,27 +22,25 @@ package io.amient.affinity.core.storage
 import java.util
 import java.util.Properties
 
-import io.amient.affinity.example.data.AvroSerde
+import io.amient.affinity.core.data.Serde
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 
 import scala.collection.JavaConverters._
 
-abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage[K, V] {
-
-  //TODO configure KafkaStorage via appConfig and replace prinln(s) with log.info
-  val keySerde = classOf[AvroSerde].getName
-  val valueSerde = classOf[AvroSerde].getName
-  //TODO provide serde via appConfig
+abstract class KafkaStorage[K, V](topic: String,
+                                  partition: Int,
+                                  keySerde: Class[_ <: Serde],
+                                  valueSerde: Class[_ <: Serde]) extends Storage[K, V] {
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", "localhost:9092")
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")
-  producerProps.put("key.serializer", keySerde)
-  producerProps.put("value.serializer", valueSerde)
+  producerProps.put("key.serializer", keySerde.getName)
+  producerProps.put("value.serializer", valueSerde.getName)
   val kafkaProducer = new KafkaProducer[K, V](producerProps)
 
   @volatile private var tailing = true
@@ -54,8 +52,8 @@ abstract class KafkaStorage[K, V](topic: String, partition: Int) extends Storage
     val consumerProps = new Properties()
     consumerProps.put("bootstrap.servers", "localhost:9092")
     consumerProps.put("enable.auto.commit", "false")
-    consumerProps.put("key.deserializer", keySerde)
-    consumerProps.put("value.deserializer", valueSerde)
+    consumerProps.put("key.deserializer", keySerde.getName)
+    consumerProps.put("value.deserializer", valueSerde.getName)
     val kafkaConsumer = new KafkaConsumer[K, V](consumerProps)
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)

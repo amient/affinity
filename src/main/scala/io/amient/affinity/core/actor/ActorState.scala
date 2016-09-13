@@ -19,28 +19,42 @@
 
 package io.amient.affinity.core.actor
 
-import akka.event.Logging
+import java.util.concurrent.CopyOnWriteArrayList
 
-trait Partition extends Service with ActorState {
+import akka.actor.Actor
+import io.amient.affinity.core.storage.Storage
 
-  override val log = Logging.getLogger(context.system, this)
+import scala.collection.JavaConverters._
 
-  /**
-    * physical partition id - this is read from the name of the Partition Actor;  assigned by the Region
-    */
-  val partition = self.path.name.toInt
+trait ActorState extends Actor {
 
-  override protected def onBecomeMaster: Unit = {
-    untailState()
+  private val storageRegistry = new CopyOnWriteArrayList[Storage[_, _]]()
+
+  //TODO configure storage by identifier in appConfig like for example in samza
+
+  def state[K, V](storage: => Storage[K, V]): Storage[K, V] = {
+    val stateStorage: Storage[K, V] = storage
+    stateStorage.boot()
+    storageRegistry.add(stateStorage)
+    stateStorage
   }
 
-  override protected def onBecomeStandby: Unit = {
-    tailState()
+  def untailState(): Unit = {
+    storageRegistry.asScala.foreach { storage =>
+      storage.untail()
+    }
   }
 
-  override def postStop(): Unit = {
-    super.postStop()
-    closeState()
+  def tailState(): Unit = {
+    storageRegistry.asScala.foreach { storage =>
+      storage.tail()
+    }
+  }
+
+  def closeState(): Unit = {
+    storageRegistry.asScala.foreach { storage =>
+      storage.close()
+    }
   }
 
 }

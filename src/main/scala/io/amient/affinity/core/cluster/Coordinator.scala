@@ -85,13 +85,23 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     *
     * @param watcher actor which will receive the messages
     */
-  def watchRoutees(watcher: ActorRef): Unit = {
+  def watch(watcher: ActorRef): Unit = {
     synchronized {
       watchers += watcher
       handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
         val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
         val (masterHandle, masterActorRef) = replicas.minBy(_._1)
         watcher ! AddMaster(group, masterActorRef)
+      }
+    }
+  }
+
+  def unwatch(watcher: ActorRef): Unit = {
+    synchronized {
+      val i = watchers.indexOf(watcher)
+      if (i >=0) {
+        println("removing watcher " + watcher)
+        watchers.remove(i)
       }
     }
   }
