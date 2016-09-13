@@ -60,9 +60,9 @@ The following core features are already in place:
  - Akka Cluster that comes with Akka is not used, instead a custom
     cluster management is implemented 
  - Each Local Actor System has a Cluster Actor in its hierarchy which 
-    is implements standard Akka Router interface with custom routing logic.
+    implements standard Akka Router interface with custom routing logic.
     This routing logic is meant to mimic whatever partitioning strategy
-    is used in the unerlying kafka storage.
+    is used in the underlying kafka storage.
  - Cluster is there fore a dynamic Akka Router which keeps a copy of the 
     active Partition Actors, kept up to date by a pluggable Coordinator 
     (ZkCoordinator by default)
