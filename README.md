@@ -16,6 +16,7 @@
  - akka for asynchronous communication 
  - akka http as the main interface
  - zookeeper for distributed coordiation
+ - kafka as a fault-tolerant change log
 
 ## State Management
 
@@ -42,12 +43,67 @@ can also be used as read replicas (this is currently not implemented
 but the design is expecting this to come in future).
 
 
-# Examples
+# Development 
 
-## Example Graph API
+The codebase is split into core which is the general purpose library 
+for this architecture and an example application which uses the core 
+library. 
 
-This example demonstrates a graph data served via API which
-maintains connected-components constant time read characteristics.
+The following core features are already in place
+
+ - HTTP Interface is completely async done with Akka Http. 
+ - HTTP Handlers participate in handling the incoming HTTP Requests
+    by chaining the receive: Receive method of the Gateway Actor
+ - Handlers translate requests into Akka Messages - they can either ? Ask
+    and get response which they turn into HTTP Response or just ! Tell
+    and respond with No Content or Accepted, etc.
+ - Akka Cluster that comes with Akka is not used, instead a custom
+    cluster management is implemented 
+ - Each Local Actor System has a Cluster Actor in its hierarchy which 
+    is implements standard Akka Router interface with custom routing logic.
+    This routing logic is meant to mimic whatever partitioning strategy
+    is used in the unerlying kafka storage.
+ - Cluster is there fore a dynamic Akka Router which keeps a copy of the 
+    active Partition Actors, kept up to date by a pluggable Coordinator 
+    (ZkCoordinator by default)
+ - Each Handler has access to the Cluster Actor by extending the Gateway
+    as mentioned above. Any task that needs to be handled by a partition
+    is given to the Cluster Actor. This may be a simple forward or 
+    it can be an orchestrated sequence of Asks and Tells.
+  - If there are multiple Partition Actors for the same physical partition
+    Coordinator uses distributed logic to choose one of them as master
+    and other become standby.    
+  - On becoming a Master, the Partition Actor stops consuming (tailng) 
+    the the underlying topic, because the master receives all the writes, 
+    its in-memory state is consistent and it only publishes to the kafka 
+    for future bootstrap and keeping other standby(s) for the partitions up to date.
+  - On becoming a Standby, the Partition Actor resumes consuming the 
+     underlying topic until it again becomes a master.
+  - Standby is not a read replica at the moment but it could be an option
+    
+
+        
+## Example Graph Data API
+
+This example demonstrates a graph data served via Affinity REST API 
+which maintains connected-components constant time read characteristics.
+
+In the connected components any new connection added is propagated to all
+other connected vertexes, which could be done either with 
+Akka ! Tell - this would result in very fast response time on updates 
+but with potential data loss. In the example, instead, Akka ? Ask 
+is used for the propagation which slows down the writes
+but results in consistent state when there is a recoverable failure.
+
+NOTE: An irrecoverable failure, like a machine crash while the 
+propagation is in progress would still result in an inconsistent state.
+As it stands now even the best effort to guarantee consistency fails 
+if the updates are done in the fast Akka layer but this is simply the 
+nature of the example. In terms of architecture there is no write-ahead 
+log for the computation and if there is a need for exactly-once
+semantics or other strong guarantees, the problem can be delegated to
+ a dedicated stream-processor by simply connecting it to the same
+  topics as are used for affinity storage change logs! 
 
 The underlying topic which back the mem store should have 4 
 partitions which can be created from kafka installation home dir:
@@ -70,4 +126,3 @@ which means there is for each physical partiton one master and
 one standby.
 
 
-    
