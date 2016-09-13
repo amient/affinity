@@ -63,7 +63,7 @@ The following core features are already in place:
     implements standard Akka Router interface with custom routing logic.
     This routing logic is meant to mimic whatever partitioning strategy
     is used in the underlying kafka storage.
- - Cluster is there fore a dynamic Akka Router which keeps a copy of the 
+ - Cluster is therefore a dynamic Akka Router which maintains a copy of the 
     active Partition Actors, kept up to date by a pluggable Coordinator 
     (ZkCoordinator by default)
  - Each Handler has access to the Cluster Actor by extending the Gateway
@@ -72,13 +72,17 @@ The following core features are already in place:
     it can be an orchestrated sequence of Asks and Tells.
  - If there are multiple Partition Actors for the same physical partition
     Coordinator uses distributed logic to choose one of them as master
-    and other become standby.    
+    and the others become standby.    
  - On becoming a Master, the Partition Actor stops consuming (tailng) 
     the the underlying topic, because the master receives all the writes, 
     its in-memory state is consistent and it only publishes to the kafka 
     for future bootstrap and keeping other standby(s) for the partitions up to date.
+         NOTE: There is a possibility of a situation where a previous
+          master has published some messages which are not received 
+          by the new Master and so its state may become inconsistent with
+          the storage - this can be solved but first needs to be proven.
  - On becoming a Standby, the Partition Actor resumes consuming the 
-     underlying topic until it again becomes a master.
+     underlying topic and stops receiving until it again becomes a master.
  - Standby is not a read replica at the moment but it could be an option
 
         
