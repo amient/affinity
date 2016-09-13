@@ -49,7 +49,7 @@ The codebase is split into core which is the general purpose library
 for this architecture and an example application which uses the core 
 library. 
 
-The following core features are already in place
+The following core features are already in place:
 
  - HTTP Interface is completely async done with Akka Http. 
  - HTTP Handlers participate in handling the incoming HTTP Requests
@@ -70,17 +70,16 @@ The following core features are already in place
     as mentioned above. Any task that needs to be handled by a partition
     is given to the Cluster Actor. This may be a simple forward or 
     it can be an orchestrated sequence of Asks and Tells.
-  - If there are multiple Partition Actors for the same physical partition
+ - If there are multiple Partition Actors for the same physical partition
     Coordinator uses distributed logic to choose one of them as master
     and other become standby.    
-  - On becoming a Master, the Partition Actor stops consuming (tailng) 
+ - On becoming a Master, the Partition Actor stops consuming (tailng) 
     the the underlying topic, because the master receives all the writes, 
     its in-memory state is consistent and it only publishes to the kafka 
     for future bootstrap and keeping other standby(s) for the partitions up to date.
-  - On becoming a Standby, the Partition Actor resumes consuming the 
+ - On becoming a Standby, the Partition Actor resumes consuming the 
      underlying topic until it again becomes a master.
-  - Standby is not a read replica at the moment but it could be an option
-    
+ - Standby is not a read replica at the moment but it could be an option
 
         
 ## Example Graph Data API
