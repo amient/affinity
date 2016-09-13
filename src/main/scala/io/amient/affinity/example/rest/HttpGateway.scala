@@ -40,15 +40,54 @@ import scala.util.control.NonFatal
 
 class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorState {
 
-  //broadcast memstore
+  val mapper = new ObjectMapper()
+  mapper.registerModule(DefaultScalaModule)
+
+  /**
+    * settings is a broadcast memstore which holds an example set of api keys for custom authentication
+    * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
+    * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
+    * can be modified by other nodes and need to be accessed concurrently
+    */
   val settings = state {
     new KafkaStorage[String, ConfigEntry](topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
       with MemStoreConcurrentMap[String, ConfigEntry]
   }
 
-  settings.put("admin", None)
+  /**
+    * AUTH_SIGNATURE is a pattern match extractor that can be used in handlers that want to use
+    * encryption-based authentication using the keys and salts stored in the val settings.
+    */
+  object AUTH_SIGNATURE {
 
+    def unapply(query: Query): Option[(Query, String)] = {
+      query.get("signature") match {
+        case None => None
+        case Some(sig) => {
+          sig.split(":") match {
+            case Array(k, clientSignature) => settings.get(k) match {
+              case None => None
+              case Some(configEntry) =>
+                //                val arg = request.uri.path.toString
+                //                if (configEntry.crypto.sign(arg) != clientSignature) {
+                //                  exchange.status = Some(Unauthorized)
+                //                  None
+                //                } else {
+                val signature = configEntry.crypto.sign(clientSignature)
+                Some(query, signature)
+              //                }
+            }
+            case _ => None
+          }
+        }
+      }
+    }
+  }
 
+  /**
+    * AUTH_ADMIN is a pattern match extractor that can be used in handlers that want to
+    * use Basic HTTP Authentication for administrative tasks like creating new keys etc.
+    */
   object AUTH_ADMIN {
 
     val adminConfig = settings.get("admin")
@@ -78,34 +117,9 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorSt
     }
   }
 
-  object AUTH_STATELESS {
-
-    def unapply(query: Query): Option[(Query, String)] = {
-      query.get("signature") match {
-        case None => None
-        case Some(sig) => {
-          sig.split(":") match {
-            case Array(k, clientSignature) => settings.get(k) match {
-              case None => None
-              case Some(configEntry) =>
-                //                val arg = request.uri.path.toString
-                //                if (configEntry.crypto.sign(arg) != clientSignature) {
-                //                  exchange.status = Some(Unauthorized)
-                //                  None
-                //                } else {
-                val signature = configEntry.crypto.sign(clientSignature)
-                Some(query, signature)
-              //                }
-            }
-            case _ => None
-          }
-        }
-      }
-    }
-  }
-
-  val mapper = new ObjectMapper()
-  mapper.registerModule(DefaultScalaModule)
+  /* Following are various helpers for HTTP <> AKKA transformations used in the handlers.
+   * - all handlers are traits that extend HttpGateway.
+   */
 
   def textValue(status: StatusCode, message: String): HttpResponse = {
     HttpResponse(status, entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, message))

@@ -30,7 +30,7 @@ trait Access extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH("p", "access", service, person), AUTH_STATELESS(query, signature), response) =>
+    case HTTP(GET, PATH("p", "access", service, person), AUTH_SIGNATURE(query, signature), response) =>
       response.success(jsonValue(OK, Map(
         "signature" -> signature,
         "service" -> service,
