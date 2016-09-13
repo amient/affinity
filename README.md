@@ -108,14 +108,20 @@ semantics or other strong guarantees, the problem can be delegated to
  a dedicated stream-processor by simply connecting it to the same
   topics as are used for affinity storage change logs! 
 
-The underlying topic which back the mem store should have 4 
-partitions which can be created from kafka installation home dir:
+### Running the example
+
+First you'll need Zookeeper and Kafka running locally. And then
+you'll need to create 2 kafka topics, e.g. from tha kafke home dir:
  
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --topic graph \
-        --create --partitions 4 --replication-factor 2 --config cleanup.policy=compact
+        --create --partitions 4 --replication-factor 1 --config cleanup.policy=compact
     
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --topic settings \ 
-        --create --partitions 1 --replication-factor 2 --config cleanup.policy=compact
+        --create --partitions 1 --replication-factor 1 --config cleanup.policy=compact
+        
+The graph topic is the the partitioned dataset for the graph and the
+ settings is a broadcast topic with a single partition.
+
 
 A single node may be started with one region
 serving all 4 partitions byt starting `ApiNode` with
