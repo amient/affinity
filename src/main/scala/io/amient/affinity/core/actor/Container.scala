@@ -26,9 +26,11 @@ import akka.event.Logging
 import io.amient.affinity.core.cluster.Coordinator
 
 object Container {
-  final val CONFIG_AKKA_HOST = "gateway.akka.host"
-  final val CONFIG_AKKA_PORT = "gateway.akka.port"
-  final val CONFIG_AKKA_SYSTEM = "gateway.akka.system.name"
+
+  final val CONFIG_AKKA_HOST = "affinity.akka.host"
+  final val CONFIG_AKKA_PORT = "affinity.akka.port"
+  final val CONFIG_AKKA_SYSTEM = "affinity.akka.system.name"
+  final val CONFIG_AKKA_CONF_NAME = "affinity.akka.conf"
 
   case class ServiceOnline(partition: ActorRef)
 

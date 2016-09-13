@@ -48,6 +48,7 @@ object ApiNode extends App {
     affinityConfig.put(Container.CONFIG_AKKA_SYSTEM, actorSystemName)
     affinityConfig.put(Container.CONFIG_AKKA_HOST, host)
     affinityConfig.put(Container.CONFIG_AKKA_PORT, akkaPort.toString)
+    affinityConfig.put(Container.CONFIG_AKKA_CONF_NAME, "example")
     affinityConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
     affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
     affinityConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)

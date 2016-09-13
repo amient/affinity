@@ -34,9 +34,8 @@ class Node(appConfig: Properties) {
 
   val akkaPort = appConfig.getProperty(Container.CONFIG_AKKA_PORT)
   val actorSystemName = appConfig.getProperty(Container.CONFIG_AKKA_SYSTEM)
-
   val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-    .withFallback(ConfigFactory.load("example"))   //FIXME example.conf should be set by the application
+    .withFallback(ConfigFactory.load(appConfig.getProperty(Container.CONFIG_AKKA_CONF_NAME)))
 
   implicit val system = ActorSystem(actorSystemName, systemConfig)
 
