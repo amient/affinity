@@ -11,7 +11,7 @@
 
 ## Cluster Overview
 
- ![Cluster Architecture](doc/ClusterArchitecture.png)
+ ![Cluster Architecture](doc/affinity.png)
 
  - akka for asynchronous communication 
  - akka http as the main interface
