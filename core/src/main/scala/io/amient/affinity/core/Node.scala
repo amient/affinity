@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.cluster
+package io.amient.affinity.core
 
 import java.util.Properties
 

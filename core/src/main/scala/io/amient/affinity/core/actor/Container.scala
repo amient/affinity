@@ -55,7 +55,6 @@ class Container(appConfig: Properties, coordinator: Coordinator, group: String) 
   override def postStop(): Unit = {
     services.foreach { case (ref, handle) =>
       log.info(s"Unregistering service: handle=${services(ref)}, path=${ref.path}")
-      println(s"Unregistering service: handle=${services(ref)}, path=${ref.path}")
       coordinator.unregister(services(ref))
     }
   }

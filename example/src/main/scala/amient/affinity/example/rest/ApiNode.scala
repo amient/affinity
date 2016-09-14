@@ -21,9 +21,9 @@ package io.amient.affinity.example.rest
 
 import java.util.Properties
 
-import io.amient.affinity.core.HttpInterface
+import io.amient.affinity.core.{HttpInterface, Node}
 import io.amient.affinity.core.actor.{Container, Region}
-import io.amient.affinity.core.cluster.{Cluster, Coordinator, Node, ZkCoordinator}
+import io.amient.affinity.core.cluster.{Cluster, Coordinator, CoordinatorZk}
 import io.amient.affinity.example.rest.handler._
 
 import scala.util.control.NonFatal
@@ -50,8 +50,8 @@ object ApiNode extends App {
     affinityConfig.put(Container.CONFIG_AKKA_PORT, akkaPort.toString)
     affinityConfig.put(Container.CONFIG_AKKA_CONF_NAME, "example")
     affinityConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
-    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
-    affinityConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
+    affinityConfig.put(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
 
     //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(affinityConfig) {

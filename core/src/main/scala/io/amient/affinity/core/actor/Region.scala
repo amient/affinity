@@ -21,7 +21,7 @@ package io.amient.affinity.core.actor
 
 import java.util.Properties
 
-import akka.actor.Props
+import akka.actor.{Props, Status}
 import akka.event.Logging
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
@@ -58,8 +58,14 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   }
 
   override def receive: Receive = super.receive orElse {
-    case AddMaster(group, ref) if (ref.path.address.hasLocalScope) => ref ! BecomeMaster()
-    case RemoveMaster(group, ref)  if (ref.path.address.hasLocalScope) => ref ! BecomeStandby()
+    case AddMaster(group, ref) if (ref.path.address.hasLocalScope) =>
+      sender ! true
+      ref ! BecomeMaster()
+    case AddMaster(group, ref) => sender ! true
+    case RemoveMaster(group, ref) if (ref.path.address.hasLocalScope) =>
+      sender ! true
+      ref ! BecomeStandby()
+    case RemoveMaster(group, ref) => sender ! true
   }
 
 }

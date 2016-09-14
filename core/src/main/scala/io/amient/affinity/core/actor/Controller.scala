@@ -46,6 +46,8 @@ class Controller(appConfig: Properties) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
+  private val nodeInfo = appConfig.getProperty(HttpInterface.CONFIG_HTTP_PORT)
+
   //controller terminates the system so cannot use system.dispatcher for Futures execution
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -143,7 +145,6 @@ class Controller(appConfig: Properties) extends Actor {
         httpInterface.foreach(_.close)
       } finally {
         system.terminate() onComplete { _ =>
-          //TODO there still could be an error that caused the gateway to terminate
           System.exit(0)
         }
       }

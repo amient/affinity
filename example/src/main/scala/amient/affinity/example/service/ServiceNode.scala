@@ -21,8 +21,9 @@ package io.amient.affinity.example.service
 
 import java.util.Properties
 
+import io.amient.affinity.core.Node
 import io.amient.affinity.core.actor.Container
-import io.amient.affinity.core.cluster.{Coordinator, Node, ZkCoordinator}
+import io.amient.affinity.core.cluster.{Coordinator, CoordinatorZk}
 
 import scala.util.control.NonFatal
 
@@ -41,8 +42,8 @@ object ServiceNode extends App {
     affinityConfig.put(Container.CONFIG_AKKA_HOST, host)
     affinityConfig.put(Container.CONFIG_AKKA_PORT, akkaPort.toString)
     affinityConfig.put(Container.CONFIG_AKKA_CONF_NAME, "example")
-    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
-    affinityConfig.put(ZkCoordinator.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
+    affinityConfig.put(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
 
     new Node(affinityConfig) {
 

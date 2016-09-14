@@ -19,19 +19,14 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util
 import java.util.Properties
 
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.util.Timeout
-import org.I0Itec.zkclient.serialize.ZkSerializer
-import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
-import org.apache.zookeeper.CreateMode
+import io.amient.affinity.core.ack._
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 object Coordinator {
 
@@ -42,7 +37,7 @@ object Coordinator {
   final case class RemoveMaster(group: String, ref: ActorRef)
 
   def fromProperties(system: ActorSystem, group: String, appConfig: Properties): Coordinator = {
-    val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[ZkCoordinator].getName)
+    val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
     val cls = Class.forName(className).asSubclass(classOf[Coordinator])
     val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Properties])
     constructor.newInstance(system, group, appConfig)
@@ -55,14 +50,11 @@ object Coordinator {
 abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   import Coordinator._
+  import system.dispatcher
 
-  /**
-    * internal data structure
-    */
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
 
   private val watchers = scala.collection.mutable.ListBuffer[ActorRef]()
-
 
   /**
     * @param actorPath of the actor that needs to managed as part of coordinated group
@@ -90,8 +82,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       watchers += watcher
       handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
         val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
-        val (masterHandle, masterActorRef) = replicas.minBy(_._1)
-        watcher ! AddMaster(group, masterActorRef)
+        val masterActorRef = replicas.minBy(_._1)._2
+        ack(watcher, AddMaster(group, masterActorRef))
+        //watcher ! AddMaster(group, masterActorRef)
       }
     }
   }
@@ -119,8 +112,11 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     }
   }
 
-  private def notifyWatchers(arg: Any): Unit = synchronized {
-    watchers.foreach(_ ! arg)
+  private def notifyWatchers(message: Any): Unit = {
+    synchronized {
+      watchers.foreach(watcher => ack(watcher, message))
+      //watchers.foreach(_ ! arg)
+    }
   }
 
   private def removeRoutee(routeeHandle: String): Unit = {
@@ -171,54 +167,4 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     }
 
   }
-}
-
-object ZkCoordinator {
-  final val CONFIG_ZOOKEEPER_CONNECT = "coordinator.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "coordinator.zookeeper.connect.timeout.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "coordinator.zookeeper.session.timeout.ms"
-  final val CONFIG_ZOOKEEPER_ROOT = "coordinator.zookeeper.root"
-}
-
-class ZkCoordinator(system: ActorSystem, group: String, appConfig: Properties) extends Coordinator(system, group) {
-
-  import ZkCoordinator._
-
-  val zkConnect = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT, "localhost:2181")
-  val zkConnectTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, "30000").toInt
-  val zkSessionTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, "6000").toInt
-  val zkRoot = appConfig.getProperty(CONFIG_ZOOKEEPER_ROOT, "/akka")
-  val groupRoot = s"$zkRoot/$group"
-
-  private val zk = new ZkClient(
-    zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
-      def serialize(o: Object): Array[Byte] = o.toString.getBytes
-
-      override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
-    })
-
-  if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
-
-  override def register(actorPath: ActorPath): String = {
-    if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
-    zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
-  }
-
-  override def unregister(handle: String) = zk.delete(handle)
-
-  override def close(): Unit = zk.close()
-
-
-  private def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
-
-  zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
-    override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
-      if (currentChilds != null) {
-        val newHandles = listAsIndexedSeq(currentChilds).map(id => s"$parentPath/$id")
-        val newState = newHandles.map(handle => (handle, zk.readData(handle).asInstanceOf[String]))
-        updateMembers(newState.toMap)
-      }
-    }
-  })
-
 }

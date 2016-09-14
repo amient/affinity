@@ -22,14 +22,14 @@ package io.amient.affinity.core.actor
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Actor, ActorRef, Status, Terminated}
 import akka.event.Logging
-import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
+import io.amient.affinity.core.HttpInterface
 import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
@@ -47,7 +47,9 @@ object Gateway {
 
 abstract class Gateway(appConfig: Properties) extends Actor {
 
-  protected val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
+  private val nodeInfo = appConfig.getProperty(HttpInterface.CONFIG_HTTP_PORT)
+
+  private val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
 
   val log = Logging.getLogger(context.system, this)
 
@@ -128,15 +130,20 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
     //Cluster Management queries
     case AddMaster(group, ref) =>
+      sender ! true
       group match {
         case "regions" => cluster ! AddRoutee(ActorRefRoutee(ref))
         case "services" =>
           val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
           val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
-          services.put(serviceClass, actors + ref)
+          if (!actors.contains(ref)) {
+            println(nodeInfo + " service online " + ref.path.name)
+            services.put(serviceClass, actors + ref)
+          }
       }
 
     case RemoveMaster(group, ref) =>
+      sender ! true
       group match {
         case "regions" => cluster ! RemoveRoutee(ActorRefRoutee(ref))
         case "services" =>

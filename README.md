@@ -80,11 +80,8 @@ The following core features are already in place:
  - On becoming a Master, the Partition Actor stops consuming (tailng) 
     the the underlying topic, because the master receives all the writes, 
     its in-memory state is consistent and it only publishes to the kafka 
-    for future bootstrap and keeping other standby(s) for the partitions up to date.
-         NOTE: There is a possibility of a situation where a previous
-          master has published some messages which are not received 
-          by the new Master and so its state may become inconsistent with
-          the storage - this can be solved but first needs to be proven.
+    for future bootstrap and keeping other standby(s) for the partitions 
+    up to date.
  - On becoming a Standby, the Partition Actor resumes consuming the 
      underlying topic and stops receiving until it again becomes a master.
  - Standby is not a read replica at the moment but it could be an option

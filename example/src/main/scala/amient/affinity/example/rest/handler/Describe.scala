@@ -45,6 +45,7 @@ trait Describe extends HttpGateway {
 
     case HTTP(GET, SingleSlash, _, response) =>
       response.success(jsonValue(OK, Map(
+        //FIXME on 8084 there is no singleton service available
         "singleton-services" -> describeServices,
         "partition-masters" -> describeRegions
       )))
