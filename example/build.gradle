@@ -1,0 +1,36 @@
+group = parent.group
+version = parent.version
+
+apply plugin: 'scala'
+apply plugin: 'java'
+
+ext {
+    mainClass = "io.amient.affinity.example.ExampleApp"
+    mainScript = "core-app"
+}
+
+task createStartScripts(type: CreateStartScripts) {
+    outputDir = file("build/scripts")
+    mainClassName = mainClass
+    applicationName = mainScript
+    classpath = jar.outputs.files
+}
+build.dependsOn createStartScripts
+libsDirName = 'lib'
+
+jar {
+    manifest {
+        attributes 'Main-Class': mainClass
+    }
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+
+dependencies {
+    compile project(':core')
+}
+
+
+

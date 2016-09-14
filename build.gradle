@@ -1,8 +1,6 @@
 version = '0.0.1-SNAPSHOT'
 
 ext {
-    appName = 'hello-akka-http'
-    mainClass = 'io.amient.akka'
     javaVersion = '1.8'
     scalaVersion = '2.11.7'
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
@@ -14,86 +12,64 @@ ext {
     jacksonVersion = '2.7.5'
 }
 
-apply plugin: 'java'
-apply plugin: 'scala'
-apply plugin: 'idea'
-
-sourceCompatibility = javaVersion
-
-jar {
-    manifest {
-        attributes 'Main-Class': mainClass
-    }
-    from {
-        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-}
-
-configurations {
-    provided
-    testCompile.extendsFrom provided
-}
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
-
-sourceSets {
-    main {
-        compileClasspath += [configurations.provided]
-    }
-}
-
-idea {
-    module {
-        scopes.PROVIDED.plus += [configurations.provided]
-    }
-}
-
-task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
-    main = 'org.scalatest.tools.Runner'
-    args = ['-R', 'build/classes/test', '-o']
-    classpath = sourceSets.test.runtimeClasspath
-}
-test.dependsOn scalaTest
-test.systemProperties 'property': 'value'
-
-dependencies {
-
-    compile 'org.scala-lang:scala-library:' + scalaVersion
-    testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
-    testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
-    testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
-    compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaClientVersion
-    compile group: 'org.apache.avro', name: 'avro', version: avroVersion
-    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
-    compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: '2.7.5'
-
-//    compile group: 'com.google.inject', name: 'guice', version: 3.0
-//    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
-//    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
-
-}
-
-
-task createStartScripts(type: CreateStartScripts) {
-    outputDir = file("build/scripts")
-    mainClassName = mainClass
-    applicationName = appName
-    classpath = jar.outputs.files
-}
-
-build.dependsOn createStartScripts
-libsDirName = 'lib'
-
 task wrapper(type: Wrapper) {
     gradleVersion = '2.7'
+}
+
+allprojects {
+
+    apply plugin: 'idea'
+
+    version = rootProject.version
+
+    plugins.withType(JavaPlugin).whenPluginAdded {
+
+        sourceCompatibility = rootProject.ext.javaVersion
+
+        repositories {
+            mavenLocal()
+            mavenCentral()
+        }
+
+        configurations {
+            provided
+            testCompile.extendsFrom provided
+        }
+
+        sourceSets {
+            main {
+                compileClasspath += [configurations.provided]
+            }
+        }
+
+        idea {
+            module {
+                scopes.PROVIDED.plus += [configurations.provided]
+            }
+        }
+
+        task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
+            main = 'org.scalatest.tools.Runner'
+            args = ['-R', 'build/classes/test', '-o']
+            classpath = sourceSets.test.runtimeClasspath
+        }
+        test.dependsOn scalaTest
+        test.systemProperties 'property': 'value'
+
+        dependencies {
+            //    compile group: 'com.google.inject', name: 'guice', version: 3.0
+            //    compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.6'
+            //    compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.6'
+        }
+    }
+
+    plugins.withType(ScalaPlugin).whenPluginAdded {
+
+        dependencies {
+            compile 'org.scala-lang:scala-library:' + scalaVersion
+            testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
+            testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
+        }
+    }
 }
 
