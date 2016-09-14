@@ -108,10 +108,11 @@ semantics or other strong guarantees, the problem can be delegated to
  a dedicated stream-processor by simply connecting it to the same
   topics as are used for affinity storage change logs! 
 
-### Running the example
+### Running the ExampleApp
 
-First you'll need Zookeeper and Kafka running locally. And then
-you'll need to create 2 kafka topics, e.g. from tha kafke home dir:
+First you'll need Zookeeper and Kafka running locally. Then
+you'll need to create 2 compacted kafka topics, 
+e.g. from the Kafka home dir:
  
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --topic graph \
         --create --partitions 4 --replication-factor 1 --config cleanup.policy=compact
@@ -119,19 +120,42 @@ you'll need to create 2 kafka topics, e.g. from tha kafke home dir:
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --topic settings \ 
         --create --partitions 1 --replication-factor 1 --config cleanup.policy=compact
         
-The graph topic is the the partitioned dataset for the graph and the
+The graph topic will hold the the main domain data for the app and the
  settings is a broadcast topic with a single partition.
 
+Running the `ExampleApp` from an IDE starts four nodes in a 
+pseudo-distributed mode. The nodes listen on http ports 8081-8084 
+and each contains a region serving two physical partitions 0,1 and 2,3.
+Each physical partition will therefore have 2 online replicas.  
+
+To view a graph component (vertex id is a simple Int)
+
+    GET http://localhost:808x/com/<vertex-id> 
+
+To connect 2 vertices into a component(non-existent vertices will be created):
+
+    GET http://localhost:808x/com/<vertex-id>/<vertex-id> 
+
+After connecting two components all vertices that have been already 
+connected should be merged into a bigger component, and viewing the 
+component by any of the connected vertex ids should show the same group.
+
+To look at the status of the node and which Partition Actors is sees
+as partition masters (the addresses may change by node locality but 
+physically they should always point to the same actors) 
+
+    GET http://localhost:<node-port>/
+
+To look kill a node: 
+
+    GET http://localhost:<node-port>/kill
+
+To look at the status of partition:
+
+    GET localhost:808x/<partition-number>
 
 A single node may be started with one region
 serving all 4 partitions byt starting `ApiNode` with
 the following arguments:
 
     ExampleSystem 2551 127.0.0.1 8081 4 0,1,2,3
-
-For pseudo-distributed mode, the `ExampleApp` can be launched
-which will run 4 nodes locally each taking 2 of the 4 partitions
-which means there is for each physical partiton one master and 
-one standby.
-
-

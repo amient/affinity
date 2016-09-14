@@ -45,8 +45,8 @@ trait Describe extends HttpGateway {
 
     case HTTP(GET, SingleSlash, _, response) =>
       response.success(jsonValue(OK, Map(
-        "services" -> describeServices,
-        "regions" -> describeRegions
+        "singleton-services" -> describeServices,
+        "partition-masters" -> describeRegions
       )))
   }
 
