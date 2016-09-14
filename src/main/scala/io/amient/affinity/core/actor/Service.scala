@@ -31,6 +31,12 @@ trait Service extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
+  //TODO this is a bit hacky: it can be done in a cleaner way but the question is:
+  // Should Partitions (which are extension of Service) have access to the cluster or not ?
+  // It is useful for composition of logic but by isolation partition should be only concerned
+  // with local data. On the other hand if Partition doesn't have access
+  // to cluster the composition logic will have to be pushed upstream to the Handlers which is
+  // not ideal because Handlers should be only the translation layer HTTP <> Akka
   val cluster = context.actorSelection("/user/controller/gateway/cluster")
 
   import Service._

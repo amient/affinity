@@ -70,6 +70,9 @@ The following core features are already in place:
     as mentioned above. Any task that needs to be handled by a partition
     is given to the Cluster Actor. This may be a simple forward or 
     it can be an orchestrated sequence of Asks and Tells.
+ - Cluster Actor routes all request to Partition Actors which implement
+    the logic over the data partition and respond to the sender which
+    will ultimately be the calling Handler but some calls may b
  - If there are multiple Partition Actors for the same physical partition
     Coordinator uses distributed logic to choose one of them as master
     and the others become standby.    
@@ -130,29 +133,30 @@ Each physical partition will therefore have 2 online replicas.
 
 To view a graph component (vertex id is a simple Int)
 
-    GET http://localhost:808x/com/<vertex-id> 
+    GET http://127.0.0.1:808x/com/<vertex-id> 
 
 To connect 2 vertices into a component(non-existent vertices will be created):
 
-    GET http://localhost:808x/com/<vertex-id>/<vertex-id> 
+    GET http://127.0.0.1:808x/com/<vertex-id>/<vertex-id> 
 
 After connecting two components all vertices that have been already 
-connected should be merged into a bigger component, and viewing the 
-component by any of the connected vertex ids should show the same group.
+connected should be merged into a bigger component. Viewing the 
+component by any of the connected vertex ids should show the same group
+just in different order.
 
 To look at the status of the node and which Partition Actors is sees
 as partition masters (the addresses may change by node locality but 
 physically they should always point to the same actors) 
 
-    GET http://localhost:<node-port>/
+    GET http://127.0.0.1:<node-port>/
 
 To look kill a node: 
 
-    GET http://localhost:<node-port>/kill
+    GET http://127.0.0.1:<node-port>/kill
 
-To look at the status of partition:
+To look at the partition stats:
 
-    GET localhost:808x/<partition-number>
+    GET http://127.0.0.1:808x/<partition-number>
 
 A single node may be started with one region
 serving all 4 partitions byt starting `ApiNode` with
