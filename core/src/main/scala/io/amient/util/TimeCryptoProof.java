@@ -76,14 +76,14 @@ public abstract class TimeCryptoProof {
     }
 
 
-    final public void verify(String signature, String arg) throws Exception {
-        verify(fromHex(signature), arg.getBytes("UTF-8"));
+    final public boolean verify(String signature, String arg) throws Exception {
+        return verify(fromHex(signature), arg.getBytes("UTF-8"));
     }
 
-    final public void verify(byte[] signature, byte[] arg) throws Exception {
-        assert (sign(arg, utcInWholeMinutes(0)) == signature)
-                || (sign(arg, utcInWholeMinutes(-1)) == signature)
-                || sign(arg, utcInWholeMinutes(+1)) == signature;
+    final public boolean verify(byte[] signature, byte[] arg) throws Exception {
+        return (Arrays.equals(sign(arg, utcInWholeMinutes(0)), signature))
+                || (Arrays.equals(sign(arg, utcInWholeMinutes(-1)), signature))
+                || (Arrays.equals(sign(arg, utcInWholeMinutes(+1)), signature));
     }
 
     abstract protected byte[] hash(byte[] input) throws Exception;

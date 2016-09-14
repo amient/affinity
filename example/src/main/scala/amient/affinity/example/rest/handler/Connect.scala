@@ -50,7 +50,7 @@ trait Connect extends HttpGateway {
     case HTTP(GET, PATH("com", INT(id)), query, response) =>
       val task = cluster ? Vertex(id)
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-        case null => errorValue(NotFound, ContentTypes.`application/json`, "Vertex not found")
+        case null => errorValue(NotFound, "Vertex not found")
         case component => jsonValue(OK, component)
       }
 

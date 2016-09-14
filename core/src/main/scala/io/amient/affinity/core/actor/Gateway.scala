@@ -27,7 +27,6 @@ import akka.event.Logging
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{BasicHttpCredentials, _}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
@@ -38,7 +37,7 @@ import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
 object Gateway {
 
@@ -85,13 +84,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     }
   }
 
-  object HTTP_AUTH {
-    def unapply(e: HttpExchange): Option[(HttpMethod, Path, Query, (Option[Authorization], Promise[HttpResponse]))] = {
-      Some(e.request.method, e.request.uri.path, e.request.uri.query(), (e.request.header[Authorization], e.promise))
-    }
-  }
-
-
   object PATH {
     def unapplySeq(path: Path): Option[Seq[String]] = {
       @tailrec
@@ -119,7 +111,12 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
   }
 
-  def handleError(status: StatusCode): HttpResponse
+  def handleException: PartialFunction[Throwable, HttpResponse]
+
+  def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
+                            (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
+    promise.completeWith(future map (f) recover handleException)
+  }
 
   def handle: Receive = {
     case null =>
@@ -127,7 +124,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
   final def receive: Receive = handle orElse {
 
-    case e: HttpExchange => e.promise.success(handleError(NotFound))
+    case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
     //Cluster Management queries
     case AddMaster(group, ref) =>

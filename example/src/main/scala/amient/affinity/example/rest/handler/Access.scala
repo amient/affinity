@@ -30,34 +30,30 @@ trait Access extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH("p", "access", service, person), AUTH_SIGNATURE(query, signature), response) =>
-      response.success(jsonValue(OK, Map(
-        "signature" -> signature,
-        "service" -> service,
-        "person" -> person
-      )))
-    case HTTP(GET, PATH("p", "access", service, person), _, response) =>
-      response.success(handleError(Unauthorized))
+    case HTTP(GET, uri@PATH("p", "access", pii), query, response) => AUTH_CRYPTO(uri, query, response) { (sig: String) =>
+      jsonValue(OK, Map(
+        "signature" -> sig,
+        "pii" -> pii
+      ))
+    }
 
 
-    case HTTP_AUTH(GET, PATH("settings"), _, AUTH_ADMIN(credentials, response)) =>
-      response.success {
-        jsonValue(OK, Map(
-          "credentials" -> credentials,
-          "settings" -> settings.iterator.toMap
-        ))
+    case http@HTTP(GET, PATH("settings"), _, _) => AUTH_ADMIN(http) { (user: String) =>
+      jsonValue(OK, Map(
+        "credentials" -> user,
+        "settings" -> settings.iterator.toMap
+      ))
+    }
+
+
+    case http@HTTP(GET, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
+      settings.get(key) match {
+        case Some(otherKey) => errorValue(BadRequest, "That key already exists")
+        case None =>
+          val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
+          settings.put(key, Some(ConfigEntry(key, salt)))
+          redirect(SeeOther, Uri("/settings"))
       }
-
-
-    case HTTP_AUTH(GET, PATH("settings", "add"), QUERY(("key", key)), AUTH_ADMIN(credentials, response)) =>
-      response.success {
-        settings.get(key) match {
-          case Some(otherKey) => errorValue(BadRequest, ContentTypes.`application/json`, "That key already exists")
-          case None =>
-            val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
-            settings.put(key, Some(ConfigEntry(key, salt)))
-            redirect(SeeOther, Uri("/settings"))
-        }
-      }
+    }
   }
 }

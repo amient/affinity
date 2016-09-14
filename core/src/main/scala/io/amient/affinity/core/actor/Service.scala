@@ -27,6 +27,7 @@ object Service {
   case class BecomeStandby()
   case class BecomeMaster()
 }
+
 trait Service extends Actor {
 
   val log = Logging.getLogger(context.system, this)

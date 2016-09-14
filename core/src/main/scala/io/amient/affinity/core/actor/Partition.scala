@@ -31,15 +31,18 @@ trait Partition extends Service with ActorState {
   val partition = self.path.name.toInt
 
   override protected def onBecomeMaster: Unit = {
+    log.info(s"Became leader for partition $partition")
     untailState()
   }
 
   override protected def onBecomeStandby: Unit = {
+    log.info(s"Became standby for partition $partition")
     tailState()
   }
 
   override def postStop(): Unit = {
     super.postStop()
+    log.info(s"Closing all state in partition $partition")
     closeState()
   }
 

@@ -48,25 +48,33 @@ class TimeCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
     forAll(salts, Gen.alphaStr) { (salt, arg) =>
 
       val crypto = new TimeCryptoProofSHA256(salt)
-      val signature = crypto.sign(arg)
+      val signature: String = crypto.sign(arg)
 
       val hexSalt = TimeCryptoProof.toHex(salt)
       val hexProof = new TimeCryptoProofSHA256(salt)
       val hexSignature = hexProof.sign(arg)
-      signature should equal (hexSignature)
-      crypto.verify(signature, arg)
-      hexProof.verify(signature, arg)
-      crypto.verify(hexSignature, arg)
-      hexProof.verify(hexSignature, arg)
+      signature should equal(hexSignature)
+      try {
+        assert(crypto.verify(signature, arg) == true)
+        assert(hexProof.verify(signature, arg) == true)
+        assert(crypto.verify(hexSignature, arg) == true)
+        assert(hexProof.verify(hexSignature, arg) == true)
+      } catch {
+        case e: Throwable => e.printStackTrace(); throw e
+      }
     }
   }
 
   property("example function is consistent with the implementation") {
     forAll(hexSalts, Gen.alphaStr) { (hexSalt, arg) =>
       val crypto = new TimeCryptoProofSHA256(hexSalt)
-      assert(crypto.sign(arg) == crypto.timeBasedHash(arg, hexSalt, 0))
-      crypto.verify(crypto.sign(arg), arg)
-      crypto.verify(crypto.timeBasedHash(arg, hexSalt, 0), arg)
+      try {
+        assert(crypto.sign(arg) == crypto.timeBasedHash(arg, hexSalt, 0) == true)
+        assert(crypto.verify(crypto.sign(arg), arg) == true)
+        assert(crypto.verify(crypto.timeBasedHash(arg, hexSalt, 0), arg) == true)
+      } catch {
+        case e: Throwable => e.printStackTrace(); throw e
+      }
     }
   }
 

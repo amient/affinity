@@ -22,20 +22,20 @@ package io.amient.affinity.example.rest
 import java.io.StringWriter
 import java.util.Properties
 
-import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
+import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{HttpEntity, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.data.StringSerde
-import io.amient.affinity.example.data.MyAvroSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
-import io.amient.affinity.example.data.ConfigEntry
+import io.amient.affinity.example.data.{ConfigEntry, MyAvroSerde}
 import io.amient.util.TimeCryptoProof
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.Promise
 import scala.util.control.NonFatal
 
 class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorState {
@@ -54,32 +54,47 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorSt
       with MemStoreConcurrentMap[String, ConfigEntry]
   }
 
-  /**
-    * AUTH_SIGNATURE is a pattern match extractor that can be used in handlers that want to use
-    * encryption-based authentication using the keys and salts stored in the val settings.
-    */
-  object AUTH_SIGNATURE {
+  override def handleException: PartialFunction[Throwable, HttpResponse] = {
+    case e: IllegalAccessError => errorValue(Forbidden, "Forbidden - " + e.getMessage)
+      //errorValue(Unauthorized, "Unauthorized")
+    case e: NoSuchElementException => errorValue(NotFound, "Haven't got that")
+    case e: IllegalArgumentException => errorValue(BadRequest, "BadRequest - " + e.getMessage)
+    case e: NotImplementedError => e.printStackTrace(); errorValue(NotImplemented, "Eeek! We have a bug..")
+    case NonFatal(e) => e.printStackTrace(); errorValue(InternalServerError, "Well, something went wrong but we should be back..")
+    case e => e.printStackTrace(); errorValue(ServiceUnavailable, "Something is seriously wrong with our servers..")
+  }
 
-    def unapply(query: Query): Option[(Query, String)] = {
-      query.get("signature") match {
-        case None => None
-        case Some(sig) => {
-          sig.split(":") match {
-            case Array(k, clientSignature) => settings.get(k) match {
-              case None => None
-              case Some(configEntry) =>
-                //                val arg = request.uri.path.toString
-                //                if (configEntry.crypto.sign(arg) != clientSignature) {
-                //                  exchange.status = Some(Unauthorized)
-                //                  None
-                //                } else {
-                val signature = configEntry.crypto.sign(clientSignature)
-                Some(query, signature)
-              //                }
+  /**
+    * AUTH_CRYPTO can be applied to requests that have been matched in the handler Receive method.
+    * It is a partial function with curried closure that is invoked on succesful authentication with
+    * the server signature that needs to be returned as part of response.
+    * This is an encryption-based authentication using the keys and salts stored in the settings state.
+    */
+  object AUTH_CRYPTO {
+
+    def apply(path: Path, query: Query, response: Promise[HttpResponse])(code: (String) => HttpResponse): Unit = {
+      try {
+        query.get("signature") match {
+          case None => throw new IllegalAccessError
+          case Some(sig) => {
+            sig.split(":") match {
+              case Array(k, clientSignature) => settings.get(k) match {
+                case Some(configEntry) =>
+                  if (configEntry.crypto.verify(clientSignature, path.toString)) {
+                    val serverSignature = configEntry.crypto.sign(clientSignature)
+                    response.success(code(serverSignature))
+                  } else {
+                    throw new IllegalAccessError(configEntry.crypto.sign(path.toString))
+                  }
+                case _ => throw new IllegalAccessError
+              }
+              case _ => throw new IllegalAccessError
             }
-            case _ => None
           }
         }
+      } catch {
+        case e: IllegalAccessError => response.success(errorValue(Unauthorized, "Unauhtorized, expecting " + e.getMessage))
+        case e: Throwable => response.success(handleException(e))
       }
     }
   }
@@ -92,29 +107,30 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorSt
 
     val adminConfig = settings.get("admin")
 
-    def unapply(responseWithCredentials: (Option[Authorization], Promise[HttpResponse])) = {
-      val (auth, response) = responseWithCredentials
-      val credentials = for ( Authorization(c @ BasicHttpCredentials(username, password)) <- auth) yield c
+    def apply(exchange: HttpExchange)(code: (String) => HttpResponse): Unit = {
+      val auth = exchange.request.header[Authorization]
+      val response = exchange.promise
+      val credentials = for (Authorization(c@BasicHttpCredentials(username, password)) <- auth) yield c
       adminConfig match {
         case None =>
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if (username == "admin") =>
               settings.put("admin", Some(ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))))
-              Some(responseWithCredentials)
+              response.success(code(username))
             case _ => response.success(HttpResponse(
               Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
-              None
           }
         case Some(ConfigEntry(any, adminPassword)) => credentials match {
           case Some(BasicHttpCredentials(username, password))
             if (username == "admin" && TimeCryptoProof.toHex(password.getBytes) == adminPassword) =>
-            Some(responseWithCredentials)
+            response.success(code(username))
           case _ =>
             response.success(HttpResponse(Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", None)))))
-            None
         }
       }
+
     }
+
   }
 
   /* Following are various helpers for HTTP <> AKKA transformations used in the handlers.
@@ -138,40 +154,15 @@ class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorSt
     HttpResponse(status, entity = HttpEntity(ContentTypes.`application/json`, json))
   }
 
-  def errorValue(errorStatus: StatusCode, ct: ContentType, message: String): HttpResponse = {
-    ct match {
-      case ContentTypes.`text/html(UTF-8)` => htmlValue(errorStatus, s"<h1> $message</h1>")
-      case ContentTypes.`application/json` => jsonValue(errorStatus, Map("error" -> message))
-      case _ => textValue(errorStatus, "error: " + message)
-    }
-  }
-
   def redirect(status: StatusCode, uri: Uri): HttpResponse = {
     HttpResponse(status, headers = List(headers.Location(uri)))
   }
 
-
-  def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
-                            (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(future map (f) recover {
-      case e: NoSuchElementException => handleError(StatusCodes.NotFound)
-      case e: IllegalArgumentException => e.printStackTrace(); handleError(StatusCodes.NotImplemented)
-      case NonFatal(e) => e.printStackTrace(); handleError(StatusCodes.InternalServerError)
-      case e => e.printStackTrace(); handleError(ServiceUnavailable)
-
-    })
-  }
-
-  override def handleError(status: StatusCode): HttpResponse = handleError(status, ContentTypes.`application/json`)
-
-  def handleError(status: StatusCode, ct: ContentType = ContentTypes.`application/json`): HttpResponse = {
-    status match {
-      case Forbidden => errorValue(Forbidden, ct, "Forbidden")
-      case Unauthorized => errorValue(Unauthorized, ct, "Unauthorized")
-      case NotFound => errorValue(NotFound, ct, "Haven't got that")
-      case NotImplemented => errorValue(NotImplemented, ct, "Eeek! We have a bug..")
-      case ServiceUnavailable => errorValue(ServiceUnavailable, ct, "Something is seriously wrong with our servers..")
-      case _ => errorValue(InternalServerError, ct, "Well, something went wrong but we should be back..")
+  def errorValue(errorStatus: StatusCode, message: String, ct: ContentType = ContentTypes.`application/json`): HttpResponse = {
+    ct match {
+      case ContentTypes.`text/html(UTF-8)` => htmlValue(errorStatus, s"<h1> $message</h1>")
+      case ContentTypes.`application/json` => jsonValue(errorStatus, Map("error" -> message))
+      case _ => textValue(errorStatus, "error: " + message)
     }
   }
 
