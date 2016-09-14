@@ -86,7 +86,14 @@ The following core features are already in place:
      underlying topic and stops receiving until it again becomes a master.
  - Standby is not a read replica at the moment but it could be an option
 
+## Testing the code
+
+    ./gradlew test    
+    
+## Building the project
         
+    ./gradlew build
+
 ## Example Graph Data API
 
 This example demonstrates a graph data served via Affinity REST API 
@@ -125,9 +132,8 @@ The graph topic will hold the the main domain data for the app and the
  settings is a broadcast topic with a single partition.
 
 Running the `ExampleApp` can be done directly from an IDE or by
- building the project with gradle and running a standalone jar
+running the standalone jar which is created during the gradlew build
  
-    ./gradlew build
     java -jar example/build/libs/example-<VERSION>-standalone.jar
     
 ExampleApp starts four nodes in a pseudo-distributed mode. 

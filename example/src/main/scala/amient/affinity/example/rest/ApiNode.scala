@@ -56,7 +56,7 @@ object ApiNode extends App {
     //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(affinityConfig) {
 
-//      startRegion(new ApiPartition(affinityConfig))
+      startRegion(new ApiPartition(affinityConfig))
 
       startGateway(new HttpGateway(affinityConfig)
         with Describe
