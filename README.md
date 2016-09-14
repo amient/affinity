@@ -127,10 +127,16 @@ e.g. from the Kafka home dir:
 The graph topic will hold the the main domain data for the app and the
  settings is a broadcast topic with a single partition.
 
-Running the `ExampleApp` from an IDE starts four nodes in a 
-pseudo-distributed mode. The nodes listen on http ports 8081-8084 
-and each contains a region serving two physical partitions 0,1 and 2,3.
-Each physical partition will therefore have 2 online replicas.  
+Running the `ExampleApp` can be done directly from an IDE or by
+ building the project with gradle and running a standalone jar
+ 
+    ./gradlew build
+    java -jar example/build/libs/example-<VERSION>-standalone.jar
+    
+ExampleApp starts four nodes in a pseudo-distributed mode. 
+The nodes listen on http ports 8081-8084 and each contains a region 
+serving two physical partitions 0,1 and 2,3. Each physical partition 
+will therefore have 2 online replicas.  
 
 To view a graph component (vertex id is a simple Int)
 

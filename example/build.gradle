@@ -6,26 +6,24 @@ apply plugin: 'java'
 
 ext {
     mainClass = "io.amient.affinity.example.ExampleApp"
-    mainScript = "core-app"
+    mainScript = "example-graph-api"
 }
 
-task createStartScripts(type: CreateStartScripts) {
-    outputDir = file("build/scripts")
-    mainClassName = mainClass
-    applicationName = mainScript
-    classpath = jar.outputs.files
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.github.rholder:gradle-one-jar:1.0.4'
+    }
 }
-build.dependsOn createStartScripts
-libsDirName = 'lib'
+apply plugin: 'gradle-one-jar'
 
-jar {
-    manifest {
-        attributes 'Main-Class': mainClass
-    }
-    from {
-        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
-    }
+task singlejar(type: OneJar) {
+    mainClass = project.ext.mainClass
 }
+
+build.dependsOn singlejar
 
 
 dependencies {
