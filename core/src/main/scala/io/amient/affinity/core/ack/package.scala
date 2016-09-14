@@ -19,34 +19,84 @@
 
 package io.amient.affinity.core
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Status}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
+/**
+  * These are utilities for stateless Akka Ack pattern.
+  * They are used where a chain of events has to be guaranteed to have completed.
+  * For example, Coordinator identifies a new master and sends AddMaster to the respective Gateway.
+  * Gateway in turn sends an ack message to the given Partition to BecomeMaster and
+  * the partition must in turn ack that it has completed the transition succesfully.
+  * The response ack returns back up the chain until Coordinator is sure that the
+  * partition has transitioned its state and knows it is now a Master.
+  */
 package object ack {
 
-  def ack(ref: ActorRef, message: Any)(implicit context: ExecutionContext): Future[Any] = {
+  /**
+    * end of chain ack() which runs the given closure and reports either a success or failure
+    * back.
+    *
+    * @param replyTo
+    * @param closure
+    */
+  def ack(replyTo: ActorRef)(closure: => Unit): Unit = {
+    try {
+      closure
+      replyTo ! Status.Success()
+    } catch {
+      case NonFatal(e) => replyTo ! Status.Failure(e)
+    }
+  }
+
+  /**
+    * intermediate ack() which requests ack from the target for given message and reports it
+    * back to the replyTo up the chain.
+    *
+    * @param target
+    * @param message
+    * @param replyTo
+    * @param context
+    */
+  def ack(target: ActorRef, message: Any, replyTo: ActorRef)(implicit context: ExecutionContext): Unit = {
+    ack(target, message) onComplete {
+      case Failure(e) => replyTo ! Status.Failure(e)
+      case Success(result) => replyTo ! result
+    }
+  }
+
+  /**
+    * initiator ack() which is used where the guaranteed processin of the message is required
+    * from the target actor.
+    * @param target
+    * @param message
+    * @param context
+    * @return
+    */
+  def ack(target: ActorRef, message: Any)(implicit context: ExecutionContext): Future[Any] = {
+    //TODO configurable ack retries and timeout
+    implicit val numRetries: Int = 3
+    implicit val timetout = Timeout(6 second)
     val promise = Promise[Any]()
-    def retry(num: Int): Unit = {
-      implicit val timetout = Timeout(1 second)
-      ref ? message onComplete {
+
+    def attempt(retry: Int): Unit = {
+      target ? message onComplete {
         case Success(result) => promise.success(result)
         case Failure(cause) => {
           cause match {
             case to: AskTimeoutException if (to.getCause() == null) => promise.failure(cause)
-            case _ => if (num == 0) promise.failure(cause) else {
-              System.out.println(s"$ref failed to ack message $message, " + cause.getMessage)
-              retry(num - 1)
-            }
+            case _ => if (retry == 0) promise.failure(cause) else attempt(retry - 1)
           }
         }
       }
     }
-    retry(5)
+    attempt(numRetries)
     promise.future
   }
 }

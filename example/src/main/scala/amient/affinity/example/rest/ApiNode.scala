@@ -21,9 +21,9 @@ package io.amient.affinity.example.rest
 
 import java.util.Properties
 
-import io.amient.affinity.core.{HttpInterface, Node}
 import io.amient.affinity.core.actor.{Container, Region}
-import io.amient.affinity.core.cluster.{Cluster, Coordinator, CoordinatorZk}
+import io.amient.affinity.core.cluster.{Cluster, Coordinator, CoordinatorZk, Node}
+import io.amient.affinity.core.http.HttpInterface
 import io.amient.affinity.example.rest.handler._
 
 import scala.util.control.NonFatal
@@ -56,7 +56,7 @@ object ApiNode extends App {
     //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(affinityConfig) {
 
-      startRegion(new ApiPartition(affinityConfig))
+//      startRegion(new ApiPartition(affinityConfig))
 
       startGateway(new HttpGateway(affinityConfig)
         with Describe

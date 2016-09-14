@@ -17,12 +17,13 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.cluster
 
 import java.util.Properties
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion, CreateServiceContainer}
 import io.amient.affinity.core.actor._
 
@@ -39,6 +40,7 @@ class Node(appConfig: Properties) {
 
   implicit val system = ActorSystem(actorSystemName, systemConfig)
 
+
   private val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
 
   //in case the process is stopped from outside
@@ -48,23 +50,26 @@ class Node(appConfig: Properties) {
     Await.ready(system.whenTerminated, 30 seconds) // TODO shutdown timeout by configuration
   }
 
+  import system.dispatcher
+
+  //TODO configurable init timeout
+  val initialisationTimeout = 30 seconds
+
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
-    controller ! CreateGateway(Props(creator))
+    Await.result(ack(controller, CreateGateway(Props(creator))), initialisationTimeout)
   }
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]) = {
-    controller ! CreateRegion(Props(partitionCreator))
+    Await.result(ack(controller, CreateRegion(Props(partitionCreator))), initialisationTimeout)
   }
 
   def startServices(services: Props*) = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
-    controller ! CreateServiceContainer(services)
+    Await.result(ack(controller, CreateServiceContainer(services)), initialisationTimeout)
   }
 
   implicit def serviceCreatorToProps[T <: Service](creator: => T)(implicit tag: ClassTag[T]): Props = {
     Props(creator)
   }
-
-
 
 }

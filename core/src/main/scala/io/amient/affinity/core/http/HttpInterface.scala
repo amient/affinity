@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.http
 
 import java.util.Properties
 

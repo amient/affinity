@@ -83,8 +83,11 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
         val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
         val masterActorRef = replicas.minBy(_._1)._2
-        ack(watcher, AddMaster(group, masterActorRef))
-        //watcher ! AddMaster(group, masterActorRef)
+        ack(watcher, AddMaster(group, masterActorRef)) onFailure {
+          case e: Throwable =>
+            e.printStackTrace()
+            system.terminate()
+        }
       }
     }
   }
@@ -94,6 +97,10 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       val i = watchers.indexOf(watcher)
       if (i >= 0) watchers.remove(i)
     }
+  }
+
+  def unwatchAll() = synchronized {
+    watchers.clear()
   }
 
   def close(): Unit
@@ -111,8 +118,11 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private def notifyWatchers(message: Any): Unit = {
     synchronized {
-      watchers.foreach(watcher => ack(watcher, message))
-      //watchers.foreach(_ ! arg)
+      watchers.foreach(watcher => ack(watcher, message) onFailure {
+        case e: Throwable =>
+          e.printStackTrace()
+          system.terminate()
+      })
     }
   }
 

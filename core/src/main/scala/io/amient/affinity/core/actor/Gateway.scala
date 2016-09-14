@@ -22,17 +22,17 @@ package io.amient.affinity.core.actor
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Status, Terminated}
+import akka.actor.{Actor, ActorRef, Terminated}
 import akka.event.Logging
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.core.HttpInterface
 import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
+import io.amient.affinity.core.http.HttpInterface
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -54,32 +54,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
   val log = Logging.getLogger(context.system, this)
 
   val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
-
-  def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }
-
-  def describeRegions = {
-    val t = 60 seconds
-    implicit val timeout = Timeout(t)
-    Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString).toList.sorted
-  }
-
-  override def preStart(): Unit = {
-    val t = 10 seconds
-    implicit val timeout = Timeout(t)
-    Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
-    context.watch(cluster)
-    context.parent ! Controller.GatewayCreated()
-  }
-
-  override def postStop(): Unit = {
-    log.info(s"Stopping Gateway")
-    super.postStop()
-  }
-
-  def service(actorClass: Class[_ <: Actor]): ActorRef = {
-    //TODO handle missing service properly
-    services.get(actorClass).head // TODO round-robin or routing for services ?
-  }
 
   object HTTP {
     def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = {
@@ -112,6 +86,31 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
   object QUERY {
     def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
+  }
+
+  def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }
+
+  def describeRegions = {
+    val t = 60 seconds
+    implicit val timeout = Timeout(t)
+    Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString).toList.sorted
+  }
+
+  override def preStart(): Unit = {
+    val t = 10 seconds
+    implicit val timeout = Timeout(t)
+    Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
+    context.watch(cluster)
+    context.parent ! Controller.GatewayCreated()
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
+  }
+
+  def service(actorClass: Class[_ <: Actor]): ActorRef = {
+    //TODO handle missing service properly
+    services.get(actorClass).head // TODO round-robin or routing for services ?
   }
 
   def handleException: PartialFunction[Throwable, HttpResponse]

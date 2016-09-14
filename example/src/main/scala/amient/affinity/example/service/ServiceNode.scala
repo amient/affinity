@@ -21,9 +21,8 @@ package io.amient.affinity.example.service
 
 import java.util.Properties
 
-import io.amient.affinity.core.Node
 import io.amient.affinity.core.actor.Container
-import io.amient.affinity.core.cluster.{Coordinator, CoordinatorZk}
+import io.amient.affinity.core.cluster.{Coordinator, CoordinatorZk, Node}
 
 import scala.util.control.NonFatal
 

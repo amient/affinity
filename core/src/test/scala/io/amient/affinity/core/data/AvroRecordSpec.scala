@@ -52,6 +52,4 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   }
 
-
-
 }

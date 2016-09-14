@@ -23,8 +23,9 @@ import java.util.Properties
 
 import akka.actor.{Actor, Props, Terminated}
 import akka.event.Logging
-import io.amient.affinity.core.HttpInterface
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.http.HttpInterface
 
 object Controller {
 
@@ -68,7 +69,7 @@ class Controller(appConfig: Properties) extends Actor {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
         e.printStackTrace()
-        System.exit(10)
+        System.exit(11)
       }
       throw e
   }
@@ -79,69 +80,54 @@ class Controller(appConfig: Properties) extends Actor {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
         e.printStackTrace()
-        System.exit(10)
+        System.exit(12)
       }
       throw e
   }
 
+  override def postStop(): Unit = {
+    regionCoordinator.unwatchAll()
+    serviceCoordinator.unwatchAll()
+    super.postStop()
+  }
+
   override def receive: Receive = {
 
-    case CreateServiceContainer(services) =>
-      try {
-        context.actorOf(Props(new Container(appConfig, serviceCoordinator, "services") {
-          services.foreach { serviceProps =>
-            context.actorOf(serviceProps, serviceProps.actorClass().getName)
-          }
-        }), name = "services")
-      } catch {
-        case e: Throwable =>
-          system.terminate() onComplete { _ =>
-            e.printStackTrace()
-            System.exit(11)
-          }
-      }
+    case CreateServiceContainer(services) => ack(sender) {
+      context.actorOf(Props(new Container(appConfig, serviceCoordinator, "services") {
+        services.foreach { serviceProps =>
+          context.actorOf(serviceProps, serviceProps.actorClass().getName)
+        }
+      }), name = "services")
+    }
 
-    case CreateRegion(partitionProps) =>
-      try {
-        context.actorOf(Props(new Region(appConfig, regionCoordinator, partitionProps)), name = "region")
-      } catch {
-        case e: Throwable =>
-          system.terminate() onComplete { _ =>
-            e.printStackTrace()
-            System.exit(11)
-          }
-      }
+    case CreateRegion(partitionProps) => ack(sender) {
+      context.actorOf(Props(new Region(appConfig, regionCoordinator, partitionProps)), name = "region")
+    }
 
-    case CreateGateway(gatewayProps) =>
-      try {
-        val gateway = context.actorOf(gatewayProps, name = "gateway")
-      } catch {
-        case e: Throwable =>
-          system.terminate() onComplete { _ =>
-            e.printStackTrace()
-            System.exit(12)
-          }
-      }
+    case CreateGateway(gatewayProps) => ack(sender) {
+      context.actorOf(gatewayProps, name = "gateway")
+    }
 
     case GatewayCreated() =>
       try {
-        log.info("Gateway Created ")
-        context.watch(sender)
+        log.info("Gateway Created " + sender)
         regionCoordinator.watch(sender)
         serviceCoordinator.watch(sender)
         httpInterface.foreach(_.bind(sender))
+        context.watch(sender)
 
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>
             e.printStackTrace()
-            System.exit(13)
+            System.exit(24)
           }
       }
 
-    case Terminated(gateway) =>
-      //TODO gateway termination is not called even though its being watched
-      log.info("Terminated(gateway) shutting down http interface")
+    //TODO gateway termination is not called during shutdown - need terminator pattern
+    case Terminated(gateway) => val gateway = sender
+      log.info("Terminated (gateway) shutting down http interface")
       regionCoordinator.unwatch(gateway)
       serviceCoordinator.unwatch(gateway)
       try {
@@ -152,10 +138,7 @@ class Controller(appConfig: Properties) extends Actor {
         }
       }
 
-    case any => system.terminate() onComplete { _ =>
-      log.error("Unknown controller message " + any)
-      System.exit(14)
-    }
+    case anyOther => log.warning("Unknown controller message " + anyOther)
   }
 
 }

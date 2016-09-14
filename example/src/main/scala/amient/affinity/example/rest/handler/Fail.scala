@@ -19,6 +19,7 @@
 
 package io.amient.affinity.example.rest.handler
 
+import akka.actor.PoisonPill
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
@@ -34,8 +35,19 @@ trait Fail extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
+    /**
+      * kill the entire node
+      */
     case HTTP(GET, PATH("kill"), _, response) => context.system.terminate()
 
+    /**
+      * terminate gateway
+      */
+    case HTTP(GET, PATH("stop"), _, response) => self ! PoisonPill
+
+    /**
+      * simulate exception in partition
+      */
     case HTTP(GET, PATH("fail", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
@@ -43,7 +55,9 @@ trait Fail extends HttpGateway {
         case any => HttpResponse(status = StatusCodes.Accepted)
       }
 
-
+    /**
+      * simulate bug in partition
+      */
     case HTTP(GET, PATH("bug", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, "message-that-can't-be-handled")

@@ -21,8 +21,9 @@ package io.amient.affinity.core.actor
 
 import java.util.Properties
 
-import akka.actor.Props
+import akka.actor.{Props, Status}
 import akka.event.Logging
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
@@ -41,7 +42,7 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   val partitions = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
 
   override def preStart(): Unit = {
-    log.info("STARTING REGION")
+    log.info("Starting Region")
     coordinator.watch(self)
     for (partition <- partitions) {
       /**
@@ -54,18 +55,19 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
   }
 
   override def postStop(): Unit = {
+    coordinator.unwatch(self)
     super.postStop()
   }
 
+  import context.dispatcher
+
   override def receive: Receive = super.receive orElse {
-    case AddMaster(group, ref) if (ref.path.address.hasLocalScope) =>
-      sender ! true
-      ref ! BecomeMaster()
-    case AddMaster(group, ref) => sender ! true
-    case RemoveMaster(group, ref) if (ref.path.address.hasLocalScope) =>
-      sender ! true
-      ref ! BecomeStandby()
-    case RemoveMaster(group, ref) => sender ! true
+
+    //TODO create coordinator watchLocal instead of this check
+    case AddMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeMaster(), sender)
+    case AddMaster(group, ref) => sender ! Status.Success()
+    case RemoveMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeStandby(), sender)
+    case RemoveMaster(group, ref) => sender ! Status.Success()
   }
 
 }

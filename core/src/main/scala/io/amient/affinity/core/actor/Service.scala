@@ -21,11 +21,15 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.event.Logging
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
 
 object Service {
+
   case class BecomeStandby()
+
   case class BecomeMaster()
+
 }
 
 trait Service extends Actor {
@@ -59,8 +63,12 @@ trait Service extends Actor {
   }
 
   final override def receive: Receive = receiveService orElse {
-    case BecomeMaster() => onBecomeMaster
-    case BecomeStandby() => onBecomeStandby
+    case BecomeMaster() => ack(sender) {
+      onBecomeMaster
+    }
+    case BecomeStandby() => ack(sender) {
+      onBecomeStandby
+    }
   }
 
   def receiveService: Receive
