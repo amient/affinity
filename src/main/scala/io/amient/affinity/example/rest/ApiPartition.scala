@@ -46,83 +46,114 @@ class ApiPartition(config: Properties) extends Partition {
 
   override def receiveService: Receive = {
 
-    case (p: Int, stateError: IllegalStateException) => throw stateError
+    /**
+      * Simulating Partition Failure - the default supervision should restart this actor
+      * after execption is thrown
+      */
+    case (p: Int, stateError: IllegalStateException) =>
+      require(p == partition)
+      throw stateError
 
+    /**
+      * Describe partition and its stats
+      */
     case (p: Int, "describe") =>
+      require(p == partition)
       sender ! Map(
         "partition" -> partition,
         "graph" -> Map(
           "size" -> graph.size
         ))
 
+    /**
+      * Viewing a Component by Vertex key
+      */
     case vertex: Vertex => graph.get(vertex) match {
       case None => sender ! Status.Failure(new NoSuchElementException)
       case Some(component) => sender ! component
     }
 
-    case component@Component(vertex, edges) =>
+    /**
+      * Connecting a Vertex to 1 or more other Vertices
+      * This is done recursively and reliably using Ask instead of Tell.
+      * Recoverable failures are attempted to be rolled back by compensation.
+      * Responds with true if the operation resulted in graph modification,
+      *   false if no changes were made.
+      */
+    case component@Component(vertex, newEdges) =>
       graph.get(vertex) match {
-        case Some(existing) if (existing.edges.forall(edges.contains)) => sender ! false
+        case Some(existing) if (existing.edges.forall(newEdges.contains)) => sender ! false
+        case None => createAndConnectNew(component)
+        case Some(existing) => connectExisting(existing, newEdges)
+      }
 
-        case None => try {
-          graph.put(vertex, Some(component))
+  }
 
-          val propagate = edges.toList.map {
-            cluster ? Component(_, Set(vertex))
-          }.map(_ map {
-            case _ => true
-          } recover {
-            case t: Throwable => false
-          })
+  private def createAndConnectNew(component: Component): Unit = {
+    try {
+      val vertex = component.key
+      val edges = component.edges
+      graph.put(vertex, Some(component))
 
-          val origin = sender
-          for (success <- Future.sequence(propagate)) {
-            if (!success.forall(_ == true)) {
-              //compensate failure - TODO use atomic version operation on the graph because this is async and some other call may have modified the component
-              graph.put(vertex, None)
-              //TODO compensate those calls that succeeded during propagation
-              origin ! Status.Failure(new IllegalStateException("propagation failed on new component - attempting to compensate"))
-            } else {
-              origin ! true
-            }
-          }
-        } catch {
-          case NonFatal(e) => sender ! Status.Failure(e)
-        }
+      val propagate = edges.toList.map {
+        cluster ? Component(_, Set(vertex))
+      }.map(_ map {
+        case _ => true
+      } recover {
+        case t: Throwable => false
+      })
 
-        case Some(existing) => try {
-          val additionalEdges = edges.diff(existing.edges)
-          if (additionalEdges.isEmpty) {
-            sender ! false
-          } else {
-            graph.put(vertex, Some(Component(vertex, existing.edges ++ additionalEdges)))
-
-            val propagate = existing.edges.toList.map {
-              cluster ? Component(_, additionalEdges)
-            } ++ additionalEdges.toList.map {
-              cluster ? Component(_, Set(vertex))
-            } map (_ map {
-              case _ => true
-            } recover {
-              case t: Throwable => false
-            })
-
-            val origin = sender
-            for (success <- Future.sequence(propagate)) {
-              if (!success.forall(_ == true)) {
-                //compensate failure - TODO use atomic version operation on the graph because this is async and some other call may have modified the component
-                graph.put(vertex, Some(existing))
-                //TODO compensate those calls that succeeded during propagation
-                origin ! Status.Failure(new IllegalStateException("propagation failed on existing component - attempting to compensate"))
-              } else {
-                origin ! true
-              }
-            }
-          }
-        } catch {
-          case NonFatal(e) => sender ! Status.Failure(e)
+      val origin = sender
+      for (success <- Future.sequence(propagate)) {
+        if (!success.forall(_ == true)) {
+          //compensate failure - TODO use atomic version operation on the graph because this is async and some other call may have modified the component
+          graph.put(vertex, None)
+          //TODO compensate those calls that succeeded during propagation
+          origin ! Status.Failure(new IllegalStateException("propagation failed on new component - attempting to compensate"))
+        } else {
+          origin ! true
         }
       }
+    } catch {
+      case NonFatal(e) => sender ! Status.Failure(e)
+    }
   }
+
+  private def connectExisting(existing: Component, newEdges: Set[Vertex]): Unit = {
+    try {
+      val vertex = existing.key
+      val additionalEdges = newEdges.diff(existing.edges)
+      if (additionalEdges.isEmpty) {
+        sender ! false
+      } else {
+        graph.put(vertex, Some(Component(vertex, existing.edges ++ additionalEdges)))
+
+        val propagate = existing.edges.toList.map {
+          cluster ? Component(_, additionalEdges)
+        } ++ additionalEdges.toList.map {
+          cluster ? Component(_, Set(vertex))
+        } map (_ map {
+          case _ => true
+        } recover {
+          case t: Throwable => false
+        })
+
+        val origin = sender
+        for (success <- Future.sequence(propagate)) {
+          if (!success.forall(_ == true)) {
+            //compensate failure - TODO use atomic version operation on the graph because this is async and some other call may have modified the component
+            graph.put(vertex, Some(existing))
+            //TODO compensate those calls that succeeded during propagation
+            origin ! Status.Failure(new IllegalStateException("propagation failed on existing component - attempting to compensate"))
+          } else {
+            origin ! true
+          }
+        }
+      }
+    } catch {
+      case NonFatal(e) => sender ! Status.Failure(e)
+    }
+  }
+
 
 }

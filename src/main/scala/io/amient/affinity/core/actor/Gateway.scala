@@ -132,11 +132,8 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     //Cluster Management queries
     case AddMaster(group, ref) =>
       group match {
-        case "regions" =>
-          println("adding master " + ref)
-          cluster ! AddRoutee(ActorRefRoutee(ref))
+        case "regions" => cluster ! AddRoutee(ActorRefRoutee(ref))
         case "services" =>
-          log.info("Adding Service " + ref)
           val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
           val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
           services.put(serviceClass, actors + ref)
@@ -144,11 +141,8 @@ abstract class Gateway(appConfig: Properties) extends Actor {
 
     case RemoveMaster(group, ref) =>
       group match {
-        case "regions" =>
-          println("Removing master " + ref)
-          cluster ! RemoveRoutee(ActorRefRoutee(ref))
+        case "regions" => cluster ! RemoveRoutee(ActorRefRoutee(ref))
         case "services" =>
-          log.info("Removing Service" + ref)
           val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
           val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
           services.put(serviceClass, actors - ref)

@@ -91,7 +91,7 @@ abstract class KafkaStorage[K, V](topic: String,
               if (kafkaConsumer.position(tp) >= lastOffset) {
                 synchronized {
                   booted = true
-                  println(s"`$topic`, partition $partition bootstrap completed")
+                  //println(s"`$topic`, partition $partition bootstrap completed")
                   notify()
                 }
               }
@@ -102,11 +102,11 @@ abstract class KafkaStorage[K, V](topic: String,
 
           synchronized {
             notify()
-            println(s"`$topic`, partition $partition suspending tail consumption")
+            //println(s"`$topic`, partition $partition suspending tail consumption")
             wait()
           }
 
-          println(s"`$topic`, partition $partition resuming tail consumption")
+          //println(s"`$topic`, partition $partition resuming tail consumption")
 
         }
       } catch {
