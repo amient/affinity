@@ -21,7 +21,7 @@ package io.amient.affinity.core.actor
 
 import java.util.Properties
 
-import akka.actor.{Props, Status}
+import akka.actor.Props
 import akka.event.Logging
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator

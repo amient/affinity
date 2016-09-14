@@ -20,6 +20,6 @@
 package io.amient.affinity
 
 class SystemTestBase {
-  //TODO start zookeeper, start kafka, start node with region and gateway and provide method for rest calls
+  //TODO #7
 
 }

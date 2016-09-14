@@ -72,6 +72,7 @@ abstract class Gateway(appConfig: Properties) extends Actor {
   }
 
   override def postStop(): Unit = {
+    log.info(s"Stopping Gateway")
     super.postStop()
   }
 
@@ -137,7 +138,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
           val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
           val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
           if (!actors.contains(ref)) {
-            println(nodeInfo + " service online " + ref.path.name)
             services.put(serviceClass, actors + ref)
           }
       }

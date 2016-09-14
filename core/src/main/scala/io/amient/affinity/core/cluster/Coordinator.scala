@@ -92,10 +92,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   def unwatch(watcher: ActorRef): Unit = {
     synchronized {
       val i = watchers.indexOf(watcher)
-      if (i >=0) {
-        println("removing watcher " + watcher)
-        watchers.remove(i)
-      }
+      if (i >= 0) watchers.remove(i)
     }
   }
 

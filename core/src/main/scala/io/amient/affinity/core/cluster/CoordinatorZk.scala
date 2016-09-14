@@ -53,7 +53,15 @@ class CoordinatorZk(system: ActorSystem, group: String, appConfig: Properties) e
       override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
     })
 
-  if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
+  if (!zk.exists(zkRoot)) zk.createPersistent(groupRoot, true)
+
+  val initialChildren = zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
+    override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
+      updateChildren(children)
+    }
+  })
+
+  updateChildren(initialChildren)
 
   override def register(actorPath: ActorPath): String = {
     if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
@@ -64,18 +72,15 @@ class CoordinatorZk(system: ActorSystem, group: String, appConfig: Properties) e
 
   override def close(): Unit = zk.close()
 
-
   private def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-  zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
-    override def handleChildChange(parentPath: String, currentChilds: util.List[String]): Unit = {
-      if (currentChilds != null) {
-        val newHandles = listAsIndexedSeq(currentChilds).map(id => s"$parentPath/$id")
-        val newState = newHandles.map(handle => (handle, zk.readData(handle).asInstanceOf[String]))
-        updateMembers(newState.toMap)
-      }
+  private def updateChildren(children: util.List[String]) = {
+    if (children != null) {
+      val newHandles = listAsIndexedSeq(children).map(id => s"$groupRoot/$id")
+      val newState = newHandles.map(handle => (handle, zk.readData(handle).asInstanceOf[String]))
+      updateMembers(newState.toMap)
     }
-  })
+  }
 
 }
 

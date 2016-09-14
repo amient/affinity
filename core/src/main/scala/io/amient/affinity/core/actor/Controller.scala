@@ -114,7 +114,7 @@ class Controller(appConfig: Properties) extends Actor {
 
     case CreateGateway(gatewayProps) =>
       try {
-        context.watch(context.actorOf(gatewayProps, name = "gateway"))
+        val gateway = context.actorOf(gatewayProps, name = "gateway")
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>
@@ -125,6 +125,8 @@ class Controller(appConfig: Properties) extends Actor {
 
     case GatewayCreated() =>
       try {
+        log.info("Gateway Created ")
+        context.watch(sender)
         regionCoordinator.watch(sender)
         serviceCoordinator.watch(sender)
         httpInterface.foreach(_.bind(sender))
@@ -138,6 +140,7 @@ class Controller(appConfig: Properties) extends Actor {
       }
 
     case Terminated(gateway) =>
+      //TODO gateway termination is not called even though its being watched
       log.info("Terminated(gateway) shutting down http interface")
       regionCoordinator.unwatch(gateway)
       serviceCoordinator.unwatch(gateway)

@@ -46,10 +46,8 @@ class AvroRecordSpec extends FlatSpec with Matchers {
       Seq(b1, b2, b3),
       Map("b1" -> b1, "b2" -> b2, "b3" -> b3)
     )
-    println(c)
     val bytes = AvroRecord.write(c, Composite.schema)
     val cc = AvroRecord.read(bytes, classOf[Composite], Composite.schema)
-    println(cc)
     assert(c == cc)
 
   }
