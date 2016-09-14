@@ -72,7 +72,8 @@ The following core features are already in place:
     it can be an orchestrated sequence of Asks and Tells.
  - Cluster Actor routes all request to Partition Actors which implement
     the logic over the data partition and respond to the sender which
-    will ultimately be the calling Handler but some calls may b
+    will ultimately be the calling Handler but sometimes the caller 
+    may be other Services in the cluster.
  - If there are multiple Partition Actors for the same physical partition
     Coordinator uses distributed logic to choose one of them as master
     and the others become standby.    
