@@ -31,12 +31,24 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
+object Node {
+  final val CONFIG_AKKA_HOST = "affinity.akka.host"
+  final val CONFIG_AKKA_PORT = "affinity.akka.port"
+  final val CONFIG_AKKA_SYSTEM = "affinity.akka.system.name"
+  final val CONFIG_AKKA_CONF_NAME = "affinity.akka.conf"
+}
+
 class Node(appConfig: Properties) {
 
-  val akkaPort = appConfig.getProperty(Container.CONFIG_AKKA_PORT)
-  val actorSystemName = appConfig.getProperty(Container.CONFIG_AKKA_SYSTEM)
-  val systemConfig = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-    .withFallback(ConfigFactory.load(appConfig.getProperty(Container.CONFIG_AKKA_CONF_NAME)))
+  import Node._
+
+  val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT)
+  val actorSystemName = appConfig.getProperty(CONFIG_AKKA_SYSTEM)
+  val systemConfig = appConfig.getProperty(CONFIG_AKKA_CONF_NAME) match {
+    case null => ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
+    case applicationAkkaConfig => ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
+      .withFallback(ConfigFactory.load(applicationAkkaConfig))
+  }
 
   implicit val system = ActorSystem(actorSystemName, systemConfig)
 

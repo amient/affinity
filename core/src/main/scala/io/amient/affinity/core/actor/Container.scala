@@ -23,14 +23,10 @@ import java.util.Properties
 
 import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
-import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.actor.Container._
+import io.amient.affinity.core.cluster.{Coordinator, Node}
 
 object Container {
-
-  final val CONFIG_AKKA_HOST = "affinity.akka.host"
-  final val CONFIG_AKKA_PORT = "affinity.akka.port"
-  final val CONFIG_AKKA_SYSTEM = "affinity.akka.system.name"
-  final val CONFIG_AKKA_CONF_NAME = "affinity.akka.conf"
 
   case class ServiceOnline(partition: ActorRef)
 
@@ -42,10 +38,8 @@ class Container(appConfig: Properties, coordinator: Coordinator, group: String) 
 
   val log = Logging.getLogger(context.system, this)
 
-  import Container._
-
-  val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT, "2552").toInt
-  val akkaAddress = appConfig.getProperty(CONFIG_AKKA_HOST, null) match {
+  val akkaPort = appConfig.getProperty(Node.CONFIG_AKKA_PORT, "2552").toInt
+  val akkaAddress = appConfig.getProperty(Node.CONFIG_AKKA_HOST, null) match {
     case null => s"akka://${context.system.name}"
     case host => s"akka.tcp://${context.system.name}@${host}:${akkaPort}"
   }

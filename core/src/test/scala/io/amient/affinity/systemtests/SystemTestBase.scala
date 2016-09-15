@@ -27,8 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.Actor.Receive
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
-import akka.util.Timeout
-import io.amient.affinity.core.actor.{Container, Gateway, Region}
+import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.cluster.{Cluster, Coordinator, CoordinatorZk, Node}
 import io.amient.affinity.core.http.HttpInterface
 import kafka.server.{KafkaConfig, KafkaServerStartable}
@@ -36,8 +35,8 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec}
 
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
 class SystemTestBase extends FlatSpec with BeforeAndAfterAll {
@@ -73,12 +72,6 @@ class SystemTestBase extends FlatSpec with BeforeAndAfterAll {
   private val kafka = new KafkaServerStartable(kafkaConfig)
   kafka.startup()
 
-  System.out.println("system test setup complete")
-
-  override def beforeAll(): Unit = {
-    //
-  }
-
   override def afterAll(): Unit = {
     try {
       //simpleProducer.close()
@@ -112,11 +105,11 @@ class SystemTestBase extends FlatSpec with BeforeAndAfterAll {
     affinityConfig.put(HttpInterface.CONFIG_HTTP_HOST, "localhost")
     affinityConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
     affinityConfig.put(Cluster.CONFIG_NUM_PARTITIONS, numPartitions.toString)
-    affinityConfig.put(Container.CONFIG_AKKA_SYSTEM, "SystemTest")
-    affinityConfig.put(Container.CONFIG_AKKA_HOST, "localhost")
-    affinityConfig.put(Container.CONFIG_AKKA_PORT, akkaPort.toString)
-    affinityConfig.put(Container.CONFIG_AKKA_CONF_NAME, "systemtests")
-    affinityConfig.put(Region.CONFIG_PARTITION_LIST, "0")
+    affinityConfig.put(Node.CONFIG_AKKA_SYSTEM, "SystemTest")
+    affinityConfig.put(Node.CONFIG_AKKA_HOST, "localhost")
+    affinityConfig.put(Node.CONFIG_AKKA_PORT, akkaPort.toString)
+    affinityConfig.put(Node.CONFIG_AKKA_CONF_NAME, "systemtests")
+//    affinityConfig.put(Region.CONFIG_PARTITION_LIST, "0")
     affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
     affinityConfig.put(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
 
