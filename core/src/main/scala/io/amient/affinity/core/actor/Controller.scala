@@ -125,7 +125,6 @@ class Controller(appConfig: Properties) extends Actor {
           }
       }
 
-    //TODO gateway termination is not called during shutdown - need terminator pattern
     case Terminated(gateway) => val gateway = sender
       log.info("Terminated (gateway) shutting down http interface")
       regionCoordinator.unwatch(gateway)

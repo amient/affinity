@@ -142,7 +142,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
               notifyWatchers(AddMaster(group, newMaster._2))
             }
           } else {
-            //TODO last replica removed - no master available
+            //TODO last replica removed - no master available, what do we do ?
           }
       }
     }

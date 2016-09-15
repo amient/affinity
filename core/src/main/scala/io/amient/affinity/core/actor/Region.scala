@@ -63,7 +63,7 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
   override def receive: Receive = super.receive orElse {
 
-    //TODO create coordinator watchLocal instead of this check
+    //TODO maybe coordinator could have another method like watchLocal instead of this pattern here
     case AddMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeMaster(), sender)
     case AddMaster(group, ref) => ack(sender){}
     case RemoveMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeStandby(), sender)

@@ -54,7 +54,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   zkFactory.startup(zookeeper)
 
   //setup kafka
-  // TODO dynamic kafka port allocation
+  // TODO dynamic kafka port allocation - probably by passing 0 and looking up in the actual port in the ZK
   val kafkaPort = "49092"
   val kafkaBootstrap = "localhost:" + kafkaPort
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")

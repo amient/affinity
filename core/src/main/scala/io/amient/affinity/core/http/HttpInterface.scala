@@ -47,7 +47,6 @@ object HttpInterface {
 
 }
 
-//TODO http://doc.akka.io/docs/akka/2.4.10/scala/http/server-side-https-support.html
 class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: ActorSystem) {
 
   implicit val materializer = ActorMaterializer.create(system)

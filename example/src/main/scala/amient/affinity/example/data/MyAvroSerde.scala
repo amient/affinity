@@ -25,8 +25,6 @@ import org.apache.avro.Schema
 
 class MyAvroSerde extends AvroSerde  {
 
-  //TODO declarative schema evolution that can be replaced by schema registry at later point
-
   override def register: Seq[(Class[_], Schema)] = Seq (
     classOf[Vertex] -> Vertex.schema,
     classOf[Edge] -> Edge.schema,
