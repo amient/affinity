@@ -65,9 +65,9 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
 
     //TODO create coordinator watchLocal instead of this check
     case AddMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeMaster(), sender)
-    case AddMaster(group, ref) => sender ! Status.Success()
+    case AddMaster(group, ref) => ack(sender){}
     case RemoveMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeStandby(), sender)
-    case RemoveMaster(group, ref) => sender ! Status.Success()
+    case RemoveMaster(group, ref) => ack(sender){}
   }
 
 }

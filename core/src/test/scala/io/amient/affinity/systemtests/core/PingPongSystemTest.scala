@@ -26,13 +26,13 @@ import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.systemtests.SystemTestBase
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 
-class PingPongSystemTest extends SystemTestBase with Matchers {
+class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   "Test1" should "blah" in {
     //TODO http interface should be able to take 0 and somehow provide the actual bound port
@@ -57,7 +57,4 @@ class PingPongSystemTest extends SystemTestBase with Matchers {
 
   }
 
-  "Test2" should "blah" in {
-
-  }
 }

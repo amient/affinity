@@ -49,7 +49,7 @@ package object ack {
   def ack(replyTo: ActorRef)(closure: => Unit): Unit = {
     try {
       closure
-      replyTo ! Status.Success()
+      replyTo ! Status.Success(true)
     } catch {
       case NonFatal(e) => replyTo ! Status.Failure(e)
     }

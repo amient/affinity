@@ -33,13 +33,13 @@ import io.amient.affinity.core.http.HttpInterface
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
-import org.scalatest.{BeforeAndAfterAll, FlatSpec}
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-class SystemTestBase extends FlatSpec with BeforeAndAfterAll {
+trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   val testDir = new File(classOf[SystemTestBase].getResource("/systemtest").getPath())
   val numPartitions = 2
