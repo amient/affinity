@@ -24,6 +24,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{ContentTypes, Uri}
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.data.{Component, Vertex}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.UserInputMediator

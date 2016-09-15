@@ -17,9 +17,10 @@
  * limitations under the License.
  */
 
-package io.amient.affinity
+package io.amient.affinity.core.http
 
-class SystemTestBase {
-  //TODO #7
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 
-}
+import scala.concurrent.Promise
+
+final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse])

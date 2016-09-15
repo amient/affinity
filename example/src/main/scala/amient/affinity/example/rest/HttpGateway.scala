@@ -28,9 +28,9 @@ import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, Ht
 import akka.http.scaladsl.model.{HttpEntity, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.data.StringSerde
+import io.amient.affinity.core.http.HttpExchange
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
 import io.amient.affinity.example.data.{ConfigEntry, MyAvroSerde}
 import io.amient.util.TimeCryptoProof

@@ -28,7 +28,6 @@ import akka.http.scaladsl.Http.{IncomingConnection, ServerBinding}
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
-import io.amient.affinity.core.actor.Gateway
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
@@ -68,7 +67,7 @@ class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: Ac
 
           val responsePromise = Promise[HttpResponse]()
 
-          gateway ! Gateway.HttpExchange(request, responsePromise)
+          gateway ! HttpExchange(request, responsePromise)
 
           responsePromise.future
         }

@@ -24,26 +24,17 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{Actor, ActorRef, Terminated}
 import akka.event.Logging
-import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Gateway.HttpExchange
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
-import io.amient.affinity.core.http.HttpInterface
+import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-
-object Gateway {
-
-  final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse])
-
-}
 
 abstract class Gateway(appConfig: Properties) extends Actor {
 
@@ -54,39 +45,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
   val log = Logging.getLogger(context.system, this)
 
   val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
-
-  object HTTP {
-    def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = {
-      Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
-    }
-  }
-
-  object PATH {
-    def unapplySeq(path: Path): Option[Seq[String]] = {
-      @tailrec
-      def r(p: Path, acc: Seq[String] = Seq()): Seq[String] =
-        if (p.isEmpty) acc
-        else if (p.startsWithSlash) r(p.tail, acc)
-        else if (p.tail.isEmpty) acc :+ p.head.toString
-        else r(p.tail, acc :+ p.head.toString)
-
-      Some(r(path))
-    }
-  }
-
-  object INT {
-    def unapply(any: Any): Option[Int] = {
-      try {
-        Some(Integer.parseInt(any.toString))
-      } catch {
-        case e: NumberFormatException => None
-      }
-    }
-  }
-
-  object QUERY {
-    def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
-  }
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }
 
@@ -102,10 +60,6 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
     context.watch(cluster)
     context.parent ! Controller.GatewayCreated()
-  }
-
-  override def postStop(): Unit = {
-    super.postStop()
   }
 
   def service(actorClass: Class[_ <: Actor]): ActorRef = {

@@ -25,6 +25,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.Path._
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.rest.HttpGateway
 
 import scala.collection.Map

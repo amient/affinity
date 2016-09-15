@@ -25,7 +25,7 @@ import akka.actor.Actor.Receive
 import akka.actor.{ActorPath, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
-import io.amient.affinity.TestCoordinator
+import io.amient.affinity.core.TestCoordinator
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.duration._

@@ -21,6 +21,7 @@ package io.amient.affinity.example.rest.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.rest.HttpGateway
 
 trait Ping extends HttpGateway {

@@ -16,3 +16,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package io.amient.affinity
+
+import io.amient.affinity.core.data.avro.AvroSerde
+import org.apache.avro.Schema
+
+class TestAvroSerde extends AvroSerde {
+  override def register: Seq[(Class[_], Schema)] = {
+    //TODO add test domain classes and schemas
+    Seq()
+  }
+}

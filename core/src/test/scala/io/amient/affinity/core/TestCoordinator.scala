@@ -17,9 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity
+package io.amient.affinity.core
 
-import akka.actor.{ActorPath, ActorRef, ActorSystem}
+import akka.actor.{ActorPath, ActorSystem}
 import io.amient.affinity.core.cluster.Coordinator
 
 class TestCoordinator(system: ActorSystem, storage: scala.collection.mutable.Set[String]) extends Coordinator(system, "test") {
