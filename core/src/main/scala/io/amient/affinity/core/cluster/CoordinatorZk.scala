@@ -20,9 +20,9 @@
 package io.amient.affinity.core.cluster
 
 import java.util
-import java.util.Properties
 
 import akka.actor.{ActorPath, ActorSystem}
+import com.typesafe.config.Config
 import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.zookeeper.CreateMode
@@ -30,20 +30,20 @@ import org.apache.zookeeper.CreateMode
 import scala.collection.JavaConverters._
 
 object CoordinatorZk {
-  final val CONFIG_ZOOKEEPER_CONNECT = "coordinator.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "coordinator.zookeeper.connect.timeout.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "coordinator.zookeeper.session.timeout.ms"
-  final val CONFIG_ZOOKEEPER_ROOT = "coordinator.zookeeper.root"
+  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.cluster.coordinator.zookeeper.connect"
+  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.connect.ms"
+  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.session.ms"
+  final val CONFIG_ZOOKEEPER_ROOT = "affinity.cluster.coordinator.zookeeper.root"
 }
 
-class CoordinatorZk(system: ActorSystem, group: String, appConfig: Properties) extends Coordinator(system, group) {
+class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
   import CoordinatorZk._
 
-  val zkConnect = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT, "localhost:2181")
-  val zkConnectTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS, "30000").toInt
-  val zkSessionTimeout = appConfig.getProperty(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS, "6000").toInt
-  val zkRoot = appConfig.getProperty(CONFIG_ZOOKEEPER_ROOT, "/affinity")
+  val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
+  val zkConnectTimeout = config.getInt(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
+  val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
+  val zkRoot = config.getString(CONFIG_ZOOKEEPER_ROOT)
   val groupRoot = s"$zkRoot/$group"
 
   private val zk = new ZkClient(

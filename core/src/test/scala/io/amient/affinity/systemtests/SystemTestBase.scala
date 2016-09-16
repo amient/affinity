@@ -27,9 +27,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.Actor.Receive
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Gateway
-import io.amient.affinity.core.cluster.{Cluster, Coordinator, CoordinatorZk, Node}
-import io.amient.affinity.core.http.HttpInterface
+import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
@@ -42,7 +42,6 @@ import scala.reflect.ClassTag
 trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   val testDir = new File(classOf[SystemTestBase].getResource("/systemtest").getPath())
-  val numPartitions = 2
   deleteDirectory(testDir)
 
   //setup zookeeper
@@ -64,7 +63,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       put("host.name", "localhost")
       put("port", kafkaPort)
       put("log.dir", embeddedKafkaPath.toString)
-      put("num.partitions", numPartitions.toString)
+      put("num.partitions", "2")
       put("auto.create.topics.enable", "true")
       put("zookeeper.connect", zkConnect)
     }
@@ -101,23 +100,17 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def createGatewayNode[T <: Gateway](httpPort: Int, akkaPort: Int)(handler: Receive)
                                      (implicit tag: ClassTag[T]): Node = {
-    val affinityConfig = new Properties()
-    affinityConfig.put(HttpInterface.CONFIG_HTTP_HOST, "localhost")
-    affinityConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
-    affinityConfig.put(Cluster.CONFIG_NUM_PARTITIONS, numPartitions.toString)
-    affinityConfig.put(Node.CONFIG_AKKA_SYSTEM, "SystemTest")
-    affinityConfig.put(Node.CONFIG_AKKA_HOST, "localhost")
-    affinityConfig.put(Node.CONFIG_AKKA_PORT, akkaPort.toString)
-    affinityConfig.put(Node.CONFIG_AKKA_CONF_NAME, "systemtests")
-//    affinityConfig.put(Region.CONFIG_PARTITION_LIST, "0")
-    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
-    affinityConfig.put(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+
+    val config = ConfigFactory.load("systemtests")
+      .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+      .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
 
     val startupMonitor = new AtomicBoolean(false)
 
-    val node = new Node(affinityConfig) {
+    val node = new Node(config) {
       startGateway {
-        new Gateway(affinityConfig) {
+        new Gateway(config) {
           override def preStart(): Unit = {
             super.preStart()
             startupMonitor.synchronized {
@@ -136,7 +129,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       }
     }
 
-    val timeout:Duration = (5 seconds)
+    val timeout: Duration = (5 seconds)
     startupMonitor.synchronized(startupMonitor.wait(timeout.toMillis))
     if (!startupMonitor.get) {
       throw new IllegalStateException(s"Node did not startup within $timeout")

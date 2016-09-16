@@ -19,27 +19,27 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.Properties
-
-import akka.actor.{Props, Status}
+import akka.actor.Props
 import akka.event.Logging
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
+import scala.collection.JavaConverters._
 
 object Region {
-  final val CONFIG_PARTITION_LIST = "partition.list"
+  final val CONFIG_PARTITION_LIST = "affinity.node.region.partitions"
 }
 
-class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Props)
-  extends Container(appConfig: Properties, coordinator: Coordinator, "regions") {
+class Region(config: Config, coordinator: Coordinator, partitionProps: Props)
+  extends Container(config: Config, coordinator: Coordinator, "regions") {
 
   override val log = Logging.getLogger(context.system, this)
 
   import Region._
 
-  val partitions = appConfig.getProperty(CONFIG_PARTITION_LIST).split("\\,").map(_.toInt).toList
+  val partitions = config.getIntList(CONFIG_PARTITION_LIST).asScala
 
   override def preStart(): Unit = {
     log.info("Starting Region")
@@ -49,7 +49,7 @@ class Region(appConfig: Properties, coordinator: Coordinator, partitionProps: Pr
         * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
         * as well as Partition
         */
-      context.actorOf(partitionProps, name = partition.toString )
+      context.actorOf(partitionProps, name = partition.toString)
     }
     super.preStart()
   }

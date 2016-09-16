@@ -25,14 +25,14 @@ import io.amient.affinity.example.service.ServiceNode
 object ExampleApp extends App {
 
   // singletons
-  ServiceNode.main(Seq("ExampleSystem", "2550", "127.0.0.1").toArray)
+  ServiceNode.main(Seq("2550", "127.0.0.1").toArray)
 
   // cluster master(s)
   val numPartitions = "4"
-  ApiNode.main(Seq("ExampleSystem", "2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
-  ApiNode.main(Seq("ExampleSystem", "2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
+  ApiNode.main(Seq("2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
+  ApiNode.main(Seq("2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
   // cluster standby(s)
-  ApiNode.main(Seq("ExampleSystem", "2553","127.0.0.1","8083", numPartitions, "0,2").toArray)
-  ApiNode.main(Seq("ExampleSystem", "2554","127.0.0.1","8084", numPartitions, "1,3").toArray)
+  ApiNode.main(Seq("2553","127.0.0.1","8083", numPartitions, "0,2").toArray)
+  ApiNode.main(Seq("2554","127.0.0.1","8084", numPartitions, "1,3").toArray)
 
 }

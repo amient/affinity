@@ -19,31 +19,24 @@
 
 package io.amient.affinity.example.service
 
-import java.util.Properties
-
-import io.amient.affinity.core.cluster.{Coordinator, CoordinatorZk, Node}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.cluster.Node
 
 import scala.util.control.NonFatal
 
 object ServiceNode extends App {
 
   try {
-    require(args.length >= 3, "Service Node requires 3 argument: <akka-system-name>, <akka-host>, <akka-port>")
+    require(args.length == 2, "Service Node requires 2 argument: <akka-host>, <akka-port>")
 
-    val actorSystemName = args(0)
-    val akkaPort = args(1).toInt
-    val host = args(2)
-    val zkConnect = if (args.length > 3) args(3) else "localhost:2181"
+    val akkaPort = args(0).toInt
+    val host = args(1)
 
-    val affinityConfig = new Properties()
-    affinityConfig.put(Node.CONFIG_AKKA_SYSTEM, actorSystemName)
-    affinityConfig.put(Node.CONFIG_AKKA_HOST, host)
-    affinityConfig.put(Node.CONFIG_AKKA_PORT, akkaPort.toString)
-    affinityConfig.put(Node.CONFIG_AKKA_CONF_NAME, "example")
-    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
-    affinityConfig.put(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+    val config = ConfigFactory.load("example")
+      .withValue(Node.CONFIG_AKKA_HOST, ConfigValueFactory.fromAnyRef(host))
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
 
-    new Node(affinityConfig) {
+    new Node(config) {
 
       startServices{
         new UserInputMediator

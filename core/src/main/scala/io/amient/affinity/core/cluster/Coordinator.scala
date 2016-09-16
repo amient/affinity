@@ -19,10 +19,9 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util.Properties
-
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.util.Timeout
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 
 import scala.concurrent.Await
@@ -30,17 +29,17 @@ import scala.concurrent.duration._
 
 object Coordinator {
 
-  final val CONFIG_COORDINATOR_CLASS = "coordinator.class"
+  final val CONFIG_COORDINATOR_CLASS = "affinity.cluster.coordinator.class"
 
   final case class AddMaster(group: String, ref: ActorRef)
 
   final case class RemoveMaster(group: String, ref: ActorRef)
 
-  def fromProperties(system: ActorSystem, group: String, appConfig: Properties): Coordinator = {
-    val className = appConfig.getProperty(CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
+  def fromConfig(system: ActorSystem, group: String, config: Config): Coordinator = {
+    val className = config.getString(CONFIG_COORDINATOR_CLASS)
     val cls = Class.forName(className).asSubclass(classOf[Coordinator])
-    val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Properties])
-    constructor.newInstance(system, group, appConfig)
+    val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Config])
+    constructor.newInstance(system, group, config)
   }
 }
 

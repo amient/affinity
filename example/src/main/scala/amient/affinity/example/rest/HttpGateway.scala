@@ -20,7 +20,6 @@
 package io.amient.affinity.example.rest
 
 import java.io.StringWriter
-import java.util.Properties
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
@@ -28,6 +27,7 @@ import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, Ht
 import akka.http.scaladsl.model.{HttpEntity, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.typesafe.config.Config
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.data.StringSerde
 import io.amient.affinity.core.http.HttpExchange
@@ -38,7 +38,7 @@ import io.amient.util.TimeCryptoProof
 import scala.concurrent.Promise
 import scala.util.control.NonFatal
 
-class HttpGateway(appConfig: Properties) extends Gateway(appConfig) with ActorState {
+class HttpGateway(config: Config) extends Gateway(config) with ActorState {
 
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)

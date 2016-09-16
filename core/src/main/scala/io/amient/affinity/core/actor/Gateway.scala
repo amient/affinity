@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{Actor, ActorRef, Terminated}
@@ -28,6 +27,7 @@ import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
+import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
@@ -36,15 +36,22 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
-abstract class Gateway(appConfig: Properties) extends Actor {
-
-  private val nodeInfo = appConfig.getProperty(HttpInterface.CONFIG_HTTP_PORT)
+object Gateway {
+  final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
+  final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
+}
+abstract class Gateway(config: Config) extends Actor {
 
   private val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
 
   val log = Logging.getLogger(context.system, this)
 
-  val cluster = context.actorOf(new Cluster(appConfig).props(), name = "cluster")
+  val cluster = context.actorOf(new Cluster(config).props(), name = "cluster")
+
+  import context.system
+
+  val httpInterface: HttpInterface = new HttpInterface(
+    config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }
 
@@ -60,6 +67,11 @@ abstract class Gateway(appConfig: Properties) extends Actor {
     Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
     context.watch(cluster)
     context.parent ! Controller.GatewayCreated()
+    httpInterface.bind(self)
+  }
+
+  override def postStop(): Unit = {
+    httpInterface.close
   }
 
   def service(actorClass: Class[_ <: Actor]): ActorRef = {

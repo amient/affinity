@@ -19,21 +19,19 @@
 
 package io.amient.affinity.example.rest
 
-import java.util.Properties
-
 import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
+import com.typesafe.config.Config
 import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.example.data.MyAvroSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
-import io.amient.affinity.example.data.{Component, _}
+import io.amient.affinity.example.data.{Component, MyAvroSerde, _}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-class ApiPartition(config: Properties) extends Partition {
+class ApiPartition(config: Config) extends Partition {
 
   val graph = state {
     new KafkaStorage[Vertex, Component](topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])

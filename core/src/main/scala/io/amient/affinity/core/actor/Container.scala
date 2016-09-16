@@ -19,10 +19,9 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.Properties
-
 import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
+import com.typesafe.config.Config
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 
@@ -34,14 +33,15 @@ object Container {
 
 }
 
-class Container(appConfig: Properties, coordinator: Coordinator, group: String) extends Actor {
+class Container(config: Config, coordinator: Coordinator, group: String) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
-  val akkaPort = appConfig.getProperty(Node.CONFIG_AKKA_PORT, "2552").toInt
-  val akkaAddress = appConfig.getProperty(Node.CONFIG_AKKA_HOST, null) match {
-    case null => s"akka://${context.system.name}"
-    case host => s"akka.tcp://${context.system.name}@${host}:${akkaPort}"
+  val akkaPort = config.getInt(Node.CONFIG_AKKA_PORT)
+  val akkaAddress = if (config.hasPath(Node.CONFIG_AKKA_HOST)) {
+    s"akka.tcp://${context.system.name}@${config.getString(Node.CONFIG_AKKA_HOST)}:${akkaPort}"
+  } else {
+    s"akka://${context.system.name}"
   }
 
   private val services = scala.collection.mutable.Map[ActorRef, String]()

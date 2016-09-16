@@ -19,13 +19,11 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.Properties
-
 import akka.actor.{Actor, Props, Terminated}
 import akka.event.Logging
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.http.HttpInterface
 
 object Controller {
 
@@ -39,7 +37,7 @@ object Controller {
 
 }
 
-class Controller(appConfig: Properties) extends Actor {
+class Controller(config: Config) extends Actor {
 
   import Controller._
 
@@ -47,13 +45,11 @@ class Controller(appConfig: Properties) extends Actor {
 
   val log = Logging.getLogger(context.system, this)
 
-  private val nodeInfo = appConfig.getProperty(HttpInterface.CONFIG_HTTP_PORT)
-
   //controller terminates the system so cannot use system.dispatcher for Futures execution
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val regionCoordinator = try {
-    Coordinator.fromProperties(system, "regions", appConfig)
+    Coordinator.fromConfig(system, "regions", config)
   } catch {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
@@ -64,23 +60,12 @@ class Controller(appConfig: Properties) extends Actor {
   }
 
   val serviceCoordinator = try {
-    Coordinator.fromProperties(system, "services", appConfig)
+    Coordinator.fromConfig(system, "services", config)
   } catch {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
         e.printStackTrace()
         System.exit(11)
-      }
-      throw e
-  }
-
-  val httpInterface: Option[HttpInterface] = try {
-    HttpInterface.fromConfig(appConfig)
-  } catch {
-    case e: Throwable =>
-      system.terminate() onComplete { _ =>
-        e.printStackTrace()
-        System.exit(12)
       }
       throw e
   }
@@ -94,7 +79,7 @@ class Controller(appConfig: Properties) extends Actor {
   override def receive: Receive = {
 
     case CreateServiceContainer(services) => ack(sender) {
-      context.actorOf(Props(new Container(appConfig, serviceCoordinator, "services") {
+      context.actorOf(Props(new Container(config, serviceCoordinator, "services") {
         services.foreach { serviceProps =>
           context.actorOf(serviceProps, serviceProps.actorClass().getName)
         }
@@ -102,7 +87,7 @@ class Controller(appConfig: Properties) extends Actor {
     }
 
     case CreateRegion(partitionProps) => ack(sender) {
-      context.actorOf(Props(new Region(appConfig, regionCoordinator, partitionProps)), name = "region")
+      context.actorOf(Props(new Region(config, regionCoordinator, partitionProps)), name = "region")
     }
 
     case CreateGateway(gatewayProps) => ack(sender) {
@@ -114,7 +99,6 @@ class Controller(appConfig: Properties) extends Actor {
         log.info("Gateway Created " + sender)
         regionCoordinator.watch(sender)
         serviceCoordinator.watch(sender)
-        httpInterface.foreach(_.bind(sender))
         context.watch(sender)
 
       } catch {
@@ -129,13 +113,6 @@ class Controller(appConfig: Properties) extends Actor {
       log.info("Terminated (gateway) shutting down http interface")
       regionCoordinator.unwatch(gateway)
       serviceCoordinator.unwatch(gateway)
-      try {
-        httpInterface.foreach(_.close)
-      } finally {
-        system.terminate() onComplete { _ =>
-          System.exit(0)
-        }
-      }
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
   }

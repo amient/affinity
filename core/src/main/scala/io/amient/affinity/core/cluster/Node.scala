@@ -19,10 +19,8 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util.Properties
-
 import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion, CreateServiceContainer}
 import io.amient.affinity.core.actor._
@@ -32,28 +30,22 @@ import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
 object Node {
-  final val CONFIG_AKKA_HOST = "affinity.akka.host"
-  final val CONFIG_AKKA_PORT = "affinity.akka.port"
-  final val CONFIG_AKKA_SYSTEM = "affinity.akka.system.name"
-  final val CONFIG_AKKA_CONF_NAME = "affinity.akka.conf"
+  final val CONFIG_AKKA_SYSTEM_NAME = "affinity.node.name"
+  final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.host"
+  final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
 }
 
-class Node(appConfig: Properties) {
+class Node(config: Config) {
 
   import Node._
 
-  val akkaPort = appConfig.getProperty(CONFIG_AKKA_PORT)
-  val actorSystemName = appConfig.getProperty(CONFIG_AKKA_SYSTEM)
-  val systemConfig = appConfig.getProperty(CONFIG_AKKA_CONF_NAME) match {
-    case null => ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-    case applicationAkkaConfig => ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$akkaPort")
-      .withFallback(ConfigFactory.load(applicationAkkaConfig))
-  }
+  val akkaPort = config.getInt(CONFIG_AKKA_PORT)
+  val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
 
-  implicit val system = ActorSystem(actorSystemName, systemConfig)
+  implicit val system = ActorSystem(actorSystemName, config)
 
 
-  private val controller = system.actorOf(Props(new Controller(appConfig)), name = "controller")
+  private val controller = system.actorOf(Props(new Controller(config)), name = "controller")
 
   //in case the process is stopped from outside
   sys.addShutdownHook {

@@ -19,8 +19,6 @@
 
 package io.amient.affinity.core.http
 
-import java.util.Properties
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.Logging
 import akka.http.scaladsl.Http
@@ -31,21 +29,6 @@ import akka.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
-
-object HttpInterface {
-
-  final val CONFIG_HTTP_HOST = "http.host"
-  final val CONFIG_HTTP_PORT = "http.port"
-
-  def fromConfig(appConfig: Properties)(implicit system: ActorSystem): Option[HttpInterface] = {
-    if (!appConfig.containsKey(CONFIG_HTTP_PORT)) None else {
-      val httpHost = appConfig.getProperty(CONFIG_HTTP_HOST, "localhost")
-      val httpPort = appConfig.getProperty(CONFIG_HTTP_PORT, "8080").toInt
-      Some(new HttpInterface(httpHost, httpPort))
-    }
-  }
-
-}
 
 class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: ActorSystem) {
 

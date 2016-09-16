@@ -19,46 +19,39 @@
 
 package io.amient.affinity.example.rest
 
-import java.util.Properties
-
-import io.amient.affinity.core.actor.Region
-import io.amient.affinity.core.cluster.{Cluster, Coordinator, CoordinatorZk, Node}
-import io.amient.affinity.core.http.HttpInterface
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.actor.{Gateway, Region}
+import io.amient.affinity.core.cluster.{Cluster, Node}
 import io.amient.affinity.example.rest.handler._
 
+import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
 object ApiNode extends App {
 
   try {
-    require(args.length >= 6)
+    require(args.length == 5, "Service Node requires 5 argument: <akka-port> <host> <http-port> <total-partitions> <node-partition-list>")
 
-    val actorSystemName = args(0)
-    val akkaPort = args(1).toInt
-    val host = args(2)
-    val httpPort = args(3).toInt
-    val numPartitions = args(4).toInt
-    val partitionList = args(5) // coma-separated list of partitions assigned to this node
-    val zkConnect = if (args.length > 6) args(6) else "localhost:2181"
+    val akkaPort = args(0).toInt
+    val host = args(1)
+    val httpPort = args(2).toInt
+    val numPartitions = args(3).toInt
+    val partitionList = args(4).split("\\,").map(_.toInt).toList.asJava
 
-    val affinityConfig = new Properties()
-    affinityConfig.put(HttpInterface.CONFIG_HTTP_HOST, host)
-    affinityConfig.put(HttpInterface.CONFIG_HTTP_PORT, httpPort.toString)
-    affinityConfig.put(Cluster.CONFIG_NUM_PARTITIONS, numPartitions.toString)
-    affinityConfig.put(Node.CONFIG_AKKA_SYSTEM, actorSystemName)
-    affinityConfig.put(Node.CONFIG_AKKA_HOST, host)
-    affinityConfig.put(Node.CONFIG_AKKA_PORT, akkaPort.toString)
-    affinityConfig.put(Node.CONFIG_AKKA_CONF_NAME, "example")
-    affinityConfig.put(Region.CONFIG_PARTITION_LIST, partitionList)
-    affinityConfig.put(Coordinator.CONFIG_COORDINATOR_CLASS, classOf[CoordinatorZk].getName)
-    affinityConfig.put(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, zkConnect)
+    val config = ConfigFactory.load("example")
+      .withValue(Cluster.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(numPartitions))
+      .withValue(Node.CONFIG_AKKA_HOST, ConfigValueFactory.fromAnyRef(host))
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+      .withValue(Gateway.CONFIG_HTTP_HOST, ConfigValueFactory.fromAnyRef(host))
+      .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
+      .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
     //this API cluster is symmetric - all nodes serve both as Gateways and Regions
-    new Node(affinityConfig) {
+    new Node(config) {
 
-      startRegion(new ApiPartition(affinityConfig))
+      startRegion(new ApiPartition(config))
 
-      startGateway(new HttpGateway(affinityConfig)
+      startGateway(new HttpGateway(config)
         with Describe
         with Ping
         with Fail

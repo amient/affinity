@@ -19,19 +19,18 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util.Properties
-
 import akka.actor.ActorSystem
 import akka.dispatch.Dispatchers
 import akka.routing._
+import com.typesafe.config.Config
 
 object Cluster {
-  final val CONFIG_NUM_PARTITIONS = "num.partitions"
+  final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
 }
 
-class Cluster(appConfig: Properties) extends Group {
+class Cluster(config: Config) extends Group {
 
-  val numPartitions = appConfig.getProperty(Cluster.CONFIG_NUM_PARTITIONS).toInt
+  val numPartitions = config.getInt(Cluster.CONFIG_NUM_PARTITIONS)
 
   override def paths(system: ActorSystem) = List()
 
