@@ -71,7 +71,7 @@ abstract class Gateway(config: Config) extends Actor {
   }
 
   override def postStop(): Unit = {
-    httpInterface.close
+    httpInterface.close()
   }
 
   def service(actorClass: Class[_ <: Actor]): ActorRef = {
@@ -83,7 +83,7 @@ abstract class Gateway(config: Config) extends Actor {
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(future map (f) recover handleException)
+    promise.completeWith(future map f recover handleException)
   }
 
   def handle: Receive = {
@@ -92,6 +92,7 @@ abstract class Gateway(config: Config) extends Actor {
 
   final def receive: Receive = handle orElse {
 
+    //No handler
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
     //Cluster Management queries
@@ -117,8 +118,8 @@ abstract class Gateway(config: Config) extends Actor {
           services.put(serviceClass, actors - ref)
       }
 
-    case Terminated(cluster) =>
-      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + cluster)
+    case Terminated(ref) =>
+      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)
 
   }
 

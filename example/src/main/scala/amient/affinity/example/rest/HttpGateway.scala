@@ -56,7 +56,7 @@ class HttpGateway(config: Config) extends Gateway(config) with ActorState {
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessError => errorValue(Forbidden, "Forbidden - " + e.getMessage)
-      //errorValue(Unauthorized, "Unauthorized")
+    //errorValue(Unauthorized, "Unauthorized")
     case e: NoSuchElementException => errorValue(NotFound, "Haven't got that")
     case e: IllegalArgumentException => errorValue(BadRequest, "BadRequest - " + e.getMessage)
     case e: NotImplementedError => e.printStackTrace(); errorValue(NotImplemented, "Eeek! We have a bug..")
@@ -76,7 +76,7 @@ class HttpGateway(config: Config) extends Gateway(config) with ActorState {
       try {
         query.get("signature") match {
           case None => throw new IllegalAccessError
-          case Some(sig) => {
+          case Some(sig) =>
             sig.split(":") match {
               case Array(k, clientSignature) => settings.get(k) match {
                 case Some(configEntry) =>
@@ -90,10 +90,9 @@ class HttpGateway(config: Config) extends Gateway(config) with ActorState {
               }
               case _ => throw new IllegalAccessError
             }
-          }
         }
       } catch {
-        case e: IllegalAccessError => response.success(errorValue(Unauthorized, "Unauhtorized, expecting " + e.getMessage))
+        case e: IllegalAccessError => response.success(errorValue(Unauthorized, "Unauthorized, expecting " + e.getMessage))
         case e: Throwable => response.success(handleException(e))
       }
     }
@@ -114,16 +113,15 @@ class HttpGateway(config: Config) extends Gateway(config) with ActorState {
       adminConfig match {
         case None =>
           credentials match {
-            case Some(BasicHttpCredentials(username, newAdminPassword)) if (username == "admin") =>
+            case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
               settings.put("admin", Some(ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))))
               response.success(code(username))
             case _ => response.success(HttpResponse(
               Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
           }
         case Some(ConfigEntry(any, adminPassword)) => credentials match {
-          case Some(BasicHttpCredentials(username, password))
-            if (username == "admin" && TimeCryptoProof.toHex(password.getBytes) == adminPassword) =>
-            response.success(code(username))
+          case Some(BasicHttpCredentials(username, password)) if username == "admin"
+            && TimeCryptoProof.toHex(password.getBytes) == adminPassword => response.success(code(username))
           case _ =>
             response.success(HttpResponse(Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", None)))))
         }
@@ -150,7 +148,7 @@ class HttpGateway(config: Config) extends Gateway(config) with ActorState {
   def jsonValue(status: StatusCode, value: Any): HttpResponse = {
     val out = new StringWriter
     mapper.writeValue(out, value)
-    val json = out.toString()
+    val json = out.toString
     HttpResponse(status, entity = HttpEntity(ContentTypes.`application/json`, json))
   }
 
