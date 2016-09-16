@@ -22,6 +22,7 @@ package io.amient.affinity.core
 import akka.actor.{ActorRef, Status}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
+import io.amient.affinity.core.ack.AckDuplicate
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -36,8 +37,18 @@ import scala.util.{Failure, Success}
   * the partition must in turn ack that it has completed the transition succesfully.
   * The response ack returns back up the chain until Coordinator is sure that the
   * partition has transitioned its state and knows it is now a Master.
+  *
+  * Supported delivery semantics: At-Least-Once
+  *
+  * Because this ack implementation is stateless, any logic relying on its functionality
+  * must take care of deduplication by throwing AckDuplicate form the closure code
+  * that needs to be guaranteed executed exactly once.
+  *
+  * Likewise in-order processing must be taken care of by the code relying on the ack.
   */
 package object ack {
+
+  final case class AckDuplicate(e: Throwable) extends RuntimeException(e)
 
   /**
     * end of chain ack() which runs the given closure and reports either a success or failure
@@ -51,6 +62,7 @@ package object ack {
       closure
       replyTo ! Status.Success(true)
     } catch {
+      case AckDuplicate(e) => replyTo ! Status.Success(true)
       case NonFatal(e) => replyTo ! Status.Failure(e)
     }
   }

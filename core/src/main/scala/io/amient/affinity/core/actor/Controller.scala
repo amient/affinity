@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, Props, Terminated}
+import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
@@ -79,19 +79,31 @@ class Controller(config: Config) extends Actor {
   override def receive: Receive = {
 
     case CreateServiceContainer(services) => ack(sender) {
-      context.actorOf(Props(new Container(config, serviceCoordinator, "services") {
-        services.foreach { serviceProps =>
-          context.actorOf(serviceProps, serviceProps.actorClass().getName)
-        }
-      }), name = "services")
+      try {
+        context.actorOf(Props(new Container(config, serviceCoordinator, "services") {
+          services.foreach { serviceProps =>
+            context.actorOf(serviceProps, serviceProps.actorClass().getName)
+          }
+        }), name = "services")
+      } catch {
+        case e: InvalidActorNameException => throw AckDuplicate(e)
+      }
     }
 
     case CreateRegion(partitionProps) => ack(sender) {
-      context.actorOf(Props(new Region(config, regionCoordinator, partitionProps)), name = "region")
+      try {
+        context.actorOf(Props(new Region(config, regionCoordinator, partitionProps)), name = "region")
+      } catch {
+        case e: InvalidActorNameException => throw AckDuplicate(e)
+      }
     }
 
     case CreateGateway(gatewayProps) => ack(sender) {
-      context.actorOf(gatewayProps, name = "gateway")
+      try {
+        context.actorOf(gatewayProps, name = "gateway")
+      } catch {
+        case e: InvalidActorNameException => throw AckDuplicate(e)
+      }
     }
 
     case GatewayCreated() =>
