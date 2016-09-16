@@ -48,7 +48,7 @@ object HttpGateway {
     val config = ConfigFactory.load("example").withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
 
     new Node(config) {
-      startGateway(new HttpGateway(config)
+      startGateway(new HttpGateway
         with Describe
         with Ping
         with Fail
@@ -60,7 +60,7 @@ object HttpGateway {
 }
 
 
-class HttpGateway(config: Config) extends Gateway(config) with ActorState {
+class HttpGateway extends Gateway with ActorState {
 
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)

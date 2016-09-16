@@ -53,7 +53,7 @@ class Node(config: Config) {
     Await.ready(system.whenTerminated, 30 seconds) // TODO configurable shutdown timeout
   }
 
-  private val controller = system.actorOf(Props(new Controller(config)), name = "controller")
+  private val controller = system.actorOf(Props(new Controller), name = "controller")
 
   import system.dispatcher
 

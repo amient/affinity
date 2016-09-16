@@ -101,7 +101,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
     val node = new Node(config) {
       startGateway {
-        new Gateway(config) {
+        new Gateway {
           override def preStart(): Unit = {
             super.preStart()
             startupMonitor.synchronized {

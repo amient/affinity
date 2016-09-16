@@ -22,17 +22,16 @@ package io.amient.affinity.example.rest
 import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Partition, Region}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{Component, MyAvroSerde, _}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-
-import scala.collection.JavaConverters._
 
 
 object ApiPartition {
@@ -50,13 +49,15 @@ object ApiPartition {
     //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(config) {
 
-      startRegion(new ApiPartition(config))
+      startRegion(new ApiPartition)
 
     }
   }
 }
 
-class ApiPartition(config: Config) extends Partition {
+class ApiPartition extends Partition {
+
+  //val config = context.system.settings.config
 
   val graph = state {
     new KafkaStorage[Vertex, Component](topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])

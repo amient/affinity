@@ -21,7 +21,6 @@ package io.amient.affinity.core.actor
 
 import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
-import com.typesafe.config.Config
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 
@@ -33,11 +32,13 @@ object Container {
 
 }
 
-class Container(config: Config, coordinator: Coordinator, group: String) extends Actor {
+class Container(coordinator: Coordinator, group: String) extends Actor {
 
-  val log = Logging.getLogger(context.system, this)
+  private val log = Logging.getLogger(context.system, this)
 
-  val akkaAddress = if (config.hasPath(Node.CONFIG_AKKA_HOST)) {
+  private val config = context.system.settings.config
+
+  private val akkaAddress = if (config.hasPath(Node.CONFIG_AKKA_HOST)) {
     s"akka.tcp://${context.system.name}@${config.getString(Node.CONFIG_AKKA_HOST)}:${config.getInt(Node.CONFIG_AKKA_PORT)}"
   } else {
     s"akka://${context.system.name}"

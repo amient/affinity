@@ -21,21 +21,23 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Props
 import akka.event.Logging
-import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
+
 import scala.collection.JavaConverters._
 
 object Region {
   final val CONFIG_PARTITION_LIST = "affinity.node.region.partitions"
 }
 
-class Region(config: Config, coordinator: Coordinator, partitionProps: Props)
-  extends Container(config: Config, coordinator: Coordinator, "regions") {
+class Region(coordinator: Coordinator, partitionProps: Props)
+  extends Container(coordinator: Coordinator, "regions") {
 
-  override val log = Logging.getLogger(context.system, this)
+  private val config = context.system.settings.config
+
+  private val log = Logging.getLogger(context.system, this)
 
   import Region._
 

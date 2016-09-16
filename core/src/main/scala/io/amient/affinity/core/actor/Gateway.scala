@@ -27,7 +27,6 @@ import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
@@ -41,17 +40,19 @@ object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
   final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
 }
-abstract class Gateway(config: Config) extends Actor {
+abstract class Gateway extends Actor {
+
+  private val log = Logging.getLogger(context.system, this)
+
+  private val config = context.system.settings.config
 
   private val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
-
-  val log = Logging.getLogger(context.system, this)
 
   val cluster = context.actorOf(new Cluster(config).props(), name = "cluster")
 
   import context.system
 
-  val httpInterface: HttpInterface = new HttpInterface(
+  private val httpInterface: HttpInterface = new HttpInterface(
     config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }

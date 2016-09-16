@@ -19,19 +19,16 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{ActorPath, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.actor.{ActorPath, Props}
+import akka.testkit.TestKit
 import akka.util.Timeout
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.TestCoordinator
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import io.amient.affinity.core.{ActorUnitTestBase, TestCoordinator}
+import org.scalatest.{BeforeAndAfterAll, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 
-class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll {
+class RegionSpec extends ActorUnitTestBase with Matchers with BeforeAndAfterAll {
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
@@ -52,13 +49,10 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
     "must keep Coordinator Updated during partition failure & restart scenario" in {
       val services = scala.collection.mutable.Set[String]()
       val coordinator = new TestCoordinator(system, services)
-
-      val config = ConfigFactory.defaultApplication()
-        .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0,1,2,3).asJava))
       val d = 1 second
       implicit val timeout = Timeout(d)
 
-      system.actorOf(Props(new Region(config, coordinator, testPartition)), name = "region")
+      system.actorOf(Props(new Region(coordinator, testPartition)), name = "region")
       awaitCond (services.size == 4)
 
       //first stop Partition explicitly - it shouldn't be restarted
@@ -71,7 +65,7 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       //now simulate error in one of the partitions
       val partitionToFail = services.head
       system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne() onSuccess {
-        case actorRef => actorRef ! new IllegalStateException
+        case actorRef => actorRef ! new IllegalStateException("Expected exception")
       }
       awaitCond(services.size == 2 && !services.contains(partitionToFail))
       // it had a failure, it should be restarted

@@ -35,7 +35,8 @@ object Coordinator {
 
   final case class RemoveMaster(group: String, ref: ActorRef)
 
-  def fromConfig(system: ActorSystem, group: String, config: Config): Coordinator = {
+  def create(system: ActorSystem, group: String): Coordinator = {
+    val config = system.settings.config
     val className = config.getString(CONFIG_COORDINATOR_CLASS)
     val cls = Class.forName(className).asSubclass(classOf[Coordinator])
     val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Config])

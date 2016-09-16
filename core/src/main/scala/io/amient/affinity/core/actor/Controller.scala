@@ -21,7 +21,6 @@ package io.amient.affinity.core.actor
 
 import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
-import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Coordinator
 
@@ -37,19 +36,19 @@ object Controller {
 
 }
 
-class Controller(config: Config) extends Actor {
+class Controller extends Actor {
+
+  val log = Logging.getLogger(context.system, this)
 
   import Controller._
 
   implicit val system = context.system
 
-  val log = Logging.getLogger(context.system, this)
-
   //controller terminates the system so cannot use system.dispatcher for Futures execution
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val regionCoordinator = try {
-    Coordinator.fromConfig(system, "regions", config)
+    Coordinator.create(system, "regions")
   } catch {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
@@ -60,7 +59,7 @@ class Controller(config: Config) extends Actor {
   }
 
   val serviceCoordinator = try {
-    Coordinator.fromConfig(system, "services", config)
+    Coordinator.create(system, "services")
   } catch {
     case e: Throwable =>
       system.terminate() onComplete { _ =>
@@ -80,7 +79,7 @@ class Controller(config: Config) extends Actor {
 
     case CreateServiceContainer(services) => ack[Unit](sender) {
       try {
-        context.actorOf(Props(new Container(config, serviceCoordinator, "services") {
+        context.actorOf(Props(new Container(serviceCoordinator, "services") {
           services.foreach { serviceProps =>
             context.actorOf(serviceProps, serviceProps.actorClass().getName)
           }
@@ -92,7 +91,7 @@ class Controller(config: Config) extends Actor {
 
     case CreateRegion(partitionProps) => ack[Unit](sender) {
       try {
-        context.actorOf(Props(new Region(config, regionCoordinator, partitionProps)), name = "region")
+        context.actorOf(Props(new Region(regionCoordinator, partitionProps)), name = "region")
       } catch {
         case e: InvalidActorNameException => throw AckDuplicate(e)
       }
