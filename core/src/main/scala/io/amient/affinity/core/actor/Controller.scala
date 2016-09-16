@@ -78,7 +78,7 @@ class Controller(config: Config) extends Actor {
 
   override def receive: Receive = {
 
-    case CreateServiceContainer(services) => ack(sender) {
+    case CreateServiceContainer(services) => ack[Unit](sender) {
       try {
         context.actorOf(Props(new Container(config, serviceCoordinator, "services") {
           services.foreach { serviceProps =>
@@ -90,7 +90,7 @@ class Controller(config: Config) extends Actor {
       }
     }
 
-    case CreateRegion(partitionProps) => ack(sender) {
+    case CreateRegion(partitionProps) => ack[Unit](sender) {
       try {
         context.actorOf(Props(new Region(config, regionCoordinator, partitionProps)), name = "region")
       } catch {
@@ -98,7 +98,7 @@ class Controller(config: Config) extends Actor {
       }
     }
 
-    case CreateGateway(gatewayProps) => ack(sender) {
+    case CreateGateway(gatewayProps) => ack[Unit](sender) {
       try {
         context.actorOf(gatewayProps, name = "gateway")
       } catch {
@@ -109,10 +109,9 @@ class Controller(config: Config) extends Actor {
     case GatewayCreated() =>
       try {
         log.info("Gateway Created " + sender)
-        regionCoordinator.watch(sender)
-        serviceCoordinator.watch(sender)
+        regionCoordinator.watch(sender, global = true)
+        serviceCoordinator.watch(sender, global = true)
         context.watch(sender)
-
       } catch {
         case e: Throwable =>
           system.terminate() onComplete { _ =>

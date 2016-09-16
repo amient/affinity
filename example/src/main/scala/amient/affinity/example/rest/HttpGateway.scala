@@ -27,16 +27,38 @@ import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, Ht
 import akka.http.scaladsl.model.{HttpEntity, _}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.data.StringSerde
 import io.amient.affinity.core.http.HttpExchange
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
 import io.amient.affinity.example.data.{ConfigEntry, MyAvroSerde}
+import io.amient.affinity.example.rest.handler._
 import io.amient.util.TimeCryptoProof
 
 import scala.concurrent.Promise
 import scala.util.control.NonFatal
+
+object HttpGateway {
+
+  def main(args: Array[String]): Unit = {
+    require(args.length == 1, "Gateway Node requires 1 argument: <http-port>")
+    val httpPort = args(0).toInt
+    val config = ConfigFactory.load("example").withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
+
+    new Node(config) {
+      startGateway(new HttpGateway(config)
+        with Describe
+        with Ping
+        with Fail
+        with Connect
+        with Access
+      )
+    }
+  }
+}
+
 
 class HttpGateway(config: Config) extends Gateway(config) with ActorState {
 

@@ -19,20 +19,23 @@
 
 package io.amient.affinity.example
 
-import io.amient.affinity.example.rest.ApiNode
+import io.amient.affinity.example.rest.{ApiPartition, HttpGateway}
 import io.amient.affinity.example.service.ServiceNode
 
 object ExampleApp extends App {
 
-  // singletons
-  ServiceNode.main(Seq("2550", "127.0.0.1").toArray)
+  // singleton services
+  ServiceNode.main(Seq("2550").toArray)
 
-  // cluster master(s)
-  val numPartitions = "4"
-  ApiNode.main(Seq("2551","127.0.0.1","8081", numPartitions, "0,2").toArray)
-  ApiNode.main(Seq("2552","127.0.0.1","8082", numPartitions, "1,3").toArray)
-  // cluster standby(s)
-  ApiNode.main(Seq("2553","127.0.0.1","8083", numPartitions, "0,2").toArray)
-  ApiNode.main(Seq("2554","127.0.0.1","8084", numPartitions, "1,3").toArray)
+  // gateways
+  HttpGateway.main(Seq("8081").toArray)
+  HttpGateway.main(Seq("8082").toArray)
+
+  // partition master(s)
+  ApiPartition.main(Seq("2551", "0,2").toArray)
+  ApiPartition.main(Seq("2552", "1,3").toArray)
+  // partition standby(s)
+  ApiPartition.main(Seq("2553", "0,2").toArray)
+  ApiPartition.main(Seq("2554", "1,3").toArray)
 
 }

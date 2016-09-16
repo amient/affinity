@@ -37,9 +37,8 @@ class Container(config: Config, coordinator: Coordinator, group: String) extends
 
   val log = Logging.getLogger(context.system, this)
 
-  val akkaPort = config.getInt(Node.CONFIG_AKKA_PORT)
   val akkaAddress = if (config.hasPath(Node.CONFIG_AKKA_HOST)) {
-    s"akka.tcp://${context.system.name}@${config.getString(Node.CONFIG_AKKA_HOST)}:${akkaPort}"
+    s"akka.tcp://${context.system.name}@${config.getString(Node.CONFIG_AKKA_HOST)}:${config.getInt(Node.CONFIG_AKKA_PORT)}"
   } else {
     s"akka://${context.system.name}"
   }

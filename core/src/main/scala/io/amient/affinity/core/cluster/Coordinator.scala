@@ -53,7 +53,13 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
 
-  private val watchers = scala.collection.mutable.ListBuffer[ActorRef]()
+  /**
+    * wacthers - a list of all actors that will receive AddMaster and RemoveMaster messages
+    * when there are changes in the cluster. The value is global flag - `true` means that the
+    * watcher is interested for changes at the global/cluster level, `false` means that the
+    * watcher is only intereseted in changes in the local system.
+    */
+  private val watchers = scala.collection.mutable.Map[ActorRef, Boolean]()
 
   /**
     * @param actorPath of the actor that needs to managed as part of coordinated group
@@ -70,31 +76,31 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   def unregister(handle: String)
 
   /**
-    * watch changes in the coordinate group of routees. The implementation must
-    * call addRouteeActor() and removeRouteeActor() methods when respective
-    * changes occur.
-    *
+    * watch changes in the coordinate group of routees in the whole cluster.
     * @param watcher actor which will receive the messages
     */
-  def watch(watcher: ActorRef): Unit = {
+  def watch(watcher: ActorRef, global: Boolean): Unit = {
     synchronized {
-      watchers += watcher
+      watchers += watcher -> true
       handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
         val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
         val masterActorRef = replicas.minBy(_._1)._2
-        ack(watcher, AddMaster(group, masterActorRef)) onFailure {
-          case e: Throwable =>
-            e.printStackTrace()
-            system.terminate()
+        //failing this ack means that the watcher would have inconsistent view of the cluster
+        if (global || masterActorRef.path.address.hasLocalScope) {
+          ack(watcher, AddMaster(group, masterActorRef)) onFailure {
+            case e: Throwable =>
+              e.printStackTrace()
+              system.terminate()
+          }
         }
       }
     }
   }
 
+
   def unwatch(watcher: ActorRef): Unit = {
     synchronized {
-      val i = watchers.indexOf(watcher)
-      if (i >= 0) watchers.remove(i)
+      watchers -= watcher
     }
   }
 
@@ -115,13 +121,17 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     }
   }
 
-  private def notifyWatchers(message: Any): Unit = {
+  private def notifyWatchers(message: Any, hasLocalScope: Boolean): Unit = {
     synchronized {
-      watchers.foreach(watcher => ack(watcher, message) onFailure {
-        case e: Throwable =>
-          e.printStackTrace()
-          system.terminate()
-      })
+      watchers.foreach { case (watcher, global) =>
+        if (global || hasLocalScope) {
+          ack(watcher, message) onFailure {
+            case e: Throwable =>
+              e.printStackTrace()
+              system.terminate()
+          }
+        }
+      }
     }
   }
 
@@ -133,12 +143,12 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
           val currentReplicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
           val currentMaster = currentReplicas.minBy(_._1)
           handles.remove(routeeHandle)
-          notifyWatchers(RemoveMaster(group, master))
+          notifyWatchers(RemoveMaster(group, master), master.path.address.hasLocalScope)
           val replicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
           if (replicas.size > 0) {
             val newMaster = replicas.minBy(_._1)
             if (currentMaster != newMaster) {
-              notifyWatchers(AddMaster(group, newMaster._2))
+              notifyWatchers(AddMaster(group, newMaster._2), newMaster._2.path.address.hasLocalScope)
             }
           } else {
             //TODO last replica removed - no master available, what do we do ?
@@ -161,11 +171,11 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         if (replicas.size > 0) {
           val (currentMasterHandle, currentMasterActorRef) = replicas.minBy(_._1)
           if (routeeHandle < currentMasterHandle) {
-            notifyWatchers(RemoveMaster(group, currentMasterActorRef))
-            notifyWatchers(AddMaster(group, routeeRef))
+            notifyWatchers(RemoveMaster(group, currentMasterActorRef), currentMasterActorRef.path.address.hasLocalScope)
+            notifyWatchers(AddMaster(group, routeeRef), routeeRef.path.address.hasLocalScope)
           }
         } else {
-          notifyWatchers(AddMaster(group, routeeRef))
+          notifyWatchers(AddMaster(group, routeeRef), routeeRef.path.address.hasLocalScope)
         }
       }
     } catch {

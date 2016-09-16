@@ -22,14 +22,39 @@ package io.amient.affinity.example.rest
 import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
-import com.typesafe.config.Config
-import io.amient.affinity.core.actor.Partition
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.actor.{Partition, Region}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.example.data.{Component, MyAvroSerde, _}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
+
+import scala.collection.JavaConverters._
+
+
+object ApiPartition {
+
+  def main(args: Array[String]): Unit = {
+    require(args.length == 2, "Service Node requires 2 argument: <akka-port> <node-partition-list>")
+
+    val akkaPort = args(0).toInt
+    val partitionList = args(1).split("\\,").map(_.toInt).toList.asJava
+
+    val config = ConfigFactory.load("example")
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+      .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
+
+    //this API cluster is symmetric - all nodes serve both as Gateways and Regions
+    new Node(config) {
+
+      startRegion(new ApiPartition(config))
+
+    }
+  }
+}
 
 class ApiPartition(config: Config) extends Partition {
 
@@ -76,7 +101,7 @@ class ApiPartition(config: Config) extends Partition {
       * This is done recursively and reliably using Ask instead of Tell.
       * Recoverable failures are attempted to be rolled back by compensation.
       * Responds with true if the operation resulted in graph modification,
-      *   false if no changes were made.
+      * false if no changes were made.
       */
     case component@Component(vertex, newEdges) =>
       graph.get(vertex) match {

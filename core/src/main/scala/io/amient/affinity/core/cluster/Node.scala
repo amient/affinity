@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.cluster
 
+
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
@@ -31,7 +32,7 @@ import scala.reflect.ClassTag
 
 object Node {
   final val CONFIG_AKKA_SYSTEM_NAME = "affinity.node.name"
-  final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.host"
+  final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.hostname"
   final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
 }
 
@@ -41,39 +42,36 @@ class Node(config: Config) {
 
   val akkaPort = config.getInt(CONFIG_AKKA_PORT)
   val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
+  val initialisationTimeout = 30 seconds //TODO configurable init timeout
 
-  implicit val system = ActorSystem(actorSystemName, config)
-
-
-  private val controller = system.actorOf(Props(new Controller(config)), name = "controller")
+  implicit val system = ActorSystem.create(actorSystemName, config)
 
   //in case the process is stopped from outside
   sys.addShutdownHook {
     system.terminate()
     //we cannot use the future returned by system.terminate() because shutdown may have already been invoked
-    Await.ready(system.whenTerminated, 30 seconds) // TODO shutdown timeout by configuration
+    Await.ready(system.whenTerminated, 30 seconds) // TODO configurable shutdown timeout
   }
+
+  private val controller = system.actorOf(Props(new Controller(config)), name = "controller")
 
   import system.dispatcher
 
-  //TODO configurable init timeout
-  val initialisationTimeout = 30 seconds
 
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
-    Await.result(ack(controller, CreateGateway(Props(creator))), initialisationTimeout)
+    ack(controller, CreateGateway(Props(creator)))
   }
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]) = {
-    Await.result(ack(controller, CreateRegion(Props(partitionCreator))), initialisationTimeout)
+    ack(controller, CreateRegion(Props(partitionCreator)))
   }
 
   def startServices(services: Props*) = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
-    Await.result(ack(controller, CreateServiceContainer(services)), initialisationTimeout)
+    ack(controller, CreateServiceContainer(services))
   }
 
   implicit def serviceCreatorToProps[T <: Service](creator: => T)(implicit tag: ClassTag[T]): Props = {
     Props(creator)
   }
-
 }

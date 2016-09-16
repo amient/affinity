@@ -73,20 +73,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   override def afterAll(): Unit = {
     try {
-      //simpleProducer.close()
-      System.out.println("Shutting down kafka...")
-      try {
-        kafka.shutdown()
-      } catch {
-        case e: IllegalStateException => //
-      }
-      System.out.println("Shutting down zookeeper...")
-      zkFactory.shutdown()
-    } finally {
-      System.out.println("Cleaning up directories...")
-      deleteDirectory(embeddedZkPath)
-      deleteDirectory(embeddedKafkaPath)
+      kafka.shutdown()
+    } catch {
+      case e: IllegalStateException => //
     }
+    zkFactory.shutdown()
   }
 
   private def deleteDirectory(path: File) = {

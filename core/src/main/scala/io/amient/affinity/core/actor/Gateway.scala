@@ -28,6 +28,7 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import com.typesafe.config.Config
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
@@ -92,12 +93,11 @@ abstract class Gateway(config: Config) extends Actor {
 
   final def receive: Receive = handle orElse {
 
-    //No handler
+    //no handler matched the HttpExchange
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
     //Cluster Management queries
-    case AddMaster(group, ref) =>
-      sender ! true
+    case AddMaster(group, ref) => ack[Unit](sender) {
       group match {
         case "regions" => cluster ! AddRoutee(ActorRefRoutee(ref))
         case "services" =>
@@ -107,9 +107,9 @@ abstract class Gateway(config: Config) extends Actor {
             services.put(serviceClass, actors + ref)
           }
       }
+    }
 
-    case RemoveMaster(group, ref) =>
-      sender ! true
+    case RemoveMaster(group, ref) => ack[Unit](sender) {
       group match {
         case "regions" => cluster ! RemoveRoutee(ActorRefRoutee(ref))
         case "services" =>
@@ -117,6 +117,7 @@ abstract class Gateway(config: Config) extends Actor {
           val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
           services.put(serviceClass, actors - ref)
       }
+    }
 
     case Terminated(ref) =>
       throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)

@@ -30,11 +30,21 @@ trait Partition extends Service with ActorState {
     */
   val partition = self.path.name.toInt
 
+  /**
+    * onBecomeMaster is signalling that the partition should take over the responsibility
+    * of being the Master for the related physical partition. The signalling message
+    * may be resent as part of ack contract so this method must be idempotent.
+    */
   override protected def onBecomeMaster: Unit = {
     log.info(s"Became leader for partition $partition")
     untailState()
   }
 
+  /**
+    * onBecomeStandby is signalling that the partition should become a passive standby
+    * and keep listening to the changes in the related physical partition.
+    * The signalling message may be resent as part of ack contract so this method must be idempotent.
+    */
   override protected def onBecomeStandby: Unit = {
     log.info(s"Became standby for partition $partition")
     tailState()

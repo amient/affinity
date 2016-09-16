@@ -27,14 +27,11 @@ import scala.util.control.NonFatal
 object ServiceNode extends App {
 
   try {
-    require(args.length == 2, "Service Node requires 2 argument: <akka-host>, <akka-port>")
+    require(args.length == 1, "Service Node requires 1 argument: <akka-port>")
 
     val akkaPort = args(0).toInt
-    val host = args(1)
 
-    val config = ConfigFactory.load("example")
-      .withValue(Node.CONFIG_AKKA_HOST, ConfigValueFactory.fromAnyRef(host))
-      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+    val config = ConfigFactory.load("example").withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
 
     new Node(config) {
 

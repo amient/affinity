@@ -57,10 +57,10 @@ package object ack {
     * @param replyTo
     * @param closure
     */
-  def ack(replyTo: ActorRef)(closure: => Unit): Unit = {
+  def ack[T](replyTo: ActorRef)(closure: => T): Unit = {
     try {
-      closure
-      replyTo ! Status.Success(true)
+      val result: T = closure
+      replyTo ! Status.Success(result)
     } catch {
       case AckDuplicate(e) => replyTo ! Status.Success(true)
       case NonFatal(e) => replyTo ! Status.Failure(e)

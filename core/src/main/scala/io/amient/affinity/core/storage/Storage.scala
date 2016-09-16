@@ -31,8 +31,16 @@ trait Storage[K,V] extends MemStore[K, V] {
     */
   private[core] def boot(): Unit
 
+  /**
+    * the implementation should stop listening for updates.
+    * This method must return immediately and be idempotent
+    */
   private[core] def untail(): Unit
 
+  /**
+    * the implementation should start listening for updates and keep the memstore up to date.
+    * The tailing must be done asychrnously - this method must return immediately and be idempotent.
+    */
   private[core] def tail(): Unit
 
   private[core] def close(): Unit

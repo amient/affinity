@@ -26,8 +26,8 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.TestCoordinator
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
 
 class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
@@ -53,7 +53,7 @@ class RegionSpec() extends TestKit(ActorSystem("MySpec")) with ImplicitSender
       val services = scala.collection.mutable.Set[String]()
       val coordinator = new TestCoordinator(system, services)
 
-      val config = ConfigFactory.defaultReference()
+      val config = ConfigFactory.defaultApplication()
         .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0,1,2,3).asJava))
       val d = 1 second
       implicit val timeout = Timeout(d)

@@ -43,7 +43,7 @@ class Region(config: Config, coordinator: Coordinator, partitionProps: Props)
 
   override def preStart(): Unit = {
     log.info("Starting Region")
-    coordinator.watch(self)
+    coordinator.watch(self, global = false)
     for (partition <- partitions) {
       /**
         * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
@@ -63,14 +63,10 @@ class Region(config: Config, coordinator: Coordinator, partitionProps: Props)
 
   override def receive: Receive = super.receive orElse {
 
-    // TODO the ack logic around BecomeMaster() here needs to guaranteed exactly-once
     // TODO the ack logic around AddMaster - RemoveMaster should be guaranteed in-order
 
-    //TODO maybe coordinator could have another method like watchLocal instead of this pattern here
-    case AddMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeMaster(), sender)
-    case AddMaster(group, ref) => ack(sender){}
-    case RemoveMaster(group, service) if (service.path.address.hasLocalScope) => ack(service, BecomeStandby(), sender)
-    case RemoveMaster(group, ref) => ack(sender){}
+    case AddMaster(group, service) => ack(service, BecomeMaster(), sender)
+    case RemoveMaster(group, service) => ack(service, BecomeStandby(), sender)
   }
 
 }
