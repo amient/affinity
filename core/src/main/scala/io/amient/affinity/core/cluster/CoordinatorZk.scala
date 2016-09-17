@@ -39,8 +39,6 @@ object CoordinatorZk {
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  System.err.println("!!!!")
-
   import CoordinatorZk._
 
   val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
