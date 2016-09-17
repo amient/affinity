@@ -96,18 +96,16 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   }
 
   /**
-    * @param akkaPort
     * @param handler
     * @param tag
     * @tparam T
     * @return (created Node instance, listening http port number)
     */
-  def createGatewayNode[T <: Gateway](akkaPort: Int)(handler: Receive)
-                                     (implicit tag: ClassTag[T]): (Node, Int) = {
+  def createGatewayNode[T <: Gateway]()(handler: Receive)(implicit tag: ClassTag[T]): (Node, Int) = {
 
     val config = ConfigFactory.load("systemtests")
       .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
-      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))
       .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
     val startupMonitor = new AtomicInteger(-1)

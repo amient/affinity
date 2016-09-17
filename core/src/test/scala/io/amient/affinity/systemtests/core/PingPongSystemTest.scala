@@ -35,7 +35,7 @@ import scala.concurrent.duration._
 class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   "A Simple Gateway" should "play ping pong well" in {
-    val (node, httpPort) = createGatewayNode(25025) {
+    val (node, httpPort) = createGatewayNode() {
         case HTTP(GET, PATH("ping"), _, response) => response.success(HttpResponse(OK, entity = "pong"))
     }
 
