@@ -28,6 +28,7 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
+import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
@@ -113,6 +114,10 @@ abstract class Gateway extends Actor {
       add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
       remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
     }
+
+    case GracefulShutdown() =>
+      sender ! GracefulShutdown()
+      context.stop(self)
 
     case Terminated(ref) =>
       throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)

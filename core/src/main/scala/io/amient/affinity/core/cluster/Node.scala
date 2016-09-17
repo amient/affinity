@@ -50,14 +50,14 @@ class Node(config: Config) {
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
+  private val controller = system.actorOf(Props(new Controller), name = "controller")
+
   //in case the process is stopped from outside
   sys.addShutdownHook {
-    system.terminate()
+    controller ! GracefulShutdown()
     //we cannot use the future returned by system.terminate() above because shutdown may have already been invoked
     Await.ready(system.whenTerminated, shutdownTimeout)
   }
-
-  private val controller = system.actorOf(Props(new Controller), name = "controller")
 
   import system.dispatcher
 

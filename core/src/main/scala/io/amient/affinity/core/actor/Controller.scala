@@ -19,10 +19,14 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, InvalidActorNameException, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
+import akka.pattern.ask
+import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Coordinator
+
+import scala.concurrent.duration._
 
 object Controller {
 
@@ -114,10 +118,14 @@ class Controller extends Actor {
       context.watch(sender)
 
     case GracefulShutdown() => ack(sender) {
-      context.actorSelection("gateway") ! PoisonPill
+      implicit val timeout = Timeout(500 milliseconds)
+      context.actorSelection("gateway") ? GracefulShutdown() onFailure {
+        case any => system.terminate()
+      }
     }
 
     case Terminated(gateway) => val gateway = sender
+      //FIXME this code doesn't differntiate between termination caused by GracefulShutdown and gateway failure
       regionCoordinator.unwatch(gateway)
       serviceCoordinator.unwatch(gateway)
       log.info("graceful shutdown completed, terminating actor system")
