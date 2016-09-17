@@ -34,7 +34,7 @@ import scala.concurrent.duration._
 
 class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
-  "Test1" should "blah" in {
+  "A Simple Gateway" should "play ping pong well" in {
     //TODO http interface should be able to take 0 and somehow provide the actual bound port
     val httpPort = 48088
 
