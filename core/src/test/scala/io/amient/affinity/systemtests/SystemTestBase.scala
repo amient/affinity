@@ -30,8 +30,11 @@ import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
+import io.amient.affinity.core.util.ZooKeeperClient
+import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.kafka.common.protocol.SecurityProtocol
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
@@ -53,15 +56,13 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   zkFactory.startup(zookeeper)
 
   //setup kafka
-  // TODO dynamic kafka port allocation - probably by passing 0 and looking up in the actual port in the ZK
-  val kafkaPort = "49092"
-  val kafkaBootstrap = "localhost:" + kafkaPort
+
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
   private val kafkaConfig = new KafkaConfig(new Properties {
     {
       put("broker.id", "1")
       put("host.name", "localhost")
-      put("port", kafkaPort)
+      put("port", "0")
       put("log.dir", embeddedKafkaPath.toString)
       put("num.partitions", "2")
       put("auto.create.topics.enable", "true")
@@ -70,6 +71,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   })
   private val kafka = new KafkaServerStartable(kafkaConfig)
   kafka.startup()
+
+  val tmpZkClient = new ZooKeeperClient(zkConnect)
+  val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
+  val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
+  tmpZkClient.close
 
   override def afterAll(): Unit = {
     try {
@@ -135,12 +141,4 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     "request.required.acks" -> "1"
   ).asJava)
 
-
-  //  def readFullyAsString(file: File , maxSize: Int) {
-  //      try (FSDataInputStream in = localFileSystem.open(file)) {
-  //        byte[] bytes = new byte[Math.min(in.available(), maxSize)];
-  //        in.readFully(bytes);
-  //        return new String(bytes);
-  //      }
-  //    }
 }

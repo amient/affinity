@@ -17,42 +17,16 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.core.util
 
-import java.util.concurrent.CopyOnWriteArrayList
+import org.I0Itec.zkclient.ZkClient
+import org.I0Itec.zkclient.serialize.ZkSerializer
 
-import akka.actor.Actor
-import io.amient.affinity.core.storage.Storage
+class ZooKeeperClient(zkConnect: String, zkSessionTimeout: Int = 30000, zkConnectTimeout: Int = 6000) extends ZkClient(
+  zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
+    def serialize(o: Object): Array[Byte] = o.toString.getBytes
 
-import scala.collection.JavaConverters._
-
-trait ActorState extends Actor {
-
-  private val storageRegistry = new CopyOnWriteArrayList[Storage[_, _]]()
-
-  def state[K, V](storage: => Storage[K, V]): Storage[K, V] = {
-    val stateStorage: Storage[K, V] = storage
-    stateStorage.boot()
-    storageRegistry.add(stateStorage)
-    stateStorage
-  }
-
-  def untailState(): Unit = {
-    storageRegistry.asScala.foreach { storage =>
-      storage.untail()
-    }
-  }
-
-  def tailState(): Unit = {
-    storageRegistry.asScala.foreach { storage =>
-      storage.tail()
-    }
-  }
-
-  def closeState(): Unit = {
-    storageRegistry.asScala.foreach { storage =>
-      storage.close()
-    }
-  }
+    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+  }) {
 
 }

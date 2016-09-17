@@ -47,7 +47,7 @@ class Region(coordinator: Coordinator, partitionProps: Props)
 
   override def preStart(): Unit = {
     log.info("Starting Region")
-    //FIXME coordinator.watch(self, global = false)
+    coordinator.watch(self, global = false)
     for (partition <- partitions) {
       /**
         * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
@@ -67,7 +67,7 @@ class Region(coordinator: Coordinator, partitionProps: Props)
 
   override def receive: Receive = super.receive orElse {
 
-    case MasterStatusUpdate("regions", add, remove) => ack(sender) {}
+    case MasterStatusUpdate("regions", add, remove) => ack(sender) {} //FIXME the ack here is broken
       //TODO arbitrary ack timeouts
       Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), 1 hour)
       Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), 1 minute)

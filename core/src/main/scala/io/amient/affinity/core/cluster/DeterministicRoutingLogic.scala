@@ -60,7 +60,6 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       case v => partition(v)
     }
 
-    //TODO test the suspended scenario
     if (!currentRouteMap.containsKey(p)) throw new IllegalStateException(
       s"Partition `$p` is not represented by any Actor - " +
         s"this shouldn't happen - gateway should suspend all requests until all partitions are present")

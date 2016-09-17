@@ -78,8 +78,10 @@ abstract class Gateway extends Actor {
   }
 
   def service(actorClass: Class[_ <: Actor]): ActorRef = {
-    //TODO handle missing service properly
-    services.get(actorClass)
+    services.get(actorClass) match {
+      case null => throw new IllegalStateException(s"Service not available for $actorClass")
+      case instance => instance
+    }
   }
 
   def handleException: PartialFunction[Throwable, HttpResponse]

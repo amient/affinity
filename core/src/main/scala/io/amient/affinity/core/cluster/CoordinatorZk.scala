@@ -23,6 +23,7 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
+import io.amient.affinity.core.util.ZooKeeperClient
 import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.zookeeper.CreateMode
@@ -46,12 +47,7 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
   val zkRoot = config.getString(CONFIG_ZOOKEEPER_ROOT)
   val groupRoot = s"$zkRoot/$group"
 
-  private val zk = new ZkClient(
-    zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
-      def serialize(o: Object): Array[Byte] = o.toString.getBytes
-
-      override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
-    })
+  private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
 
   if (!zk.exists(zkRoot)) zk.createPersistent(groupRoot, true)
 
