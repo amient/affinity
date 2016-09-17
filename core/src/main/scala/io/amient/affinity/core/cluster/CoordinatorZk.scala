@@ -39,6 +39,8 @@ object CoordinatorZk {
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
+  System.err.println("!!!!")
+
   import CoordinatorZk._
 
   val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
@@ -66,7 +68,10 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
 
   override def unregister(handle: String) = zk.delete(handle)
 
-  override def close(): Unit = zk.close()
+  override def close(): Unit = {
+    super.close()
+    zk.close()
+  }
 
   private def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 

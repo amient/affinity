@@ -19,6 +19,8 @@
 
 package io.amient.affinity.core.cluster
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.util.Timeout
 import com.typesafe.config.Config
@@ -27,6 +29,7 @@ import io.amient.affinity.core.ack._
 import scala.collection.Set
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 object Coordinator {
 
@@ -52,6 +55,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   import system.dispatcher
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
+
+  private val closed = new AtomicBoolean(false)
 
   /**
     * wacthers - a list of all actors that will receive AddMaster and RemoveMaster messages
@@ -87,9 +92,10 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
       //TODO this ack can take very long if the accumulated state change log is large so need variable ack timeout
       ack(watcher, MasterStatusUpdate(group, currentMasters, Set())) onFailure {
-        case e: Throwable =>
+        case e: Throwable => if (!closed.get) {
           e.printStackTrace()
           system.terminate()
+        }
       }
     }
   }
@@ -100,11 +106,13 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     }
   }
 
-  def unwatchAll() = synchronized {
-    watchers.clear()
+  def close(): Unit = {
+    closed.set(true)
+    synchronized {
+      watchers.clear()
+      handles.clear()
+    }
   }
-
-  def close(): Unit
 
 
   final protected def updateGroup(newState: Map[String, String]) = {
@@ -117,9 +125,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         try {
           handles.put(handle, Await.result(system.actorSelection(actorPath).resolveOne(), t))
         } catch {
-          case e: Throwable =>
-            //TODO most likely the actor has gone and there will be another update right away but could be something else
-            //e.printStackTrace()
+          case NonFatal(e) => //TODO most likely the actor has gone and there will be another update right away but could be something else
         }
       }
 

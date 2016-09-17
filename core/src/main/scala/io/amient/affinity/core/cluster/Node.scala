@@ -45,7 +45,8 @@ class Node(config: Config) {
 
   val akkaPort = config.getInt(CONFIG_AKKA_PORT)
   val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
-  val initialisationTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
+  val startupTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
+  val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
@@ -53,7 +54,7 @@ class Node(config: Config) {
   sys.addShutdownHook {
     system.terminate()
     //we cannot use the future returned by system.terminate() above because shutdown may have already been invoked
-    Await.ready(system.whenTerminated, config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds)
+    Await.ready(system.whenTerminated, shutdownTimeout)
   }
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
@@ -61,10 +62,8 @@ class Node(config: Config) {
   import system.dispatcher
 
   final def shutdown(): Unit = {
-    ack(controller, GracefulShutdown()) recover {
-      case NonFatal(e) => System.exit(99)
-      case fatal => throw fatal
-    }
+    controller ! GracefulShutdown()
+    Await.ready(system.whenTerminated, shutdownTimeout)
   }
 
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {

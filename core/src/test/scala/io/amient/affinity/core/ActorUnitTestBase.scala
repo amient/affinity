@@ -24,11 +24,11 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Region
 import io.amient.affinity.core.cluster.Node
-import org.scalatest.WordSpecLike
+import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
 import scala.collection.JavaConverters._
 
-class ActorUnitTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike {
+class ActorUnitTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
 
   def this(config: Config) = this(ActorSystem.create("AffinitySpec", config))
 
@@ -36,5 +36,9 @@ class ActorUnitTestBase(system: ActorSystem) extends TestKit(system) with Implic
     .withValue(Node.CONFIG_AKKA_HOST, ConfigValueFactory.fromAnyRef(null))
     .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1, 2, 3).asJava))
   )
+
+  override def afterAll {
+    TestKit.shutdownActorSystem(system)
+  }
 
 }
