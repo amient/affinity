@@ -19,7 +19,10 @@
 
 package io.amient.affinity.core.http
 
-import akka.actor.{ActorRef, ActorSystem}
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicReference
+
+import akka.actor.{ActorRef, ActorSystem, Address}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{IncomingConnection, ServerBinding}
@@ -30,7 +33,9 @@ import akka.stream.scaladsl.{Sink, Source}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 
-class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: ActorSystem) {
+class HttpInterface(val httpHost: String, httpPort: Int)(implicit system: ActorSystem) {
+
+
 
   implicit val materializer = ActorMaterializer.create(system)
 
@@ -40,9 +45,13 @@ class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: Ac
 
   @volatile private var binding: ServerBinding = null
 
+  private val listenAddress = new AtomicReference[InetSocketAddress](null)
+
+  def getListenPort: Int = listenAddress.get.getPort
+
   def bind(gateway: ActorRef): Unit = {
     close()
-    log.info(s"binding http interface to http  $httpHost:$httpPort")
+    log.info(s"binding http interface with $httpHost:$httpPort")
     val bindingFuture: Future[Http.ServerBinding] =
       incoming.to(Sink.foreach { connection =>
         connection.handleWithAsyncHandler { request =>
@@ -56,13 +65,14 @@ class HttpInterface(val httpHost: String, val httpPort: Int)(implicit system: Ac
       }).run()
 
     binding = Await.result(bindingFuture, 10 seconds)
+    listenAddress.set(binding.localAddress)
+    log.info(s"http interface listening on ${listenAddress.get}")
   }
-
-  log.info(s"Akka Http Server online at http://$httpHost:$httpPort/\nPress ^C to stop...")
 
   def close(): Unit = {
     if (binding != null) {
       log.info("unbinding http interface")
+      listenAddress.set(null)
       Await.result(binding.unbind(), 15 seconds)
     }
   }

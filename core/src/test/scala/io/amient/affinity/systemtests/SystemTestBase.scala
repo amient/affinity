@@ -22,7 +22,7 @@ package io.amient.affinity.systemtests
 import java.io.File
 import java.net.InetSocketAddress
 import java.util.Properties
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
 
 import akka.actor.Actor.Receive
 import akka.http.scaladsl.model.HttpResponse
@@ -95,15 +95,22 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
   }
 
-  def createGatewayNode[T <: Gateway](httpPort: Int, akkaPort: Int)(handler: Receive)
-                                     (implicit tag: ClassTag[T]): Node = {
+  /**
+    * @param akkaPort
+    * @param handler
+    * @param tag
+    * @tparam T
+    * @return (created Node instance, listening http port number)
+    */
+  def createGatewayNode[T <: Gateway](akkaPort: Int)(handler: Receive)
+                                     (implicit tag: ClassTag[T]): (Node, Int) = {
 
     val config = ConfigFactory.load("systemtests")
       .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
       .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
-      .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
+      .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
-    val startupMonitor = new AtomicBoolean(false)
+    val startupMonitor = new AtomicInteger(-1)
 
     val node = new Node(config) {
       startGateway {
@@ -111,7 +118,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
           override def preStart(): Unit = {
             super.preStart()
             startupMonitor.synchronized {
-              startupMonitor.set(true)
+              startupMonitor.set(getHttpPort)
               startupMonitor.notify
             }
           }
@@ -128,10 +135,10 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
     val timeout: Duration = (5 seconds)
     startupMonitor.synchronized(startupMonitor.wait(timeout.toMillis))
-    if (!startupMonitor.get) {
+    if (startupMonitor.get <= 0) {
       throw new IllegalStateException(s"Node did not startup within $timeout")
     } else {
-      return node
+      return (node, startupMonitor.get)
     }
   }
 

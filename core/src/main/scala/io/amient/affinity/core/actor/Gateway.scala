@@ -56,6 +56,8 @@ abstract class Gateway extends Actor {
   private val httpInterface: HttpInterface = new HttpInterface(
     config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
 
+  def getHttpPort: Int = httpInterface.getListenPort
+
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }
 
   def describeRegions = {
