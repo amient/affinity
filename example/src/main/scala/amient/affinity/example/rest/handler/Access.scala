@@ -47,7 +47,7 @@ trait Access extends HttpGateway {
     }
 
 
-    case http@HTTP(GET, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
+    case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
       settings.get(key) match {
         case Some(otherKey) => errorValue(BadRequest, "That key already exists")
         case None =>

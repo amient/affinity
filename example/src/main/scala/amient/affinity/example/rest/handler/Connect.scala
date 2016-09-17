@@ -39,7 +39,7 @@ trait Connect extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH("com", INT(id), INT(id2)), query, response) =>
+    case HTTP(POST, PATH("com", INT(id), INT(id2)), query, response) =>
       val source = Vertex(id)
       val target = Vertex(id2)
       val task = cluster ? Component(source, Set(target))

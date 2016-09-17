@@ -147,7 +147,7 @@ To view a graph component (vertex id is a simple Int)
 
 To connect 2 vertices into a component(non-existent vertices will be created):
 
-    GET http://127.0.0.1:808x/com/<vertex-id>/<vertex-id> 
+    POST http://127.0.0.1:808x/com/<vertex-id>/<vertex-id> 
 
 After connecting two components all vertices that have been already 
 connected should be merged into a bigger component. Viewing the 
@@ -162,11 +162,15 @@ physically they should always point to the same actors)
 
 To look kill a node: 
 
-    GET http://127.0.0.1:<node-port>/kill
-
+    POST http://127.0.0.1:<node-port>/kill
+    
 To look at the partition stats:
 
     GET http://127.0.0.1:808x/<partition-number>
+
+To look kill a region by partition: 
+
+    POST http://127.0.0.1:808x/<partition>/down
 
 A single node may be started with one region
 serving all 4 partitions byt starting `ApiNode` with

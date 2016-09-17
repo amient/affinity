@@ -39,17 +39,26 @@ trait Fail extends HttpGateway {
     /**
       * kill the entire node
       */
-    case HTTP(GET, PATH("kill"), _, response) => context.system.terminate()
+    case HTTP(POST, PATH("kill"), _, response) => context.system.terminate()
 
     /**
       * terminate gateway
       */
-    case HTTP(GET, PATH("stop"), _, response) => self ! PoisonPill
+    case HTTP(POST, PATH("stop"), _, response) => self ! PoisonPill
+
+    /**
+      * shut down region serving the given partition
+      */
+    case HTTP(POST, PATH(INT(partition), "down"), _, response) =>
+      implicit val timeout = Timeout(1 second)
+      val task = cluster ! (partition, "down")
+      Thread.sleep(1000)
+      response.success(redirect(SeeOther, Uri("/")))
 
     /**
       * simulate exception in partition
       */
-    case HTTP(GET, PATH("fail", INT(partition)), _, response) =>
+    case HTTP(POST, PATH(INT(partition), "fail"), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
@@ -59,7 +68,7 @@ trait Fail extends HttpGateway {
     /**
       * simulate bug in partition
       */
-    case HTTP(GET, PATH("bug", INT(partition)), _, response) =>
+    case HTTP(POST, PATH(INT(partition), "bug"), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, "message-that-can't-be-handled")
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
