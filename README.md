@@ -59,7 +59,7 @@ The following core features are already in place:
     and respond with No Content or Accepted, etc.
  - Akka Cluster that comes with Akka is not used, instead a custom
     cluster management is implemented 
- - Each Local Actor System has a Cluster Actor in its hierarchy which 
+ - Each Gateway Actor System has a Cluster Actor in its hierarchy which 
     implements standard Akka Router interface with custom routing logic.
     This routing logic is meant to mimic whatever partitioning strategy
     is used in the underlying kafka storage.
@@ -73,7 +73,8 @@ The following core features are already in place:
  - Cluster Actor routes all request to Partition Actors which implement
     the logic over the data partition and respond to the sender which
     will ultimately be the calling Handler but sometimes the caller 
-    may be other Services in the cluster.
+    may be other Services in the cluster. The partition doesn't have
+    any knowledge of the larger cluster it is part of.
  - If there are multiple Partition Actors for the same physical partition
     Coordinator uses distributed logic to choose one of them as master
     and the others become standby.    
