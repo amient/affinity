@@ -20,8 +20,8 @@
 package io.amient.affinity.example.data
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.data.avro.AvroRecord
-import io.amient.util.TimeCryptoProofSHA256
+import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import org.apache.avro.SchemaBuilder
 
 object ConfigEntry {

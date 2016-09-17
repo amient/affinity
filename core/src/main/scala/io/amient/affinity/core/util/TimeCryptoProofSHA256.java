@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.util;
+package io.amient.affinity.core.util;
 
 import javax.xml.bind.DatatypeConverter;
 import java.net.URL;
@@ -25,8 +25,6 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class TimeCryptoProofSHA256 extends TimeCryptoProof {
 

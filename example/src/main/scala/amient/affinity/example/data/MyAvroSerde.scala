@@ -20,7 +20,7 @@
 package io.amient.affinity.example.data
 
 
-import io.amient.affinity.core.data.avro.AvroSerde
+import io.amient.affinity.core.serde.avro.AvroSerde
 import org.apache.avro.Schema
 
 class MyAvroSerde extends AvroSerde  {

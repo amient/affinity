@@ -17,9 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.data.avro
+package io.amient.affinity.core.serde.avro
 
-import io.amient.affinity.core.data.Serde
+import io.amient.affinity.core.serde.Serde
 import org.apache.avro.Schema
 
 abstract class AvroSerde extends Serde {

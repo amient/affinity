@@ -29,7 +29,7 @@ import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Cluster
-import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
+import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
 import scala.collection.JavaConverters._
@@ -40,13 +40,14 @@ object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
   final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
 }
+
 abstract class Gateway extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
   private val config = context.system.settings.config
 
-  private val services = new ConcurrentHashMap[Class[_ <: Actor], Set[ActorRef]]
+  private val services = new ConcurrentHashMap[Class[_ <: Actor], ActorRef]
 
   val cluster = context.actorOf(new Cluster(config).props(), name = "cluster")
 
@@ -55,7 +56,7 @@ abstract class Gateway extends Actor {
   private val httpInterface: HttpInterface = new HttpInterface(
     config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
 
-  def describeServices = services.asScala.map { case (k, v) => (k.toString, v.map(_.path.toString)) }
+  def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }
 
   def describeRegions = {
     val t = 60 seconds
@@ -78,7 +79,7 @@ abstract class Gateway extends Actor {
 
   def service(actorClass: Class[_ <: Actor]): ActorRef = {
     //TODO handle missing service properly
-    services.get(actorClass).head // TODO round-robin or routing for services ?
+    services.get(actorClass)
   }
 
   def handleException: PartialFunction[Throwable, HttpResponse]
@@ -97,27 +98,14 @@ abstract class Gateway extends Actor {
     //no handler matched the HttpExchange
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
-    //Cluster Management queries
-    case AddMaster(group, ref) => ack[Unit](sender) {
-      group match {
-        case "regions" => cluster ! AddRoutee(ActorRefRoutee(ref))
-        case "services" =>
-          val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
-          val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
-          if (!actors.contains(ref)) {
-            services.put(serviceClass, actors + ref)
-          }
-      }
+    case MasterStatusUpdate("regions", add, remove) => ack(sender) {
+      remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
+      add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
     }
 
-    case RemoveMaster(group, ref) => ack[Unit](sender) {
-      group match {
-        case "regions" => cluster ! RemoveRoutee(ActorRefRoutee(ref))
-        case "services" =>
-          val serviceClass = Class.forName(ref.path.name).asSubclass(classOf[Actor])
-          val actors = services.getOrDefault(serviceClass, Set[ActorRef]())
-          services.put(serviceClass, actors - ref)
-      }
+    case MasterStatusUpdate("services", add, remove) => ack(sender) {
+      add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
+      remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
     }
 
     case Terminated(ref) =>

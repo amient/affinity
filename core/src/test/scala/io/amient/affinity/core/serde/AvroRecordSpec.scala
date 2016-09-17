@@ -1,6 +1,6 @@
-package io.amient.affinity.core.data
+package io.amient.affinity.core.serde
 
-import io.amient.affinity.core.data.avro.AvroRecord
+import io.amient.affinity.core.serde.avro.AvroRecord
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
 

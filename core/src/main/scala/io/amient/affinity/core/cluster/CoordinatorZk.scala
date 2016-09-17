@@ -78,7 +78,7 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
     if (children != null) {
       val newHandles = listAsIndexedSeq(children).map(id => s"$groupRoot/$id")
       val newState = newHandles.map(handle => (handle, zk.readData(handle).asInstanceOf[String]))
-      updateMembers(newState.toMap)
+      updateGroup(newState.toMap)
     }
   }
 

@@ -25,7 +25,7 @@ import akka.http.scaladsl.model._
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
-import io.amient.util.TimeCryptoProof
+import io.amient.affinity.core.util.TimeCryptoProof
 
 trait Access extends HttpGateway {
 

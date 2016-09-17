@@ -22,7 +22,7 @@ package io.amient.affinity.core.storage
 import java.util
 import java.util.Properties
 
-import io.amient.affinity.core.data.Serde
+import io.amient.affinity.core.serde.Serde
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition

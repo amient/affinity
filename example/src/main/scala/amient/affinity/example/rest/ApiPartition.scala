@@ -81,6 +81,11 @@ class ApiPartition extends Partition {
     /**
       * Describe partition and its stats
       */
+    case (p: Int, "down") => context.system.terminate()
+
+    /**
+      * Describe partition and its stats
+      */
     case (p: Int, "describe") =>
       require(p == partition)
       sender ! Map(

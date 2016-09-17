@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.data
+package io.amient.affinity.core.serde
 
 class StringSerde extends Serde {
 

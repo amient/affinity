@@ -24,6 +24,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 
+import scala.collection.Set
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -31,9 +32,7 @@ object Coordinator {
 
   final val CONFIG_COORDINATOR_CLASS = "affinity.cluster.coordinator.class"
 
-  final case class AddMaster(group: String, ref: ActorRef)
-
-  final case class RemoveMaster(group: String, ref: ActorRef)
+  final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef])
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
@@ -78,26 +77,22 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   /**
     * watch changes in the coordinate group of routees in the whole cluster.
+    *
     * @param watcher actor which will receive the messages
     */
   def watch(watcher: ActorRef, global: Boolean): Unit = {
     synchronized {
       watchers += watcher -> true
-      handles.map(_._2.path.toStringWithoutAddress).toSet[String].foreach { relPath =>
-        val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
-        val masterActorRef = replicas.minBy(_._1)._2
-        //failing this ack means that the watcher would have inconsistent view of the cluster
-        if (global || masterActorRef.path.address.hasLocalScope) {
-          ack(watcher, AddMaster(group, masterActorRef)) onFailure {
-            case e: Throwable =>
-              e.printStackTrace()
-              system.terminate()
-          }
-        }
+      //failing this ack means that the watcher would have inconsistent view of the cluster
+      val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
+      //TODO this ack can take very long if the accumulated state change log is large so need variable ack timeout
+      ack(watcher, MasterStatusUpdate(group, currentMasters, Set())) onFailure {
+        case e: Throwable =>
+          e.printStackTrace()
+          system.terminate()
       }
     }
   }
-
 
   def unwatch(watcher: ActorRef): Unit = {
     synchronized {
@@ -111,77 +106,54 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   def close(): Unit
 
-  final protected def updateMembers(newState: Map[String, String]) = {
-    synchronized {
-      newState.foreach { case (handle, actorPath) => if (!handles.keySet.contains(handle))
-        addRouteeActor(handle, actorPath, force = false)
-      }
-      handles.keySet.filter(!newState.contains(_)).foreach { handle =>
-        removeRoutee(handle)
-      }
-    }
-  }
 
-  private def notifyWatchers(message: Any, hasLocalScope: Boolean): Unit = {
-    synchronized {
-      watchers.foreach { case (watcher, global) =>
-        if (global || hasLocalScope) {
-          ack(watcher, message) onFailure {
-            case e: Throwable =>
-              e.printStackTrace()
-              system.terminate()
-          }
-        }
-      }
-    }
-  }
-
-  private def removeRoutee(routeeHandle: String): Unit = {
-    if (handles.contains(routeeHandle)) {
-      handles.get(routeeHandle) match {
-        case None =>
-        case Some(master) =>
-          val currentReplicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
-          val currentMaster = currentReplicas.minBy(_._1)
-          handles.remove(routeeHandle)
-          notifyWatchers(RemoveMaster(group, master), master.path.address.hasLocalScope)
-          val replicas = handles.filter(_._2.path.toStringWithoutAddress == master.path.toStringWithoutAddress)
-          if (replicas.size > 0) {
-            val newMaster = replicas.minBy(_._1)
-            if (currentMaster != newMaster) {
-              notifyWatchers(AddMaster(group, newMaster._2), newMaster._2.path.address.hasLocalScope)
-            }
-          } else {
-            //TODO last replica removed - no master available, what do we do ?
-          }
-      }
-    }
-  }
-
-  private def addRouteeActor(routeeHandle: String,
-                             routeePath: String,
-                             force: Boolean = false): Unit = {
+  final protected def updateGroup(newState: Map[String, String]) = {
     val t = 6 seconds
     implicit val timeout = new Timeout(t)
-    try {
-      val routeeRef = Await.result(system.actorSelection(routeePath).resolveOne(), t)
-      if (force || !handles.contains(routeeHandle)) {
-        val relPath = routeeRef.path.toStringWithoutAddress
-        val replicas = handles.filter(_._2.path.toStringWithoutAddress == relPath)
-        handles.put(routeeHandle, routeeRef)
-        if (replicas.size > 0) {
-          val (currentMasterHandle, currentMasterActorRef) = replicas.minBy(_._1)
-          if (routeeHandle < currentMasterHandle) {
-            notifyWatchers(RemoveMaster(group, currentMasterActorRef), currentMasterActorRef.path.address.hasLocalScope)
-            notifyWatchers(AddMaster(group, routeeRef), routeeRef.path.address.hasLocalScope)
-          }
-        } else {
-          notifyWatchers(AddMaster(group, routeeRef), routeeRef.path.address.hasLocalScope)
+    synchronized {
+      val prevMasters: Set[ActorRef] = getCurrentMasters
+      handles.clear()
+      newState.foreach { case (handle, actorPath) =>
+        try {
+          handles.put(handle, Await.result(system.actorSelection(actorPath).resolveOne(), t))
+        } catch {
+          case e: Throwable =>
+            //TODO most likely the actor has gone and there will be another update right away but could be something else
+            //e.printStackTrace()
         }
       }
-    } catch {
-      case e: Throwable => e.printStackTrace() //TODO handle this by recursive retry few times and than exit the system
+
+      val currentMasters: Set[ActorRef] = getCurrentMasters
+
+      val add = currentMasters.filter(!prevMasters.contains(_))
+      val remove = prevMasters.filter(!currentMasters.contains(_))
+      val fullUpdate = MasterStatusUpdate(group, add, remove)
+
+      notifyWatchers(fullUpdate)
     }
 
   }
+
+  private def getCurrentMasters: Set[ActorRef] = {
+    handles.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
+      handles.filter(_._2.path.toStringWithoutAddress == relPath).minBy(_._1)._2
+    }
+  }
+
+
+  private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
+    def isLocal(ref: ActorRef) = ref.path.address.hasLocalScope
+
+    val localUpdate = MasterStatusUpdate(group, fullUpdate.add.filter(isLocal), fullUpdate.remove.filter(isLocal))
+
+    watchers.foreach { case (watcher, global) =>
+      ack(watcher, if (global) fullUpdate else localUpdate) onFailure {
+        case e: Throwable =>
+          e.printStackTrace()
+          system.terminate()
+      }
+    }
+  }
+
+
 }

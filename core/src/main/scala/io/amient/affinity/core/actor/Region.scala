@@ -24,9 +24,11 @@ import akka.event.Logging
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.{AddMaster, RemoveMaster}
+import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 
 import scala.collection.JavaConverters._
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 
 object Region {
   final val CONFIG_PARTITION_LIST = "affinity.node.region.partitions"
@@ -45,7 +47,7 @@ class Region(coordinator: Coordinator, partitionProps: Props)
 
   override def preStart(): Unit = {
     log.info("Starting Region")
-    coordinator.watch(self, global = false)
+    //FIXME coordinator.watch(self, global = false)
     for (partition <- partitions) {
       /**
         * partition actor name is the physical partition id which is relied upon by DeterministicRoutingLogic
@@ -65,10 +67,11 @@ class Region(coordinator: Coordinator, partitionProps: Props)
 
   override def receive: Receive = super.receive orElse {
 
-    // TODO the ack logic around AddMaster - RemoveMaster should be guaranteed in-order
-
-    case AddMaster(group, service) => ack(service, BecomeMaster(), sender)
-    case RemoveMaster(group, service) => ack(service, BecomeStandby(), sender)
+    case MasterStatusUpdate("regions", add, remove) => ack(sender) {}
+      //TODO arbitrary ack timeouts
+      Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), 1 hour)
+      Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), 1 minute)
+    //}
   }
 
 }

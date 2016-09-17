@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.util
+package io.amient.affinity.core.util
 
 import java.net.URL
 

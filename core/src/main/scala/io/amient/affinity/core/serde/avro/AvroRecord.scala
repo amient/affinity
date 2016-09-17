@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.data.avro
+package io.amient.affinity.core.serde.avro
 
 import java.io.ByteArrayOutputStream
 

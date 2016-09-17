@@ -30,12 +30,12 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.data.StringSerde
+import io.amient.affinity.core.serde.StringSerde
 import io.amient.affinity.core.http.HttpExchange
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
 import io.amient.affinity.example.data.{ConfigEntry, MyAvroSerde}
 import io.amient.affinity.example.rest.handler._
-import io.amient.util.TimeCryptoProof
+import io.amient.affinity.core.util.TimeCryptoProof
 
 import scala.concurrent.Promise
 import scala.util.control.NonFatal
