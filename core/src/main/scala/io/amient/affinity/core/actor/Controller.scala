@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
+import akka.actor.{Actor, InvalidActorNameException, PoisonPill, Props, Terminated}
 import akka.event.Logging
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Coordinator
@@ -33,6 +33,8 @@ object Controller {
   final case class CreateServiceContainer(services: Seq[Props])
 
   final case class GatewayCreated()
+
+  final case class GracefulShutdown()
 
 }
 
@@ -106,23 +108,20 @@ class Controller extends Actor {
     }
 
     case GatewayCreated() =>
-      try {
-        log.info("Gateway Created " + sender)
-        regionCoordinator.watch(sender, global = true)
-        serviceCoordinator.watch(sender, global = true)
-        context.watch(sender)
-      } catch {
-        case e: Throwable =>
-          system.terminate() onComplete { _ =>
-            e.printStackTrace()
-            System.exit(24)
-          }
-      }
+      log.info("gateway is online " + sender)
+      regionCoordinator.watch(sender, global = true)
+      serviceCoordinator.watch(sender, global = true)
+      context.watch(sender)
+
+    case GracefulShutdown() => ack(sender) {
+      context.actorSelection("gateway") ! PoisonPill
+    }
 
     case Terminated(gateway) => val gateway = sender
-      log.info("Terminated (gateway) shutting down http interface")
       regionCoordinator.unwatch(gateway)
       serviceCoordinator.unwatch(gateway)
+      log.info("graceful shutdown completed, terminating actor system")
+      context.system.terminate()
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
   }

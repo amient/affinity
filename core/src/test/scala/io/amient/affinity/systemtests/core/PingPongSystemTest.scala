@@ -48,8 +48,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
       response.entity should be(HttpEntity("pong"))
 
     } finally {
-      //TODO node.shutdown()
-      Await.ready(system.terminate(), 3 seconds)
+      node.shutdown()
     }
 
   }
