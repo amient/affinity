@@ -39,7 +39,7 @@ class RegionSpec extends ActorUnitTestBase with Matchers with BeforeAndAfterAll 
       Thread.sleep(100)
       super.preStart()
     }
-    override def receiveService: Receive = {
+    override def handle: Receive = {
       case e: IllegalStateException => throw e
       case any =>
     }
