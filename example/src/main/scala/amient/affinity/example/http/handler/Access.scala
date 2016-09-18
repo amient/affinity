@@ -23,6 +23,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import io.amient.affinity.core.http.RequestMatchers._
+import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.core.util.TimeCryptoProof
@@ -32,7 +33,7 @@ trait Access extends HttpGateway {
   abstract override def handle: Receive = super.handle orElse {
 
     case HTTP(GET, uri@PATH("p", "access", pii), query, response) => AUTH_CRYPTO(uri, query, response) { (sig: String) =>
-      jsonValue(OK, Map(
+      ResponseBuilder.json(OK, Map(
         "signature" -> sig,
         "pii" -> pii
       ))
@@ -40,7 +41,7 @@ trait Access extends HttpGateway {
 
 
     case http@HTTP(GET, PATH("settings"), _, _) => AUTH_ADMIN(http) { (user: String) =>
-      jsonValue(OK, Map(
+      ResponseBuilder.json(OK, Map(
         "credentials" -> user,
         "settings" -> settings.iterator.toMap
       ))
@@ -49,11 +50,11 @@ trait Access extends HttpGateway {
 
     case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
       settings.get(key) match {
-        case Some(otherKey) => errorValue(BadRequest, "That key already exists")
+        case Some(otherKey) => ResponseBuilder.json(BadRequest, "That key already exists" -> key)
         case None =>
           val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
           settings.put(key, Some(ConfigEntry(key, salt)))
-          redirect(SeeOther, Uri("/settings"))
+          HttpResponse(SeeOther, headers = List(headers.Location( Uri("/settings"))))
       }
     }
   }

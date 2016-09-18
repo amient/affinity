@@ -22,9 +22,11 @@ package io.amient.affinity.systemtests.core
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
+import akka.util.ByteString
 import io.amient.affinity.core.http.RequestMatchers._
+import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.systemtests.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -36,17 +38,24 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   "A Simple Gateway" should "play ping pong well" in {
     val (node, httpPort) = createGatewayNode() {
-        case HTTP(GET, PATH("ping"), _, response) => response.success(HttpResponse(OK, entity = "pong"))
+      case HTTP(GET, PATH("ping"), _, response) => response.success(ResponseBuilder.json(OK, "pong", gzip = false))
     }
 
     import node.system
+    import system.dispatcher
+
     implicit val materializer = ActorMaterializer()
 
-    try {
-      val response = Await.result(Http().singleRequest(HttpRequest(uri = s"http://localhost:$httpPort/ping")), 1 second)
-      response.status should be(OK)
-      response.entity should be(HttpEntity("pong"))
+    def get(path: String): HttpEntity.Strict = {
+      val uri = Uri(s"http://localhost:$httpPort$path")
+      val strict = Http().singleRequest(HttpRequest(uri = uri)) flatMap {
+        response => response.entity.toStrict(2 seconds)
+      }
+      Await.result(strict, 2 seconds)
+    }
 
+    try {
+      get(s"/ping") should be(HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"pong\"")))
     } finally {
       node.shutdown()
     }

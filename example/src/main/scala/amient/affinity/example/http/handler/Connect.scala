@@ -21,10 +21,11 @@ package io.amient.affinity.example.rest.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, SeeOther}
-import akka.http.scaladsl.model.{ContentTypes, Uri}
+import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
+import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.example.data.{Component, Vertex}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.UserInputMediator
@@ -42,21 +43,21 @@ trait Connect extends HttpGateway {
 
     case HTTP(POST, PATH("com", INT(id), INT(id2)), query, response) =>
       fulfillAndHandleErrors(response, connect(Vertex(id), Set(Vertex(id2))), ContentTypes.`application/json`) {
-        case true => redirect(SeeOther, Uri(s"/com/$id"))
-        case false => redirect(MovedPermanently, Uri(s"/com/$id"))
+        case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/com/$id"))))
+        case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/com/$id"))))
       }
 
     case HTTP(GET, PATH("com", INT(id)), query, response) =>
       val task = cluster ? Vertex(id)
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-        case false => errorValue(NotFound, "Vertex not found")
-        case component => jsonValue(OK, component)
+        case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
+        case component => ResponseBuilder.json(OK, component)
       }
 
     case HTTP(GET, PATH("delegate"), query, response) =>
       val userInputMediator = service(classOf[UserInputMediator])
       userInputMediator ? "hello" onSuccess {
-        case userInput: String => response.success(htmlValue(OK, userInput))
+        case userInput: String => response.success(ResponseBuilder.json(OK, Map("userInput" -> userInput)))
       }
 
   }
@@ -65,10 +66,11 @@ trait Connect extends HttpGateway {
   /**
     * Connecting a Vertex to 1 or more other Vertices
     * This is done recursively and reliably using Ask instead of Tell.
+    *
     * @return Future which fails if any of the propagation steps fail. When successful holds:
     *         true if the operation resulted in graph modification,
     *         false if there were no modifications and
-    * false if no changes were made.
+    *         false if no changes were made.
     */
   private def connect(vertex: Vertex, withEdges: Set[Vertex]): Future[Boolean] = {
 

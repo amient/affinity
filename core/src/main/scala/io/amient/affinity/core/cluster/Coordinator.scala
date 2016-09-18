@@ -90,7 +90,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       watchers += watcher -> true
       //failing this ack means that the watcher would have inconsistent view of the cluster
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
-      //TODO this ack can take very long if the accumulated state change log is large so need variable ack timeout
+      //TODO ACK - this ack can take very long if the accumulated state change log is large so need variable ack timeout
       ack(watcher, MasterStatusUpdate(group, currentMasters, Set())) onFailure {
         case e: Throwable => if (!closed.get) {
           e.printStackTrace()

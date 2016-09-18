@@ -67,8 +67,8 @@ class Region(coordinator: Coordinator, partitionProps: Props)
 
   override def receive: Receive = super.receive orElse {
 
-    case MasterStatusUpdate("regions", add, remove) => ack(sender) {} //FIXME the ack here is broken
-      //TODO arbitrary ack timeouts
+    case MasterStatusUpdate("regions", add, remove) => ack(sender) {} //FIXME ACK - the ack here is broken
+      //TODO ACK - arbitrary ack timeouts
       Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), 1 hour)
       Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), 1 minute)
     //}

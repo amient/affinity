@@ -92,7 +92,7 @@ package object ack {
     * @return
     */
   def ack(target: ActorRef, message: Any)(implicit context: ExecutionContext): Future[Any] = {
-    //TODO configurable ack retries and timeout
+    //TODO ACK - configurable ack retries and timeout
     implicit val numRetries: Int = 3
     implicit val timetout = Timeout(6 second)
     val promise = Promise[Any]()

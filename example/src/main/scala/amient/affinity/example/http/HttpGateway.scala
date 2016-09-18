@@ -19,23 +19,19 @@
 
 package io.amient.affinity.example.rest
 
-import java.io.StringWriter
-
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
-import akka.http.scaladsl.model.{HttpEntity, _}
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import akka.http.scaladsl.model.{headers, _}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
 import io.amient.affinity.core.serde.StringSerde
-import io.amient.affinity.core.http.HttpExchange
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
+import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.data.{ConfigEntry, MyAvroSerde}
 import io.amient.affinity.example.rest.handler._
-import io.amient.affinity.core.util.TimeCryptoProof
 
 import scala.concurrent.Promise
 import scala.util.control.NonFatal
@@ -62,9 +58,6 @@ object HttpGateway {
 
 class HttpGateway extends Gateway with ActorState {
 
-  val mapper = new ObjectMapper()
-  mapper.registerModule(DefaultScalaModule)
-
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
@@ -77,14 +70,21 @@ class HttpGateway extends Gateway with ActorState {
   }
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: IllegalAccessError => errorValue(Forbidden, "Forbidden - " + e.getMessage)
+    case e: IllegalAccessError => ResponseBuilder.json(Forbidden, "Forbidden" -> e.getMessage)
     //errorValue(Unauthorized, "Unauthorized")
-    case e: NoSuchElementException => errorValue(NotFound, "Haven't got that")
-    case e: IllegalArgumentException => errorValue(BadRequest, "BadRequest - " + e.getMessage)
-    case e: NotImplementedError => e.printStackTrace(); errorValue(NotImplemented, "Eeek! We have a bug..")
-    case NonFatal(e) => e.printStackTrace(); errorValue(InternalServerError, "Well, something went wrong but we should be back..")
-    case e => e.printStackTrace(); errorValue(ServiceUnavailable, "Something is seriously wrong with our servers..")
+    case e: NoSuchElementException => ResponseBuilder.json(NotFound, "Haven't got that" -> e.getMessage)
+    case e: IllegalArgumentException => ResponseBuilder.json(BadRequest, "BadRequest" -> e.getMessage)
+    case e: NotImplementedError =>
+      e.printStackTrace()
+      ResponseBuilder.json(NotImplemented, "Eeek! We have a bug..")
+    case NonFatal(e) =>
+      e.printStackTrace()
+      ResponseBuilder.json(InternalServerError, "Well, something went wrong but we should be back..")
+    case e =>
+      e.printStackTrace()
+      ResponseBuilder.json(ServiceUnavailable, "Something is seriously wrong with our servers..")
   }
+
 
   /**
     * AUTH_CRYPTO can be applied to requests that have been matched in the handler Receive method.
@@ -114,7 +114,7 @@ class HttpGateway extends Gateway with ActorState {
             }
         }
       } catch {
-        case e: IllegalAccessError => response.success(errorValue(Unauthorized, "Unauthorized, expecting " + e.getMessage))
+        case e: IllegalAccessError => response.success(ResponseBuilder.json(Unauthorized, "Unauthorized, expecting " -> e.getMessage))
         case e: Throwable => response.success(handleException(e))
       }
     }
@@ -151,39 +151,6 @@ class HttpGateway extends Gateway with ActorState {
 
     }
 
-  }
-
-  /* Following are various helpers for HTTP <> AKKA transformations used in the handlers.
-   * - all handlers are traits that extend HttpGateway.
-   */
-
-  def textValue(status: StatusCode, message: String): HttpResponse = {
-    HttpResponse(status, entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, message))
-  }
-
-  def htmlValue(status: StatusCode, message: String): HttpResponse = {
-    val formattedMessage = message.replace("\n", "<br/>")
-    HttpResponse(status,
-      entity = HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h3>$formattedMessage</h3s>"))
-  }
-
-  def jsonValue(status: StatusCode, value: Any): HttpResponse = {
-    val out = new StringWriter
-    mapper.writeValue(out, value)
-    val json = out.toString
-    HttpResponse(status, entity = HttpEntity(ContentTypes.`application/json`, json))
-  }
-
-  def redirect(status: StatusCode, uri: Uri): HttpResponse = {
-    HttpResponse(status, headers = List(headers.Location(uri)))
-  }
-
-  def errorValue(errorStatus: StatusCode, message: String, ct: ContentType = ContentTypes.`application/json`): HttpResponse = {
-    ct match {
-      case ContentTypes.`text/html(UTF-8)` => htmlValue(errorStatus, s"<h1> $message</h1>")
-      case ContentTypes.`application/json` => jsonValue(errorStatus, Map("error" -> message))
-      case _ => textValue(errorStatus, "error: " + message)
-    }
   }
 
 }
