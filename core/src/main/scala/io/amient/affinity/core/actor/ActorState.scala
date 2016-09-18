@@ -22,37 +22,30 @@ package io.amient.affinity.core.actor
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor.Actor
+import akka.event.Logging
 import io.amient.affinity.core.storage.Storage
 
 import scala.collection.JavaConverters._
 
 trait ActorState extends Actor {
 
+  private val log = Logging.getLogger(context.system, this)
+
   private val storageRegistry = new CopyOnWriteArrayList[Storage[_, _]]()
 
-  def state[K, V](storage: => Storage[K, V]): Storage[K, V] = {
-    val stateStorage: Storage[K, V] = storage
+  def state[K, V](creator: => Storage[K, V]): Storage[K, V] = {
+    val stateStorage: Storage[K, V] = creator
+    stateStorage.init()
     stateStorage.boot()
+    stateStorage.tail()
     storageRegistry.add(stateStorage)
     stateStorage
   }
 
-  def untailState(): Unit = {
-    storageRegistry.asScala.foreach { storage =>
-      storage.untail()
-    }
-  }
+  def untailState(): Unit = storageRegistry.asScala.foreach(_.boot())
 
-  def tailState(): Unit = {
-    storageRegistry.asScala.foreach { storage =>
-      storage.tail()
-    }
-  }
+  def tailState(): Unit = storageRegistry.asScala.foreach(_.tail())
 
-  def closeState(): Unit = {
-    storageRegistry.asScala.foreach { storage =>
-      storage.close()
-    }
-  }
+  def closeState(): Unit = storageRegistry.asScala.foreach (_.close())
 
 }

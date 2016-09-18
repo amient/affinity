@@ -21,6 +21,7 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Props
 import akka.event.Logging
+import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
@@ -67,10 +68,13 @@ class Region(coordinator: Coordinator, partitionProps: Props)
 
   override def receive: Receive = super.receive orElse {
 
-    case MasterStatusUpdate("regions", add, remove) => ack(sender) {} //FIXME ACK - the ack here is broken
-      //TODO ACK - arbitrary ack timeouts
-      Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), 1 hour)
-      Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), 1 minute)
+    case MasterStatusUpdate("regions", add, remove) => ack(sender) {
+      //TODO global config bootstrap timeout
+      val t = 30 seconds
+      implicit val timeout = Timeout(t)
+      Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), t)
+      Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), t)
+    }
 
   }
 

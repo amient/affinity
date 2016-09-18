@@ -74,9 +74,10 @@ package object ack {
     * @param target
     * @param message
     * @param replyTo
+    * @param timeout
     * @param context
     */
-  def ack(target: ActorRef, message: Any, replyTo: ActorRef)(implicit context: ExecutionContext): Unit = {
+  def ack(target: ActorRef, message: Any, replyTo: ActorRef)(implicit timeout: Timeout, context: ExecutionContext): Unit = {
     ack(target, message) onComplete {
       case Failure(e) => replyTo ! Status.Failure(e)
       case Success(result) => replyTo ! result
@@ -86,29 +87,33 @@ package object ack {
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
     * from the target actor.
+    *
     * @param target
     * @param message
+    * @param timeout
     * @param context
     * @return
     */
-  def ack(target: ActorRef, message: Any)(implicit context: ExecutionContext): Future[Any] = {
-    //TODO ACK - configurable ack retries and timeout
-    implicit val numRetries: Int = 3
-    implicit val timetout = Timeout(6 second)
+  def ack(target: ActorRef, message: Any)(implicit timeout: Timeout, context: ExecutionContext): Future[Any] = {
+    //TODO ACK - configurable ack retries
     val promise = Promise[Any]()
-
-    def attempt(retry: Int): Unit = {
+    def attempt(retry: Int = 3): Unit = {
       target ? message onComplete {
         case Success(result) => promise.success(result)
         case Failure(cause) => {
           cause match {
             case to: AskTimeoutException if (to.getCause() == null) => promise.failure(cause)
-            case _ => if (retry == 0) promise.failure(cause) else attempt(retry - 1)
+            case _ => if (retry == 0) promise.failure(cause)
+            else {
+              cause.printStackTrace()
+              attempt(retry - 1)
+            }
           }
         }
       }
     }
-    attempt(numRetries)
+    attempt()
     promise.future
   }
+
 }

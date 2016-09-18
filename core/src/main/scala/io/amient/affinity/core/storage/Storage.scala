@@ -22,20 +22,21 @@ package io.amient.affinity.core.storage
 trait Storage[K,V] extends MemStore[K, V] {
 
   /**
-    * the contract of this method is that it should start restoring the state from the underlying
-    * data and block until the state has been fully restored. Once this method returns, the partition
-    * or service which owns it will become eligible for becoming a master and thus serving requests.
-    * and so the state must be in a fully consistent state. The implementation should not
-    * assume that after a boot, the partition will be a master and so should remain in
-    * the tailing mode after returning from boot().
+    * the contract of this method is that it should start a background process of restoring
+    * the state from the underlying storage.
     */
-  private[core] def boot(): Unit
+  private[core] def init(): Unit
 
   /**
-    * the implementation should stop listening for updates.
-    * This method must return immediately and be idempotent
+    * The implementation should stop listening for updates on the underlying topic after it has
+    * fully caught up with the state updates. This method must block until completed and can
+    * be interrupted by a consequent tail() call.
+    *
+    * Once this method returns, the partition or service which owns it will become available
+    * for serving requests and so the state must be in a fully consistent state.
+    *
     */
-  private[core] def untail(): Unit
+  private[core] def boot(): Unit
 
   /**
     * the implementation should start listening for updates and keep the memstore up to date.
@@ -43,6 +44,9 @@ trait Storage[K,V] extends MemStore[K, V] {
     */
   private[core] def tail(): Unit
 
+  /**
+    * close all resource and background processes
+    */
   private[core] def close(): Unit
 
   /**

@@ -60,6 +60,14 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       case v => partition(v)
     }
 
+    /**
+      * This means that no region has registered the partition - this may happen for 2 reasons:
+      * 1. all regions representing that partition are genuinely down and there nothing that can be done
+      * 2. between a master failure and a standby election there may be a brief period
+      *    of the partition not being represented -
+      */
+    //TODO the 2. case needs to be handled by the API and there a different ways how to do it
+
     if (!currentRouteMap.containsKey(p)) throw new IllegalStateException(
       s"Partition `$p` is not represented by any Actor - " +
         s"this shouldn't happen - gateway should suspend all requests until all partitions are present")

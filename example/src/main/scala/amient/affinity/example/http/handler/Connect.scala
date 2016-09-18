@@ -24,6 +24,7 @@ import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, See
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.example.data.{Component, Vertex}

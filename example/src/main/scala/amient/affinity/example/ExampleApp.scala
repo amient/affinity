@@ -26,11 +26,11 @@ import io.amient.affinity.example.service.ServiceNode
 object ExampleApp extends App {
 
   // singleton services
-  ServiceNode.main(Seq("2550").toArray)
+//  ServiceNode.main(Seq("2550").toArray)
 
   // gateways
   HttpGateway.main(Seq("8081").toArray)
-  HttpGateway.main(Seq("8082").toArray)
+//  HttpGateway.main(Seq("8082").toArray)
 
   // partition master(s)
   DataPartition.main(Seq("2551", "0,1").toArray)

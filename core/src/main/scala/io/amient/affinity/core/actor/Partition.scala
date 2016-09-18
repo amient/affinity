@@ -23,7 +23,7 @@ import akka.event.Logging
 
 trait Partition extends Service with ActorState {
 
-  override val log = Logging.getLogger(context.system, this)
+  private val log = Logging.getLogger(context.system, this)
 
   /**
     * physical partition id - this is read from the name of the Partition Actor;  assigned by the Region
@@ -36,8 +36,8 @@ trait Partition extends Service with ActorState {
     * may be resent as part of ack contract so this method must be idempotent.
     */
   override protected def onBecomeMaster: Unit = {
-    log.info(s"Became master for partition $partition")
     untailState()
+    log.info(s"Became master for partition $partition")
   }
 
   /**
@@ -46,8 +46,8 @@ trait Partition extends Service with ActorState {
     * The signalling message may be resent as part of ack contract so this method must be idempotent.
     */
   override protected def onBecomeStandby: Unit = {
-    log.info(s"Became standby for partition $partition")
     tailState()
+    log.info(s"Became standby for partition $partition")
   }
 
   override def postStop(): Unit = {

@@ -34,7 +34,7 @@ object Service {
 
 trait Service extends Actor {
 
-  val log = Logging.getLogger(context.system, this)
+  private val log = Logging.getLogger(context.system, this)
 
   import Service._
 

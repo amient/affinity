@@ -21,6 +21,7 @@ package io.amient.affinity.core.cluster
 
 
 import akka.actor.{ActorSystem, Props}
+import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller._
@@ -67,15 +68,18 @@ class Node(config: Config) {
   }
 
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
+    implicit val timeout = Timeout(startupTimeout)
     ack(controller, CreateGateway(Props(creator)))
   }
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]) = {
+    implicit val timeout = Timeout(startupTimeout)
     ack(controller, CreateRegion(Props(partitionCreator)))
   }
 
   def startServices(services: Props*) = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
+    implicit val timeout = Timeout(startupTimeout)
     ack(controller, CreateServiceContainer(services))
   }
 

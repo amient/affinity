@@ -28,6 +28,8 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordM
 import org.apache.kafka.common.TopicPartition
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 abstract class KafkaStorage[K, V](topic: String,
                                   partition: Int,
@@ -43,9 +45,7 @@ abstract class KafkaStorage[K, V](topic: String,
   producerProps.put("value.serializer", valueSerde.getName)
   val kafkaProducer = new KafkaProducer[K, V](producerProps)
 
-  @volatile private var tailing = true
-
-  @volatile private var booted = false
+  private var tailing = true
 
   private val consumer = new Thread {
 
@@ -74,39 +74,35 @@ abstract class KafkaStorage[K, V](topic: String,
           kafkaConsumer.seek(tp, bootOffset)
 
           var keepConsuming = true
-
           while (keepConsuming) {
 
             if (isInterrupted) throw new InterruptedException
 
-            val records = kafkaConsumer.poll(1000)
+            val records = kafkaConsumer.poll(500)
+            var fetchedNumRecrods = 0
             for (r <- records.iterator().asScala) {
+              fetchedNumRecrods += 1
               if (r.value == null) {
                 remove(r.key)
               } else {
                 update(r.key, r.value)
               }
             }
-            if (!booted) {
-              if (kafkaConsumer.position(tp) >= lastOffset) {
-                synchronized {
-                  booted = true
-                  //println(s"`$topic`, partition $partition bootstrap completed")
-                  notify()
-                }
-              }
-            } else if (!tailing) {
+            //TODO the fact that fetchedNumRecords is 0 doesn't still guarantee that there were not other records
+            //produced by another instance - to reliably know that the consumer is fully caught up,
+            // there should be a watermark maintained by the master which is updated similarly to standard
+            // kafka consumer offset
+            if (!tailing && fetchedNumRecrods == 0 && kafkaConsumer.position(tp) >= lastOffset) {
               keepConsuming = false
             }
           }
 
           synchronized {
             notify()
-            //println(s"`$topic`, partition $partition suspending tail consumption")
+//            println(s"`$topic`, partition $partition suspending tail consumption @ offest ${kafkaConsumer.position(tp)}")
             wait()
+//            println(s"`$topic`, partition $partition resuming tail consumption from offset ${kafkaConsumer.position(tp)}")
           }
-
-          //println(s"`$topic`, partition $partition resuming tail consumption")
 
         }
       } catch {
@@ -115,22 +111,14 @@ abstract class KafkaStorage[K, V](topic: String,
     }
   }
 
+  private[core] def init(): Unit = consumer.start()
+
   private[core] def boot(): Unit = {
-
-    consumer.start()
-
     consumer.synchronized {
-      if (!booted) {
-        consumer.wait()
-      }
-    }
-  }
-
-  private[core] def untail(): Unit = {
-    consumer.synchronized {
-      if (tailing) {
+      if (!tailing) Future.successful() else {
         tailing = false
-        consumer.wait()
+        //TODO require bootstrap timeout
+        consumer.synchronized(consumer.wait)
       }
     }
   }
