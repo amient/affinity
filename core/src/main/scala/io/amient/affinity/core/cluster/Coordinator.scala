@@ -35,7 +35,15 @@ object Coordinator {
 
   final val CONFIG_COORDINATOR_CLASS = "affinity.cluster.coordinator.class"
 
-  final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef])
+  final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef]) {
+    def localTo(actor: ActorRef): MasterStatusUpdate = {
+      MasterStatusUpdate(
+        group,
+        add.filter(_.path.address == actor.path.address),
+        remove.filter(_.path.address == actor.path.address)
+      )
+    }
+  }
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
@@ -84,14 +92,17 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * watch changes in the coordinate group of routees in the whole cluster.
     *
     * @param watcher actor which will receive the messages
+    * @param global if true, the watcher will be notified of master status changes in the entire cluster
+    *               if false, the watcher will be notified of master status changes local to that watcher
     */
   def watch(watcher: ActorRef, global: Boolean): Unit = {
     synchronized {
-      watchers += watcher -> true
+      watchers += watcher -> global
       //failing this ack means that the watcher would have inconsistent view of the cluster
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
+      val update = MasterStatusUpdate(group, currentMasters, Set())
       //TODO ACK - this ack can take very long if the accumulated state change log is large so need variable ack timeout
-      ack(watcher, MasterStatusUpdate(group, currentMasters, Set())) onFailure {
+      ack(watcher, if (global) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
           e.printStackTrace()
           system.terminate()
@@ -133,9 +144,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
       val add = currentMasters.filter(!prevMasters.contains(_))
       val remove = prevMasters.filter(!currentMasters.contains(_))
-      val fullUpdate = MasterStatusUpdate(group, add, remove)
+      val update = MasterStatusUpdate(group, add, remove)
 
-      notifyWatchers(fullUpdate)
+      notifyWatchers(update)
     }
 
   }
@@ -148,12 +159,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
 
   private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
-    def isLocal(ref: ActorRef) = ref.path.address.hasLocalScope
-
-    val localUpdate = MasterStatusUpdate(group, fullUpdate.add.filter(isLocal), fullUpdate.remove.filter(isLocal))
 
     watchers.foreach { case (watcher, global) =>
-      ack(watcher, if (global) fullUpdate else localUpdate) onFailure {
+      ack(watcher, if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
         case e: Throwable =>
           e.printStackTrace()
           system.terminate()

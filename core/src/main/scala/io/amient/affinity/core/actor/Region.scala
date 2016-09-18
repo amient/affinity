@@ -71,7 +71,7 @@ class Region(coordinator: Coordinator, partitionProps: Props)
       //TODO ACK - arbitrary ack timeouts
       Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), 1 hour)
       Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), 1 minute)
-    //}
+
   }
 
 }

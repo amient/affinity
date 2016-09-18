@@ -36,7 +36,7 @@ trait Partition extends Service with ActorState {
     * may be resent as part of ack contract so this method must be idempotent.
     */
   override protected def onBecomeMaster: Unit = {
-    log.info(s"Became leader for partition $partition")
+    log.info(s"Became master for partition $partition")
     untailState()
   }
 
