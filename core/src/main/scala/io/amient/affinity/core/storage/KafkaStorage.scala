@@ -115,7 +115,7 @@ abstract class KafkaStorage[K, V](topic: String,
 
   private[core] def boot(): Unit = {
     consumer.synchronized {
-      if (!tailing) Future.successful() else {
+      if (tailing) {
         tailing = false
         //TODO require bootstrap timeout
         consumer.synchronized(consumer.wait)
