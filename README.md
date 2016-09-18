@@ -137,11 +137,29 @@ running the standalone jar which is created during the gradlew build
  
     java -jar example/build/libs/example-<VERSION>-standalone.jar
     
-ExampleApp starts four nodes in a pseudo-distributed mode. 
-The nodes listen on http ports 8081-8084 and each contains a region 
-serving two physical partitions 0,1 and 2,3. Each physical partition 
-will therefore have 2 online replicas.  
+ExampleApp starts several nodes in a pseudo-distributed mode:
+    2 Gateways listen on http ports 8081 and 8082
+    4 Regions each serving two physical partitions
+    1 Singleton service node for demonstration purpose
 
+Each of the 4 data partitions will 2 online replicas:
+  
+                    | Assigned Partitions   |
+    ----------------+-----+-----+-----+-----+
+    Data Partition: |  0  |  1  |  2  |  3  |
+    ----------------+-----+-----+-----+-----+               
+    Region 1        |  x  |  x  |  -  |  -  |
+    Region 2        |  -  |  x  |  x  |  -  |
+    Region 3        |  -  |  -  |  x  |  x  |
+    Region 4        |  x  |  -  |  -  |  x  |
+
+Cooridnation process on startup chooses one of the replicas as
+ master and the other standby. Using the `kill region` endpoint
+ below it can be demonstrated how the zero-down time works by
+ standby immediately taking over the killed master.
+ 
+The example data set is a Graph of Vertices which are connected
+to other Vertices. A group of inter-connected vertices is a Component.
 To view a graph component (vertex id is a simple Int)
 
     GET http://127.0.0.1:808x/com/<vertex-id> 
@@ -173,8 +191,3 @@ To look kill a region by partition:
 
     POST http://127.0.0.1:808x/<partition>/down
 
-A single node may be started with one region
-serving all 4 partitions byt starting `ApiNode` with
-the following arguments:
-
-    ExampleSystem 2551 127.0.0.1 8081 4 0,1,2,3

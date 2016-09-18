@@ -33,10 +33,10 @@ object ExampleApp extends App {
   HttpGateway.main(Seq("8082").toArray)
 
   // partition master(s)
-  DataPartition.main(Seq("2551", "0,2").toArray)
-  DataPartition.main(Seq("2552", "1,3").toArray)
+  DataPartition.main(Seq("2551", "0,1").toArray)
+  DataPartition.main(Seq("2552", "1,2").toArray)
   // partition standby(s)
-  DataPartition.main(Seq("2553", "0,2").toArray)
-  DataPartition.main(Seq("2554", "1,3").toArray)
+  DataPartition.main(Seq("2553", "2,3").toArray)
+  DataPartition.main(Seq("2554", "3,0").toArray)
 
 }

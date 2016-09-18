@@ -22,7 +22,7 @@ package io.amient.affinity.systemtests
 import java.io.File
 import java.net.InetSocketAddress
 import java.util.Properties
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
+import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.Actor.Receive
 import akka.http.scaladsl.model.HttpResponse
