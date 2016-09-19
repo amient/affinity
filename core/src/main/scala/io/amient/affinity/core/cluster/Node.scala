@@ -30,7 +30,6 @@ import io.amient.affinity.core.actor._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
-import scala.util.control.NonFatal
 
 object Node {
   final val CONFIG_AKKA_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"
@@ -44,10 +43,10 @@ class Node(config: Config) {
 
   import Node._
 
-  val akkaPort = config.getInt(CONFIG_AKKA_PORT)
-  val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
-  val startupTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
-  val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
+  private val akkaPort = config.getInt(CONFIG_AKKA_PORT)
+  private val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
+  private val startupTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
+  private val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 

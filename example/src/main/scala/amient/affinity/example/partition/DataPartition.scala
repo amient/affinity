@@ -43,7 +43,7 @@ object DataPartition {
       .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
       .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
-    //this API cluster is symmetric - all nodes serve both as Gateways and Regions
+  //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(config) {
 
       startRegion(new DataPartition)
@@ -57,7 +57,7 @@ class DataPartition extends Partition {
   //val config = context.system.settings.config
 
   val graph = state {
-    new KafkaStorage[Vertex, Component](topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
+    new KafkaStorage[Vertex, Component](brokers = "loclahost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
       with MemStoreSimpleMap[Vertex, Component]
   }
 

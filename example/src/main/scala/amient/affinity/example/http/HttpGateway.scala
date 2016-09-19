@@ -65,7 +65,7 @@ class HttpGateway extends Gateway with ActorState {
     * can be modified by other nodes and need to be accessed concurrently
     */
   val settings = state {
-    new KafkaStorage[String, ConfigEntry](topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
+    new KafkaStorage[String, ConfigEntry](brokers = "loclahost:9092", topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
       with MemStoreConcurrentMap[String, ConfigEntry]
   }
 

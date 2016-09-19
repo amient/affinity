@@ -19,47 +19,56 @@
 
 package io.amient.affinity.systemtests.core
 
-import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
-import akka.util.ByteString
+import akka.pattern.ask
+import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.systemtests.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
-
 
 class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
-  "A Simple Gateway" should "play ping pong well" in {
-    val (node, httpPort) = createGatewayNode() {
+  val gateway = new TestGatewayNode(new TestGateway {
+    import context.dispatcher
+    override def handle: Receive = super.handle orElse {
       case HTTP(GET, PATH("ping"), _, response) => response.success(ResponseBuilder.json(OK, "pong", gzip = false))
+      case HTTP(GET, PATH("clusterping"), _, response) =>
+        implicit val timeout = Timeout(1 second)
+        fulfillAndHandleErrors(response, cluster ? "ping", ContentTypes.`application/json`) {
+          case pong => ResponseBuilder.json(OK, pong, gzip = false)
+        }
     }
+  })
 
-    import node.system
-    import system.dispatcher
-
-    implicit val materializer = ActorMaterializer()
-
-    def get(path: String): HttpEntity.Strict = {
-      val uri = Uri(s"http://localhost:$httpPort$path")
-      val strict = Http().singleRequest(HttpRequest(uri = uri)) flatMap {
-        response => response.entity.toStrict(2 seconds)
-      }
-      Await.result(strict, 2 seconds)
+  val region = new TestRegionNode(new TestPartition {
+    override def handle: Receive = {
+      case "ping" => sender ! "pong"
     }
+  })
 
+  awaitRegions()
+
+  override def afterAll(): Unit = {
     try {
-      get(s"/ping") should be(HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"pong\"")))
+      gateway.shutdown()
+      region.shutdown()
     } finally {
-      node.shutdown()
+      super.afterAll()
     }
+  }
 
+
+  "A Simple Gateway" should "play ping pong well" in {
+    gateway.http(GET, s"/ping").entity should be(jsonStringEntity("pong"))
+  }
+
+  "A Simple Cluster" should "play ping pong too" in {
+    gateway.http(GET, s"/clusterping").entity should be(jsonStringEntity("pong"))
   }
 
 }

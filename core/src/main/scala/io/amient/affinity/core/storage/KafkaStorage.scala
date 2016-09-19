@@ -31,13 +31,14 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-abstract class KafkaStorage[K, V](topic: String,
+abstract class KafkaStorage[K, V](brokers: String,
+                                  topic: String,
                                   partition: Int,
                                   keySerde: Class[_ <: Serde],
                                   valueSerde: Class[_ <: Serde]) extends Storage[K, V] {
 
   val producerProps = new Properties()
-  producerProps.put("bootstrap.servers", "localhost:9092")
+  producerProps.put("bootstrap.servers", brokers)
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")
@@ -48,17 +49,18 @@ abstract class KafkaStorage[K, V](topic: String,
   private var tailing = true
 
   private val consumer = new Thread {
-
     val consumerProps = new Properties()
-    consumerProps.put("bootstrap.servers", "localhost:9092")
+    consumerProps.put("bootstrap.servers", brokers)
     consumerProps.put("enable.auto.commit", "false")
     consumerProps.put("key.deserializer", keySerde.getName)
     consumerProps.put("value.deserializer", valueSerde.getName)
     val kafkaConsumer = new KafkaConsumer[K, V](consumerProps)
+
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
     kafkaConsumer.assign(consumerPartitions)
     kafkaConsumer.seekToBeginning(consumerPartitions)
+
 
     override def run(): Unit = {
 
@@ -74,6 +76,7 @@ abstract class KafkaStorage[K, V](topic: String,
           kafkaConsumer.seek(tp, bootOffset)
 
           var keepConsuming = true
+
           while (keepConsuming) {
 
             if (isInterrupted) throw new InterruptedException
@@ -92,7 +95,7 @@ abstract class KafkaStorage[K, V](topic: String,
             //produced by another instance - to reliably know that the consumer is fully caught up,
             // there should be a watermark maintained by the master which is updated similarly to standard
             // kafka consumer offset
-            if (!tailing && fetchedNumRecrods == 0 && kafkaConsumer.position(tp) >= lastOffset) {
+            if (!tailing && fetchedNumRecrods == 0) { //&& kafkaConsumer.position(tp) >= lastOffset) {
               keepConsuming = false
             }
           }

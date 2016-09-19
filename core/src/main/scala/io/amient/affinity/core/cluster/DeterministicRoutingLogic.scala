@@ -22,6 +22,7 @@ package io.amient.affinity.core.cluster
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.routing.{ActorRefRoutee, Routee, RoutingLogic}
+import io.amient.affinity.core.util.ObjectHashPartitioner
 
 import scala.collection.immutable
 
@@ -30,12 +31,8 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
   private var prevRoutees: immutable.IndexedSeq[Routee] = immutable.IndexedSeq()
   private val currentRouteMap = new ConcurrentHashMap[Int, Routee]()
 
-  def partition(key: Any): Int = {
-    (math.abs(key.hashCode()) match {
-      case Int.MinValue => 0
-      case a => a
-    }) % numPartitions
-  }
+  //TODO configurable partitioner
+  val partitioner = new ObjectHashPartitioner
 
   def select(message: Any, routees: immutable.IndexedSeq[Routee]): Routee = {
 
@@ -56,8 +53,8 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       }
     }
     val p = message match {
-      case (k, v) => partition(k)
-      case v => partition(v)
+      case (k, v) => partitioner.partition(k, numPartitions)
+      case v => partitioner.partition(v, numPartitions)
     }
 
     /**
@@ -68,9 +65,9 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       */
     //TODO the 2. case needs to be handled by the API and there a different ways how to do it
 
-    if (!currentRouteMap.containsKey(p)) throw new IllegalStateException(
-      s"Partition `$p` is not represented by any Actor - " +
-        s"this shouldn't happen - gateway should suspend all requests until all partitions are present")
+    if (!currentRouteMap.containsKey(p)) {
+      throw new IllegalStateException(s"Data partition `$p` is not represented in the cluster")
+    }
 
     currentRouteMap.get(p)
   }

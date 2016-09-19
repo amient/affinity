@@ -17,15 +17,29 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde
+package io.amient.affinity.core.util
 
-class StringSerde extends Serde {
+import java.util
 
-  override protected def fromBytes(bytes: Array[Byte]): AnyRef = if (bytes == null) null else new String(bytes, "UTF-8")
+import org.apache.kafka.clients.producer.Partitioner
+import org.apache.kafka.common.Cluster
 
-  override protected def toBytes(obj: Any): Array[Byte] = if (obj == null) null else {
-    obj.asInstanceOf[String].getBytes("UTF-8")
+class ObjectHashPartitioner extends Partitioner {
+  override def configure(configs: util.Map[String, _]): Unit = ()
+
+  override def close(): Unit = ()
+
+  def partition(key: Any, numPartitions: Int): Int = {
+    (math.abs(key.hashCode()) match {
+      case Int.MinValue => 0
+      case a => a
+    }) % numPartitions
   }
 
-  override def identifier: Int = 21
+  override def partition(topic: String, key: scala.Any, keyBytes: Array[Byte], value: scala.Any, valueBytes: Array[Byte], cluster: Cluster): Int = {
+    val partitions = cluster.partitionsForTopic(topic)
+    partition(key, partitions.size)
+  }
+
+
 }

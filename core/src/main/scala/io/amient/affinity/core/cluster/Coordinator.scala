@@ -92,8 +92,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * watch changes in the coordinate group of routees in the whole cluster.
     *
     * @param watcher actor which will receive the messages
-    * @param global if true, the watcher will be notified of master status changes in the entire cluster
-    *               if false, the watcher will be notified of master status changes local to that watcher
+    * @param global  if true, the watcher will be notified of master status changes in the entire cluster
+    *                if false, the watcher will be notified of master status changes local to that watcher
     */
   def watch(watcher: ActorRef, global: Boolean): Unit = {
     synchronized {
@@ -137,7 +137,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         try {
           handles.put(handle, Await.result(system.actorSelection(actorPath).resolveOne(), t))
         } catch {
-          case NonFatal(e) => //TODO most likely the actor has gone and there will be another update right away but could be something else
+          case NonFatal(e) =>
+            //most likely the actor has gone and there will be another update right away but could be something else
+            if (!closed.get) e.printStackTrace()
         }
       }
 
@@ -164,10 +166,18 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     watchers.foreach { case (watcher, global) =>
       //TODO global config bootstrap timeout
       implicit val timeout = Timeout(30 seconds)
-      ack(watcher, if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
-        case e: Throwable =>
+      try {
+        ack(watcher, if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
+          case e: Throwable => if (!closed.get) {
+            e.printStackTrace()
+            system.terminate()
+          }
+        }
+      } catch {
+        case e: Throwable => if (!closed.get) {
           e.printStackTrace()
           system.terminate()
+        }
       }
     }
   }
