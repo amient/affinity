@@ -44,7 +44,7 @@ object DataPartition {
       .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
       .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
-  //this API cluster is symmetric - all nodes serve both as Gateways and Regions
+    //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(config) {
 
       startRegion(new DataPartition)

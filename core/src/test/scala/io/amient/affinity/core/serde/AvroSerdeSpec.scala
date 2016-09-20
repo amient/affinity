@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.serde
 
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.serde.avro.AvroSerde
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
 

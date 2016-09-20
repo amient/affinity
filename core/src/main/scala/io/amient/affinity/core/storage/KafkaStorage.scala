@@ -28,8 +28,6 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordM
 import org.apache.kafka.common.TopicPartition
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 abstract class KafkaStorage[K, V](brokers: String,
                                   topic: String,
