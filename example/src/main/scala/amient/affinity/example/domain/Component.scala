@@ -22,16 +22,30 @@ package io.amient.affinity.example.data
 import io.amient.affinity.core.serde.avro.AvroRecord
 import org.apache.avro.SchemaBuilder
 
+//object Side extends Enumeration {
+//  type Side = Value
+//  val LEFT, RIGHT = Value
+//  val symbols= values.toList.map(_.toString)
+//  val schema: Schema = SchemaBuilder.enumeration("Side").namespace(getClass.getPackage.getName)
+//    .symbols(symbols:_*)
+//}
+
 object Component {
-  val schema = SchemaBuilder.record("Component")
+  val schemaV1 = SchemaBuilder.record("Component")
     .namespace("io.amient.affinity.example.data").fields()
     .name("key").`type`(Vertex.schema).noDefault()
     .name("edges").`type`().array().items().`type`(Vertex.schema).noDefault()
     .endRecord()
+
+//  val schemaV2 = SchemaBuilder.record("Component")
+//    .namespace("io.amient.affinity.example.data").fields()
+//    .name("key").`type`(Vertex.schema).noDefault()
+//    .name("edges").`type`().array().items().`type`(Vertex.schema).noDefault()
+//    .endRecord()
 }
 
 final case class Component(val key: Vertex, val edges: Set[Vertex])
-  extends AvroRecord(Component.schema) {
+  extends AvroRecord(Component.schemaV1) {
 
   override def hashCode(): Int = key.hashCode
 }

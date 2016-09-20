@@ -17,19 +17,19 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
-
+package amient.affinity.example
 
 import io.amient.affinity.core.serde.avro.AvroSerde
+import io.amient.affinity.example.data.{Component, ConfigEntry, Edge, Vertex}
 import org.apache.avro.Schema
 
 class MyAvroSerde extends AvroSerde  {
 
-  override def register: Seq[(Class[_], Schema)] = Seq (
-    classOf[Vertex] -> Vertex.schema,
-    classOf[Edge] -> Edge.schema,
-    classOf[Component] -> Component.schema,
-    classOf[ConfigEntry] -> ConfigEntry.schema
+  override def register: Seq[(Schema, Class[_])] = Seq (
+    Vertex.schema -> classOf[Vertex],
+    Edge.schema -> classOf[Edge],
+    Component.schemaV1 -> classOf[Component],
+    ConfigEntry.schema -> classOf[ConfigEntry]
   )
 
 

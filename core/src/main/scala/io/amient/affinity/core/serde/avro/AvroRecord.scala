@@ -43,7 +43,9 @@ object AvroRecord {
     try {
       val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
       val writer = new GenericDatumWriter[Any](schema)
-      if (schemaId >= 0) encoder.writeInt(schemaId)
+      if (schemaId >= 0) {
+        encoder.writeInt(schemaId)
+      }
       writer.write(x, encoder)
       encoder.flush()
       valueOut.toByteArray
@@ -52,39 +54,38 @@ object AvroRecord {
     }
   }
 
+  def read[T](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
 
-  def read[T](bytes: Array[Byte], cls: Class[T], schema: Schema): T = {
+  def read[T](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema): T = {
     val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
-    read(bytes, cls, schema, decoder)
+    read(bytes, cls, writerSchema, readerSchema, decoder)
   }
 
-  def read[T](bytes: Array[Byte], cls: Class[T], schema: Schema, decoder: BinaryDecoder): T = {
-    val reader = new GenericDatumReader[GenericRecord](schema)
-    val record: GenericRecord = reader.read(null, decoder)
-    readRecord(record, cls).asInstanceOf[T]
-  }
-
-  def read[T](bytes: Array[Byte], cls: Class[T], schemaRegistry: (Int) => (Class[_], Schema)): T = {
-    if (bytes == null) null.asInstanceOf[T] else {
-      val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
-      val schemaId = decoder.readInt()
-      require(schemaId >= 0)
-      val (cls2, schema) = schemaRegistry(schemaId)
-      read(bytes, cls, schema, decoder)
-    }
-  }
-
-  def read(bytes: Array[Byte], schemaRegistry: (Int) => (Class[_], Schema)): AnyRef = {
+  def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): AnyRef = {
     if (bytes == null) null.asInstanceOf[AnyRef] else {
       val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
       val schemaId = decoder.readInt()
       require(schemaId >= 0)
-      val (cls, schema) = schemaRegistry(schemaId)
-      read(bytes, cls, schema, decoder).asInstanceOf[AnyRef]
+      val (cls, writerSchema) = schemaRegistry.schema(schemaId)
+      schemaRegistry.schema(cls) match {
+        case None => ???
+
+        case Some(readerSchemaId) if (schemaId == readerSchemaId) =>
+          read(bytes, cls, writerSchema, writerSchema, decoder).asInstanceOf[AnyRef]
+
+        case Some(readerSchemaId) =>
+          val (clz, readerSchema) = schemaRegistry.schema(readerSchemaId)
+          require(cls == clz)
+          read(bytes, cls, writerSchema, readerSchema, decoder).asInstanceOf[AnyRef]
+      }
     }
   }
 
-
+  private def read[T](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema, decoder: BinaryDecoder): T = {
+    val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
+    val record: GenericRecord = reader.read(null, decoder)
+    readRecord(record, cls).asInstanceOf[T]
+  }
 
   private val cache = scala.collection.mutable.Map[String, Class[_]]()
   private def readDatum(datum: Any, cls: Class[_], schema: Schema): AnyRef = {

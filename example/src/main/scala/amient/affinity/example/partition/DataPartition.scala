@@ -20,11 +20,12 @@
 package amient.affinity.example.partition
 
 import akka.actor.Status
+import amient.affinity.example.MyAvroSerde
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Partition, Region}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
-import io.amient.affinity.example.data.{Component, MyAvroSerde, _}
+import io.amient.affinity.example.data.{Component, Vertex}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
@@ -57,7 +58,7 @@ class DataPartition extends Partition {
   //val config = context.system.settings.config
 
   val graph = state {
-    new KafkaStorage[Vertex, Component](brokers = "loclahost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
+    new KafkaStorage[Vertex, Component](brokers = "localhost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
       with MemStoreSimpleMap[Vertex, Component]
   }
 

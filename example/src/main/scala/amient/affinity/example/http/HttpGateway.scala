@@ -23,6 +23,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{headers, _}
+import amient.affinity.example.MyAvroSerde
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
@@ -30,7 +31,7 @@ import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
 import io.amient.affinity.core.serde.StringSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
 import io.amient.affinity.core.util.TimeCryptoProof
-import io.amient.affinity.example.data.{ConfigEntry, MyAvroSerde}
+import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.handler._
 
 import scala.concurrent.Promise
@@ -65,7 +66,7 @@ class HttpGateway extends Gateway with ActorState {
     * can be modified by other nodes and need to be accessed concurrently
     */
   val settings = state {
-    new KafkaStorage[String, ConfigEntry](brokers = "loclahost:9092", topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
+    new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
       with MemStoreConcurrentMap[String, ConfigEntry]
   }
 

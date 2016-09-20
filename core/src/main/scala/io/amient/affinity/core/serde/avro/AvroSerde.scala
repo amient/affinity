@@ -20,32 +20,26 @@
 package io.amient.affinity.core.serde.avro
 
 import io.amient.affinity.core.serde.Serde
-import org.apache.avro.Schema
 
-abstract class AvroSerde extends Serde {
+abstract class AvroSerde extends Serde with AvroSchemaProvider {
 
   override def identifier: Int = 101
 
-  val reg1: Map[Class[_], Int] = register.zipWithIndex.map { case ((cls, schema), i) =>
-    cls -> i
-  }.toMap
 
-  val reg2: Map[Int, (Class[_], Schema)] = register.zipWithIndex.map { case ((cls, schema), i) =>
-    i -> (cls, schema)
-  }.toMap
-
-  def register: Seq[(Class[_], Schema)]
-
-  override protected def fromBytes(bytes: Array[Byte]): AnyRef = {
-    AvroRecord.read(bytes, (schemaId: Int) => reg2(schemaId))
-  }
+  override protected def fromBytes(bytes: Array[Byte]): AnyRef = AvroRecord.read(bytes, this)
 
   override protected def toBytes(obj: Any): Array[Byte] = {
-    if (obj == null) null else reg1.get(obj.getClass) match {
-      case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
-      case Some(schemaId) =>
-        val schema = reg2(schemaId)._2
-        AvroRecord.write(obj, schema, schemaId)
+    if (obj == null) null
+    else obj match {
+      //AvroRecords are capable of forward-compatible schema evolution
+      case record: AvroRecord => schema(record.getSchema) match {
+        case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
+        case Some(schemaId) => AvroRecord.write(obj, record.getSchema, schemaId)
+      }
+      case _ => schema(obj.getClass) match {
+        case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
+        case Some(schemaId) => AvroRecord.write(obj, schema(schemaId)._2, schemaId)
+      }
     }
   }
 
