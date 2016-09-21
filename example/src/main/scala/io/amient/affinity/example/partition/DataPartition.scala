@@ -100,7 +100,7 @@ class DataPartition extends Partition {
       * This is a non-recursive operation, local to the
       * data shard owned by this partition.
       */
-    case component@Component(vertex, newEdges) =>
+    case component@Component(vertex, newEdges, op) =>
       graph.get(vertex) match {
         case Some(existing) => connect(existing, newEdges)
         case None => connect(Component(vertex, Set[Vertex]()), newEdges)

@@ -19,7 +19,8 @@
 
 package io.amient.affinity.core.serde
 
-import io.amient.affinity.core.serde.avro.{AvroRecord, EmbeddedAvroSerde}
+import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import org.scalatest.{FlatSpec, Matchers}
 
 class AvroSerdeSpec extends FlatSpec with Matchers {
@@ -27,7 +28,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
   /**
     * Data version 1 is written at some point in the past
     */
-  val oldSerde = new EmbeddedAvroSerde {
+  val oldSerde = new AvroSerde with EmbeddedAvroSchemaProvider {
     register(classOf[_V1_Composite])
 
     //Future schema V2 available in old version - slightly unrealistic for embedded registry but here we're testing
@@ -41,7 +42,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     * New version 2 of the case class and schema is added at the end of registry
     * the previous V1 schema version now points to the newest case class.
     */
-  val newSerde = new EmbeddedAvroSerde {
+  val newSerde = new AvroSerde with EmbeddedAvroSchemaProvider {
     register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
     register(classOf[Composite])
     register(classOf[Base])

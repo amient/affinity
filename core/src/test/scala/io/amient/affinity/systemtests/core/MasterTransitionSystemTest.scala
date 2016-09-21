@@ -28,7 +28,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.ResponseBuilder
-import io.amient.affinity.core.serde.StringSerde
+import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.systemtests.SystemTestBaseWithKafka
 import org.apache.kafka.clients.producer.ProducerRecord

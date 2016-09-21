@@ -26,7 +26,7 @@ import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 
 trait Serde extends JSerializer with Serializer[Any] with Deserializer[Any] {
 
-  protected def fromBytes(bytes: Array[Byte]): AnyRef
+  protected def fromBytes(bytes: Array[Byte]): Any
 
   protected def toBytes(obj: Any): Array[Byte]
 
@@ -36,8 +36,6 @@ trait Serde extends JSerializer with Serializer[Any] with Deserializer[Any] {
 
   override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj)
 
-  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes)
-
   override def serialize(topic: String, data: scala.Any): Array[Byte] = toBytes(data)
 
   override def deserialize(topic: String, data: Array[Byte]): Any = fromBytes(data)
@@ -46,5 +44,17 @@ trait Serde extends JSerializer with Serializer[Any] with Deserializer[Any] {
 
   override def close(): Unit = ()
 
+  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes) match {
+    case ref: AnyRef => ref
+    case u: Unit => u.asInstanceOf[AnyRef]
+    case z: Boolean => z.asInstanceOf[AnyRef]
+    case b: Byte => b.asInstanceOf[AnyRef]
+    case c: Char => c.asInstanceOf[AnyRef]
+    case s: Short => s.asInstanceOf[AnyRef]
+    case i: Int => i.asInstanceOf[AnyRef]
+    case l: Long => l.asInstanceOf[AnyRef]
+    case f: Float => f.asInstanceOf[AnyRef]
+    case d: Double => d.asInstanceOf[AnyRef]
+  }
 
 }

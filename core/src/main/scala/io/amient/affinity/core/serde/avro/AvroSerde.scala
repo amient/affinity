@@ -20,8 +20,9 @@
 package io.amient.affinity.core.serde.avro
 
 import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 
-abstract class EmbeddedAvroSerde extends Serde with AvroSchemaProvider {
+trait AvroSerde extends Serde with AvroSchemaProvider {
 
   override def identifier: Int = 101
 

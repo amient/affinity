@@ -25,7 +25,6 @@ import org.scalatest.{FlatSpec, Matchers}
 object Side extends Enumeration {
   type Side = Value
   val LEFT, RIGHT = Value
-  val symbols = values.toList.map(_.toString)
 }
 
 case class Base(val id: Int, val side: Side.Value = Side.LEFT) extends AvroRecord[Base]

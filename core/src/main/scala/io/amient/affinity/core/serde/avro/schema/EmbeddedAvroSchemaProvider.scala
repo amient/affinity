@@ -17,14 +17,15 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro
+package io.amient.affinity.core.serde.avro.schema
 
+import io.amient.affinity.core.serde.avro.AvroRecord
 import org.apache.avro.Schema
 
 import scala.reflect.runtime.universe._
 
 // TODO This class is not fully Thread-Safe at the moment but once the API is completed it should be reimplemented.
-trait AvroSchemaProvider {
+trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
 
   private val register = scala.collection.mutable.LinkedHashMap[Schema, (Class[_], Type)]()
 
@@ -34,11 +35,11 @@ trait AvroSchemaProvider {
 
   private var reg3: Map[Schema, Int] = Map()
 
-  def schema(id: Int): (Type, Class[_], Schema) = reg2(id)
+  override def schema(id: Int): (Type, Class[_], Schema) = reg2(id)
 
-  def schema(cls: Class[_]): Option[Int] = reg1.get(cls)
+  override def schema(cls: Class[_]): Option[Int] = reg1.get(cls)
 
-  def schema(schema: Schema): Option[Int] = reg3.get(schema)
+  override def schema(schema: Schema): Option[Int] = reg3.get(schema)
 
   /**
     * register run-time type and its new schema

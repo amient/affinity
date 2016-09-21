@@ -20,17 +20,22 @@
 package io.amient.affinity.example
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.{AvroRecord, EmbeddedAvroSerde}
+import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
+import org.apache.avro.Schema
 
-class MyAvroSerde extends EmbeddedAvroSerde  {
-
-  register(classOf[Vertex]) //0
-  register(classOf[Edge]) //1
-  register(classOf[Component]) //2
-  register(classOf[ConfigEntry]) //3
-  //TODO try declarative schema evolution by adding enum to the Component
-
+class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
+  //0
+  register(classOf[Vertex])
+  //1
+  register(classOf[Edge])
+  //2 example of declarative schema evolution - here is an older version of the Component with its literal schema snapshot
+  register(classOf[Component], new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Component\",\"namespace\":\"io.amient.affinity.example\",\"fields\":[{\"name\":\"key\",\"type\":{\"type\":\"record\",\"name\":\"Vertex\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]}},{\"name\":\"edges\",\"type\":{\"type\":\"array\",\"items\":\"Vertex\"}}]}"))
+  //3
+  register(classOf[ConfigEntry])
+  //4 this is the latest verson of the Component class
+  register(classOf[Component])
 }
 
 final case class Vertex(id: Int) extends AvroRecord[Vertex] {
@@ -41,7 +46,14 @@ final case class Edge(source: Vertex, target: Vertex) extends AvroRecord[Edge] {
   override def hashCode(): Int = source.hashCode()
 }
 
-final case class Component(val key: Vertex, val edges: Set[Vertex]) extends AvroRecord[Component] {
+object Operation extends Enumeration {
+  type Side = Value
+  val ASSIGN, ADD, REMOVE = Value
+}
+
+
+final case class Component(val key: Vertex, val edges: Set[Vertex], op: Operation.Value = Operation.ASSIGN)
+  extends AvroRecord[Component] {
   override def hashCode(): Int = key.hashCode
 }
 

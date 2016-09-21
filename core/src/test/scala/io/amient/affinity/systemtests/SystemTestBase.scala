@@ -32,7 +32,7 @@ import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Gateway, Partition}
 import io.amient.affinity.core.cluster.{Cluster, CoordinatorZk, Node}
-import io.amient.affinity.core.serde.StringSerde
+import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.util.{ObjectHashPartitioner, ZooKeeperClient}
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}

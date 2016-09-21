@@ -28,7 +28,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
-import io.amient.affinity.core.serde.StringSerde
+import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreConcurrentMap}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.rest.handler._

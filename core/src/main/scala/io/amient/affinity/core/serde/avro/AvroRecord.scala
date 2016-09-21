@@ -22,6 +22,7 @@ package io.amient.affinity.core.serde.avro
 import java.io.ByteArrayOutputStream
 
 import com.fasterxml.jackson.annotation.JsonIgnore
+import io.amient.affinity.core.serde.avro.schema.{AvroSchemaProvider}
 import org.apache.avro.Schema.Type._
 import org.apache.avro.SchemaBuilder.FieldAssembler
 import org.apache.avro.generic.GenericData.EnumSymbol

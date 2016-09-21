@@ -17,15 +17,13 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde
+package io.amient.affinity.example
 
-class StringSerde extends Serde {
+import io.amient.affinity.core.serde.avro.AvroRecord
+import org.scalatest.{FlatSpec, Matchers}
 
-  override protected def fromBytes(bytes: Array[Byte]): AnyRef = if (bytes == null) null else new String(bytes, "UTF-8")
+class DomainSpec extends FlatSpec with Matchers {
 
-  override protected def toBytes(obj: Any): Array[Byte] = if (obj == null) null else {
-    obj.asInstanceOf[String].getBytes("UTF-8")
-  }
+  println(AvroRecord.inferSchema(classOf[Component]))
 
-  override def identifier: Int = 21
 }
