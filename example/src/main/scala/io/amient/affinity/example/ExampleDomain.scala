@@ -20,16 +20,16 @@
 package io.amient.affinity.example
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.serde.avro.{AvroRecord, EmbeddedAvroSerde}
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 
-class MyAvroSerde extends AvroSerde  {
+class MyAvroSerde extends EmbeddedAvroSerde  {
 
-  require(AvroRecord.inferSchema(classOf[Vertex]) != AvroRecord.inferSchema(classOf[Edge]))
   register(classOf[Vertex]) //0
   register(classOf[Edge]) //1
   register(classOf[Component]) //2
   register(classOf[ConfigEntry]) //3
+  //TODO try declarative schema evolution by adding enum to the Component
 
 }
 
