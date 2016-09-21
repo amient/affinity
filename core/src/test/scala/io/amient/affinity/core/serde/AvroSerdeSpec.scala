@@ -19,8 +19,7 @@
 
 package io.amient.affinity.core.serde
 
-import io.amient.affinity.core.serde.avro.AvroSerde
-import org.apache.avro.Schema
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import org.scalatest.{FlatSpec, Matchers}
 
 class AvroSerdeSpec extends FlatSpec with Matchers {
@@ -29,44 +28,43 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     * Data version 1 is written at some point in the past
     */
   val oldSerde = new AvroSerde {
-    override def register: Seq[(Schema, Class[_])] = Seq(
-      Base.schema -> classOf[Base],
-      Composite.schemaV1 -> classOf[_V1_Composite],
-      Composite.schemaV2 -> classOf[_V1_Composite]
-      //Future schema V2 available in old version - slightly unrealistic for embedded registry but here we're testing
-      //the API for handling serialization, not the embedded implementation of registry, i.e. this would be true
-      //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
-    )
+    register(classOf[_V1_Composite])
+
+    //Future schema V2 available in old version - slightly unrealistic for embedded registry but here we're testing
+    //the API for handling serialization, not the embedded implementation of registry, i.e. this would be true
+    //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
+    register(classOf[_V1_Composite].getName, AvroRecord.inferSchema(classOf[Composite]))
+    register(classOf[Base])
   }
-  val oldValue = oldSerde.toBinary(_V1_Composite(Seq(Base(1, Side.LEFT)), 10))
 
   /**
     * New version 2 of the case class and schema is added at the end of registry
     * the previous V1 schema version now points to the newest case class.
     */
   val newSerde = new AvroSerde {
-    override def register: Seq[(Schema, Class[_])] = Seq(
-      Base.schema -> classOf[Base],
-      Composite.schemaV1 -> classOf[Composite],
-      Composite.schemaV2 -> classOf[Composite]
-    )
+    register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
+    register(classOf[Composite])
+    register(classOf[Base])
   }
 
-  /**
-    * Backward compatible schemas - data written with Version 1 schema is encountered with
-    * newer serde and is rendered via avro schema evolution into the latest case class form.
-    */
-  val upgradedValue = newSerde.fromBinary(oldValue)
-  upgradedValue should be(Composite(Seq(Base(1, Side.LEFT)), Map()))
+  "Schema Registry" should "preserve strict ordering when registering classes" in {
+    oldSerde.schema(classOf[_V1_Composite]) should be(Some(1))
+    oldSerde.schema(classOf[Base]) should be(Some(2))
+    newSerde.schema(classOf[Composite]) should be(Some(1))
+    newSerde.schema(classOf[Base]) should be(Some(2))
+  }
 
-  val newValue = newSerde.toBinary(upgradedValue)
+  "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
+    val oldValue = oldSerde.toBinary(_V1_Composite(Seq(Base(1, Side.LEFT)), 10))
+    val renderedValue = newSerde.fromBinary(oldValue)
+    renderedValue should be(Composite(Seq(Base(1, Side.LEFT)), Map()))
+  }
 
-  /**
-    * Forward compatible schemas - newer version of data is encountered by an older serde.
-    */
-  // FIXME the last obstacle for having the neat API between scala case classes and avro records is getting the compile time schema associated with the class
-  //  val downgradedValue = oldSerde.fromBinary(newValue)
-  //  downgradedValue should be(_V1_Composite(Seq(Base(1, Side.LEFT)), 0))
+  "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
+    val newValue = newSerde.toBinary(Composite(Seq(Base(1, Side.LEFT)), Map("1" -> Base(1, Side.LEFT))))
+    val downgradedValue = oldSerde.fromBinary(newValue)
+    downgradedValue should be(_V1_Composite(Seq(Base(1, Side.LEFT)), 0))
+  }
 
 
 }

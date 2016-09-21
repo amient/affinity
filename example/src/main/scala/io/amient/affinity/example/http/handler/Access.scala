@@ -22,9 +22,9 @@ package io.amient.affinity.example.rest.handler
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
+import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.ResponseBuilder
-import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.core.util.TimeCryptoProof
 

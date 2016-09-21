@@ -17,15 +17,14 @@
  * limitations under the License.
  */
 
-package amient.affinity.example.partition
+package io.amient.affinity.example.partition
 
 import akka.actor.Status
-import amient.affinity.example.MyAvroSerde
+import io.amient.affinity.example.{Component, MyAvroSerde, Vertex}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Partition, Region}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
-import io.amient.affinity.example.data.{Component, Vertex}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set

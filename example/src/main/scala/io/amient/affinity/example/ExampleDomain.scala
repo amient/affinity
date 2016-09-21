@@ -17,23 +17,37 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.example
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
-import org.apache.avro.SchemaBuilder
 
-object ConfigEntry {
-  val schema = SchemaBuilder.record("ConfigEntry")
-    .namespace("io.amient.affinity.example.data").fields()
-    .name("val1").`type`().stringType().noDefault()
-    .name("salt").`type`().stringType().noDefault()
-    .endRecord()
+class MyAvroSerde extends AvroSerde  {
+
+  require(AvroRecord.inferSchema(classOf[Vertex]) != AvroRecord.inferSchema(classOf[Edge]))
+  register(classOf[Vertex]) //0
+  register(classOf[Edge]) //1
+  register(classOf[Component]) //2
+  register(classOf[ConfigEntry]) //3
+
 }
 
-final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord(ConfigEntry.schema) {
+final case class Vertex(id: Int) extends AvroRecord[Vertex] {
+  override def hashCode(): Int = id.hashCode()
+}
+
+final case class Edge(source: Vertex, target: Vertex) extends AvroRecord[Edge] {
+  override def hashCode(): Int = source.hashCode()
+}
+
+final case class Component(val key: Vertex, val edges: Set[Vertex]) extends AvroRecord[Component] {
+  override def hashCode(): Int = key.hashCode
+}
+
+final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
   override def hashCode(): Int = description.hashCode()
-
 }
+
+

@@ -23,16 +23,33 @@ import java.io.ByteArrayOutputStream
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.avro.Schema.Type._
+import org.apache.avro.SchemaBuilder.FieldAssembler
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord, IndexedRecord}
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.Utf8
-import org.apache.avro.{AvroRuntimeException, Schema}
+import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
 
 import scala.collection.JavaConverters._
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe._
 
 object AvroRecord {
+
+  private val typeSchemaCache = scala.collection.mutable.Map[Type, Schema]()
+
+  private val cacheNameCache = scala.collection.mutable.Map[String, Class[_]]()
+
+  private def classForName(fullClassName: String): Class[_] = {
+    cacheNameCache.get(fullClassName) match {
+      case Some(cls) => cls
+      case None =>
+        val cls = Class.forName(fullClassName)
+        cacheNameCache.put(fullClassName, cls)
+        cls
+    }
+  }
 
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
     write(x, x.getSchema, schemaId)
@@ -54,51 +71,48 @@ object AvroRecord {
     }
   }
 
-  def read[T](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
+  def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
 
-  def read[T](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema): T = {
+  def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema): T = {
     val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
     read(bytes, cls, writerSchema, readerSchema, decoder)
   }
 
   def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): AnyRef = {
-    if (bytes == null) null.asInstanceOf[AnyRef] else {
+    if (bytes == null) null.asInstanceOf[AnyRef]
+    else {
       val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
       val schemaId = decoder.readInt()
       require(schemaId >= 0)
-      val (cls, writerSchema) = schemaRegistry.schema(schemaId)
-      schemaRegistry.schema(cls) match {
-        case None => ???
-
-        case Some(readerSchemaId) if (schemaId == readerSchemaId) =>
-          read(bytes, cls, writerSchema, writerSchema, decoder).asInstanceOf[AnyRef]
-
-        case Some(readerSchemaId) =>
-          val (clz, readerSchema) = schemaRegistry.schema(readerSchemaId)
-          require(cls == clz)
-          read(bytes, cls, writerSchema, readerSchema, decoder).asInstanceOf[AnyRef]
-      }
+      val (tpe, cls, writerSchema) = schemaRegistry.schema(schemaId)
+      val readerSchema = inferSchema(tpe)
+      val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
+      val record: GenericRecord = reader.read(null, decoder)
+      readRecord(record, cls)
     }
   }
 
-  private def read[T](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema, decoder: BinaryDecoder): T = {
+  private def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema, decoder: BinaryDecoder): T = {
     val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
     val record: GenericRecord = reader.read(null, decoder)
     readRecord(record, cls).asInstanceOf[T]
   }
 
-  private val cache = scala.collection.mutable.Map[String, Class[_]]()
+  //TODO readDatum(record: GenericRecord, tpe: Type): AnyRef
+
+  private def readRecord(record: GenericRecord, cls: Class[_]): AnyRef = {
+    val c = cls.getConstructors()(0)
+    val params = c.getParameterTypes
+    val arguments: Seq[Object] = record.getSchema.getFields.asScala.map { field =>
+      val datum: AnyRef = record.get(field.pos)
+      val param: Class[_] = params(field.pos)
+      readDatum(datum, param, field.schema)
+    }
+    c.newInstance(arguments: _*).asInstanceOf[AnyRef]
+  }
+
   private def readDatum(datum: Any, cls: Class[_], schema: Schema): AnyRef = {
 
-    def classCache(fullClassName: String): Class[_] = {
-      cache.get(fullClassName) match {
-        case Some(cls) => cls
-        case None =>
-          val cls = Class.forName(fullClassName)
-          cache.put(fullClassName, cls)
-          cls
-      }
-    }
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])
@@ -108,15 +122,16 @@ object AvroRecord {
       case LONG => new java.lang.Long(datum.asInstanceOf[Long])
       case FIXED | BYTES => datum.asInstanceOf[Array[Byte]]
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
-      case RECORD => readRecord(datum.asInstanceOf[GenericRecord], classCache(schema.getFullName))
-      case ENUM => classCache(schema.getFullName).getMethod("withName", classOf[String])
-          .invoke(null, datum.asInstanceOf[EnumSymbol].toString)
+      case RECORD => readRecord(datum.asInstanceOf[GenericRecord], classForName(schema.getFullName))
+      case ENUM => classForName(schema.getFullName).getMethod("withName", classOf[String])
+        .invoke(null, datum.asInstanceOf[EnumSymbol].toString)
       case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
-          .map{ case (k,v)  => (
-            k.toString,
-            readDatum(v, classCache(schema.getValueType.getFullName), schema.getValueType))}
+        .map { case (k, v) => (
+          k.toString,
+          readDatum(v, classForName(schema.getValueType.getFullName), schema.getValueType))
+        }
       case ARRAY => val iterable = datum.asInstanceOf[java.util.Collection[_]].asScala
-          .map(item => readDatum(item, classCache(schema.getElementType.getFullName), schema.getElementType))
+        .map(item => readDatum(item, classForName(schema.getElementType.getFullName), schema.getElementType))
         if (cls.isAssignableFrom(classOf[Set[_]])) {
           iterable.toSet
         } else if (cls.isAssignableFrom(classOf[List[_]])) {
@@ -130,26 +145,101 @@ object AvroRecord {
         } else {
           iterable
         }
-      case UNION=> throw new NotImplementedError("Avro Unions are not supported")
+      case UNION => throw new NotImplementedError("Avro Unions are not supported")
     }
   }
 
-  private def readRecord[T](record: GenericRecord, cls: Class[T]): AnyRef = {
-    val c = cls.getConstructors()(0)
-    val params = c.getParameterTypes
-    val arguments: Seq[Object] = record.getSchema.getFields.asScala.map { field =>
-      val datum: AnyRef = record.get(field.pos)
-      val param: Class[_] = params(field.pos)
-      readDatum(datum, param, field.schema)
-    }
-    c.newInstance(arguments: _*).asInstanceOf[AnyRef]
-  }
 
+  def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
+
+  private def inferSchema(tpe: Type): Schema = {
+
+    def assembleField(assembler: FieldAssembler[Schema], param: (Symbol, Option[Any])): FieldAssembler[Schema] = {
+
+      val name = param._1.name.toString
+      val t = param._1.typeSignature
+      val default = param._2
+
+      if (t <:< typeOf[Map[_, _]]) {
+        val valueSchema = inferSchema(t.typeArgs(1))
+        val map = assembler.name(name).`type`.map().values().`type`(valueSchema)
+        default match {
+          case None => map.noDefault()
+          case Some(arg) => map.mapDefault(arg.asInstanceOf[Map[String, _]].asJava)
+        }
+      } else if (t <:< typeOf[Iterable[_]]) {
+        val itemSchema = inferSchema(t.typeArgs(0))
+        val array = assembler.name(name).`type`.array().items().`type`(itemSchema)
+        default match {
+          case None => array.noDefault()
+          case Some(arg) => array.arrayDefault(arg.asInstanceOf[Iterable[_]].toList.asJava)
+        }
+
+      } else if (t <:< typeOf[scala.Enumeration#Value]) {
+        t match {
+          case TypeRef(enumType, _, _) =>
+            val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
+            val instanceMirror = rootMirror.reflect(moduleMirror.instance)
+            val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
+            val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
+            val args = enumSymbols.toSeq.map(_.toString)
+            val enum = assembler.name(name).`type`.enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
+            default match {
+              case None => enum.noDefault()
+              case Some(arg) => enum.enumDefault(arg.asInstanceOf[Enumeration#Value].toString)
+            }
+        }
+      } else if (t =:= definitions.IntTpe) {
+        val int = assembler.name(name).`type`.intType()
+        default match {
+          case None => int.noDefault()
+          case Some(arg) => int.intDefault(arg.asInstanceOf[Int])
+        }
+      } else if (t =:= typeOf[String]) {
+        val str = assembler.name(name).`type`.stringType()
+        default match {
+          case None => str.noDefault()
+          case Some(arg) => str.stringDefault(arg.asInstanceOf[String])
+        }
+      } else {
+        val nestedRecord = assembler.name(name).`type`(inferSchema(t))
+        default match {
+          case None => nestedRecord.noDefault()
+          case Some(arg) => nestedRecord.withDefault(arg)
+        }
+      }
+    }
+
+    //TODO thread-safe type cache
+    typeSchemaCache.get(tpe) match {
+      case Some(schema) => schema
+      case None =>
+        val moduleMirror = rootMirror.reflectModule(tpe.typeSymbol.companion.asModule)
+        val companionMirror = rootMirror.reflect(moduleMirror.instance)
+        val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
+        val params: List[(Symbol, Option[Any])] = constructor.asMethod.paramLists(0).zipWithIndex.map { case (symbol, i) =>
+          val defaultArg = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
+          if (defaultArg != NoSymbol) {
+            val methodMirror = companionMirror.reflectMethod(defaultArg.asMethod)
+            (symbol, Some(methodMirror()))
+          } else {
+            (symbol, None)
+          }
+        }
+
+        val assembler = SchemaBuilder.record(tpe.toString).fields()
+        params.foldLeft(assembler) { case (assembler, param) => assembleField(assembler, param) }
+        val schema = assembler.endRecord()
+        typeSchemaCache.put(tpe, schema)
+        schema
+    }
+  }
 
 }
 
-abstract class AvroRecord(@JsonIgnore schema: Schema) extends SpecificRecord with java.io.Serializable {
+abstract class AvroRecord[X: TypeTag] extends SpecificRecord with java.io.Serializable {
 
+  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(typeOf[X])
   private val schemaFields = schema.getFields
   private val params = getClass.getConstructors()(0).getParameters
   require(params.length == schemaFields.size,
@@ -179,6 +269,6 @@ abstract class AvroRecord(@JsonIgnore schema: Schema) extends SpecificRecord wit
   }
 
   final override def put(i: Int, v: scala.Any): Unit = {
-    throw new AvroRuntimeException("Scala AvroRecorod is immutable")
+    throw new AvroRuntimeException("Scala AvroRecord is immutable")
   }
 }

@@ -21,26 +21,64 @@ package io.amient.affinity.core.serde.avro
 
 import org.apache.avro.Schema
 
+import scala.reflect.runtime.universe._
+
+// TODO This class is not fully Thread-Safe at the moment but once the API is completed it should be reimplemented.
 trait AvroSchemaProvider {
 
-  private val reg1: Map[Class[_], Int] = register.zipWithIndex.map { case ((schema, cls), i) =>
-    cls -> i
-  }.toMap
+  private val register = scala.collection.mutable.LinkedHashMap[Schema, (Class[_], Type)]()
 
-  private val reg2: Map[Int, (Class[_], Schema)] = register.zipWithIndex.map { case ((schema, cls), i) =>
-    i -> (cls, schema)
-  }.toMap
+  private var reg1: Map[Class[_], Int] = Map()
 
-  private val reg3: Map[Schema, Int] = register.zipWithIndex.map { case ((schema, cls), i) =>
-    schema -> i
-  }.toMap
+  private var reg2: Map[Int, (Type, Class[_], Schema)] = Map()
 
-  protected def register: Seq[(Schema, Class[_])]
+  private var reg3: Map[Schema, Int] = Map()
 
-  def schema(id: Int): (Class[_], Schema) = reg2(id)
+  def schema(id: Int): (Type, Class[_], Schema) = reg2(id)
 
   def schema(cls: Class[_]): Option[Int] = reg1.get(cls)
 
   def schema(schema: Schema): Option[Int] = reg3.get(schema)
 
+  /**
+    * register run-time type and its new schema
+    * @param schema
+    * @param className
+    */
+  final def register(className: String, schema: Schema): Unit = synchronized {
+    val (tpe, cls, currentSchema) = reg2(reg1(Class.forName(className)))
+    register(tpe, cls,  schema)
+  }
+
+  /**
+    * register compile-time type with its current schema
+    * @param cls
+    * @tparam T
+    */
+  final def register[T: TypeTag](cls: Class[T]): Unit = synchronized {
+    register(typeOf[T], cls, AvroRecord.inferSchema(cls))
+  }
+
+  /**
+    * register compile-time type with older schema version
+    * @param schema
+    * @param cls
+    * @tparam T
+    */
+  final def register[T: TypeTag](cls: Class[T], schema: Schema): Unit = synchronized {
+    register(typeOf[T], cls, schema)
+  }
+
+  private def register(tpe: Type, cls: Class[_], schema: Schema): Unit = synchronized {
+    register += schema -> (cls, tpe)
+    reg1 = register.zipWithIndex.map { case ((schema, (cls, tpe)), i) =>
+      cls -> i
+    }.toMap
+    reg2 = register.zipWithIndex.map { case ((schema, (cls, tpe)), i) =>
+      i -> (tpe, cls, schema)
+    }.toMap
+    reg3 = register.zipWithIndex.map { case ((schema, cls), i) =>
+      schema -> i
+    }.toMap
+  }
 }

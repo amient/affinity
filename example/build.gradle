@@ -5,7 +5,7 @@ apply plugin: 'scala'
 apply plugin: 'java'
 
 ext {
-    mainClass = "io.amient.affinity.example.ExampleApp"
+    mainClass = "io.io.amient.affinity.example.ExampleApp"
     mainScript = "example-graph-api"
 }
 

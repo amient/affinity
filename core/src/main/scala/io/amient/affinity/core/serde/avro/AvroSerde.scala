@@ -25,20 +25,21 @@ abstract class AvroSerde extends Serde with AvroSchemaProvider {
 
   override def identifier: Int = 101
 
-
   override protected def fromBytes(bytes: Array[Byte]): AnyRef = AvroRecord.read(bytes, this)
 
   override protected def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else obj match {
       //AvroRecords are capable of forward-compatible schema evolution
-      case record: AvroRecord => schema(record.getSchema) match {
+      case record: AvroRecord[_] => schema(record.getSchema) match {
         case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
         case Some(schemaId) => AvroRecord.write(obj, record.getSchema, schemaId)
       }
       case _ => schema(obj.getClass) match {
         case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
-        case Some(schemaId) => AvroRecord.write(obj, schema(schemaId)._2, schemaId)
+        case Some(schemaId) =>
+          val (_, _, writerSchema) = schema(schemaId)
+          AvroRecord.write(obj, writerSchema, schemaId)
       }
     }
   }

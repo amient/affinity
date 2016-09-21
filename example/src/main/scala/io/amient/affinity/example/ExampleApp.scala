@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example
 
-import amient.affinity.example.partition.DataPartition
+import io.amient.affinity.example.partition.DataPartition
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.ServiceNode
 

@@ -21,6 +21,7 @@ package io.amient.affinity.core.storage
 
 import java.util
 import java.util.Properties
+import java.util.concurrent.atomic.AtomicReference
 
 import io.amient.affinity.core.serde.Serde
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -45,6 +46,7 @@ abstract class KafkaStorage[K, V](brokers: String,
   val kafkaProducer = new KafkaProducer[K, V](producerProps)
 
   private var tailing = true
+  private val consumerError = new AtomicReference[Throwable](null)
 
   private val consumer = new Thread {
     val consumerProps = new Properties()
@@ -69,7 +71,6 @@ abstract class KafkaStorage[K, V](brokers: String,
 
           val bootOffset = kafkaConsumer.position(tp)
           kafkaConsumer.seekToEnd(consumerPartitions)
-          kafkaConsumer.poll(50L)
           val lastOffset = kafkaConsumer.position(tp)
           kafkaConsumer.seek(tp, bootOffset)
 
@@ -79,22 +80,32 @@ abstract class KafkaStorage[K, V](brokers: String,
 
             if (isInterrupted) throw new InterruptedException
 
-            val records = kafkaConsumer.poll(500)
-            var fetchedNumRecrods = 0
-            for (r <- records.iterator().asScala) {
-              fetchedNumRecrods += 1
-              if (r.value == null) {
-                remove(r.key)
-              } else {
-                update(r.key, r.value)
+            try {
+              val records = kafkaConsumer.poll(500)
+              var fetchedNumRecrods = 0
+              for (r <- records.iterator().asScala) {
+                fetchedNumRecrods += 1
+                if (r.value == null) {
+                  remove(r.key)
+                } else {
+                  update(r.key, r.value)
+                }
               }
-            }
-            //TODO the fact that fetchedNumRecords is 0 doesn't still guarantee that there were not other records
-            //produced by another instance - to reliably know that the consumer is fully caught up,
-            // there should be a watermark maintained by the master which is updated similarly to standard
-            // kafka consumer offset
-            if (!tailing && fetchedNumRecrods == 0) { //&& kafkaConsumer.position(tp) >= lastOffset) {
-              keepConsuming = false
+              //TODO the fact that fetchedNumRecords is 0 doesn't still guarantee that there were not other records
+              //produced by another instance - to reliably know that the consumer is fully caught up,
+              // there should be a watermark maintained by the master which is updated similarly to standard
+              // kafka consumer offset
+              if (!tailing && fetchedNumRecrods == 0) { //&& kafkaConsumer.position(tp) >= lastOffset) {
+                keepConsuming = false
+              }
+            } catch {
+              case e: Throwable =>
+                e.printStackTrace()
+                synchronized {
+                  consumerError.set(e)
+                  notify
+                }
+                this.interrupt()
             }
           }
 
@@ -118,8 +129,12 @@ abstract class KafkaStorage[K, V](brokers: String,
     consumer.synchronized {
       if (tailing) {
         tailing = false
-        //TODO require bootstrap timeout
+        //TODO instead of infinite wait do interval wait with health-check
+        // the health check cannot be trivial because kafka may block infinitely when corruption occurs in the broker
         consumer.synchronized(consumer.wait)
+        if (consumerError.get != null) {
+          throw consumerError.get
+        }
       }
     }
   }
