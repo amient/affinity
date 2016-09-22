@@ -64,7 +64,7 @@ class HttpGateway extends Gateway with ActorState {
     * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
     * can be modified by other nodes and need to be accessed concurrently
     */
-  val settings = state {
+  val settings = storage {
     new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
       with MemStoreConcurrentMap[String, ConfigEntry]
   }

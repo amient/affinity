@@ -56,7 +56,7 @@ class DataPartition extends Partition {
 
   //val config = context.system.settings.config
 
-  val graph = state {
+  val graph = storage {
     new KafkaStorage[Vertex, Component](brokers = "localhost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
       with MemStoreSimpleMap[Vertex, Component]
   }
