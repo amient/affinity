@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, See
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.example.{Component, Vertex}
+import io.amient.affinity.example._
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.example.rest.HttpGateway
@@ -42,7 +42,7 @@ trait Connect extends HttpGateway {
   abstract override def handle: Receive = super.handle orElse {
 
     case HTTP(POST, PATH("com", INT(id), INT(id2)), query, response) =>
-      fulfillAndHandleErrors(response, connect(Vertex(id), Set(Vertex(id2))), ContentTypes.`application/json`) {
+      fulfillAndHandleErrors(response, connect(Vertex(id), Vertex(id2)), ContentTypes.`application/json`) {
         case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/com/$id"))))
         case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/com/$id"))))
       }
@@ -62,58 +62,67 @@ trait Connect extends HttpGateway {
 
   }
 
-
-  /**
-    * Connecting a Vertex to 1 or more other Vertices
-    * This is done recursively and reliably using Ask instead of Tell.
-    *
-    * @return Future which fails if any of the propagation steps fail. When successful holds:
-    *         true if the operation resulted in graph modification,
-    *         false if there were no modifications and
-    *         false if no changes were made.
-    */
-  private def connect(vertex: Vertex, withEdges: Set[Vertex]): Future[Boolean] = {
-
-    val promise = Promise[Boolean]()
-
-    implicit val timeout = Timeout(10 seconds)
-
-    cluster ? vertex map {
-      case false => Set[Vertex]()
-      case component: Component => component.edges
-    } map { existingEdges =>
-      val additionalEdges = withEdges.diff(existingEdges)
-      if (additionalEdges.isEmpty) promise.success(false)
-      else {
-        cluster ? Component(vertex, additionalEdges /*Component.AddEdges*/) map {
-          case false => promise.success(false)
-          case true =>
-            val propagate: List[Future[Boolean]] = existingEdges.toList.map {
-              connect(_, additionalEdges)
-            } ++ additionalEdges.toList.map {
-              connect(_, Set(vertex))
-            } map (_ map {
-              case _ => true
-            } recover {
-              case t: Throwable => false
-            })
-
-            for (successes <- Future.sequence(propagate)) {
-              if (!successes.forall(_ == true)) {
-                //TODO compensate failure - use atomic versioning on component object because this is all async and some other call may have modified the component
-                //TODO cluster ! Component(vertex, additionalEdges, Component.RemoveEdges )
-                //TODO AvroRecord enum mapping and evolution test by adding operation type to the Component
-                promise.failure(new IllegalStateException("propagation failed on existing component - attempting to compensate"))
-              } else {
-                promise.success(true)
-              }
-            }
-        }
-      }
-    }
-
-    promise.future
+  def connect(v1: Vertex, v2: Vertex): Future[Any] = {
+    for {
+      oneway <- (cluster ? ModifyGraph(v1, Edge(v2), GOP.ADD)).asInstanceOf[Future[Boolean]]
+      if oneway
+      reverse <- (cluster ? ModifyGraph(v2, Edge(v1), GOP.ADD)).asInstanceOf[Future[Boolean]]
+    } yield reverse
   }
+
+
+  //  /**
+  //    * Connecting a Vertex to 1 or more other Vertices
+  //    * This is done recursively and reliably using Ask instead of Tell.
+  //    *
+  //    * @return Future which fails if any of the propagation steps fail. When successful holds:
+  //    *         true if the operation resulted in graph modification,
+  //    *         false if there were no modifications and
+  //    *         false if no changes were made.
+  //    */
+  //  private def connect(vertex: Vertex, withVertices: Set[Vertex], ts: Long = System.currentTimeMillis): Future[Boolean] = {
+  //
+  //    val promise = Promise[Boolean]()
+  //
+  //    implicit val timeout = Timeout(10 seconds)
+  //
+  //    cluster ? vertex map {
+  //      case false => Set[Edge]()
+  //      case props: VertexProps => props.edges
+  //    } map { existingEdges: Set[Edge] =>
+  //      val additionalEdges = withVertices.map(Edge(_, ts)).diff(existingEdges)
+  //      if (additionalEdges.isEmpty) promise.success(false)
+  //      else {
+  //        cluster ? Component(vertex, additionalEdges, GOP.ADD) map {
+  //          case false => promise.success(false)
+  //          case true =>
+  //            val propagate: List[Future[Boolean]] = existingEdges.toList.map { e =>
+  //              connect(e.target, additionalEdges)
+  //            } ++ additionalEdges.toList.map { e =>
+  //              connect(e.target, Set(vertex))
+  //            } map (_ map {
+  //              case _ => true
+  //            } recover {
+  //              case t: Throwable => false
+  //            })
+  //
+  //            for (successes <- Future.sequence(propagate)) {
+  //              if (!successes.forall(_ == true)) {
+  //                //TODO compensate failure - use atomic versioning on component object because this is all async and some other call may have modified the component
+  //                //TODO cluster ! Component(vertex, additionalEdges, Component.RemoveEdges )
+  //                //TODO AvroRecord enum mapping and evolution test by adding operation type to the Component
+  //                //TODO to have a reliable compensation, each edge has to carry the correlation and root
+  //                promise.failure(new IllegalStateException("propagation failed on existing component - attempting to compensate"))
+  //              } else {
+  //                promise.success(true)
+  //              }
+  //            }
+  //        }
+  //      }
+  //    }
+  //
+  //    promise.future
+  //  }
 
 
 }

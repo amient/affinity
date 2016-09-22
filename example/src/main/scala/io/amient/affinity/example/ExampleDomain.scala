@@ -23,43 +23,44 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
-import org.apache.avro.Schema
 
 class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
   //0
-  register(classOf[Vertex])
+  register(classOf[ConfigEntry])
   //1
   register(classOf[Edge])
-  //2 example of declarative schema evolution - here is an older version of the Component with its literal schema snapshot
-  register(classOf[Component], new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Component\",\"namespace\":\"io.amient.affinity.example\",\"fields\":[{\"name\":\"key\",\"type\":{\"type\":\"record\",\"name\":\"Vertex\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]}},{\"name\":\"edges\",\"type\":{\"type\":\"array\",\"items\":\"Vertex\"}}]}"))
+  //2
+  register(classOf[VertexProps])
   //3
-  register(classOf[ConfigEntry])
-  //4 this is the latest verson of the Component class
-  register(classOf[Component])
-}
+  register(classOf[ModifyGraph])
+  //4
+  register(classOf[UpdateComponent])
+  //5
 
-final case class Vertex(id: Int) extends AvroRecord[Vertex] {
-  override def hashCode(): Int = id.hashCode()
-}
-
-final case class Edge(source: Vertex, target: Vertex) extends AvroRecord[Edge] {
-  override def hashCode(): Int = source.hashCode()
-}
-
-object Operation extends Enumeration {
-  type Side = Value
-  val ASSIGN, ADD, REMOVE = Value
-}
-
-
-final case class Component(val key: Vertex, val edges: Set[Vertex], op: Operation.Value = Operation.ASSIGN)
-  extends AvroRecord[Component] {
-  override def hashCode(): Int = key.hashCode
 }
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
   override def hashCode(): Int = description.hashCode()
+}
+
+final case class Vertex(val id: Int) extends AnyVal
+
+final case class Edge(target: Vertex = Vertex(0), timestamp: Long = 0L) extends AvroRecord[Edge]
+
+final case class VertexProps(edges: Set[Edge] = Set(), component: Set[Vertex] = Set()) extends AvroRecord[VertexProps]
+
+object GOP extends Enumeration {
+  type Side = Value
+  val ADD, REMOVE = Value
+}
+
+final case class ModifyGraph(val key: Vertex, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph]{
+  override def hashCode(): Int = key.hashCode
+}
+
+final case class UpdateComponent(key: Vertex, val component: Set[Vertex] = Set()) extends AvroRecord[UpdateComponent] {
+  override def hashCode(): Int = key.hashCode
 }
 
 

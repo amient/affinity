@@ -19,11 +19,10 @@
 
 package io.amient.affinity.example
 
-import io.amient.affinity.core.serde.avro.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
 
 class DomainSpec extends FlatSpec with Matchers {
 
-  println(AvroRecord.inferSchema(classOf[Component]))
+  //TODO example affinity.testutil
 
 }

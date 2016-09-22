@@ -19,12 +19,14 @@
 
 package io.amient.affinity.example.partition
 
+import java.util.concurrent.Future
+
 import akka.actor.Status
-import io.amient.affinity.example.{Component, MyAvroSerde, Vertex}
+import io.amient.affinity.example._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Partition, Region}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
+import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap, NoopStorage}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
@@ -56,9 +58,13 @@ class DataPartition extends Partition {
 
   //val config = context.system.settings.config
 
-  val graph = state {
-    new KafkaStorage[Vertex, Component](brokers = "localhost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
-      with MemStoreSimpleMap[Vertex, Component]
+  //  val graph = storage {
+  //    new KafkaStorage[Vertex, VertexProps](brokers = "localhost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
+  //      with MemStoreSimpleMap[Vertex, VertexProps]
+  //  }
+
+  val graph = storage {
+    new NoopStorage[Vertex, VertexProps] with MemStoreSimpleMap[Vertex, VertexProps]
   }
 
   override def handle: Receive = {
@@ -88,38 +94,32 @@ class DataPartition extends Partition {
         ))
 
     /**
-      * Viewing a Component by Vertex key
+      * getting VertexProps object by Vertex key
       */
     case vertex: Vertex => graph.get(vertex) match {
       case None => sender ! false
-      case Some(component) => sender ! component
+      case Some(vertexProps) => sender ! vertexProps
     }
 
     /**
-      * Adding edges to a component identified by vertex.
+      * Add edges to a graph vertex.
       * This is a non-recursive operation, local to the
       * data shard owned by this partition.
       */
-    case component@Component(vertex, newEdges, op) =>
+    case ModifyGraph(vertex, edge, GOP.ADD) =>
       graph.get(vertex) match {
-        case Some(existing) => connect(existing, newEdges)
-        case None => connect(Component(vertex, Set[Vertex]()), newEdges)
+        case Some(existing) => add(vertex, existing, edge)
+        case None => add(vertex, VertexProps(), edge)
       }
   }
 
-  private def connect(component: Component, withVertices: Set[Vertex]): Unit = {
+  private def add(vertex: Vertex, existing: VertexProps, edge: Edge): Unit = {
     try {
-      withVertices.diff(component.edges).toList match {
-        case Nil => sender ! false
-        case additionalEdges =>
-          val updatedComponent = Component(component.key, component.edges ++ additionalEdges)
-          graph.put(component.key, Some(updatedComponent))
-          sender ! true
+      if (existing.edges.contains(edge)) sender ! false else {
+        sender ! graph.put(vertex, Some(VertexProps(existing.edges + edge)))
       }
     } catch {
-      case NonFatal(e) =>
-        e.printStackTrace()
-        sender ! Status.Failure(e)
+      case NonFatal(e) => sender ! Status.Failure(e)
     }
   }
 
