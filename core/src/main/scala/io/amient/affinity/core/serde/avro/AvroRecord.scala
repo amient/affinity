@@ -161,7 +161,43 @@ object AvroRecord {
       val t = param._1.typeSignature
       val default = param._2
 
-      if (t <:< typeOf[Map[_, _]]) {
+      if (t =:= typeOf[String]) {
+        val str = assembler.name(name).`type`.stringType()
+        default match {
+          case None => str.noDefault()
+          case Some(arg) => str.stringDefault(arg.asInstanceOf[String])
+        }
+      } else if (t =:= definitions.IntTpe) {
+        val int = assembler.name(name).`type`.intType()
+        default match {
+          case None => int.noDefault()
+          case Some(arg) => int.intDefault(arg.asInstanceOf[Int])
+        }
+      } else if (t =:= definitions.LongTpe) {
+        val int = assembler.name(name).`type`.longType()
+        default match {
+          case None => int.noDefault()
+          case Some(arg) => int.longDefault(arg.asInstanceOf[Long])
+        }
+      } else if (t =:= definitions.BooleanTpe) {
+        val int = assembler.name(name).`type`.booleanType()
+        default match {
+          case None => int.noDefault()
+          case Some(arg) => int.booleanDefault(arg.asInstanceOf[Boolean])
+        }
+      } else if (t =:= definitions.FloatTpe) {
+        val int = assembler.name(name).`type`.floatType()
+        default match {
+          case None => int.noDefault()
+          case Some(arg) => int.floatDefault(arg.asInstanceOf[Float])
+        }
+      } else if (t =:= definitions.DoubleTpe) {
+        val int = assembler.name(name).`type`.doubleType()
+        default match {
+          case None => int.noDefault()
+          case Some(arg) => int.doubleDefault(arg.asInstanceOf[Double])
+        }
+      } else if (t <:< typeOf[Map[_, _]]) {
         val valueSchema = inferSchema(t.typeArgs(1))
         val map = assembler.name(name).`type`.map().values().`type`(valueSchema)
         default match {
@@ -190,24 +226,24 @@ object AvroRecord {
               case Some(arg) => enum.enumDefault(arg.asInstanceOf[Enumeration#Value].toString)
             }
         }
-      } else if (t =:= definitions.IntTpe) {
-        val int = assembler.name(name).`type`.intType()
-        default match {
-          case None => int.noDefault()
-          case Some(arg) => int.intDefault(arg.asInstanceOf[Int])
-        }
-      } else if (t =:= typeOf[String]) {
-        val str = assembler.name(name).`type`.stringType()
-        default match {
-          case None => str.noDefault()
-          case Some(arg) => str.stringDefault(arg.asInstanceOf[String])
-        }
-      } else {
+      } else if (t <:< typeOf[AvroRecord[_]]) {
         val nestedRecord = assembler.name(name).`type`(inferSchema(t))
         default match {
           case None => nestedRecord.noDefault()
           case Some(arg) => nestedRecord.withDefault(arg)
         }
+      } else if (t <:< typeOf[AnyVal]) {
+        val constructor = t.decl(universe.termNames.CONSTRUCTOR).asMethod
+        val valSymbol = constructor.paramLists(0).head
+        default match {
+          case None => assembleField(assembler, (valSymbol, None))
+          case Some(arg) =>
+            val fieldMirror = rootMirror.reflect(arg).reflectField(t.member(valSymbol.name).asTerm)
+            assembleField(assembler, (valSymbol, Some(fieldMirror.get)))
+        }
+      } else {
+        //TODO Avro Case Class support for UUID
+        throw new IllegalArgumentException("Unsupported Avro Case Class type " + t.toString)
       }
     }
 
