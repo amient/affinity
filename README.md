@@ -162,11 +162,11 @@ The example data set is a Graph of Vertices which are connected
 to other Vertices. A group of inter-connected vertices is a Component.
 To view a graph component (vertex id is a simple Int)
 
-    GET http://127.0.0.1:808x/com/<vertex-id> 
+    GET http://127.0.0.1:808x/vertex/<vertex-id> 
 
 To connect 2 vertices into a component(non-existent vertices will be created):
 
-    POST http://127.0.0.1:808x/com/<vertex-id>/<vertex-id> 
+    POST http://127.0.0.1:808x/connect/<vertex-id>/<vertex-id> 
 
 After connecting two components all vertices that have been already 
 connected should be merged into a bigger component. Viewing the 

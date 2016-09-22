@@ -41,20 +41,39 @@ trait Connect extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(POST, PATH("com", INT(id), INT(id2)), query, response) =>
-      fulfillAndHandleErrors(response, connect(Vertex(id), Vertex(id2)), ContentTypes.`application/json`) {
-        case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/com/$id"))))
-        case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/com/$id"))))
+    /**
+      * GET /vertex/<vertex>
+      */
+    case HTTP(GET, PATH("vertex", INT(id)), query, response) =>
+      val task = cluster ? id
+      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+        case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
+        case props => ResponseBuilder.json(OK, props)
       }
 
-    case HTTP(GET, PATH("com", INT(id)), query, response) =>
-      val task = cluster ? Vertex(id)
-      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+
+    /**
+      * POST /component/<vertex>/
+      */
+    case HTTP(POST, PATH("component", INT(id)), query, response) =>
+      fulfillAndHandleErrors(response, collect(id), ContentTypes.`application/json`) {
         case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
         case component => ResponseBuilder.json(OK, component)
       }
 
-    case HTTP(GET, PATH("delegate"), query, response) =>
+    /**
+      * POST /connect/<vertex1>/<vertex2>
+      */
+    case HTTP(POST, PATH("connect", INT(id), INT(id2)), query, response) =>
+      fulfillAndHandleErrors(response, connect(id, id2), ContentTypes.`application/json`) {
+        case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+        case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+      }
+
+    /**
+      * PUT /delegate
+      */
+    case HTTP(PUT, PATH("delegate"), query, response) =>
       val userInputMediator = service(classOf[UserInputMediator])
       userInputMediator ? "hello" onSuccess {
         case userInput: String => response.success(ResponseBuilder.json(OK, Map("userInput" -> userInput)))
@@ -62,12 +81,26 @@ trait Connect extends HttpGateway {
 
   }
 
-  def connect(v1: Vertex, v2: Vertex): Future[Any] = {
+  def connect(v1: Int, v2: Int): Future[Any] = {
     for {
       oneway <- (cluster ? ModifyGraph(v1, Edge(v2), GOP.ADD)).asInstanceOf[Future[Boolean]]
       if oneway
       reverse <- (cluster ? ModifyGraph(v2, Edge(v1), GOP.ADD)).asInstanceOf[Future[Boolean]]
     } yield reverse
+  }
+
+  def collect(vertex: Int): Future[Any] = {
+    val promise = Promise[Component]()
+    implicit val timeout = Timeout(10 seconds)
+    def collect(v: Int, agg: Set[Int]): Unit = {
+      promise.completeWith {
+        cluster ? Component(v, agg) map {
+          case Component(_, add) => Component(v, agg ++ add)
+        }
+      }
+    }
+    collect(vertex, Set())
+    promise.future
   }
 
 

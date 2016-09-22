@@ -59,12 +59,12 @@ class DataPartition extends Partition {
   //val config = context.system.settings.config
 
   //  val graph = storage {
-  //    new KafkaStorage[Vertex, VertexProps](brokers = "localhost:9092", topic = "graph", partition, classOf[MyAvroSerde], classOf[MyAvroSerde])
-  //      with MemStoreSimpleMap[Vertex, VertexProps]
+  //    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition, classOf[IntSerde], classOf[MyAvroSerde])
+  //      with MemStoreSimpleMap[Int, VertexProps]
   //  }
 
   val graph = storage {
-    new NoopStorage[Vertex, VertexProps] with MemStoreSimpleMap[Vertex, VertexProps]
+    new NoopStorage[Int, VertexProps] with MemStoreSimpleMap[Int, VertexProps]
   }
 
   override def handle: Receive = {
@@ -96,7 +96,7 @@ class DataPartition extends Partition {
     /**
       * getting VertexProps object by Vertex key
       */
-    case vertex: Vertex => graph.get(vertex) match {
+    case vertex: Int => graph.get(vertex) match {
       case None => sender ! false
       case Some(vertexProps) => sender ! vertexProps
     }
@@ -106,16 +106,26 @@ class DataPartition extends Partition {
       * This is a non-recursive operation, local to the
       * data shard owned by this partition.
       */
-    case ModifyGraph(vertex, edge, GOP.ADD) =>
-      graph.get(vertex) match {
-        case Some(existing) => add(vertex, existing, edge)
-        case None => add(vertex, VertexProps(), edge)
-      }
+    case ModifyGraph(vertex, edge, GOP.ADD) => graph.get(vertex) match {
+      case Some(existing) => add(vertex, existing, edge)
+      case None => add(vertex, VertexProps(), edge)
+    }
+
+
+    /**
+      * Collect all connected vertices
+      */
+    case Component(vertex, group) => graph.get(vertex) match {
+      case Some(existing) => sender ! Component(vertex, existing.edges.map(_.target))
+      case None => sender ! Component(vertex, Set())
+    }
+
   }
 
-  private def add(vertex: Vertex, existing: VertexProps, edge: Edge): Unit = {
+  private def add(vertex: Int, existing: VertexProps, edge: Edge): Unit = {
     try {
-      if (existing.edges.contains(edge)) sender ! false else {
+      if (existing.edges.contains(edge)) sender ! false
+      else {
         sender ! graph.put(vertex, Some(VertexProps(existing.edges + edge)))
       }
     } catch {
