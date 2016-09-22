@@ -70,7 +70,7 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
   })
 
   class MyTestPartition extends TestPartition {
-    val data = state {
+    val data = storage {
       new KafkaStorage[String, String](kafkaBootstrap, topic, partition, classOf[StringSerde], classOf[StringSerde])
         with MemStoreSimpleMap[String, String]
     }

@@ -55,12 +55,22 @@ trait Storage[K,V] extends MemStore[K, V] {
     * @param key
     * @param value if None is given as value the key will be removed from the underlying storage
     *              otherwise the key will be updated with the value
+    * @return true if the operation resulted in modification of the underlying data structure
     */
-  final def put(key: K, value: Option[V]): Unit = value match {
-    case None => if (remove(key)) write(key, null.asInstanceOf[V]).get()
-    case Some(data) => if (update(key, data)) write(key, data).get()
+  final def put(key: K, value: Option[V]): Boolean = value match {
+    case None => if (remove(key)) {
+      write(key, null.asInstanceOf[V]).get()
+      true
+    } else {
+      false
+    }
+    case Some(data) => if (update(key, data)) {
+      write(key, data).get()
+      true
+    } else {
+      false
+    }
   }
-
 
   /**
     * @param key of the pair

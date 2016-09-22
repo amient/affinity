@@ -27,8 +27,19 @@ trait MemStore[K, V] {
 
   def size: Long
 
+  /**
+    *
+    * @param key
+    * @param value
+    * @return true if the operation resulted in any modification
+    */
   protected def update(key: K, value: V): Boolean
 
+  /**
+    *
+    * @param key
+    * @return true if the operation resulted in any modification
+    */
   protected def remove(key: K): Boolean
 
 }

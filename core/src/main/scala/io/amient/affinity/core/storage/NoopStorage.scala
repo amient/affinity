@@ -16,36 +16,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.amient.affinity.core.storage
 
-package io.amient.affinity.core.actor
+import java.util.concurrent.{CompletableFuture, Future}
 
-import java.util.concurrent.CopyOnWriteArrayList
+abstract class NoopStorage[K,V] extends Storage[K,V] {
 
-import akka.actor.Actor
-import akka.event.Logging
-import io.amient.affinity.core.storage.Storage
+  override def write(key: K, value: V): Future[Unit] = CompletableFuture.completedFuture(())
 
-import scala.collection.JavaConverters._
+  override private[core] def init(): Unit = ()
 
-trait ActorState extends Actor {
+  override private[core] def boot(): Unit = ()
 
-  private val log = Logging.getLogger(context.system, this)
+  override private[core] def tail(): Unit = ()
 
-  private val storageRegistry = new CopyOnWriteArrayList[Storage[_, _]]()
-
-  def storage[K, V](creator: => Storage[K, V]): Storage[K, V] = {
-    val stateStorage: Storage[K, V] = creator
-    stateStorage.init()
-    stateStorage.boot()
-    stateStorage.tail()
-    storageRegistry.add(stateStorage)
-    stateStorage
-  }
-
-  def untailState(): Unit = storageRegistry.asScala.foreach(_.boot())
-
-  def tailState(): Unit = storageRegistry.asScala.foreach(_.tail())
-
-  def closeState(): Unit = storageRegistry.asScala.foreach (_.close())
-
+  override private[core] def close(): Unit = ()
 }
