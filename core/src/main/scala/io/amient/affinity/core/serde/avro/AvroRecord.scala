@@ -113,7 +113,6 @@ object AvroRecord {
   }
 
   private def readDatum(datum: Any, cls: Class[_], schema: Schema): AnyRef = {
-
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])
