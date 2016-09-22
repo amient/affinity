@@ -27,7 +27,9 @@ object Side extends Enumeration {
   val LEFT, RIGHT = Value
 }
 
-case class Base(val id: Int, val side: Side.Value = Side.LEFT) extends AvroRecord[Base]
+case class ID(val id: Int) extends AvroRecord[ID]
+
+case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base]
 
 case class Composite(val items: Seq[Base] = Seq(), val index: Map[String, Base] = Map()) extends AvroRecord[Composite]
 
@@ -39,9 +41,11 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   import Side._
 
   "write-read" should "produce the same record" in {
-    val b1 = Base(1, LEFT)
-    val b2 = Base(2, LEFT)
-    val b3 = Base(3, RIGHT)
+    val b1 = Base()
+    assert(b1 == Base(ID(0), LEFT, Seq()))  //defaults
+    val b2 = Base(ID(2), LEFT, Seq(ID(1), ID(3)))
+    AvroRecord.write(b2, b2.getSchema) // value class set
+    val b3 = Base(ID(3), RIGHT, Seq(ID(1), ID(2)))
     val c = Composite(
       Seq(b1, b2, b3),
       Map("b1" -> b1, "b2" -> b2, "b3" -> b3)

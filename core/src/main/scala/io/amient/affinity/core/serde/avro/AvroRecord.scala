@@ -22,9 +22,8 @@ package io.amient.affinity.core.serde.avro
 import java.io.ByteArrayOutputStream
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.schema.{AvroSchemaProvider}
+import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 import org.apache.avro.Schema.Type._
-import org.apache.avro.SchemaBuilder.FieldAssembler
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord, IndexedRecord}
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
@@ -152,125 +151,75 @@ object AvroRecord {
 
   def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
 
-  private def inferSchema(tpe: Type): Schema = {
+  private def inferSchema(t: Type): Schema = {
 
-    def assembleField(assembler: FieldAssembler[Schema], param: (Symbol, Option[Any])): FieldAssembler[Schema] = {
-
-      val name = param._1.name.toString
-      val t = param._1.typeSignature
-      val default = param._2
-
-      if (t =:= typeOf[String]) {
-        val str = assembler.name(name).`type`.stringType()
-        default match {
-          case None => str.noDefault()
-          case Some(arg) => str.stringDefault(arg.asInstanceOf[String])
-        }
-      } else if (t =:= definitions.IntTpe) {
-        val int = assembler.name(name).`type`.intType()
-        default match {
-          case None => int.noDefault()
-          case Some(arg) => int.intDefault(arg.asInstanceOf[Int])
-        }
-      } else if (t =:= definitions.LongTpe) {
-        val int = assembler.name(name).`type`.longType()
-        default match {
-          case None => int.noDefault()
-          case Some(arg) => int.longDefault(arg.asInstanceOf[Long])
-        }
-      } else if (t =:= definitions.BooleanTpe) {
-        val int = assembler.name(name).`type`.booleanType()
-        default match {
-          case None => int.noDefault()
-          case Some(arg) => int.booleanDefault(arg.asInstanceOf[Boolean])
-        }
-      } else if (t =:= definitions.FloatTpe) {
-        val int = assembler.name(name).`type`.floatType()
-        default match {
-          case None => int.noDefault()
-          case Some(arg) => int.floatDefault(arg.asInstanceOf[Float])
-        }
-      } else if (t =:= definitions.DoubleTpe) {
-        val int = assembler.name(name).`type`.doubleType()
-        default match {
-          case None => int.noDefault()
-          case Some(arg) => int.doubleDefault(arg.asInstanceOf[Double])
-        }
-      } else if (t <:< typeOf[Map[_, _]]) {
-        val valueSchema = inferSchema(t.typeArgs(1))
-        val map = assembler.name(name).`type`.map().values().`type`(valueSchema)
-        default match {
-          case None => map.noDefault()
-          case Some(arg) => map.mapDefault(arg.asInstanceOf[Map[String, _]].asJava)
-        }
-      } else if (t <:< typeOf[Iterable[_]]) {
-        val itemSchema = inferSchema(t.typeArgs(0))
-        val array = assembler.name(name).`type`.array().items().`type`(itemSchema)
-        default match {
-          case None => array.noDefault()
-          case Some(arg) => array.arrayDefault(arg.asInstanceOf[Iterable[_]].toList.asJava)
-        }
-
-      } else if (t <:< typeOf[scala.Enumeration#Value]) {
-        t match {
-          case TypeRef(enumType, _, _) =>
-            val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
-            val instanceMirror = rootMirror.reflect(moduleMirror.instance)
-            val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
-            val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
-            val args = enumSymbols.toSeq.map(_.toString)
-            val enum = assembler.name(name).`type`.enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
-            default match {
-              case None => enum.noDefault()
-              case Some(arg) => enum.enumDefault(arg.asInstanceOf[Enumeration#Value].toString)
-            }
-        }
-      } else if (t <:< typeOf[AvroRecord[_]]) {
-        val nestedRecord = assembler.name(name).`type`(inferSchema(t))
-        default match {
-          case None => nestedRecord.noDefault()
-          case Some(arg) => nestedRecord.withDefault(arg)
-        }
-      } else if (t <:< typeOf[AnyVal]) {
-        val constructor = t.decl(universe.termNames.CONSTRUCTOR).asMethod
-        val valSymbol = constructor.paramLists(0).head
-        default match {
-          case None => assembleField(assembler, (valSymbol, None))
-          case Some(arg) =>
-            val fieldMirror = rootMirror.reflect(arg).reflectField(t.member(valSymbol.name).asTerm)
-            assembleField(assembler, (valSymbol, Some(fieldMirror.get)))
-        }
-      } else {
-        //TODO Avro Case Class support for UUID
-        throw new IllegalArgumentException("Unsupported Avro Case Class type " + t.toString)
-      }
-    }
-
-    //TODO thread-safe type cache
-    typeSchemaCache.get(tpe) match {
+    typeSchemaCache.get(t) match {
       case Some(schema) => schema
       case None =>
-        val moduleMirror = rootMirror.reflectModule(tpe.typeSymbol.companion.asModule)
-        val companionMirror = rootMirror.reflect(moduleMirror.instance)
-        val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
-        val params: List[(Symbol, Option[Any])] = constructor.asMethod.paramLists(0).zipWithIndex.map { case (symbol, i) =>
-          val defaultArg = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
-          if (defaultArg != NoSymbol) {
-            val methodMirror = companionMirror.reflectMethod(defaultArg.asMethod)
-            (symbol, Some(methodMirror()))
-          } else {
-            (symbol, None)
-          }
-        }
 
-        val assembler = SchemaBuilder.record(tpe.toString).fields()
-        params.foldLeft(assembler) { case (assembler, param) => assembleField(assembler, param) }
-        val schema = assembler.endRecord()
-        typeSchemaCache.put(tpe, schema)
+        val schema: Schema =
+          if (t =:= typeOf[String]) {
+            SchemaBuilder.builder().stringType()
+          } else if (t =:= definitions.IntTpe) {
+            SchemaBuilder.builder().intType()
+          } else if (t =:= definitions.LongTpe) {
+            SchemaBuilder.builder().longType()
+          } else if (t =:= definitions.BooleanTpe) {
+            SchemaBuilder.builder().booleanType()
+          } else if (t =:= definitions.FloatTpe) {
+            SchemaBuilder.builder().floatType()
+          } else if (t =:= definitions.DoubleTpe) {
+            SchemaBuilder.builder().doubleType()
+          } else if (t <:< typeOf[Map[_, _]]) {
+            SchemaBuilder.builder().map().values().`type`(inferSchema(t.typeArgs(1)))
+          } else if (t <:< typeOf[Iterable[_]]) {
+            SchemaBuilder.builder().array().items().`type`(inferSchema(t.typeArgs(0)))
+          } else if (t <:< typeOf[scala.Enumeration#Value]) {
+            t match {
+              case TypeRef(enumType, _, _) =>
+                val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
+                val instanceMirror = rootMirror.reflect(moduleMirror.instance)
+                val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
+                val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
+                val args = enumSymbols.toSeq.map(_.toString)
+                SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
+            }
+          } else if (t <:< typeOf[AvroRecord[_]]) {
+
+            val moduleMirror = rootMirror.reflectModule(t.typeSymbol.companion.asModule)
+            val companionMirror = rootMirror.reflect(moduleMirror.instance)
+            val constructor = t.decl(universe.termNames.CONSTRUCTOR)
+            val params = constructor.asMethod.paramLists(0)
+            val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(t.toString).fields()) {
+              case (assembler, (symbol, i)) =>
+                val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
+                val field = assembler.name(symbol.name.toString).`type`(inferSchema(symbol.typeSignature))
+                if (defaultDef == NoSymbol) {
+                  field.noDefault()
+                } else {
+                  val methodMirror = companionMirror.reflectMethod(defaultDef.asMethod)
+                  val default = methodMirror()
+                  if (symbol.typeSignature <:< typeOf[scala.Enumeration#Value]) {
+                    field.withDefault(default.asInstanceOf[Enumeration#Value].toString)
+                  } else if (t <:< typeOf[Map[_, _]]) {
+                    field.withDefault(default.asInstanceOf[Map[String, _]].asJava)
+                  } else if (symbol.typeSignature <:< typeOf[Iterable[_]]) {
+                    field.withDefault(default.asInstanceOf[Iterable[_]].toList.asJava)
+                  } else {
+                    field.withDefault(default)
+                  }
+                }
+            }
+            assembler.endRecord()
+          } else {
+            //TODO maybe Avro Case Class support for UUID as fixed 16 bytes or 2x long
+            throw new IllegalArgumentException("Unsupported Avro Case Class type " + t.toString)
+          }
+
+        typeSchemaCache.put(t, schema)
         schema
     }
   }
-
 }
 
 abstract class AvroRecord[X: TypeTag] extends SpecificRecord with java.io.Serializable {
