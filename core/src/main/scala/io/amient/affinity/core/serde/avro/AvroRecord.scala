@@ -39,18 +39,6 @@ object AvroRecord {
 
   private val typeSchemaCache = scala.collection.mutable.Map[Type, Schema]()
 
-  private val cacheNameCache = scala.collection.mutable.Map[String, Class[_]]()
-
-  private def classForName(fullClassName: String): Class[_] = {
-    cacheNameCache.get(fullClassName) match {
-      case Some(cls) => cls
-      case None =>
-        val cls = Class.forName(fullClassName)
-        cacheNameCache.put(fullClassName, cls)
-        cls
-    }
-  }
-
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
     write(x, x.getSchema, schemaId)
   }
@@ -74,11 +62,13 @@ object AvroRecord {
   def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
 
   def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema): T = {
-    val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
-    read(bytes, cls, writerSchema, readerSchema, decoder)
+    val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
+    val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
+    val record: GenericRecord = reader.read(null, decoder)
+    readDatum(record, typeOf[T], readerSchema).asInstanceOf[T]
   }
 
-  def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): AnyRef = {
+  def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
     if (bytes == null) null.asInstanceOf[AnyRef]
     else {
       val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
@@ -88,30 +78,11 @@ object AvroRecord {
       val readerSchema = inferSchema(tpe)
       val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
       val record: GenericRecord = reader.read(null, decoder)
-      readRecord(record, cls)
+      readDatum(record, tpe, readerSchema)
     }
   }
 
-  private def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema, decoder: BinaryDecoder): T = {
-    val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
-    val record: GenericRecord = reader.read(null, decoder)
-    readRecord(record, cls).asInstanceOf[T]
-  }
-
-  //TODO readDatum(record: GenericRecord, tpe: Type): AnyRef
-
-  private def readRecord(record: GenericRecord, cls: Class[_]): AnyRef = {
-    val c = cls.getConstructors()(0)
-    val params = c.getParameterTypes
-    val arguments: Seq[Object] = record.getSchema.getFields.asScala.map { field =>
-      val datum: AnyRef = record.get(field.pos)
-      val param: Class[_] = params(field.pos)
-      readDatum(datum, param, field.schema)
-    }
-    c.newInstance(arguments: _*).asInstanceOf[AnyRef]
-  }
-
-  private def readDatum(datum: Any, cls: Class[_], schema: Schema): AnyRef = {
+  private def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])
@@ -121,25 +92,39 @@ object AvroRecord {
       case LONG => new java.lang.Long(datum.asInstanceOf[Long])
       case FIXED | BYTES => datum.asInstanceOf[Array[Byte]]
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
-      case RECORD => readRecord(datum.asInstanceOf[GenericRecord], classForName(schema.getFullName))
-      case ENUM => classForName(schema.getFullName).getMethod("withName", classOf[String])
-        .invoke(null, datum.asInstanceOf[EnumSymbol].toString)
+      case RECORD =>
+        val record = datum.asInstanceOf[GenericRecord]
+        val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
+        val params = constructor.paramLists(0)
+        val arguments = record.getSchema.getFields.asScala.map { field =>
+          readDatum(record.get(field.pos), params(field.pos).typeSignature, field.schema)
+        }
+        val classMirror = rootMirror.reflectClass(tpe.typeSymbol.asClass)
+        val constructorMirror = classMirror.reflectConstructor(constructor)
+        constructorMirror(arguments: _*)
+      case ENUM => tpe match {
+        case TypeRef(enumType, _, _) =>
+          val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
+          val instanceMirror = rootMirror.reflect(moduleMirror.instance)
+          val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("withName")).asMethod)
+          methodMirror(datum.asInstanceOf[EnumSymbol].toString)
+      }
       case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
         .map { case (k, v) => (
           k.toString,
-          readDatum(v, classForName(schema.getValueType.getFullName), schema.getValueType))
+          readDatum(v, tpe.typeArgs(1), schema.getValueType))
         }
       case ARRAY => val iterable = datum.asInstanceOf[java.util.Collection[_]].asScala
-        .map(item => readDatum(item, classForName(schema.getElementType.getFullName), schema.getElementType))
-        if (cls.isAssignableFrom(classOf[Set[_]])) {
+        .map(item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
+        if (tpe <:< typeOf[Set[_]]) {
           iterable.toSet
-        } else if (cls.isAssignableFrom(classOf[List[_]])) {
+        } else if (tpe <:< typeOf[List[_]]) {
           iterable.toList
-        } else if (cls.isAssignableFrom(classOf[Vector[_]])) {
+        } else if (tpe <:< typeOf[Vector[_]]) {
           iterable.toVector
-        } else if (cls.isAssignableFrom(classOf[IndexedSeq[_]])) {
+        } else if (tpe <:< typeOf[IndexedSeq[_]]) {
           iterable.toIndexedSeq
-        } else if (cls.isAssignableFrom(classOf[Seq[_]])) {
+        } else if (tpe <:< typeOf[Seq[_]]) {
           iterable.toSeq
         } else {
           iterable
@@ -148,34 +133,33 @@ object AvroRecord {
     }
   }
 
-
   def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
 
-  private def inferSchema(t: Type): Schema = {
+  private def inferSchema(tpe: Type): Schema = {
 
-    typeSchemaCache.get(t) match {
+    typeSchemaCache.get(tpe) match {
       case Some(schema) => schema
       case None =>
 
         val schema: Schema =
-          if (t =:= typeOf[String]) {
+          if (tpe =:= typeOf[String]) {
             SchemaBuilder.builder().stringType()
-          } else if (t =:= definitions.IntTpe) {
+          } else if (tpe =:= definitions.IntTpe) {
             SchemaBuilder.builder().intType()
-          } else if (t =:= definitions.LongTpe) {
+          } else if (tpe =:= definitions.LongTpe) {
             SchemaBuilder.builder().longType()
-          } else if (t =:= definitions.BooleanTpe) {
+          } else if (tpe =:= definitions.BooleanTpe) {
             SchemaBuilder.builder().booleanType()
-          } else if (t =:= definitions.FloatTpe) {
+          } else if (tpe =:= definitions.FloatTpe) {
             SchemaBuilder.builder().floatType()
-          } else if (t =:= definitions.DoubleTpe) {
+          } else if (tpe =:= definitions.DoubleTpe) {
             SchemaBuilder.builder().doubleType()
-          } else if (t <:< typeOf[Map[_, _]]) {
-            SchemaBuilder.builder().map().values().`type`(inferSchema(t.typeArgs(1)))
-          } else if (t <:< typeOf[Iterable[_]]) {
-            SchemaBuilder.builder().array().items().`type`(inferSchema(t.typeArgs(0)))
-          } else if (t <:< typeOf[scala.Enumeration#Value]) {
-            t match {
+          } else if (tpe <:< typeOf[Map[_, _]]) {
+            SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
+          } else if (tpe <:< typeOf[Iterable[_]]) {
+            SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
+          } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
+            tpe match {
               case TypeRef(enumType, _, _) =>
                 val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
                 val instanceMirror = rootMirror.reflect(moduleMirror.instance)
@@ -184,13 +168,13 @@ object AvroRecord {
                 val args = enumSymbols.toSeq.map(_.toString)
                 SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
             }
-          } else if (t <:< typeOf[AvroRecord[_]]) {
+          } else if (tpe <:< typeOf[AvroRecord[_]]) {
 
-            val moduleMirror = rootMirror.reflectModule(t.typeSymbol.companion.asModule)
+            val moduleMirror = rootMirror.reflectModule(tpe.typeSymbol.companion.asModule)
             val companionMirror = rootMirror.reflect(moduleMirror.instance)
-            val constructor = t.decl(universe.termNames.CONSTRUCTOR)
+            val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
             val params = constructor.asMethod.paramLists(0)
-            val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(t.toString).fields()) {
+            val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
               case (assembler, (symbol, i)) =>
                 val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
                 val field = assembler.name(symbol.name.toString).`type`(inferSchema(symbol.typeSignature))
@@ -201,7 +185,7 @@ object AvroRecord {
                   val default = methodMirror()
                   if (symbol.typeSignature <:< typeOf[scala.Enumeration#Value]) {
                     field.withDefault(default.asInstanceOf[Enumeration#Value].toString)
-                  } else if (t <:< typeOf[Map[_, _]]) {
+                  } else if (tpe <:< typeOf[Map[_, _]]) {
                     field.withDefault(default.asInstanceOf[Map[String, _]].asJava)
                   } else if (symbol.typeSignature <:< typeOf[Iterable[_]]) {
                     field.withDefault(default.asInstanceOf[Iterable[_]].toList.asJava)
@@ -213,10 +197,10 @@ object AvroRecord {
             assembler.endRecord()
           } else {
             //TODO maybe Avro Case Class support for UUID as fixed 16 bytes or 2x long
-            throw new IllegalArgumentException("Unsupported Avro Case Class type " + t.toString)
+            throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
           }
 
-        typeSchemaCache.put(t, schema)
+        typeSchemaCache.put(tpe, schema)
         schema
     }
   }
