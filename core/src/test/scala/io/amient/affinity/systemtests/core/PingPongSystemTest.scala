@@ -45,7 +45,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     }
   })
 
-  val region = new TestRegionNode(new TestPartition {
+  val region = new TestRegionNode(new TestPartition("R0") {
     override def handle: Receive = {
       case "ping" => sender ! "pong"
     }
@@ -64,11 +64,11 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
 
   "A Simple Gateway" should "play ping pong well" in {
-    gateway.http(GET, s"/ping").entity should be(jsonStringEntity("pong"))
+    gateway.http_sync(GET, s"/ping").entity should be(jsonStringEntity("pong"))
   }
 
   "A Simple Cluster" should "play ping pong too" in {
-    gateway.http(GET, s"/clusterping").entity should be(jsonStringEntity("pong"))
+    gateway.http_sync(GET, s"/clusterping").entity should be(jsonStringEntity("pong"))
   }
 
 }

@@ -42,7 +42,7 @@ trait ActorState extends Actor {
     stateStorage
   }
 
-  def untailState(): Unit = storageRegistry.asScala.foreach(_.boot())
+  def bootState(): Unit = storageRegistry.asScala.foreach(_.boot())
 
   def tailState(): Unit = storageRegistry.asScala.foreach(_.tail())
 

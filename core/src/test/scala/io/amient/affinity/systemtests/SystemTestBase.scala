@@ -30,8 +30,8 @@ import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{Gateway, Partition}
-import io.amient.affinity.core.cluster.{Cluster, CoordinatorZk, Node}
+import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
+import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.util.{ObjectHashPartitioner, ZooKeeperClient}
 import kafka.cluster.Broker
@@ -42,7 +42,7 @@ import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 object SystemTestBase {
@@ -127,12 +127,15 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       throw new IllegalStateException(s"Node did not startup within $timeout")
     }
 
-    def http(method: HttpMethod, path: String): HttpResponse = {
+    def http(method: HttpMethod, path: String): Future[HttpResponse] = {
       val uri = Uri(s"http://localhost:$httpPort$path")
-      val strict = Http().singleRequest(HttpRequest(method = method, uri = uri)) flatMap {
+      Http().singleRequest(HttpRequest(method = method, uri = uri)) flatMap {
         response => response.toStrict(2 seconds)
       }
-      Await.result(strict, 2 seconds)
+    }
+
+    def http_sync(method: HttpMethod, path: String): HttpResponse = {
+      Await.result(http(method, path), 2 seconds)
     }
 
   }
@@ -142,10 +145,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     startRegion(partitionCreator)
   }
 
-  abstract class TestPartition extends Partition {
+  abstract class TestPartition(rname:String) extends Partition {
 
     override def onBecomeMaster: Unit = {
       super.onBecomeMaster
+      println(s"$rname became leader of partition $partition")
       regionStartupMonitor.synchronized(regionStartupMonitor.notify)
     }
 

@@ -17,41 +17,47 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.cluster
+package io.amient.affinity.core.actor
 
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.routing.{ActorRefRoutee, Routee, RoutingLogic}
+import akka.actor.Actor
+import akka.routing.{ActorRefRoutee, AddRoutee, RemoveRoutee, Routee}
 import io.amient.affinity.core.util.ObjectHashPartitioner
 
-import scala.collection.immutable
+object Cluster {
+  final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
+}
 
-case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogic {
+class Cluster extends Actor {
 
-  private var prevRoutees: immutable.IndexedSeq[Routee] = immutable.IndexedSeq()
+  private val config = context.system.settings.config
+
+  private val numPartitions = config.getInt(Cluster.CONFIG_NUM_PARTITIONS)
+
+  //TODO #6 use lighter structure than concurrenthashmap
   private val currentRouteMap = new ConcurrentHashMap[Int, Routee]()
 
   //TODO configurable partitioner
   val partitioner = new ObjectHashPartitioner
 
-  def select(message: Any, routees: immutable.IndexedSeq[Routee]): Routee = {
+  override def receive: Receive = {
+    case AddRoutee(routee: ActorRefRoutee) =>
+      /**
+        * relying on Region to assign partition name equal to physical partition id
+        */
+      val partition = routee.ref.path.name.toInt
+      currentRouteMap.put(partition, routee)
 
-    if (!prevRoutees.eq(routees)) {
-      prevRoutees.synchronized {
-          if (!prevRoutees.eq(routees)) {
-            currentRouteMap.clear()
-            routees.foreach {
-              case actorRefRoutee: ActorRefRoutee =>
-                /**
-                  * relying on Region to assign partition name equal to physical partition id
-                  */
-                val partition = actorRefRoutee.ref.path.name.toInt
-                currentRouteMap.put(partition, actorRefRoutee)
-            }
-            prevRoutees = routees
-          }
-      }
-    }
+    case RemoveRoutee(routee: ActorRefRoutee) =>
+      val partition = routee.ref.path.name.toInt
+      currentRouteMap.put(partition, routee)
+
+    case message => route(message)
+
+  }
+
+  private def route(message: Any): Unit = {
     val p = message match {
       case (k, v) => partitioner.partition(k, numPartitions)
       case v => partitioner.partition(v, numPartitions)
@@ -63,13 +69,15 @@ case class DeterministicRoutingLogic(val numPartitions: Int) extends RoutingLogi
       * 2. between a master failure and a standby election there may be a brief period
       *    of the partition not being represented -
       */
-    //TODO the 2. case needs to be handled by the API and there a different ways how to do it
+    //TODO #6 the second case needs to be handled by the API and there a different ways how to do it
 
     if (!currentRouteMap.containsKey(p)) {
       throw new IllegalStateException(s"Data partition `$p` is not represented in the cluster")
     }
 
-    currentRouteMap.get(p)
+    currentRouteMap.get(p).send(message, sender)
+
   }
+
 
 }

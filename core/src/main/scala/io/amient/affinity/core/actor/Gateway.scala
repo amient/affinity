@@ -21,7 +21,7 @@ package io.amient.affinity.core.actor
 
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.event.Logging
 import akka.http.scaladsl.model._
 import akka.pattern.ask
@@ -29,7 +29,6 @@ import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.cluster.Cluster
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
@@ -50,7 +49,7 @@ abstract class Gateway extends Actor {
 
   private val services = new ConcurrentHashMap[Class[_ <: Actor], ActorRef]
 
-  val cluster = context.actorOf(new Cluster(config).props(), name = "cluster")
+  val cluster = context.actorOf(Props(new Cluster()), name = "cluster")
 
   import context.system
 
@@ -119,8 +118,8 @@ abstract class Gateway extends Actor {
       sender ! GracefulShutdown()
       context.stop(self)
 
-    case Terminated(ref) =>
-      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)
+//    case Terminated(ref) =>
+//      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)
 
   }
 
