@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.storage
 
-trait Storage[K,V] extends MemStore[K, V] {
+trait Storage[K, V] extends MemStore[K, V] {
 
   /**
     * the contract of this method is that it should start a background process of restoring
@@ -52,28 +52,25 @@ trait Storage[K,V] extends MemStore[K, V] {
   /**
     * Storage offers only simple blocking put so that the mutations do not escape single-threaded actor
     * context from which it is called
+    *
     * @param key
     * @param value if None is given as value the key will be removed from the underlying storage
     *              otherwise the key will be updated with the value
-    * @return true if the operation resulted in modification of the underlying data structure
+    * @return An optional value previously held at the key position, None if new value was inserted
     */
-  final def put(key: K, value: Option[V]): Boolean = value match {
-    case None => if (remove(key)) {
+  final def put(key: K, value: Option[V]): Option[V] = value match {
+    case None => remove(key) map { prev =>
       write(key, null.asInstanceOf[V]).get()
-      true
-    } else {
-      false
+      prev
     }
-    case Some(data) => if (update(key, data)) {
-      write(key, data).get()
-      true
-    } else {
-      false
+    case Some(data) => update(key, data) map { prev =>
+      if (prev != data) write(key, data).get()
+      prev
     }
   }
 
   /**
-    * @param key of the pair
+    * @param key   of the pair
     * @param value of the pair
     * @return Future with metadata returned by the underlying implementation
     */

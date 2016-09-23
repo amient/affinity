@@ -24,14 +24,15 @@ import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, See
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.example._
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.example._
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.UserInputMediator
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+import scala.util.{Failure, Success}
 
 trait Connect extends HttpGateway {
 
@@ -53,10 +54,10 @@ trait Connect extends HttpGateway {
 
 
     /**
-      * POST /component/<vertex>/
+      * GET /component/<vertex>/
       */
     case HTTP(POST, PATH("component", INT(id)), query, response) =>
-      fulfillAndHandleErrors(response, collect(id), ContentTypes.`application/json`) {
+      fulfillAndHandleErrors(response, getComponent(id), ContentTypes.`application/json`) {
         case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
         case component => ResponseBuilder.json(OK, component)
       }
@@ -66,6 +67,15 @@ trait Connect extends HttpGateway {
       */
     case HTTP(POST, PATH("connect", INT(id), INT(id2)), query, response) =>
       fulfillAndHandleErrors(response, connect(id, id2), ContentTypes.`application/json`) {
+        case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+        case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+      }
+
+    /**
+      * POST /disconnect/<vertex1>/<vertex2>
+      */
+    case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), query, response) =>
+      fulfillAndHandleErrors(response, disconnect(id, id2), ContentTypes.`application/json`) {
         case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
         case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }
@@ -81,81 +91,78 @@ trait Connect extends HttpGateway {
 
   }
 
-  def connect(v1: Int, v2: Int): Future[Any] = {
-    for {
-      oneway <- (cluster ? ModifyGraph(v1, Edge(v2), GOP.ADD)).asInstanceOf[Future[Boolean]]
-      if oneway
-      reverse <- (cluster ? ModifyGraph(v2, Edge(v1), GOP.ADD)).asInstanceOf[Future[Boolean]]
-    } yield reverse
-  }
-
-  def collect(vertex: Int): Future[Any] = {
-    val promise = Promise[Component]()
+  private def getComponent(vertex: Int): Future[Set[Int]] = {
+    val promise = Promise[Set[Int]]()
     implicit val timeout = Timeout(10 seconds)
-    def collect(v: Int, agg: Set[Int]): Unit = {
-      promise.completeWith {
-        cluster ? Component(v, agg) map {
-          case Component(_, add) => Component(v, agg ++ add)
-        }
+    def collect(queue: Set[Int], agg: Set[Int]): Unit = {
+      if (queue.isEmpty) promise.success(agg)
+      else cluster ? Component(queue.head, agg) map {
+        case Component(_, add) => collect(queue.tail ++ (add -- agg), agg ++ add)
       }
     }
-    collect(vertex, Set())
+    collect(Set(vertex), Set(vertex))
     promise.future
   }
 
+  private def connect(v1: Int, v2: Int): Future[Boolean] = modify(v1, v2, GOP.ADD)
 
-  //  /**
-  //    * Connecting a Vertex to 1 or more other Vertices
-  //    * This is done recursively and reliably using Ask instead of Tell.
-  //    *
-  //    * @return Future which fails if any of the propagation steps fail. When successful holds:
-  //    *         true if the operation resulted in graph modification,
-  //    *         false if there were no modifications and
-  //    *         false if no changes were made.
-  //    */
-  //  private def connect(vertex: Vertex, withVertices: Set[Vertex], ts: Long = System.currentTimeMillis): Future[Boolean] = {
-  //
-  //    val promise = Promise[Boolean]()
-  //
-  //    implicit val timeout = Timeout(10 seconds)
-  //
-  //    cluster ? vertex map {
-  //      case false => Set[Edge]()
-  //      case props: VertexProps => props.edges
-  //    } map { existingEdges: Set[Edge] =>
-  //      val additionalEdges = withVertices.map(Edge(_, ts)).diff(existingEdges)
-  //      if (additionalEdges.isEmpty) promise.success(false)
-  //      else {
-  //        cluster ? Component(vertex, additionalEdges, GOP.ADD) map {
-  //          case false => promise.success(false)
-  //          case true =>
-  //            val propagate: List[Future[Boolean]] = existingEdges.toList.map { e =>
-  //              connect(e.target, additionalEdges)
-  //            } ++ additionalEdges.toList.map { e =>
-  //              connect(e.target, Set(vertex))
-  //            } map (_ map {
-  //              case _ => true
-  //            } recover {
-  //              case t: Throwable => false
-  //            })
-  //
-  //            for (successes <- Future.sequence(propagate)) {
-  //              if (!successes.forall(_ == true)) {
-  //                //TODO compensate failure - use atomic versioning on component object because this is all async and some other call may have modified the component
-  //                //TODO cluster ! Component(vertex, additionalEdges, Component.RemoveEdges )
-  //                //TODO AvroRecord enum mapping and evolution test by adding operation type to the Component
-  //                //TODO to have a reliable compensation, each edge has to carry the correlation and root
-  //                promise.failure(new IllegalStateException("propagation failed on existing component - attempting to compensate"))
-  //              } else {
-  //                promise.success(true)
-  //              }
-  //            }
-  //        }
-  //      }
-  //    }
-  //
-  //    promise.future
-  //  }
+  private def disconnect(v1: Int, v2: Int): Future[Boolean] = modify(v1, v2, GOP.REMOVE)
 
+  private def modify(v1: Int, v2: Int, op: GOP.Value): Future[Boolean] = {
+
+    //to handle fatal crash consistency we'd need somethin like def WAL(t: java.lang.Long = System.currentTimeMillis) = op -> t
+
+    val ts = System.currentTimeMillis
+    val promise = Promise[Boolean]()
+    val m1 = ModifyGraph(v1, Edge(v2, ts), op)
+    cluster ? m1 onComplete {
+      case Failure(e) => promise.failure(e) //earliest possible failure, nothing to rollback just report failure
+      case Success(false) => promise.success(false)
+      case Success(_) =>
+        val m2 = ModifyGraph(v2, Edge(v1, ts), op)
+        cluster ? m2 onComplete {
+          case Failure(e) =>
+            //second failure case we have to rollback the first edge modification
+            cluster ! m1.inverse
+            promise.failure(e)
+          case Success(false) => promise.failure(new IllegalStateException)
+          case Success(_) =>
+            Future.sequence(op match {
+              case GOP.ADD => List(getComponent(v2))
+              case GOP.REMOVE => List(getComponent(v1), getComponent(v2))
+            }) onComplete {
+              case Failure(e) =>
+                //third failure case we have to rollback both edge modifications
+                cluster ! m1.inverse
+                cluster ! m2.inverse
+                promise.failure(e)
+              case Success(components) =>
+                Future.sequence(components.map { component =>
+                  Future.sequence(component.toSeq.map { v =>
+                    (cluster ? UpdateComponent(v, component)).asInstanceOf[Future[Component]] recover {
+                      case e: Throwable => null.asInstanceOf[Component]
+                    }
+                  })
+                }) map { componentUpdates =>
+                  if (componentUpdates.forall(_.forall(_ != null))) {
+                    //all successful
+                    promise.success(true)
+                  } else {
+                    promise.failure(new UnknownError)
+                    // the worst possible failure, rollback everything that was modified
+                    cluster ! m1.inverse
+                    cluster ! m2.inverse
+                    componentUpdates.foreach {
+                      _ filter (_ != null) foreach { rollbackComponent =>
+                        cluster ! rollbackComponent
+                      }
+                    }
+                  }
+                }
+            }
+        }
+    }
+    promise.future
+  }
 
 }

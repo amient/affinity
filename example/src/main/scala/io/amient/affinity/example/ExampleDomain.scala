@@ -36,7 +36,7 @@ class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
   //4
   register(classOf[Component])
   //5
-
+  register(classOf[UpdateComponent])
 }
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
@@ -53,12 +53,21 @@ object GOP extends Enumeration {
   val ADD, REMOVE = Value
 }
 
-final case class ModifyGraph(val key: Int, val edge: Edge, val op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph]{
-  override def hashCode(): Int = key.hashCode
+final case class Component(vertex: Int, component: Set[Int] = Set()) extends AvroRecord[Component] {
+  override def hashCode(): Int = vertex.hashCode
 }
 
-final case class Component(val key: Int, val component: Set[Int] = Set()) extends AvroRecord[Component] {
-  override def hashCode(): Int = key.hashCode
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] {
+  override def hashCode(): Int = vertex.hashCode
+  def inverse = op match {
+    case GOP.ADD => ModifyGraph(vertex, edge, GOP.REMOVE)
+    case GOP.REMOVE => ModifyGraph(vertex, edge, GOP.ADD)
+  }
 }
+
+final case class UpdateComponent(vertex: Int, component: Set[Int]) extends AvroRecord[UpdateComponent] {
+  override def hashCode(): Int = vertex.hashCode
+}
+
 
 

@@ -22,7 +22,7 @@ package io.amient.affinity.core.serde
 import io.amient.affinity.core.serde.avro.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
 
-//TODO test avro record with PropSpec generating random records
+//TODO #9 test avro record with PropSpec generating random records
 class AvroRecordSpec extends FlatSpec with Matchers {
 
   import Side._

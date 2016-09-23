@@ -26,6 +26,7 @@ import io.amient.affinity.example._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Partition, Region}
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap, NoopStorage}
 
 import scala.collection.JavaConverters._
@@ -45,26 +46,23 @@ object DataPartition {
       .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
       .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
-    //this API cluster is symmetric - all nodes serve both as Gateways and Regions
     new Node(config) {
-
       startRegion(new DataPartition)
-
     }
   }
 }
 
 class DataPartition extends Partition {
 
-  //val config = context.system.settings.config
+  // val config = context.system.settings.config
 
   //  val graph = storage {
-  //    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition, classOf[IntSerde], classOf[MyAvroSerde])
-  //      with MemStoreSimpleMap[Int, VertexProps]
+  //    new NoopStorage[Int, VertexProps] with MemStoreSimpleMap[Int, VertexProps]
   //  }
 
   val graph = storage {
-    new NoopStorage[Int, VertexProps] with MemStoreSimpleMap[Int, VertexProps]
+    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition, classOf[IntSerde], classOf[MyAvroSerde])
+      with MemStoreSimpleMap[Int, VertexProps]
   }
 
   override def handle: Receive = {
@@ -102,17 +100,6 @@ class DataPartition extends Partition {
     }
 
     /**
-      * Add edges to a graph vertex.
-      * This is a non-recursive operation, local to the
-      * data shard owned by this partition.
-      */
-    case ModifyGraph(vertex, edge, GOP.ADD) => graph.get(vertex) match {
-      case Some(existing) => add(vertex, existing, edge)
-      case None => add(vertex, VertexProps(), edge)
-    }
-
-
-    /**
       * Collect all connected vertices
       */
     case Component(vertex, group) => graph.get(vertex) match {
@@ -120,18 +107,65 @@ class DataPartition extends Partition {
       case None => sender ! Component(vertex, Set())
     }
 
-  }
+    /**
+      * Add an edge to the graph vertex.
+      * This is a non-recursive operation, local to the
+      * data shard owned by this partition.
+      * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
+      */
+    case ModifyGraph(vertex, edge, GOP.ADD) => graph.get(vertex) match {
 
-  private def add(vertex: Int, existing: VertexProps, edge: Edge): Unit = {
-    try {
-      if (existing.edges.contains(edge)) sender ! false
-      else {
-        sender ! graph.put(vertex, Some(VertexProps(existing.edges + edge)))
+      case None => try {
+        graph.put(vertex, Some(VertexProps(Set(edge))))
+        sender ! true
+      } catch {
+        case NonFatal(e) => sender ! Status.Failure(e)
       }
-    } catch {
-      case NonFatal(e) => sender ! Status.Failure(e)
-    }
-  }
 
+      case Some(existing) if (existing.edges.exists(_.target == edge.target)) => sender ! false
+
+      case Some(existing) => try {
+        graph.put(vertex, Some(VertexProps(existing.edges + edge, existing.component)))
+        sender ! true
+      } catch {
+        case NonFatal(e) => sender ! Status.Failure(e)
+      }
+    }
+
+    /**
+      * Remove an edge from the graph vertex.
+      * This is a non-recursive operation, local to the
+      * data shard owned by this partition.
+      * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
+      */
+    case ModifyGraph(vertex, edge, GOP.REMOVE) => {
+      graph.get(vertex) match {
+        case None => sender ! false
+        case Some(existing) => try {
+          graph.put(vertex, Some(VertexProps(existing.edges.filter(_.target != edge.target), existing.component)))
+          sender ! true
+        } catch {
+          case NonFatal(e) => sender ! Status.Failure(e)
+        }
+      }
+    }
+
+    /**
+      * Updated component of the vertex.
+      * Responds with the Component data previously associated with the vertex
+      */
+    case UpdateComponent(vertex, updatedComponent) => {
+      graph.get(vertex) match {
+        case None => sender ! Component(vertex, Set())
+        case Some(existing) => try {
+          graph.put(vertex, Some(VertexProps(existing.edges, updatedComponent)))
+          sender ! Component(vertex, existing.component)
+        } catch {
+          case NonFatal(e) => sender ! Status.Failure(e)
+        }
+      }
+    }
+
+  }
 
 }

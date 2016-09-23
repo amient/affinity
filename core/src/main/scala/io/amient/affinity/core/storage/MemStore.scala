@@ -31,15 +31,15 @@ trait MemStore[K, V] {
     *
     * @param key
     * @param value
-    * @return true if the operation resulted in any modification
+    * @return optional value held at the key position before the update
     */
-  protected def update(key: K, value: V): Boolean
+  protected def update(key: K, value: V): Option[V]
 
   /**
     *
     * @param key
-    * @return true if the operation resulted in any modification
+    * @return optional value held at the key position before the update, None if the key doesn't exist
     */
-  protected def remove(key: K): Boolean
+  protected def remove(key: K): Option[V]
 
 }

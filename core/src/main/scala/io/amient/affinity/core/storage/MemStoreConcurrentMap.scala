@@ -42,11 +42,13 @@ trait MemStoreConcurrentMap[K,V] extends MemStore[K,V] {
 
   override def size: Long = internal.size
 
-  override protected def update(key: K, value: V): Boolean = internal.put(key, value) match {
-    case null => true
-    case prev if (prev != value) => true
-    case _ => false
+  override protected def update(key: K, value: V): Option[V] = internal.put(key, value) match {
+    case null => None
+    case prev => Some(prev)
   }
 
-  override protected def remove(key: K): Boolean = internal.remove(key) != null
+  override protected def remove(key: K): Option[V] = internal.remove(key)  match {
+    case null => None
+    case prev => Some(prev)
+  }
 }

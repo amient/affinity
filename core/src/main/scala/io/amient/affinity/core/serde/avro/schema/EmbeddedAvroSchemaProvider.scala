@@ -24,7 +24,7 @@ import org.apache.avro.Schema
 
 import scala.reflect.runtime.universe._
 
-// TODO This class is not fully Thread-Safe at the moment but once the API is completed it should be reimplemented.
+// TODO #9 This class is not fully Thread-Safe at the moment but once the API is completed it should be reimplemented.
 trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
 
   private val register = scala.collection.mutable.LinkedHashMap[Schema, (Class[_], Type)]()

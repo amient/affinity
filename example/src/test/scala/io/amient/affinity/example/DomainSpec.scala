@@ -23,15 +23,9 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class DomainSpec extends FlatSpec with Matchers {
 
-  //TODO example affinity.testutil
-//  println(AvroRecord.inferSchema(classOf[ModifyGraph]))
-
-
   val serde = new MyAvroSerde
   val c = Component(100, Set(101, 102))
   val bytes = serde.toBinary(c)
-  println(c.getSchema)
-  //FIXME avro array of int is broken
   serde.fromBinary(bytes) should be (c)
 
 }

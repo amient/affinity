@@ -196,7 +196,7 @@ object AvroRecord {
             }
             assembler.endRecord()
           } else {
-            //TODO maybe Avro Case Class support for UUID as fixed 16 bytes or 2x long
+            //TODO #9 maybe Avro Case Class support for UUID as fixed 16 bytes or 2x long
             throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
           }
 

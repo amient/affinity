@@ -160,9 +160,13 @@ Cooridnation process on startup chooses one of the replicas as
  
 The example data set is a Graph of Vertices which are connected
 to other Vertices. A group of inter-connected vertices is a Component.
-To view a graph component (vertex id is a simple Int)
+To view a graph vertex (vertex id is a simple Int)
 
     GET http://127.0.0.1:808x/vertex/<vertex-id> 
+
+To compute component on the fly starting from the given vertex
+
+    GET http://127.0.0.1:808x/component/<vertex-id> 
 
 To connect 2 vertices into a component(non-existent vertices will be created):
 
@@ -172,6 +176,15 @@ After connecting two components all vertices that have been already
 connected should be merged into a bigger component. Viewing the 
 component by any of the connected vertex ids should show the same group
 just in different order.
+
+To disconnect 2 vertices into a component(non-existent vertices will be created):
+
+    POST http://127.0.0.1:808x/disconnect/<vertex-id>/<vertex-id> 
+
+After disconnecting any 2 vertices which were connected previously.
+Their respective components will be updated if they were the "bridge"
+and the result should be splitting of the component into 2 smaller
+components.
 
 To look at the status of the node and which Partition Actors is sees
 as partition masters (the addresses may change by node locality but 
