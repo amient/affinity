@@ -91,7 +91,7 @@ abstract class KafkaStorage[K, V](brokers: String,
                   update(r.key, r.value)
                 }
               }
-              //TODO the fact that fetchedNumRecords is 0 doesn't still guarantee that there were not other records
+              //TODO #6 the fact that fetchedNumRecords is 0 doesn't still guarantee that there were no other records
               //produced by another instance - to reliably know that the consumer is fully caught up,
               // there should be a watermark maintained by the master which is updated similarly to standard
               // kafka consumer offset
@@ -129,7 +129,7 @@ abstract class KafkaStorage[K, V](brokers: String,
     consumer.synchronized {
       if (tailing) {
         tailing = false
-        //TODO instead of infinite wait do interval wait with health-check
+        //TODO #12 instead of infinite wait do interval wait with health-check
         // the health check cannot be trivial because kafka may block infinitely when corruption occurs in the broker
         consumer.synchronized(consumer.wait)
         if (consumerError.get != null) {

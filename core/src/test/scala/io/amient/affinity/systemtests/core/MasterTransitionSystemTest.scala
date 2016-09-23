@@ -105,8 +105,8 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
     gateway.http(GET, "/A").entity should be (jsonStringEntity("updatedValueA"))
   }
 
-  //TODO "Master Transition" should "not cause requests being dropped" in {}
+  //TODO #6 "Master Transition" should "not cause requests being dropped" in {}
 
-  //TODO "Master Transition" should "not lead to inconsistent state" in {}
+  //TODO #6 "Master Transition" should "not lead to inconsistent state" in {}
 
 }
