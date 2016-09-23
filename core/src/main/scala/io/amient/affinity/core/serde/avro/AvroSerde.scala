@@ -26,7 +26,7 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
 
   override def identifier: Int = 101
 
-  override protected def fromBytes(bytes: Array[Byte]): AnyRef = AvroRecord.read(bytes, this)
+  override protected def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this)
 
   override protected def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
