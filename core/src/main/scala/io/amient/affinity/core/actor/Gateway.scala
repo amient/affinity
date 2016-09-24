@@ -21,7 +21,7 @@ package io.amient.affinity.core.actor
 
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props, Terminated}
 import akka.event.Logging
 import akka.http.scaladsl.model._
 import akka.pattern.ask
@@ -118,8 +118,8 @@ abstract class Gateway extends Actor {
       sender ! GracefulShutdown()
       context.stop(self)
 
-//    case Terminated(ref) =>
-//      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)
+    case Terminated(ref) =>
+      throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)
 
   }
 

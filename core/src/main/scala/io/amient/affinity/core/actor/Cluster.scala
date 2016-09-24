@@ -19,9 +19,8 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.concurrent.ConcurrentHashMap
-
-import akka.actor.Actor
+import scala.collection.mutable
+import akka.actor.{Actor, ActorRef}
 import akka.routing.{ActorRefRoutee, AddRoutee, RemoveRoutee, Routee}
 import io.amient.affinity.core.util.ObjectHashPartitioner
 
@@ -35,47 +34,53 @@ class Cluster extends Actor {
 
   private val numPartitions = config.getInt(Cluster.CONFIG_NUM_PARTITIONS)
 
-  //TODO #6 use lighter structure than concurrenthashmap
-  private val currentRouteMap = new ConcurrentHashMap[Int, Routee]()
+  private val routes = mutable.Map[Int, Routee]()
 
   //TODO configurable partitioner
   val partitioner = new ObjectHashPartitioner
 
+
   override def receive: Receive = {
+
+    /**
+      * relying on Region to assign partition name equal to physical partition id
+      */
+
     case AddRoutee(routee: ActorRefRoutee) =>
-      /**
-        * relying on Region to assign partition name equal to physical partition id
-        */
       val partition = routee.ref.path.name.toInt
-      currentRouteMap.put(partition, routee)
+      routes.put(partition, routee)
 
     case RemoveRoutee(routee: ActorRefRoutee) =>
       val partition = routee.ref.path.name.toInt
-      currentRouteMap.put(partition, routee)
+      routes.remove(partition) foreach { removed =>
+        if (removed != routee) routes.put(partition, removed)
+      }
 
     case message => route(message)
 
   }
 
   private def route(message: Any): Unit = {
-    val p = message match {
+    val partition = message match {
       case (k, v) => partitioner.partition(k, numPartitions)
       case v => partitioner.partition(v, numPartitions)
     }
 
-    /**
-      * This means that no region has registered the partition - this may happen for 2 reasons:
-      * 1. all regions representing that partition are genuinely down and there nothing that can be done
-      * 2. between a master failure and a standby election there may be a brief period
-      *    of the partition not being represented -
-      */
-    //TODO #6 the second case needs to be handled by the API and there a different ways how to do it
+    routes.get(partition) match {
+      case Some(routee) => routee.send(message, sender)
+      case None =>
+        throw new IllegalStateException(s"Partition $partition is not represented in the cluster")
 
-    if (!currentRouteMap.containsKey(p)) {
-      throw new IllegalStateException(s"Data partition `$p` is not represented in the cluster")
+      /**
+        * This means that no region has registered the partition which may happen for 2 reasons:
+        * 1. all regions representing that partition are genuinely down and not coming back
+        * 2. between a master failure and a standby takeover there may be a brief period
+        * of the partition not being represented.
+        *
+        * Both of the cases will see IllegalStateException which have to be handled by ack-and-retry
+        */
+
     }
-
-    currentRouteMap.get(p).send(message, sender)
 
   }
 

@@ -25,7 +25,6 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
 import akka.http.scaladsl.model.Uri.Path._
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
-import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -54,13 +53,13 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
 
     override def handle: Receive = super.handle orElse {
       case HTTP(GET, PATH(key), _, response) =>
-        implicit val timeout = Timeout(1 second)
-        fulfillAndHandleErrors(response, cluster ? key, ContentTypes.`application/json`) {
+        implicit val timeout = Timeout(500 milliseconds)
+        fulfillAndHandleErrors(response, ack(cluster, key), ContentTypes.`application/json`) {
           case value => ResponseBuilder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
-        implicit val timeout = Timeout(1 second)
+        implicit val timeout = Timeout(500 milliseconds)
         fulfillAndHandleErrors(response, ack(cluster, (key, value)), ContentTypes.`application/json`) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
@@ -109,7 +108,7 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
     gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("updatedValueA"))
   }
 
-  "Master Transition" should "not cause requests being dropped" in {
+  "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
     val requestCount = new AtomicLong(0L)
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
@@ -140,7 +139,7 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
           errorCount.set(requestCount.get - statuses("200 OK"))
         } catch {
           case e: Throwable =>
-            e.printStackTrace()
+            //e.printStackTrace()
             errorCount.set(requests.size)
         }
 
@@ -148,12 +147,10 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
     }
     client.start
     Thread.sleep(100)
-    println("Shutting down region 1")
-    //region1.shutdown()
+    region1.shutdown()
     stopSignal.set(true)
     client.join()
-    System.err.println(s"Total error count ${errorCount.get}")
-    //errorCount.get should be(0L)
+    errorCount.get should be(0L)
   }
 
   //TODO #6 "Master Transition" should "not lead to inconsistent state" in {}

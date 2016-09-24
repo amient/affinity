@@ -100,16 +100,8 @@ package object ack {
     def attempt(retry: Int = 3): Unit = {
       target ? message onComplete {
         case Success(result) => promise.success(result)
-        case Failure(cause) => {
-          cause match {
-            case to: AskTimeoutException if (to.getCause() == null) => promise.failure(cause)
-            case _ => if (retry == 0) promise.failure(cause)
-            else {
-              cause.printStackTrace()
-              attempt(retry - 1)
-            }
-          }
-        }
+        case Failure(cause) if (retry == 0) => promise.failure(cause)
+        case Failure(_) => attempt(retry - 1)
       }
     }
     attempt()
