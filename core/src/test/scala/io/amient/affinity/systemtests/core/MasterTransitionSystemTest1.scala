@@ -23,14 +23,11 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
-import akka.http.scaladsl.model.Uri.Path._
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.ResponseBuilder
-import io.amient.affinity.core.serde.primitive.StringSerde
-import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.systemtests.SystemTestBaseWithKafka
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.scalatest.{FlatSpec, Matchers}
@@ -39,7 +36,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
   val topic = "test"
 
   val producer = createProducer()
@@ -59,36 +56,15 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
-        implicit val timeout = Timeout(500 milliseconds)
+        implicit val timeout = Timeout(1500 milliseconds)
         fulfillAndHandleErrors(response, ack(cluster, (key, value)), ContentTypes.`application/json`) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
-
-      case HTTP(GET, SingleSlash, _, response) =>
-        response.success(ResponseBuilder.json(OK, Map(
-          "singleton-services" -> describeServices,
-          "partition-masters" -> describeRegions
-        ), gzip = false))
     }
   })
 
-  class MyTestPartition(rname: String) extends TestPartition(rname) {
-    val data = storage {
-      new KafkaStorage[String, String](kafkaBootstrap, topic, partition, classOf[StringSerde], classOf[StringSerde])
-        with MemStoreSimpleMap[String, String]
-    }
-
-    override def handle: Receive = {
-      case key: String => sender ! data.get(key)
-      case (key: String, value: String) => ack(sender) {
-        data.put(key, Some(value))
-      }
-    }
-  }
-
-  val region1 = new TestRegionNode(new MyTestPartition("R1"))
-  val region2 = new TestRegionNode(new MyTestPartition("R2"))
-
+  val region1 = new TestRegionNode(new MyTestPartition(topic, "R1"))
+  val region2 = new TestRegionNode(new MyTestPartition(topic, "R2"))
   awaitRegions()
 
   override def afterAll(): Unit = {
@@ -101,58 +77,58 @@ class MasterTransitionSystemTest extends FlatSpec with SystemTestBaseWithKafka w
     }
   }
 
-  "Master" should "have all data after startup" in {
+  "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
+
     gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("initialValueA"))
     gateway.http_sync(GET, "/B").entity should be(jsonStringEntity("initialValueB"))
     gateway.http_sync(POST, "/A/updatedValueA").status.intValue should be(303)
     gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("updatedValueA"))
-  }
 
-  "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
-    val requestCount = new AtomicLong(0L)
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
-    val client = new Thread {
 
+    val region1 = new TestRegionNode(new MyTestPartition(topic ,"R1"))
+    val region2 = new TestRegionNode(new MyTestPartition(topic, "R2"))
+
+    try {
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      override def run: Unit = {
-        val random = new Random()
-        val requests = scala.collection.mutable.ListBuffer[Future[String]]()
-        while (!stopSignal.get) {
-          Thread.sleep(1)
-          if (isInterrupted) throw new InterruptedException
-          val path = if (random.nextBoolean()) "/A" else "/B"
-          requests += gateway.http(GET, path) map {
-            case response => response.status.value
-          } recover {
-            case e: Throwable => e.getMessage
-          }
-        }
-        requestCount.set(requests.size)
-        println("Requests awaiting completion " + requestCount.get)
-        try {
-          val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
-            case (status, list) => (status, list.length)
-          }
-          println(statuses)
-          errorCount.set(requestCount.get - statuses("200 OK"))
-        } catch {
-          case e: Throwable =>
-            //e.printStackTrace()
-            errorCount.set(requests.size)
-        }
+      val client = new Thread {
 
+        override def run: Unit = {
+          val random = new Random()
+          val requests = scala.collection.mutable.ListBuffer[Future[String]]()
+          while (!stopSignal.get) {
+            Thread.sleep(1)
+            if (isInterrupted) throw new InterruptedException
+            val path = if (random.nextBoolean()) "/A" else "/B"
+            requests += gateway.http(GET, path) map {
+              case response => response.status.value
+            } recover {
+              case e: Throwable => e.getMessage
+            }
+          }
+          try {
+            val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
+              case (status, list) => (status, list.length)
+            }
+            errorCount.set(requests.size - statuses("200 OK"))
+          } catch {
+            case e: Throwable => errorCount.set(requests.size)
+          }
+
+        }
       }
+      client.start
+      Thread.sleep(100)
+      region1.shutdown()
+      stopSignal.set(true)
+      client.join()
+      errorCount.get should be(0L)
+    } finally {
+      region2.shutdown()
     }
-    client.start
-    Thread.sleep(100)
-    region1.shutdown()
-    stopSignal.set(true)
-    client.join()
-    errorCount.get should be(0L)
   }
 
-  //TODO #6 "Master Transition" should "not lead to inconsistent state" in {}
 
 }

@@ -38,6 +38,7 @@ abstract class KafkaStorage[K, V](brokers: String,
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", brokers)
+  //TODO storage options: no-ack, 1-ack all-ack should be available at the abstract level
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")
@@ -69,11 +70,6 @@ abstract class KafkaStorage[K, V](brokers: String,
 
           if (isInterrupted) throw new InterruptedException
 
-          val bootOffset = kafkaConsumer.position(tp)
-          kafkaConsumer.seekToEnd(consumerPartitions)
-          val lastOffset = kafkaConsumer.position(tp)
-          kafkaConsumer.seek(tp, bootOffset)
-
           var keepConsuming = true
 
           while (keepConsuming) {
@@ -91,11 +87,7 @@ abstract class KafkaStorage[K, V](brokers: String,
                   update(r.key, r.value)
                 }
               }
-              //TODO #6 the fact that fetchedNumRecords is 0 doesn't still guarantee that there were no other records
-              //produced by another instance - to reliably know that the consumer is fully caught up,
-              // there should be a watermark maintained by the master which is updated similarly to standard
-              // kafka consumer offset
-              if (!tailing && fetchedNumRecrods == 0) { //&& kafkaConsumer.position(tp) >= lastOffset) {
+              if (!tailing && fetchedNumRecrods == 0) {
                 keepConsuming = false
               }
             } catch {
@@ -105,7 +97,6 @@ abstract class KafkaStorage[K, V](brokers: String,
                   consumerError.set(e)
                   notify
                 }
-                this.interrupt()
             }
           }
 

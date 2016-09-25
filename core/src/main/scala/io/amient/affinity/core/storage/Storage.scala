@@ -63,9 +63,12 @@ trait Storage[K, V] extends MemStore[K, V] {
       write(key, null.asInstanceOf[V]).get()
       prev
     }
-    case Some(data) => update(key, data) map { prev =>
-      if (prev != data) write(key, data).get()
-      prev
+    case Some(data) => update(key, data) match {
+      case Some(prev) if (prev == data) => Some(prev)
+      case other =>
+        //TODO storage options: non-blocking variant should be available
+        write(key, data).get()
+        other
     }
   }
 

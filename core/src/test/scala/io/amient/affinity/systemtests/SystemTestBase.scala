@@ -30,9 +30,11 @@ import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import io.amient.affinity.core.serde.primitive.StringSerde
+import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
 import io.amient.affinity.core.util.{ObjectHashPartitioner, ZooKeeperClient}
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
@@ -52,6 +54,7 @@ object SystemTestBase {
 trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   val testDir = new File(classOf[SystemTestBase].getResource("/systemtest").getPath() + "/" + this.getClass.getSimpleName)
+  println(s"Test dir: $testDir")
   deleteDirectory(testDir)
   testDir.mkdirs()
 
@@ -149,8 +152,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
     override def onBecomeMaster: Unit = {
       super.onBecomeMaster
-      println(s"$rname became leader of partition $partition")
       regionStartupMonitor.synchronized(regionStartupMonitor.notify)
+    }
+
+    override def onBecomeStandby: Unit = {
+      super.onBecomeStandby
     }
 
   }
@@ -196,4 +202,18 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     "partitioner.class" -> classOf[ObjectHashPartitioner].getName,
     "acks" -> "all"
   ).asJava)
+
+  class MyTestPartition(topic: String, rname: String) extends TestPartition(rname) {
+    val data = storage {
+      new KafkaStorage[String, String](kafkaBootstrap, topic, partition, classOf[StringSerde], classOf[StringSerde])
+        with MemStoreSimpleMap[String, String]
+    }
+
+    override def handle: Receive = {
+      case key: String => sender ! data.get(key)
+      case (key: String, value: String) => ack(sender) {
+        data.put(key, Some(value))
+      }
+    }
+  }
 }

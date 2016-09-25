@@ -7,13 +7,13 @@
         </layout>
     </appender>
 
-    <logger name="io.amient.kafka.hadoop" additivity="false">
-        <level value="INFO" />
+    <logger name="io.amient" additivity="false">
+        <level value="WARN" />
         <appender-ref ref="consoleAppender"/>
     </logger>
 
     <root>
-        <priority value ="WARN" />
+        <priority value ="ERROR" />
         <appender-ref ref="consoleAppender"/>
     </root>
 

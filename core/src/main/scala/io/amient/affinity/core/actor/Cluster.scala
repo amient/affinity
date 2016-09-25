@@ -19,10 +19,11 @@
 
 package io.amient.affinity.core.actor
 
-import scala.collection.mutable
-import akka.actor.{Actor, ActorRef}
+import akka.actor.Actor
 import akka.routing.{ActorRefRoutee, AddRoutee, RemoveRoutee, Routee}
 import io.amient.affinity.core.util.ObjectHashPartitioner
+
+import scala.collection.mutable
 
 object Cluster {
   final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
