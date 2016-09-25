@@ -19,15 +19,7 @@
 
 package io.amient.affinity.core.util
 
-import java.util
-
-import org.apache.kafka.clients.producer.Partitioner
-import org.apache.kafka.common.Cluster
-
-class ObjectHashPartitioner extends Partitioner {
-  override def configure(configs: util.Map[String, _]): Unit = ()
-
-  override def close(): Unit = ()
+class ObjectHashPartitioner {
 
   def partition(key: Any, numPartitions: Int): Int = {
     (math.abs(key.hashCode()) match {
@@ -35,11 +27,5 @@ class ObjectHashPartitioner extends Partitioner {
       case a => a
     }) % numPartitions
   }
-
-  override def partition(topic: String, key: scala.Any, keyBytes: Array[Byte], value: scala.Any, valueBytes: Array[Byte], cluster: Cluster): Int = {
-    val partitions = cluster.partitionsForTopic(topic)
-    partition(key, partitions.size)
-  }
-
 
 }

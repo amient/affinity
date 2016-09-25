@@ -26,9 +26,9 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
 
   override def identifier: Int = 101
 
-  override protected def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this)
+  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this)
 
-  override protected def toBytes(obj: Any): Array[Byte] = {
+  override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else obj match {
       //AvroRecords are capable of forward-compatible schema evolution

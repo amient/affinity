@@ -19,15 +19,14 @@
 
 package io.amient.affinity.example.partition
 
-import java.util.concurrent.Future
-
 import akka.actor.Status
-import io.amient.affinity.example._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Partition, Region}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.primitive.IntSerde
-import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap, NoopStorage}
+import io.amient.affinity.core.storage.MemStoreSimpleMap
+import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.example._
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set

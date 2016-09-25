@@ -26,9 +26,10 @@ import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
+import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.ResponseBuilder
-import io.amient.affinity.systemtests.SystemTestBaseWithKafka
+import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -37,18 +38,12 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
-  val topic = "test"
 
-  val producer = createProducer()
-  producer.send(new ProducerRecord[String, String](topic, "A", "initialValueA"))
-  producer.send(new ProducerRecord[String, String](topic, "B", "initialValueB"))
-  producer.close()
-
-  val gateway = new TestGatewayNode(new TestGateway {
+  val gateway = new TestGatewayNode(new Gateway {
 
     import context.dispatcher
 
-    override def handle: Receive = super.handle orElse {
+    override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
         fulfillAndHandleErrors(response, ack(cluster, key), ContentTypes.`application/json`) {
@@ -63,15 +58,19 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(new MyTestPartition(topic, "R1"))
-  val region2 = new TestRegionNode(new MyTestPartition(topic, "R2"))
+  val region1 = new TestRegionNode(new MyTestPartition("test", "R1") {
+    data.put("A", Some("initialValueA"))
+  })
+  val region2 = new TestRegionNode(new MyTestPartition("test", "R2") {
+    data.put("B", Some("initialValueB"))
+  })
   awaitRegions()
 
   override def afterAll(): Unit = {
     try {
       gateway.shutdown()
-      region1.shutdown()
       region2.shutdown()
+      region1.shutdown()
     } finally {
       super.afterAll()
     }
@@ -87,47 +86,40 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
 
-    val region1 = new TestRegionNode(new MyTestPartition(topic ,"R1"))
-    val region2 = new TestRegionNode(new MyTestPartition(topic, "R2"))
+    import scala.concurrent.ExecutionContext.Implicits.global
 
-    try {
-      import scala.concurrent.ExecutionContext.Implicits.global
+    val client = new Thread {
 
-      val client = new Thread {
-
-        override def run: Unit = {
-          val random = new Random()
-          val requests = scala.collection.mutable.ListBuffer[Future[String]]()
-          while (!stopSignal.get) {
-            Thread.sleep(1)
-            if (isInterrupted) throw new InterruptedException
-            val path = if (random.nextBoolean()) "/A" else "/B"
-            requests += gateway.http(GET, path) map {
-              case response => response.status.value
-            } recover {
-              case e: Throwable => e.getMessage
-            }
+      override def run: Unit = {
+        val random = new Random()
+        val requests = scala.collection.mutable.ListBuffer[Future[String]]()
+        while (!stopSignal.get) {
+          Thread.sleep(1)
+          if (isInterrupted) throw new InterruptedException
+          val path = if (random.nextBoolean()) "/A" else "/B"
+          requests += gateway.http(GET, path) map {
+            case response => response.status.value
+          } recover {
+            case e: Throwable => e.getMessage
           }
-          try {
-            val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
-              case (status, list) => (status, list.length)
-            }
-            errorCount.set(requests.size - statuses("200 OK"))
-          } catch {
-            case e: Throwable => errorCount.set(requests.size)
-          }
-
         }
+        try {
+          val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
+            case (status, list) => (status, list.length)
+          }
+          errorCount.set(requests.size - statuses("200 OK"))
+        } catch {
+          case e: Throwable => errorCount.set(requests.size)
+        }
+
       }
-      client.start
-      Thread.sleep(100)
-      region1.shutdown()
-      stopSignal.set(true)
-      client.join()
-      errorCount.get should be(0L)
-    } finally {
-      region2.shutdown()
     }
+    client.start
+    Thread.sleep(100)
+    region1.shutdown()
+    stopSignal.set(true)
+    client.join()
+    errorCount.get should be(0L)
   }
 
 

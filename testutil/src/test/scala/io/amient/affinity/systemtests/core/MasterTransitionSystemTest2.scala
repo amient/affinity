@@ -27,9 +27,10 @@ import akka.http.scaladsl.model.Uri.Path._
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
+import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.ResponseBuilder
-import io.amient.affinity.systemtests.SystemTestBaseWithKafka
+import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -38,11 +39,11 @@ import scala.util.Random
 
 class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val gateway = new TestGatewayNode(new TestGateway {
+  val gateway = new TestGatewayNode(new Gateway {
 
     import context.dispatcher
 
-    override def handle: Receive = super.handle orElse {
+    override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
         fulfillAndHandleErrors(response, ack(cluster, key), ContentTypes.`application/json`) {

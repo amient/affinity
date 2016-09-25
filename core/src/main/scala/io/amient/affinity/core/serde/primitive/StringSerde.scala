@@ -23,11 +23,11 @@ import io.amient.affinity.core.serde.Serde
 
 class StringSerde extends Serde {
 
-  override protected def fromBytes(bytes: Array[Byte]): Any = if (bytes == null) null else {
+  override def fromBytes(bytes: Array[Byte]): Any = if (bytes == null) null else {
     new String(bytes, "UTF-8")
   }
 
-  override protected def toBytes(obj: Any): Array[Byte] = if (obj == null) null else {
+  override def toBytes(obj: Any): Array[Byte] = if (obj == null) null else {
     obj.asInstanceOf[String].getBytes("UTF-8")
   }
 

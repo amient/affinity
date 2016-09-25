@@ -26,6 +26,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.Coordinator
 
+import scala.concurrent.Promise
 import scala.concurrent.duration._
 
 object Controller {
@@ -36,7 +37,7 @@ object Controller {
 
   final case class CreateServiceContainer(services: Seq[Props])
 
-  final case class GatewayCreated()
+  final case class GatewayCreated(httpPort: Int)
 
   final case class GracefulShutdown()
 
@@ -75,6 +76,8 @@ class Controller extends Actor {
       throw e
   }
 
+  private var gatewayPromise: Promise[Int] = null
+
   override def postStop(): Unit = {
     regionCoordinator.close()
     serviceCoordinator.close()
@@ -91,7 +94,7 @@ class Controller extends Actor {
           }
         }), name = "services")
       } catch {
-        case e: InvalidActorNameException => throw AckDuplicate(e)
+        case e: InvalidActorNameException => ()
       }
     }
 
@@ -99,23 +102,26 @@ class Controller extends Actor {
       try {
         context.actorOf(Props(new Region(regionCoordinator, partitionProps)), name = "region")
       } catch {
-        case e: InvalidActorNameException => throw AckDuplicate(e)
+        case e: InvalidActorNameException => ()
       }
     }
 
-    case CreateGateway(gatewayProps) => ack[Unit](sender) {
+    case CreateGateway(gatewayProps) =>
+      val origin = sender
       try {
         context.actorOf(gatewayProps, name = "gateway")
+        gatewayPromise = Promise[Int]()
+        ackWhen(origin, gatewayPromise.future)
       } catch {
-        case e: InvalidActorNameException => throw AckDuplicate(e)
+        case e: InvalidActorNameException => ackWhen(origin, gatewayPromise.future)
       }
-    }
 
-    case GatewayCreated() =>
+    case GatewayCreated(httpPort) =>
       log.info("gateway is online " + sender)
       regionCoordinator.watch(sender, global = true)
       serviceCoordinator.watch(sender, global = true)
       context.watch(sender)
+      gatewayPromise.success(httpPort)
 
     case GracefulShutdown() => ack(sender) {
       implicit val timeout = Timeout(500 milliseconds)

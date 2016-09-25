@@ -27,7 +27,7 @@ import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
@@ -43,7 +43,7 @@ class Node(config: Config) {
 
   import Node._
 
-  private val akkaPort = config.getInt(CONFIG_AKKA_PORT)
+//  private val akkaPort = config.getInt(CONFIG_AKKA_PORT)
   private val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
   private val startupTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
   private val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
@@ -66,17 +66,23 @@ class Node(config: Config) {
     Await.ready(system.whenTerminated, shutdownTimeout)
   }
 
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
+  /**
+    * @param creator
+    * @param tag
+    * @tparam T
+    * @return Future holding the httpPort on which the gateway listens
+    */
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     ack(controller, CreateGateway(Props(creator)))
   }
 
-  def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]) = {
+  def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
     ack(controller, CreateRegion(Props(partitionCreator)))
   }
 
-  def startServices(services: Props*) = {
+  def startServices(services: Props*): Future[Unit] = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
     implicit val timeout = Timeout(startupTimeout)
     ack(controller, CreateServiceContainer(services))

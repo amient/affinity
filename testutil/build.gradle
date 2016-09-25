@@ -1,0 +1,18 @@
+group = parent.group
+version = parent.version
+
+apply plugin: 'scala'
+apply plugin: 'java'
+
+dependencies {
+    compile project(':core')
+    compile project(':kafka')
+    //
+    compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
+    compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
+    compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
+
+}
+
+
+

@@ -17,21 +17,18 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.primitive
+package io.amient.affinity.example
 
-import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.example.rest.HttpGateway
+import io.amient.affinity.testutil.SystemTestBaseWithKafka
+import org.scalatest.{FlatSpec, Matchers}
 
-class IntSerde extends Serde {
+class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  override def identifier: Int = 20
+  val gateway = new TestGatewayNode(new HttpGateway)
 
-  override def fromBytes(bytes: Array[Byte]): Any = if (bytes == null) null else {
-    ByteUtils.asIntValue(bytes)
+  "ExampleApp Gateway" should "be able to play ping pong" in {
+    //TODO TestGatewayNode http and http_sync to decode gzipped responses
+    //gateway.http_sync(GET, s"/ping").entity should be(jsonStringEntity("pong"))
   }
-
-  override def toBytes(obj: Any): Array[Byte] = if (obj == null) null else {
-    ByteUtils.putIntValue(obj.asInstanceOf[Int], new Array[Byte](4),0)
-  }
-
 }

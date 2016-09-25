@@ -20,11 +20,9 @@
 package io.amient.affinity.core
 
 import akka.actor.{ActorRef, Status}
-import akka.pattern.{AskTimeoutException, ask}
+import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.ack.AckDuplicate
 
-import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -41,48 +39,13 @@ import scala.util.{Failure, Success}
   * Supported delivery semantics: At-Least-Once
   *
   * Because this ack implementation is stateless, any logic relying on its functionality
-  * must take care of deduplication by throwing AckDuplicate form the closure code
-  * that needs to be guaranteed executed exactly once.
+  * must take care of deduplication that can result from the retries in case the ack response
+  * wasn't delivered.
   *
   * Likewise in-order processing must be taken care of by the code relying on the ack.
   */
 package object ack {
 
-  final case class AckDuplicate(e: Throwable) extends RuntimeException(e)
-
-  /**
-    * end of chain ack() which runs the given closure and reports either a success or failure
-    * back.
-    *
-    * @param replyTo
-    * @param closure
-    */
-  def ack[T](replyTo: ActorRef)(closure: => T): Unit = {
-    try {
-      val result: T = closure
-      replyTo ! Status.Success(result)
-    } catch {
-      case AckDuplicate(e) => replyTo ! Status.Success(true)
-      case NonFatal(e) => replyTo ! Status.Failure(e)
-    }
-  }
-
-  /**
-    * intermediate ack() which requests ack from the target for given message and reports it
-    * back to the replyTo up the chain.
-    *
-    * @param target
-    * @param message
-    * @param replyTo
-    * @param timeout
-    * @param context
-    */
-  def ack(target: ActorRef, message: Any, replyTo: ActorRef)(implicit timeout: Timeout, context: ExecutionContext): Unit = {
-    ack(target, message) onComplete {
-      case Failure(e) => replyTo ! Status.Failure(e)
-      case Success(result) => replyTo ! result
-    }
-  }
 
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
@@ -94,12 +57,12 @@ package object ack {
     * @param context
     * @return
     */
-  def ack(target: ActorRef, message: Any)(implicit timeout: Timeout, context: ExecutionContext): Future[Any] = {
+  def ack[T](target: ActorRef, message: Any)(implicit timeout: Timeout, context: ExecutionContext): Future[T] = {
     //TODO ACK - configurable ack retries
-    val promise = Promise[Any]()
+    val promise = Promise[T]()
     def attempt(retry: Int = 3): Unit = {
       target ? message onComplete {
-        case Success(result) => promise.success(result)
+        case Success(result) => promise.success(result.asInstanceOf[T])
         case Failure(cause) if (retry == 0) => promise.failure(cause)
         case Failure(_) => attempt(retry - 1)
       }
@@ -107,5 +70,35 @@ package object ack {
     attempt()
     promise.future
   }
+
+  /**
+    * Intermediate ack with future. An ack is sent to the `replyTo` actor when the future completes.
+    * @param replyTo
+    * @param future
+    * @tparam T
+    */
+  def ackWhen[T](replyTo: ActorRef, future: Future[T])(implicit context: ExecutionContext): Unit = {
+    future onComplete {
+      case Success(result) => replyTo ! result
+      case Failure(e) => replyTo ! Status.Failure(e)
+    }
+  }
+
+  /**
+    * end of chain ack() which runs the given closure and reports either a success or failure
+    * back.
+    *
+    * @param replyTo
+    * @param closure
+    */
+  def ack[T](replyTo: ActorRef)(closure: => T): Unit = {
+    try {
+      val result: T = closure
+      replyTo ! result
+    } catch {
+      case NonFatal(e) => replyTo ! Status.Failure(e)
+    }
+  }
+
 
 }

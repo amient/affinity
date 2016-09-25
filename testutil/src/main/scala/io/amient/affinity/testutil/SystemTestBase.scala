@@ -17,35 +17,25 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests
+package io.amient.affinity.testutil
 
 import java.io.File
 import java.net.InetSocketAddress
-import java.util.Properties
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
-import io.amient.affinity.core.serde.primitive.StringSerde
-import io.amient.affinity.core.storage.{KafkaStorage, MemStoreSimpleMap}
-import io.amient.affinity.core.util.{ObjectHashPartitioner, ZooKeeperClient}
-import kafka.cluster.Broker
-import kafka.server.{KafkaConfig, KafkaServerStartable}
-import org.apache.kafka.clients.producer.KafkaProducer
-import org.apache.kafka.common.protocol.SecurityProtocol
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-import scala.collection.JavaConverters._
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 object SystemTestBase {
   val akkaPort = new AtomicInteger(15001)
@@ -53,7 +43,7 @@ object SystemTestBase {
 
 trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
-  val testDir = new File(classOf[SystemTestBase].getResource("/systemtest").getPath() + "/" + this.getClass.getSimpleName)
+  val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
   println(s"Test dir: $testDir")
   deleteDirectory(testDir)
   testDir.mkdirs()
@@ -75,7 +65,6 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
-  val gatewayStartupMonitor = new AtomicInteger(-1)
   val regionStartupMonitor = new AtomicInteger(config.getInt(Cluster.CONFIG_NUM_PARTITIONS))
 
   import SystemTestBase._
@@ -95,24 +84,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
-  class TestGateway extends Gateway {
-
-    override def preStart(): Unit = {
-      super.preStart()
-      gatewayStartupMonitor.synchronized {
-        gatewayStartupMonitor.set(getHttpPort)
-        gatewayStartupMonitor.notify
-      }
-    }
-
-    override def handleException: PartialFunction[Throwable, HttpResponse] = {
-      case e: NoSuchElementException => HttpResponse(NotFound)
-      case e: Throwable => e.printStackTrace(); HttpResponse(InternalServerError)
-    }
-
-  }
-
-  class TestGatewayNode(gateway: => TestGateway)
+  class TestGatewayNode(gateway: => Gateway)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
 
     import system.dispatcher
@@ -120,14 +92,12 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     implicit val materializer = ActorMaterializer.create(system)
 
     val timeout: Duration = (5 seconds)
-    val httpPort = gatewayStartupMonitor.synchronized {
-      startGateway(gateway)
-      gatewayStartupMonitor.wait(timeout.toMillis)
-      gatewayStartupMonitor.get
-    }
+    val httpPort: Int = Await.result(startGateway(gateway), 10 seconds)
 
     if (httpPort <= 0) {
       throw new IllegalStateException(s"Node did not startup within $timeout")
+    } else {
+      println(s"TestGatewayNode listening on $httpPort")
     }
 
     def http(method: HttpMethod, path: String): Future[HttpResponse] = {
@@ -164,56 +134,3 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 }
 
 
-trait SystemTestBaseWithKafka extends SystemTestBase {
-
-  private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
-  private val kafkaConfig = new KafkaConfig(new Properties {
-    {
-      put("broker.id", "1")
-      put("host.name", "localhost")
-      put("port", "0")
-      put("log.dir", embeddedKafkaPath.toString)
-      put("num.partitions", "2")
-      put("auto.create.topics.enable", "true")
-      put("zookeeper.connect", zkConnect)
-    }
-  })
-  private val kafka = new KafkaServerStartable(kafkaConfig)
-  kafka.startup()
-
-  val tmpZkClient = new ZooKeeperClient(zkConnect)
-  val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
-  val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
-  tmpZkClient.close
-
-  override def afterAll(): Unit = {
-    try {
-      kafka.shutdown()
-    } catch {
-      case e: IllegalStateException => //
-    }
-    super.afterAll()
-  }
-
-  def createProducer() = new KafkaProducer[String, String](Map[String, AnyRef](
-    "bootstrap.servers" -> kafkaBootstrap,
-    "key.serializer" -> classOf[StringSerde].getName,
-    "value.serializer" -> classOf[StringSerde].getName,
-    "partitioner.class" -> classOf[ObjectHashPartitioner].getName,
-    "acks" -> "all"
-  ).asJava)
-
-  class MyTestPartition(topic: String, rname: String) extends TestPartition(rname) {
-    val data = storage {
-      new KafkaStorage[String, String](kafkaBootstrap, topic, partition, classOf[StringSerde], classOf[StringSerde])
-        with MemStoreSimpleMap[String, String]
-    }
-
-    override def handle: Receive = {
-      case key: String => sender ! data.get(key)
-      case (key: String, value: String) => ack(sender) {
-        data.put(key, Some(value))
-      }
-    }
-  }
-}

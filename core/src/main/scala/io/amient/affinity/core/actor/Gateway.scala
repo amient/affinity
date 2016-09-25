@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{Actor, ActorRef, Props, Terminated}
 import akka.event.Logging
+import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.routing._
@@ -30,11 +31,12 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
-import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
+import io.amient.affinity.core.http.{HttpExchange, HttpInterface, ResponseBuilder}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 
 object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
@@ -51,12 +53,14 @@ abstract class Gateway extends Actor {
 
   val cluster = context.actorOf(Props(new Cluster()), name = "cluster")
 
+  context.watch(cluster)
+
   import context.system
 
   private val httpInterface: HttpInterface = new HttpInterface(
     config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
 
-  def getHttpPort: Int = httpInterface.getListenPort
+  httpInterface.bind(self)
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }
 
@@ -68,12 +72,11 @@ abstract class Gateway extends Actor {
 
   override def preStart(): Unit = {
     log.info("starting gateway")
-    val t = 10 seconds
-    implicit val timeout = Timeout(t)
-    Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
-    context.watch(cluster)
-    context.parent ! Controller.GatewayCreated()
-    httpInterface.bind(self)
+//    val t = 10 seconds
+//    implicit val timeout = Timeout(t)
+    //Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
+    context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
+
   }
 
   override def postStop(): Unit = {
@@ -88,7 +91,14 @@ abstract class Gateway extends Actor {
     }
   }
 
-  def handleException: PartialFunction[Throwable, HttpResponse]
+  def handleException: PartialFunction[Throwable, HttpResponse]= {
+    case e: IllegalAccessError => HttpResponse(Forbidden)
+    case e: NoSuchElementException => HttpResponse(NotFound)
+    case e: IllegalArgumentException => HttpResponse(BadRequest)
+    case e: NotImplementedError => e.printStackTrace(); HttpResponse(NotImplemented)
+    case NonFatal(e) => e.printStackTrace(); HttpResponse(InternalServerError)
+    case e => e.printStackTrace(); HttpResponse(ServiceUnavailable)
+  }
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
@@ -104,12 +114,12 @@ abstract class Gateway extends Actor {
     //no handler matched the HttpExchange
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
-    case MasterStatusUpdate("regions", add, remove) => ack(sender) {
+    case MasterStatusUpdate("regions", add, remove) => ack[Unit](sender) {
       remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
     }
 
-    case MasterStatusUpdate("services", add, remove) => ack(sender) {
+    case MasterStatusUpdate("services", add, remove) => ack[Unit](sender) {
       add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
       remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
     }

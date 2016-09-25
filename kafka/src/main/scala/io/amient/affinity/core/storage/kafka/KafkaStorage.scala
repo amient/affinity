@@ -17,24 +17,29 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.storage
+package io.amient.affinity.core.storage.kafka
 
 import java.util
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
 import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.storage.Storage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import scala.collection.JavaConverters._
 
 abstract class KafkaStorage[K, V](brokers: String,
                                   topic: String,
                                   partition: Int,
-                                  keySerde: Class[_ <: Serde],
-                                  valueSerde: Class[_ <: Serde]) extends Storage[K, V] {
+                                  keySerdeClass: Class[_ <: Serde],
+                                  valueSerdeClass: Class[_ <: Serde]) extends Storage[K, V] {
+
+  val keySerde: Serde = keySerdeClass.newInstance()
+  val valueSerde: Serde = valueSerdeClass.newInstance()
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", brokers)
@@ -42,9 +47,9 @@ abstract class KafkaStorage[K, V](brokers: String,
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")
-  producerProps.put("key.serializer", keySerde.getName)
-  producerProps.put("value.serializer", valueSerde.getName)
-  val kafkaProducer = new KafkaProducer[K, V](producerProps)
+  producerProps.put("key.serializer", classOf[ByteArraySerializer].getName)
+  producerProps.put("value.serializer", classOf[ByteArraySerializer].getName)
+  val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
   private var tailing = true
   private val consumerError = new AtomicReference[Throwable](null)
@@ -53,9 +58,9 @@ abstract class KafkaStorage[K, V](brokers: String,
     val consumerProps = new Properties()
     consumerProps.put("bootstrap.servers", brokers)
     consumerProps.put("enable.auto.commit", "false")
-    consumerProps.put("key.deserializer", keySerde.getName)
-    consumerProps.put("value.deserializer", valueSerde.getName)
-    val kafkaConsumer = new KafkaConsumer[K, V](consumerProps)
+    consumerProps.put("key.deserializer", classOf[ByteArrayDeserializer].getName)
+    consumerProps.put("value.deserializer", classOf[ByteArrayDeserializer].getName)
+    val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
 
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
@@ -81,10 +86,11 @@ abstract class KafkaStorage[K, V](brokers: String,
               var fetchedNumRecrods = 0
               for (r <- records.iterator().asScala) {
                 fetchedNumRecrods += 1
+                val key = keySerde.fromBytes(r.key).asInstanceOf[K]
                 if (r.value == null) {
-                  remove(r.key)
+                  remove(key)
                 } else {
-                  update(r.key, r.value)
+                  update(key, valueSerde.fromBytes(r.value).asInstanceOf[V])
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {
@@ -149,7 +155,9 @@ abstract class KafkaStorage[K, V](brokers: String,
   }
 
   def write(key: K, value: V): java.util.concurrent.Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
+    val k = keySerde.toBytes(key)
+    val v = valueSerde.toBytes(value)
+    kafkaProducer.send(new ProducerRecord(topic, partition, k, v))
   }
 
 }
