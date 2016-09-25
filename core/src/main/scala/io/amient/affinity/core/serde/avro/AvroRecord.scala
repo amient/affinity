@@ -20,6 +20,7 @@
 package io.amient.affinity.core.serde.avro
 
 import java.io.ByteArrayOutputStream
+import java.util.UUID
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
@@ -90,7 +91,7 @@ object AvroRecord {
       case FLOAT => new java.lang.Float(datum.asInstanceOf[Float])
       case DOUBLE => new java.lang.Double(datum.asInstanceOf[Double])
       case LONG => new java.lang.Long(datum.asInstanceOf[Long])
-      case FIXED | BYTES => datum.asInstanceOf[Array[Byte]]
+      case BYTES => datum.asInstanceOf[java.nio.ByteBuffer]
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
       case RECORD =>
         val record = datum.asInstanceOf[GenericRecord]
@@ -129,6 +130,7 @@ object AvroRecord {
         } else {
           iterable
         }
+      case FIXED => throw new NotImplementedError("Avro Fixed are not supported")
       case UNION => throw new NotImplementedError("Avro Unions are not supported")
     }
   }
@@ -154,6 +156,8 @@ object AvroRecord {
             SchemaBuilder.builder().floatType()
           } else if (tpe =:= definitions.DoubleTpe) {
             SchemaBuilder.builder().doubleType()
+          } else if (tpe =:= typeOf[java.nio.ByteBuffer]) {
+            SchemaBuilder.builder().bytesType()
           } else if (tpe <:< typeOf[Map[_, _]]) {
             SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
           } else if (tpe <:< typeOf[Iterable[_]]) {
@@ -176,8 +180,8 @@ object AvroRecord {
             val params = constructor.asMethod.paramLists(0)
             val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
               case (assembler, (symbol, i)) =>
-                val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
                 val field = assembler.name(symbol.name.toString).`type`(inferSchema(symbol.typeSignature))
+                val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
                 if (defaultDef == NoSymbol) {
                   field.noDefault()
                 } else {
@@ -195,8 +199,9 @@ object AvroRecord {
                 }
             }
             assembler.endRecord()
+          } else if (tpe =:= typeOf[UUID]) {
+            SchemaBuilder.builder().fixed("java.lang.UUID").size(16)
           } else {
-            //TODO #9 maybe Avro Case Class support for UUID as fixed 16 bytes or 2x long
             throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
           }
 

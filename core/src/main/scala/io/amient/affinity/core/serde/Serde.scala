@@ -19,12 +19,10 @@
 
 package io.amient.affinity.core.serde
 
-import java.util
 
 import akka.serialization.JSerializer
-//import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 
-trait Serde extends JSerializer  { //with Serializer[Any] with Deserializer[Any] {
+trait Serde extends JSerializer  {
 
   def fromBytes(bytes: Array[Byte]): Any
 
@@ -35,14 +33,6 @@ trait Serde extends JSerializer  { //with Serializer[Any] with Deserializer[Any]
   override def includeManifest: Boolean = false
 
   override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj)
-
-//  override def serialize(topic: String, data: scala.Any): Array[Byte] = toBytes(data)
-
-//  override def deserialize(topic: String, data: Array[Byte]): Any = fromBytes(data)
-
-//  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = ()
-
-//  override def close(): Unit = ()
 
   override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes) match {
     case ref: AnyRef => ref

@@ -108,9 +108,7 @@ abstract class KafkaStorage[K, V](brokers: String,
 
           synchronized {
             notify()
-//            println(s"`$topic`, partition $partition suspending tail consumption @ offest ${kafkaConsumer.position(tp)}")
             wait()
-//            println(s"`$topic`, partition $partition resuming tail consumption from offset ${kafkaConsumer.position(tp)}")
           }
 
         }

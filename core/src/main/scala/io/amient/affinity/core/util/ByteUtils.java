@@ -18,7 +18,9 @@
 package io.amient.affinity.core.util;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.UUID;
 
 public class ByteUtils {
 
@@ -281,6 +283,17 @@ public class ByteUtils {
         return sum;
     }
 
+    public static byte[] uuid(UUID uuid) {
+        byte[] result = new byte[16];
+        putLongValue(uuid.getMostSignificantBits(), result, 0);
+        putLongValue(uuid.getLeastSignificantBits(), result, 8);
+        return result;
+    }
+
+    public static UUID uuid(byte[] uuid) {
+        return new UUID(asLongValue(uuid, 0), asLongValue(uuid, 8));
+    }
+
     public static byte[] parseUUID(String uuid) {
         return parseUUID(uuid, new byte[16], 0);
     }
@@ -304,14 +317,14 @@ public class ByteUtils {
     public static void parseUUID(byte[] uuid, int spacing, int uuidOffset, byte[] dest, int destOffset) {
         long mostSigBits = parseLongRadix16(uuid, uuidOffset, uuidOffset + 7);
         mostSigBits <<= 16;
-        mostSigBits |= ByteUtils.parseLongRadix16(uuid, uuidOffset + 8 + 1 * spacing, uuidOffset + 11 + 1 * spacing);
+        mostSigBits |= parseLongRadix16(uuid, uuidOffset + 8 + 1 * spacing, uuidOffset + 11 + 1 * spacing);
         mostSigBits <<= 16;
-        mostSigBits |= ByteUtils.parseLongRadix16(uuid, uuidOffset + 12 + 2 * spacing, uuidOffset + 15 + 2 * spacing);
-        long leastSigBits = ByteUtils.parseLongRadix16(uuid, uuidOffset + 16 + 3 * spacing, uuidOffset + 19 + 3 * spacing);
+        mostSigBits |= parseLongRadix16(uuid, uuidOffset + 12 + 2 * spacing, uuidOffset + 15 + 2 * spacing);
+        long leastSigBits = parseLongRadix16(uuid, uuidOffset + 16 + 3 * spacing, uuidOffset + 19 + 3 * spacing);
         leastSigBits <<= 48;
-        leastSigBits |= ByteUtils.parseLongRadix16(uuid, uuidOffset + 20 + 4 * spacing, uuidOffset + 31 + 4 * spacing);
-        ByteUtils.putLongValue(mostSigBits, dest, destOffset);
-        ByteUtils.putLongValue(leastSigBits, dest, destOffset + 8);
+        leastSigBits |= parseLongRadix16(uuid, uuidOffset + 20 + 4 * spacing, uuidOffset + 31 + 4 * spacing);
+        putLongValue(mostSigBits, dest, destOffset);
+        putLongValue(leastSigBits, dest, destOffset + 8);
     }
 
     public static String UUIDToString(byte[] src, int offset) {

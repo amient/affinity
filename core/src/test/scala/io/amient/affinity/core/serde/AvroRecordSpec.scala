@@ -19,6 +19,8 @@
 
 package io.amient.affinity.core.serde
 
+import java.util.UUID
+
 import io.amient.affinity.core.serde.avro.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -38,10 +40,18 @@ class AvroRecordSpec extends FlatSpec with Matchers {
       Map("b1" -> b1, "b2" -> b2, "b3" -> b3),
       Set(1L, 2L, 3L)
     )
-    val bytes = AvroRecord.write(c, c.getSchema)
-    val cc = AvroRecord.read(bytes, classOf[Composite], c.getSchema)
-    assert(c == cc)
+    val bytes = AvroRecord.write(c, c.schema)
+    val cc = AvroRecord.read(bytes, classOf[Composite], c.schema)
+    c should equal(cc)
 
+  }
+
+  "java.lang.UUID" should "work when represented as Avro ByteBuffer BYTES" in {
+    val uuid = UUID.randomUUID()
+    val x = AvroUUID(uuid)
+    val bytes = AvroRecord.write(x, x.schema)
+    val copy = AvroRecord.read(bytes, classOf[AvroUUID], x.schema)
+    copy.uuid should be (uuid)
   }
 
 }
