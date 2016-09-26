@@ -19,7 +19,17 @@
 
 package io.amient.affinity.core.serde.avro.schema
 
-trait ZkAvroSchemaProvider extends AvroSchemaProvider {
+import io.amient.affinity.core.serde.avro.AvroSerde
+import org.apache.avro.Schema
+import scala.reflect.runtime.universe._
 
-  //TODO #9 ZkSchemaProvider with shared and guaranteed schema registration
+/**
+  * Confluent Schema Registry provider and serde
+  */
+class CfAvroSchemaRegistry extends AvroSerde with AvroSchemaProvider {
+
+  //TODO #9 Confluent Schema Registry Provider
+  override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = ???
+
+  override protected def getAllSchemas(): List[(Int, Schema, Class[_], Type)] = ???
 }

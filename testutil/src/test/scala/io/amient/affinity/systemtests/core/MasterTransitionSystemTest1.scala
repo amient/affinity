@@ -30,7 +30,6 @@ import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
-import org.apache.kafka.clients.producer.ProducerRecord
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._

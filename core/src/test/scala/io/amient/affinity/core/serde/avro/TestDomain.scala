@@ -16,12 +16,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.amient.affinity.core.serde
+package io.amient.affinity.core.serde.avro
 
 import java.nio.ByteBuffer
 import java.util.UUID
 
-import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.util.ByteUtils
 
 object Side extends Enumeration {
@@ -39,6 +38,8 @@ case class Composite(
     val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord[Composite]
 
 case class _V1_Composite(val items: Seq[Base] = Seq(), val removed: Int = 0) extends AvroRecord[_V1_Composite]
+
+case class _V3_Composite(val items: Seq[Base] = Seq(), val index: Map[String, Base] = Map()) extends AvroRecord[_V3_Composite]
 
 object AvroUUID {
   def apply(uuid: UUID): AvroUUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))

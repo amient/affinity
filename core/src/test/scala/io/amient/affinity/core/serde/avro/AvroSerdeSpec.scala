@@ -17,10 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde
+package io.amient.affinity.core.serde.avro
 
 import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import org.scalatest.{FlatSpec, Matchers}
 
 class AvroSerdeSpec extends FlatSpec with Matchers {

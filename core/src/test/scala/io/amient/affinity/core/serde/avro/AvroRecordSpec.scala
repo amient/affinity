@@ -17,11 +17,10 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde
+package io.amient.affinity.core.serde.avro
 
 import java.util.UUID
 
-import io.amient.affinity.core.serde.avro.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
 
 //TODO #9 test avro record with PropSpec generating random records

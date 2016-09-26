@@ -38,6 +38,9 @@ import scala.reflect.runtime.universe._
 
 object AvroRecord {
 
+  private val magicWriter = Array[Byte](0)
+  private val magicReader = Array[Byte](0)
+
   private val typeSchemaCache = scala.collection.mutable.Map[Type, Schema]()
 
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
@@ -45,11 +48,15 @@ object AvroRecord {
   }
 
   def write(x: Any, schema: Schema, schemaId: Int = -1): Array[Byte] = {
+    if (x == null) {
+      return null
+    }
     val valueOut = new ByteArrayOutputStream()
     try {
       val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
       val writer = new GenericDatumWriter[Any](schema)
       if (schemaId >= 0) {
+        encoder.writeFixed(magicWriter, 0, 1)
         encoder.writeInt(schemaId)
       }
       writer.write(x, encoder)
@@ -70,12 +77,13 @@ object AvroRecord {
   }
 
   def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
-    if (bytes == null) null.asInstanceOf[AnyRef]
+    if (bytes == null) null
     else {
       val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
+      decoder.readFixed(magicReader, 0, 1)
       val schemaId = decoder.readInt()
       require(schemaId >= 0)
-      val (tpe, cls, writerSchema) = schemaRegistry.schema(schemaId)
+      val (tpe, _, writerSchema) = schemaRegistry.schema(schemaId)
       val readerSchema = inferSchema(tpe)
       val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
       val record: GenericRecord = reader.read(null, decoder)
@@ -84,6 +92,9 @@ object AvroRecord {
   }
 
   private def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
+    if (datum == null) {
+      return null
+    }
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])

@@ -19,67 +19,23 @@
 
 package io.amient.affinity.core.serde.avro.schema
 
-import io.amient.affinity.core.serde.avro.AvroRecord
 import org.apache.avro.Schema
 
+import scala.collection.immutable
 import scala.reflect.runtime.universe._
 
-// TODO #9 This class is not fully Thread-Safe at the moment but once the API is completed it should be reimplemented.
 trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
 
   private val register = scala.collection.mutable.LinkedHashMap[Schema, (Class[_], Type)]()
 
-  private var reg1: Map[Class[_], Int] = Map()
-
-  private var reg2: Map[Int, (Type, Class[_], Schema)] = Map()
-
-  private var reg3: Map[Schema, Int] = Map()
-
-  override def schema(id: Int): (Type, Class[_], Schema) = reg2(id)
-
-  override def schema(cls: Class[_]): Option[Int] = reg1.get(cls)
-
-  override def schema(schema: Schema): Option[Int] = reg3.get(schema)
-
-  /**
-    * register run-time type and its new schema
-    * @param schema
-    * @param className
-    */
-  final def register(className: String, schema: Schema): Unit = synchronized {
-    val (tpe, cls, currentSchema) = reg2(reg1(Class.forName(className)))
-    register(tpe, cls,  schema)
-  }
-
-  /**
-    * register compile-time type with its current schema
-    * @param cls
-    * @tparam T
-    */
-  final def register[T: TypeTag](cls: Class[T]): Unit = synchronized {
-    register(typeOf[T], cls, AvroRecord.inferSchema(cls))
-  }
-
-  /**
-    * register compile-time type with older schema version
-    * @param schema
-    * @param cls
-    * @tparam T
-    */
-  final def register[T: TypeTag](cls: Class[T], schema: Schema): Unit = synchronized {
-    register(typeOf[T], cls, schema)
-  }
-
-  private def register(tpe: Type, cls: Class[_], schema: Schema): Unit = synchronized {
+  override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     register += schema -> (cls, tpe)
-    reg1 = register.zipWithIndex.map { case ((schema, (cls, tpe)), i) =>
-      cls -> i
-    }.toMap
-    reg2 = register.zipWithIndex.map { case ((schema, (cls, tpe)), i) =>
-      i -> (tpe, cls, schema)
-    }.toMap
-    reg3 = register.zipWithIndex.map { case ((schema, cls), i) =>
-      schema -> i
-    }.toMap
+    register.size - 1
+  }
+
+  override protected def getAllSchemas: immutable.List[(Int, Schema, Class[_], Type)] = synchronized {
+    register.toList.zipWithIndex.map { case ((schema, (cls, tpe)), schemaId) =>
+      (schemaId, schema, cls, tpe)
+    }
   }
 }
