@@ -58,10 +58,8 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(new MyTestPartition("test", "R1"))
-  Thread.sleep(1300)
-  val region2 = new TestRegionNode(new MyTestPartition("test", "R2"))
-  awaitRegions()
+  val region1 = new TestRegionNode(new MyTestPartition("test"))
+  val region2 = new TestRegionNode(new MyTestPartition("test"))
 
   override def afterAll(): Unit = {
     try {

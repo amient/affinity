@@ -21,7 +21,7 @@ package io.amient.affinity.example.partition
 
 import akka.actor.Status
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{Partition, Region}
+import io.amient.affinity.core.actor.{Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.MemStoreSimpleMap
@@ -43,7 +43,7 @@ object DataPartition {
 
     val config = ConfigFactory.load("example")
       .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
-      .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
+      .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
     new Node(config) {
       startRegion(new DataPartition)

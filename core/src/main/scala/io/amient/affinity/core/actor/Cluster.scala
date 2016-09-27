@@ -20,7 +20,7 @@
 package io.amient.affinity.core.actor
 
 import akka.actor.Actor
-import akka.routing.{ActorRefRoutee, AddRoutee, RemoveRoutee, Routee}
+import akka.routing._
 import io.amient.affinity.core.util.ObjectHashPartitioner
 
 import scala.collection.mutable
@@ -56,6 +56,8 @@ class Cluster extends Actor {
       routes.remove(partition) foreach { removed =>
         if (removed != routee) routes.put(partition, removed)
       }
+
+    case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
 
     case message => route(message)
 

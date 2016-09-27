@@ -24,14 +24,17 @@ import akka.event.Logging
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
-import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.cluster.{Coordinator, Node}
 
 import scala.concurrent.Promise
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 
 object Controller {
 
   final case class CreateRegion(partitionProps: Props)
+
+  final case class ContainerCreated(group: String)
 
   final case class CreateGateway(handlerProps: Props)
 
@@ -45,7 +48,9 @@ object Controller {
 
 class Controller extends Actor {
 
-  val log = Logging.getLogger(context.system, this)
+  private val log = Logging.getLogger(context.system, this)
+
+  private val config = context.system.settings.config
 
   import Controller._
 
@@ -77,6 +82,8 @@ class Controller extends Actor {
   }
 
   private var gatewayPromise: Promise[Int] = null
+  private var regionPromise: Promise[Unit] = null
+  private var servicesPromise: Promise[Unit] = null
 
   override def postStop(): Unit = {
     regionCoordinator.close()
@@ -86,25 +93,39 @@ class Controller extends Actor {
 
   override def receive: Receive = {
 
-    case CreateServiceContainer(services) => ack[Unit](sender) {
+    case CreateServiceContainer(services) =>
       try {
         context.actorOf(Props(new Container(serviceCoordinator, "services") {
           services.foreach { serviceProps =>
             context.actorOf(serviceProps, serviceProps.actorClass().getName)
           }
         }), name = "services")
+        servicesPromise = Promise[Unit]()
+        ackWhen(sender, servicesPromise.future)
       } catch {
-        case e: InvalidActorNameException => ()
+        case e: InvalidActorNameException => ackWhen(sender, servicesPromise.future)
       }
-    }
 
-    case CreateRegion(partitionProps) => ack[Unit](sender) {
+    case ContainerCreated("services") => servicesPromise.success(())
+
+    case CreateRegion(partitionProps) =>
+      val origin = sender
       try {
-        context.actorOf(Props(new Region(regionCoordinator, partitionProps)), name = "region")
+        context.actorOf(Props(new Container(regionCoordinator, "region") {
+          val partitions = config.getIntList(Node.CONFIG_PARTITION_LIST).asScala
+          for (partition <- partitions) {
+            context.actorOf(partitionProps, name = partition.toString)
+          }
+        }), name = "region")
+        regionPromise = Promise[Unit]()
+        ackWhen(origin, regionPromise.future)
       } catch {
-        case e: InvalidActorNameException => ()
+        case e: InvalidActorNameException => ackWhen(origin, gatewayPromise.future)
       }
-    }
+
+
+    case ContainerCreated("region") => regionPromise.success(())
+
 
     case CreateGateway(gatewayProps) =>
       val origin = sender

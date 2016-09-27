@@ -23,6 +23,7 @@ import java.io.File
 import java.util.Properties
 
 import io.amient.affinity.core.ack._
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.core.storage.kafka.KafkaStorage
@@ -62,7 +63,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     super.afterAll()
   }
 
-  class MyTestPartition(topic: String, rname: String) extends TestPartition(rname) {
+  class MyTestPartition(topic: String) extends Partition {
     val data = storage {
       new KafkaStorage[String, String](kafkaBootstrap, topic, partition, classOf[StringSerde], classOf[StringSerde])
         with MemStoreSimpleMap[String, String]

@@ -21,8 +21,16 @@ package io.amient.affinity.core.actor
 
 import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
+import akka.util.Timeout
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Container._
+import io.amient.affinity.core.actor.Controller.ContainerCreated
+import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
+import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
+import scala.concurrent.duration._
+
+import scala.concurrent.{Await, Future}
 
 object Container {
 
@@ -46,12 +54,28 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
 
   private val services = scala.collection.mutable.Map[ActorRef, String]()
 
+  /**
+    * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
+    */
+  coordinator.watch(self, global = false)
+
+  override def preStart(): Unit = {
+    log.info(s"Starting container `$group`")
+    super.preStart()
+    //FIXME this message must be sent only once all services are online
+    context.parent ! ContainerCreated(group)
+  }
+
   override def postStop(): Unit = {
+    coordinator.unwatch(self)
     services.foreach { case (ref, handle) =>
       log.info(s"Unregistering service: handle=${services(ref)}, path=${ref.path}")
       coordinator.unregister(services(ref))
     }
+    super.postStop()
   }
+
+  import context.dispatcher
 
   override def receive: Receive = {
     case ServiceOnline(ref) =>
@@ -64,5 +88,13 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       log.info(s"Service offline: handle=${services(ref)}, path=${ref.path}")
       coordinator.unregister(services(ref))
       services -= ref
+
+    case MasterStatusUpdate(_, add, remove) => ack(sender) {
+      //TODO global config bootstrap timeout
+      val t = 30 seconds
+      implicit val timeout = Timeout(t)
+      Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), t)
+      Await.ready(Future.sequence(add.toList.map(ref => ack(ref, BecomeMaster()))), t)
+    }
   }
 }

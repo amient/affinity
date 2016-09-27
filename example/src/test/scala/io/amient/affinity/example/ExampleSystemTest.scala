@@ -19,13 +19,15 @@
 
 package io.amient.affinity.example
 
+import akka.http.scaladsl.model.HttpMethods._
 import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.testutil.SystemTestBaseWithKafka
+import io.amient.affinity.testutil.{SystemTestBase, SystemTestBaseWithKafka}
 import org.scalatest.{FlatSpec, Matchers}
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val gateway = new TestGatewayNode(new HttpGateway)
+  //TODO Configure settings and graph storage to use `kafkaBootstrap`
+  //val gateway = new TestGatewayNode(new HttpGateway)
 
   "ExampleApp Gateway" should "be able to play ping pong" in {
     //TODO TestGatewayNode http and http_sync to decode gzipped responses

@@ -20,11 +20,12 @@
 package io.amient.affinity.core.actor
 
 import akka.actor.{ActorPath, PoisonPill, Props}
-import akka.testkit.TestKit
 import akka.util.Timeout
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.{ActorUnitTestBase, TestCoordinator}
-import org.scalatest.{BeforeAndAfterAll, Matchers}
+import org.scalatest.Matchers
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 
@@ -48,7 +49,12 @@ class RegionSpec extends ActorUnitTestBase with Matchers {
         val d = 1 second
         implicit val timeout = Timeout(d)
 
-        val region = system.actorOf(Props(new Region(coordinator, testPartition)), name = "region")
+        val region = system.actorOf(Props(new Container(coordinator, "region") {
+          val partitions = system.settings.config.getIntList(Node.CONFIG_PARTITION_LIST).asScala
+          for (partition <- partitions) {
+            context.actorOf(testPartition, name = partition.toString)
+          }
+        }), name = "region")
         awaitCond(coordinator.services.size == 4)
 
         //first stop Partition explicitly - it shouldn't be restarted

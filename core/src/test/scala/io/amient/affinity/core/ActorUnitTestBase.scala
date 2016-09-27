@@ -22,7 +22,6 @@ package io.amient.affinity.core
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Region
 import io.amient.affinity.core.cluster.Node
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
@@ -34,7 +33,7 @@ class ActorUnitTestBase(system: ActorSystem) extends TestKit(system) with Implic
 
   def this() = this(ConfigFactory.defaultApplication()
     .withValue(Node.CONFIG_AKKA_HOST, ConfigValueFactory.fromAnyRef(null))
-    .withValue(Region.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1, 2, 3).asJava))
+    .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1, 2, 3).asJava))
   )
 
   override def afterAll {

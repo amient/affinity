@@ -65,18 +65,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
-  val regionStartupMonitor = new AtomicInteger(config.getInt(Cluster.CONFIG_NUM_PARTITIONS))
-
   import SystemTestBase._
-
-  def awaitRegions() = {
-    val timeout: Duration = (5 seconds)
-    regionStartupMonitor.synchronized {
-      while (regionStartupMonitor.getAndDecrement() > 0) {
-        regionStartupMonitor.wait(timeout.toMillis)
-      }
-    }
-  }
 
   override def afterAll(): Unit = {
     zkFactory.shutdown()
@@ -103,7 +92,9 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     def http(method: HttpMethod, path: String): Future[HttpResponse] = {
       val uri = Uri(s"http://localhost:$httpPort$path")
       Http().singleRequest(HttpRequest(method = method, uri = uri)) flatMap {
-        response => response.toStrict(2 seconds)
+        response =>
+          //println(response.headers)
+          response.toStrict(2 seconds)
       }
     }
 
@@ -115,20 +106,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   class TestRegionNode(partitionCreator: => Partition)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
-    startRegion(partitionCreator)
-  }
-
-  abstract class TestPartition(rname:String) extends Partition {
-
-    override def onBecomeMaster: Unit = {
-      super.onBecomeMaster
-      regionStartupMonitor.synchronized(regionStartupMonitor.notify)
-    }
-
-    override def onBecomeStandby: Unit = {
-      super.onBecomeStandby
-    }
-
+    Await.result(startRegion(partitionCreator), 3 seconds)
   }
 
 }

@@ -72,9 +72,6 @@ abstract class Gateway extends Actor {
 
   override def preStart(): Unit = {
     log.info("starting gateway")
-//    val t = 10 seconds
-//    implicit val timeout = Timeout(t)
-    //Await.ready(context.actorSelection(cluster.path).resolveOne(), t)
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
 
   }

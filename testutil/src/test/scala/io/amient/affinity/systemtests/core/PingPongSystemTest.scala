@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.actor.{Gateway, Partition}
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.testutil.SystemTestBase
@@ -46,13 +46,11 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     }
   })
 
-  val region = new TestRegionNode(new TestPartition("R0") {
+  val region = new TestRegionNode(new Partition {
     override def handle: Receive = {
       case "ping" => sender ! "pong"
     }
   })
-
-  awaitRegions()
 
   override def afterAll(): Unit = {
     try {

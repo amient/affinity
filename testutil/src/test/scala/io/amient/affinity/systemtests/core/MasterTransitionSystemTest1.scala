@@ -57,13 +57,12 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(new MyTestPartition("test", "R1") {
+  val region1 = new TestRegionNode(new MyTestPartition("test") {
     data.put("A", Some("initialValueA"))
   })
-  val region2 = new TestRegionNode(new MyTestPartition("test", "R2") {
+  val region2 = new TestRegionNode(new MyTestPartition("test") {
     data.put("B", Some("initialValueB"))
   })
-  awaitRegions()
 
   override def afterAll(): Unit = {
     try {
