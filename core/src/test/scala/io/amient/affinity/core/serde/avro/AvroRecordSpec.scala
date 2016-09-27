@@ -21,36 +21,57 @@ package io.amient.affinity.core.serde.avro
 
 import java.util.UUID
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalacheck.Gen
+import org.scalacheck.Gen._
+import org.scalatest.prop.PropertyChecks
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalatest.{Matchers, PropSpec}
 
-//TODO #9 test avro record with PropSpec generating random records
-class AvroRecordSpec extends FlatSpec with Matchers {
+class AvroRecordSpec extends PropSpec with PropertyChecks with Matchers {
 
   import Side._
 
-  "write-read" should "produce the same record" in {
-    val b1 = Base()
-    assert(b1 == Base(ID(0), LEFT, Seq()))  //defaults
-    val b2 = Base(ID(2), LEFT, Seq(ID(1), ID(3)))
-    AvroRecord.write(b2, b2.getSchema) // value class set
-    val b3 = Base(ID(3), RIGHT, Seq(ID(1), ID(2)))
-    val c = Composite(
-      Seq(b1, b2, b3),
-      Map("b1" -> b1, "b2" -> b2, "b3" -> b3),
-      Set(1L, 2L, 3L)
-    )
-    val bytes = AvroRecord.write(c, c.schema)
-    val cc = AvroRecord.read(bytes, classOf[Composite], c.schema)
-    c should equal(cc)
-
+  property("Case Class constructor default arguments are AvroRecord defaults") {
+    val b = Base()
+    assert(b == Base(ID(0), LEFT, Seq()))
+    AvroRecord.read(AvroRecord.write(b, b.schema), classOf[Base], b.schema) should equal(Base(ID(0), LEFT, Seq()))
+    val c = Composite()
+    assert(c == Composite(Seq(), Map(), Set()))
+    AvroRecord.read(AvroRecord.write(c, c.schema), classOf[Composite], c.schema) should equal(Composite(Seq(), Map(), Set()))
   }
 
-  "java.lang.UUID" should "work when represented as Avro ByteBuffer BYTES" in {
-    val uuid = UUID.randomUUID()
-    val x = AvroUUID(uuid)
-    val bytes = AvroRecord.write(x, x.schema)
-    val copy = AvroRecord.read(bytes, classOf[AvroUUID], x.schema)
-    copy.uuid should be (uuid)
+  def uuids: Gen[UUID] = for {
+    hi <- arbitrary[Long]
+    lo <- arbitrary[Long]
+  } yield new UUID(hi, lo)
+
+  property("java.lang.UUID can be represented as Avro Bytes") {
+    forAll(uuids) { uuid: UUID =>
+      val x = AvroUUID(uuid)
+      val bytes = AvroRecord.write(x, x.schema)
+      val copy = AvroRecord.read(bytes, classOf[AvroUUID], x.schema)
+      copy.uuid should be(uuid)
+    }
   }
+  def bases: Gen[Base] = for {
+    id <- arbitrary[Int]
+    side <- Gen.oneOf(Side.LEFT, Side.RIGHT)
+    ints <- listOf(arbitrary[Int])
+  } yield Base(ID(id), side, ints.map(ID(_)))
+
+  def composites: Gen[Composite] = for {
+     nitems <- Gen.choose(1, 2)
+     items <- listOfN(nitems, bases)
+     keys <- listOfN(nitems, Gen.alphaStr)
+     longs <- listOf(arbitrary[Long])
+  } yield Composite(items, keys.zip(items).toMap, longs.toSet)
+
+  property("AvroRecord.write is fully reversible by AvroRecord.read") {
+    forAll(composites) { composite: Composite =>
+      val bytes = AvroRecord.write(composite, composite.schema)
+      AvroRecord.read(bytes, classOf[Composite], composite.schema) should equal(composite )
+    }
+  }
+
 
 }

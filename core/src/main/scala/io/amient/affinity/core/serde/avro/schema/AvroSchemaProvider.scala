@@ -25,14 +25,13 @@ import org.apache.avro.Schema
 import scala.collection.immutable
 import scala.reflect.runtime.universe._
 
-// TODO #9 This trait is not fully Thread-Safe at the moment but once the API is completed it should be reimplemented.
 trait AvroSchemaProvider {
 
-  private var reg1: immutable.Map[Class[_], Int] = Map()
+  @volatile private var reg1: immutable.Map[Class[_], Int] = Map()
 
-  private var reg2: immutable.Map[Int, (Type, Class[_], Schema)] = Map()
+  @volatile private var reg2: immutable.Map[Int, (Type, Class[_], Schema)] = Map()
 
-  private var reg3: immutable.Map[Schema, Int] = Map()
+  @volatile private var reg3: immutable.Map[Schema, Int] = Map()
 
   final def schema(id: Int): (Type, Class[_], Schema) = reg2(id)
 
@@ -41,14 +40,14 @@ trait AvroSchemaProvider {
   final def schema(schema: Schema): Option[Int] = reg3.get(schema)
 
   /**
-    * register run-time type and its new schema
+    * register run-time type by its class name and a schema
     *
-    * @param schema
-    * @param className
+    * @param schema schema variant for the type
+    * @param className class name of the type
     * @return unique schema id
     */
   final def register(className: String, schema: Schema): Int = synchronized {
-    val (tpe, cls, currentSchema) = reg2(reg1(Class.forName(className)))
+    val (tpe, cls, _) = reg2(reg1(Class.forName(className)))
     register(tpe, cls, schema)
   }
 
