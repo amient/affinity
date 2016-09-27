@@ -23,17 +23,23 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.GZIPInputStream
 
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.HttpEncodings
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
+import io.amient.affinity.core.actor.{Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
+import org.apache.avro.util.ByteBufferInputStream
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -91,11 +97,19 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
     def http(method: HttpMethod, path: String): Future[HttpResponse] = {
       val uri = Uri(s"http://localhost:$httpPort$path")
-      Http().singleRequest(HttpRequest(method = method, uri = uri)) flatMap {
-        response =>
-          //println(response.headers)
-          response.toStrict(2 seconds)
+      val decodedResponse: Future[HttpResponse] = Http().singleRequest(HttpRequest(method = method, uri = uri)) flatMap {
+        response => response.header[headers.`Content-Encoding`] match {
+          case Some(c) if (c.encodings.contains(HttpEncodings.gzip)) =>
+            response.entity.dataBytes.map(_.asByteBuffer).runWith(Sink.seq).map {
+              byteBufferSequence =>
+                val unzipped = fromInputStream(() => new GZIPInputStream(new ByteBufferInputStream(byteBufferSequence.asJava)))
+                val unzippedEntity =  HttpEntity(response.entity.contentType, unzipped)
+                response.copy(entity = unzippedEntity)
+            }
+          case _ => Future.successful(response)
+        }
       }
+      decodedResponse.flatMap(_.toStrict(2 seconds))
     }
 
     def http_sync(method: HttpMethod, path: String): HttpResponse = {

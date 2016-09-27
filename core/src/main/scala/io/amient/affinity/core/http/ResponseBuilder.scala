@@ -43,10 +43,13 @@ object ResponseBuilder {
     val writer = if (gzip) new OutputStreamWriter(new GZIPOutputStream(out)) else new OutputStreamWriter(out)
     mapper.writeValue(writer, value)
 
-    //TODO - Source will always make the response chunked but for small non-gzip values this may be big overhead
+    val buffers = out.getBufferList
+
     HttpResponse(status
-      , entity = HttpEntity(ContentTypes.`application/json`, Source(out.getBufferList.asScala.map(ByteString(_)).toList))
-      , headers = if (!gzip) List() else List(headers.`Content-Encoding`(HttpEncodings.gzip)))
+      , entity = buffers.size match {
+        case 1 => HttpEntity(ContentTypes.`application/json`, ByteString(buffers.get(0)))
+        case _ => HttpEntity(ContentTypes.`application/json`, Source(buffers.asScala.map(ByteString(_)).toList))
+      }, headers = if (!gzip) List() else List(headers.`Content-Encoding`(HttpEncodings.gzip)))
   }
 
 }

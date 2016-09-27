@@ -142,6 +142,7 @@ class Controller extends Actor {
       regionCoordinator.watch(sender, global = true)
       serviceCoordinator.watch(sender, global = true)
       context.watch(sender)
+      //FIXME when gateway gets restarted CreateGateway is never called again and the promise will be 'already completed'
       gatewayPromise.success(httpPort)
 
     case GracefulShutdown() => ack(sender) {
