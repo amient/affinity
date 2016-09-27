@@ -64,9 +64,6 @@ object HttpGateway {
 
 class HttpGateway extends Gateway with ActorState {
 
-  //FIXME serde access
-  val avroSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde]
-
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
@@ -74,8 +71,11 @@ class HttpGateway extends Gateway with ActorState {
     * can be modified by other nodes and need to be accessed concurrently
     */
   val settings = storage {
-    new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0, new StringSerde(), avroSerde)
-      with MemStoreConcurrentMap[String, ConfigEntry]
+    new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0) with MemStoreConcurrentMap {
+      override val keySerde = new StringSerde()
+      override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde]
+      //FIXME storage serde configuration
+    }
   }
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {

@@ -19,7 +19,14 @@
 
 package io.amient.affinity.core.storage
 
-trait Storage[K, V] extends MemStore[K, V] {
+import java.nio.ByteBuffer
+
+import io.amient.affinity.core.serde.Serde
+
+trait Storage[K, V] extends MemStore {
+
+  val keySerde: Serde
+  val valueSerde: Serde
 
   /**
     * the contract of this method is that it should start a background process of restoring
@@ -58,18 +65,29 @@ trait Storage[K, V] extends MemStore[K, V] {
     *              otherwise the key will be updated with the value
     * @return An optional value previously held at the key position, None if new value was inserted
     */
-  final def put(key: K, value: Option[V]): Option[V] = value match {
-    case None => remove(key) map { prev =>
-      write(key, null.asInstanceOf[V]).get()
-      prev
+  final def put(key: K, value: Option[V]): Option[V] = {
+    val k = ByteBuffer.wrap(keySerde.toBytes(key))
+    value match {
+      case None => remove(k) map { prev =>
+        write(k, null).get()
+        valueSerde.fromBytes(prev.array).asInstanceOf[V]
+      }
+      case Some(data) => {
+        val v = ByteBuffer.wrap(valueSerde.toBytes(data))
+        update(k, v) match {
+          case Some(prev) if (prev == v) => Some(data)
+          case other: Option[MV] =>
+            //TODO storage options: non-blocking variant should be available
+            write(k, v).get()
+            other.map(x => valueSerde.fromBytes(x.array).asInstanceOf[V])
+        }
+      }
     }
-    case Some(data) => update(key, data) match {
-      case Some(prev) if (prev == data) => Some(prev)
-      case other =>
-        //TODO storage options: non-blocking variant should be available
-        write(key, data).get()
-        other
-    }
+  }
+
+  final def get(key: K): Option[V] = {
+    val k = ByteBuffer.wrap(keySerde.toBytes(key))
+    get(k).map(d => valueSerde.fromBytes(d.array).asInstanceOf[V])
   }
 
   /**
@@ -77,6 +95,6 @@ trait Storage[K, V] extends MemStore[K, V] {
     * @param value of the pair
     * @return Future with metadata returned by the underlying implementation
     */
-  def write(key: K, value: V): java.util.concurrent.Future[_]
+  def write(key: MK, value: MV): java.util.concurrent.Future[_]
 
 }

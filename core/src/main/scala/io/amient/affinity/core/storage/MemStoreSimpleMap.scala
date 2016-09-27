@@ -19,17 +19,17 @@
 
 package io.amient.affinity.core.storage
 
-trait MemStoreSimpleMap[K,V] extends MemStore[K,V] {
+trait MemStoreSimpleMap extends MemStore {
 
-  private val internal = scala.collection.mutable.Map[K, V]()
+  private val internal = scala.collection.mutable.Map[MK, MV]()
 
-  override def get(key: K): Option[V] = internal.get(key)
+  override def get(key: MK): Option[MV] = internal.get(key)
 
   override def iterator = internal.iterator
 
   override def size: Long = internal.size
 
-  override protected def update(key: K, value: V): Option[V] = internal.put(key, value)
+  override protected def update(key: MK, value: MV): Option[MV] = internal.put(key, value)
 
-  override protected def remove(key: K):Option[V] = internal.remove(key)
+  override protected def remove(key: MK):Option[MV] = internal.remove(key)
 }

@@ -19,11 +19,16 @@
 
 package io.amient.affinity.core.storage
 
-trait MemStore[K, V] {
+import java.nio.ByteBuffer
 
-  def get(key: K): Option[V]
+trait MemStore {
 
-  def iterator: Iterator[(K,V)]
+  type MK = ByteBuffer
+  type MV = ByteBuffer
+
+  def get(key: MK): Option[MV]
+
+  def iterator: Iterator[(MK,MV)]
 
   def size: Long
 
@@ -33,13 +38,13 @@ trait MemStore[K, V] {
     * @param value
     * @return optional value held at the key position before the update
     */
-  protected def update(key: K, value: V): Option[V]
+  protected def update(key: MK, value: MV): Option[MV]
 
   /**
     *
     * @param key
     * @return optional value held at the key position before the update, None if the key doesn't exist
     */
-  protected def remove(key: K): Option[V]
+  protected def remove(key: MK): Option[MV]
 
 }

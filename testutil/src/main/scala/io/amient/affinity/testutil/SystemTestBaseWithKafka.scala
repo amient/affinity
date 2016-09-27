@@ -65,8 +65,10 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
   class MyTestPartition(topic: String) extends Partition {
     val data = storage {
-      new KafkaStorage[String, String](kafkaBootstrap, topic, partition, new StringSerde(), new StringSerde())
-        with MemStoreSimpleMap[String, String]
+      new KafkaStorage[String, String](kafkaBootstrap, topic, partition) with MemStoreSimpleMap {
+        override val keySerde = new StringSerde()
+        override val valueSerde = new StringSerde()
+      }
     }
 
     override def handle: Receive = {

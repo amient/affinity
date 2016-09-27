@@ -19,24 +19,20 @@
 
 package io.amient.affinity.core.storage.kafka
 
+import java.nio.ByteBuffer
 import java.util
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
-import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.storage.Storage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBufferSerializer}
 
 import scala.collection.JavaConverters._
 
-abstract class KafkaStorage[K, V](brokers: String,
-                                  topic: String,
-                                  partition: Int,
-                                  keySerde: Serde,
-                                  valueSerde: Serde) extends Storage[K, V] {
+abstract class KafkaStorage[K, V](brokers: String, topic: String, partition: Int) extends Storage[K, V] {
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", brokers)
@@ -44,9 +40,9 @@ abstract class KafkaStorage[K, V](brokers: String,
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")
-  producerProps.put("key.serializer", classOf[ByteArraySerializer].getName)
-  producerProps.put("value.serializer", classOf[ByteArraySerializer].getName)
-  val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+  producerProps.put("key.serializer", classOf[ByteBufferSerializer].getName)
+  producerProps.put("value.serializer", classOf[ByteBufferSerializer].getName)
+  val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
 
   private var tailing = true
   private val consumerError = new AtomicReference[Throwable](null)
@@ -55,9 +51,9 @@ abstract class KafkaStorage[K, V](brokers: String,
     val consumerProps = new Properties()
     consumerProps.put("bootstrap.servers", brokers)
     consumerProps.put("enable.auto.commit", "false")
-    consumerProps.put("key.deserializer", classOf[ByteArrayDeserializer].getName)
-    consumerProps.put("value.deserializer", classOf[ByteArrayDeserializer].getName)
-    val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
+    consumerProps.put("key.deserializer", classOf[ByteBufferDeserializer].getName)
+    consumerProps.put("value.deserializer", classOf[ByteBufferDeserializer].getName)
+    val kafkaConsumer = new KafkaConsumer[ByteBuffer, ByteBuffer](consumerProps)
 
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
@@ -83,13 +79,10 @@ abstract class KafkaStorage[K, V](brokers: String,
               var fetchedNumRecrods = 0
               for (r <- records.iterator().asScala) {
                 fetchedNumRecrods += 1
-                val key = keySerde.fromBytes(r.key).asInstanceOf[K]
                 if (r.value == null) {
-                  remove(key)
+                  remove(r.key)
                 } else {
-                  //TODO store only bytes in the memstore and use serde when accessing the data
-                  val v = valueSerde.fromBytes(r.value).asInstanceOf[V]
-                  update(key, v)
+                  update(r.key, r.value)
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {
@@ -151,10 +144,8 @@ abstract class KafkaStorage[K, V](brokers: String,
     }
   }
 
-  def write(key: K, value: V): java.util.concurrent.Future[RecordMetadata] = {
-    val k = keySerde.toBytes(key)
-    val v = valueSerde.toBytes(value)
-    kafkaProducer.send(new ProducerRecord(topic, partition, k, v))
+  def write(key: MK, value: MV): java.util.concurrent.Future[RecordMetadata] = {
+    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
   }
 
 }

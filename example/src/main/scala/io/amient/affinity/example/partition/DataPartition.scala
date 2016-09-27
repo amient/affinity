@@ -57,18 +57,12 @@ object DataPartition {
 
 class DataPartition extends Partition {
 
-  // val config = context.system.settings.config
-
-  //  val graph = storage {
-  //    new NoopStorage[Int, VertexProps] with MemStoreSimpleMap[Int, VertexProps]
-  //  }
-
-  //FIXME serde access
-  val avroSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
-
   val graph = storage {
-    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition, new IntSerde(), avroSerde)
-      with MemStoreSimpleMap[Int, VertexProps]
+    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition) with MemStoreSimpleMap {
+      override val keySerde = new IntSerde()
+      override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
+      //FIXME - storage serde configuration
+    }
   }
 
   override def handle: Receive = {

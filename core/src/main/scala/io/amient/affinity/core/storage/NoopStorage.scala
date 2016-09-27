@@ -22,7 +22,7 @@ import java.util.concurrent.{CompletableFuture, Future}
 
 abstract class NoopStorage[K,V] extends Storage[K,V] {
 
-  override def write(key: K, value: V): Future[Unit] = CompletableFuture.completedFuture(())
+  override def write(key: MK, value: MV): Future[Unit] = CompletableFuture.completedFuture(())
 
   override private[core] def init(): Unit = ()
 
