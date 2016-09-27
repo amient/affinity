@@ -32,20 +32,20 @@ import io.amient.affinity.example.rest.HttpGateway
 import scala.collection.Map
 import scala.concurrent.duration._
 
-trait Describe extends HttpGateway {
+trait Status extends HttpGateway {
 
   import context.dispatcher
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH(INT(p)), _, response) =>
+    case HTTP(GET, PATH("status", INT(p)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = cluster ? (p.toInt, "describe")
+      val task = cluster ? (p.toInt, "status")
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
         case any => ResponseBuilder.json(OK, any)
       }
 
-    case HTTP(GET, SingleSlash, _, response) =>
+    case HTTP(GET, PATH("status"), _, response) =>
       response.success(ResponseBuilder.json(OK, Map(
         "singleton-services" -> describeServices,
         "partition-masters" -> describeRegions

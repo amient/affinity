@@ -82,7 +82,7 @@ class DataPartition extends Partition {
     /**
       * Describe partition and its stats
       */
-    case (p: Int, "describe") =>
+    case (p: Int, "status") =>
       require(p == partition)
       sender ! Map(
         "partition" -> partition,

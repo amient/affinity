@@ -50,7 +50,7 @@ trait Fail extends HttpGateway {
     /**
       * shut down region serving the given partition
       */
-    case HTTP(POST, PATH(INT(partition), "down"), _, response) =>
+    case HTTP(POST, PATH("down", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ! (partition, "down")
       Thread.sleep(1000)
@@ -59,7 +59,7 @@ trait Fail extends HttpGateway {
     /**
       * simulate exception in partition
       */
-    case HTTP(POST, PATH(INT(partition), "fail"), _, response) =>
+    case HTTP(POST, PATH("fail", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
@@ -69,7 +69,7 @@ trait Fail extends HttpGateway {
     /**
       * simulate bug in partition
       */
-    case HTTP(POST, PATH(INT(partition), "bug"), _, response) =>
+    case HTTP(POST, PATH("bug", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, "message-that-can't-be-handled")
       fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {

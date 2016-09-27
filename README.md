@@ -190,7 +190,7 @@ To look at the status of the node and which Partition Actors is sees
 as partition masters (the addresses may change by node locality but 
 physically they should always point to the same actors) 
 
-    GET http://127.0.0.1:<node-port>/
+    GET http://127.0.0.1:<node-port>/status
 
 To look kill a node: 
 
@@ -198,9 +198,9 @@ To look kill a node:
     
 To look at the partition stats:
 
-    GET http://127.0.0.1:808x/<partition-number>
+    GET http://127.0.0.1:808x/status/<partition-number>
 
 To look kill a region by partition: 
 
-    POST http://127.0.0.1:808x/<partition>/down
+    POST http://127.0.0.1:808x/down/<partition>
 

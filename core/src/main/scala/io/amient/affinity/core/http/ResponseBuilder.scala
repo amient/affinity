@@ -19,10 +19,10 @@
 
 package io.amient.affinity.core.http
 
-import java.io.OutputStreamWriter
+import java.io.{OutputStreamWriter, Writer}
 import java.util.zip.GZIPOutputStream
 
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.{HttpEntity, _}
 import akka.http.scaladsl.model.headers.HttpEncodings
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -37,19 +37,32 @@ object ResponseBuilder {
   private val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
 
-  def json(status: StatusCode, value: Any, gzip: Boolean = true) = {
+  def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+    encode(status, ContentTypes.`application/json`, gzip) { writer =>
+      mapper.writeValue(writer, value)
+    }
+  }
+
+  def html(status: StatusCode, value: String, gzip: Boolean = true): HttpResponse = {
+    encode(status, ContentTypes.`text/html(UTF-8)`, gzip) { writer =>
+      writer.append(value)
+      writer.close()
+    }
+  }
+
+  private def encode(status: StatusCode, contentType: ContentType, gzip: Boolean = false)(f: (Writer) => Unit) = {
     val out = new ByteBufferOutputStream()
 
     val writer = if (gzip) new OutputStreamWriter(new GZIPOutputStream(out)) else new OutputStreamWriter(out)
-    mapper.writeValue(writer, value)
+
+    f(writer)
 
     val buffers = out.getBufferList
 
     HttpResponse(status
       , entity = buffers.size match {
-        case 1 => HttpEntity(ContentTypes.`application/json`, ByteString(buffers.get(0)))
-        case _ => HttpEntity(ContentTypes.`application/json`, Source(buffers.asScala.map(ByteString(_)).toList))
+        case 1 => HttpEntity(contentType, ByteString(buffers.get(0)))
+        case _ => HttpEntity(contentType, Source(buffers.asScala.map(ByteString(_)).toList))
       }, headers = if (!gzip) List() else List(headers.`Content-Encoding`(HttpEncodings.gzip)))
   }
-
 }

@@ -32,6 +32,7 @@ import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.storage.MemStoreConcurrentMap
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.TimeCryptoProof
+import io.amient.affinity.example.http.handler.WebApp
 import io.amient.affinity.example.rest.handler._
 
 import scala.concurrent.Promise
@@ -46,11 +47,12 @@ object HttpGateway {
 
     new Node(config) {
       startGateway(new HttpGateway
-        with Describe
+        with Status
         with Ping
         with Fail
         with Connect
         with Access
+        with WebApp
       )
     }
   }
