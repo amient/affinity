@@ -24,7 +24,7 @@ import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Container._
-import io.amient.affinity.core.actor.Controller.ContainerCreated
+import io.amient.affinity.core.actor.Controller.ContainerOnline
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
@@ -60,10 +60,9 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
   coordinator.watch(self, global = false)
 
   override def preStart(): Unit = {
-    log.info(s"Starting container `$group`")
+    log.info(s"Starting container `$group` with ${context.children.size} services")
     super.preStart()
-    //FIXME this message must be sent only once all services are online
-    context.parent ! ContainerCreated(group)
+    context.children.foreach(services += _ -> null)
   }
 
   override def postStop(): Unit = {
@@ -83,6 +82,9 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       val handle = coordinator.register(partitionActorPath)
       log.info(s"Service online: handle=$handle, path=${partitionActorPath}")
       services += (ref -> handle)
+      if (services.values.forall(_ != null)) {
+        context.parent ! ContainerOnline(group)
+      }
 
     case ServiceOffline(ref) =>
       log.info(s"Service offline: handle=${services(ref)}, path=${ref.path}")

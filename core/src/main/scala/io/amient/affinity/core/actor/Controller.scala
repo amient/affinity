@@ -34,7 +34,7 @@ object Controller {
 
   final case class CreateRegion(partitionProps: Props)
 
-  final case class ContainerCreated(group: String)
+  final case class ContainerOnline(group: String)
 
   final case class CreateGateway(handlerProps: Props)
 
@@ -106,7 +106,7 @@ class Controller extends Actor {
         case e: InvalidActorNameException => ackWhen(sender, servicesPromise.future)
       }
 
-    case ContainerCreated("services") => servicesPromise.success(())
+    case ContainerOnline("services") => servicesPromise.success(())
 
     case CreateRegion(partitionProps) =>
       val origin = sender
@@ -124,7 +124,7 @@ class Controller extends Actor {
       }
 
 
-    case ContainerCreated("region") => regionPromise.success(())
+    case ContainerOnline("region") => regionPromise.success(())
 
 
     case CreateGateway(gatewayProps) =>

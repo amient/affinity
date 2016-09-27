@@ -70,7 +70,9 @@ class Cluster extends Actor {
     }
 
     routes.get(partition) match {
-      case Some(routee) => routee.send(message, sender)
+      case Some(routee) =>
+        //println(s"routing $message to partition $partition represented by $routee")
+        routee.send(message, sender)
       case None =>
         throw new IllegalStateException(s"Partition $partition is not represented in the cluster")
 

@@ -58,11 +58,13 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
   })
 
   val region1 = new TestRegionNode(new MyTestPartition("test") {
-    data.put("A", Some("initialValueA"))
+    override def preStart(): Unit = {
+      super.preStart()
+      if (partition == 0) data.put("B", Some("initialValueB"))
+      else if (partition == 1) data.put("A", Some("initialValueA"))
+    }
   })
-  val region2 = new TestRegionNode(new MyTestPartition("test") {
-    data.put("B", Some("initialValueB"))
-  })
+  val region2 = new TestRegionNode(new MyTestPartition("test"))
 
   override def afterAll(): Unit = {
     try {
