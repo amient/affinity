@@ -34,7 +34,9 @@ import scala.concurrent.duration._
 
 class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
-  val gateway = new TestGatewayNode(new Gateway {
+  val config = configure("systemtests")
+
+  val gateway = new TestGatewayNode(config, new Gateway {
     import context.dispatcher
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(ResponseBuilder.json(OK, "pong", gzip = false))
@@ -46,7 +48,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     }
   })
 
-  val region = new TestRegionNode(new Partition {
+  val region = new TestRegionNode(config, new Partition {
     override def handle: Receive = {
       case "ping" => sender ! "pong"
     }

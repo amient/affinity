@@ -20,9 +20,13 @@
 package io.amient.affinity.example.partition
 
 import akka.actor.Status
+import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{Partition}
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.core.storage.kafka.KafkaStorage
@@ -59,8 +63,11 @@ class DataPartition extends Partition {
   //    new NoopStorage[Int, VertexProps] with MemStoreSimpleMap[Int, VertexProps]
   //  }
 
+  //FIXME serde access
+  val avroSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
+
   val graph = storage {
-    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition, classOf[IntSerde], classOf[MyAvroSerde])
+    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition, new IntSerde(), avroSerde)
       with MemStoreSimpleMap[Int, VertexProps]
   }
 

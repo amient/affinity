@@ -32,9 +32,9 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Gateway, Partition}
-import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
+import io.amient.affinity.core.cluster.Node
 import org.apache.avro.util.ByteBufferInputStream
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -66,9 +66,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   val zkConnect = "localhost:" + zkFactory.getLocalPort
   zkFactory.startup(zookeeper)
 
-
-  val config = ConfigFactory.load("systemtests")
-    .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
+  def configure(): Config = configure(ConfigFactory.defaultReference())
+  def configure(confname: String): Config = configure(ConfigFactory.load(confname)
+    .withFallback(ConfigFactory.defaultReference()))
+  def configure(config: Config): Config = config
+    .withValue(Node.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
   import SystemTestBase._
@@ -79,7 +81,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
-  class TestGatewayNode(gateway: => Gateway)
+  class TestGatewayNode(config: Config, gateway: => Gateway)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
 
     import system.dispatcher
@@ -118,7 +120,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   }
 
-  class TestRegionNode(partitionCreator: => Partition)
+  class TestRegionNode(config: Config, partitionCreator: => Partition)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
     Await.result(startRegion(partitionCreator), 3 seconds)
   }

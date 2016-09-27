@@ -84,10 +84,15 @@ object AvroRecord {
       val schemaId = decoder.readInt()
       require(schemaId >= 0)
       val (tpe, _, writerSchema) = schemaRegistry.schema(schemaId)
-      val readerSchema = inferSchema(tpe)
-      val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
-      val record: GenericRecord = reader.read(null, decoder)
-      readDatum(record, tpe, readerSchema)
+      if (tpe == null) {
+        val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
+        reader.read(null, decoder)
+      } else {
+        val readerSchema = inferSchema(tpe)
+        val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
+        val record = reader.read(null, decoder)
+        readDatum(record, tpe, readerSchema)
+      }
     }
   }
 

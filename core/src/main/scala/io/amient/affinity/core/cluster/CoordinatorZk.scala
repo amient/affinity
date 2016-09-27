@@ -31,20 +31,17 @@ import org.apache.zookeeper.CreateMode
 import scala.collection.JavaConverters._
 
 object CoordinatorZk {
-  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.cluster.coordinator.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.connect.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.session.ms"
   final val CONFIG_ZOOKEEPER_ROOT = "affinity.cluster.coordinator.zookeeper.root"
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  import CoordinatorZk._
+  import Node._
 
   val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
   val zkConnectTimeout = config.getInt(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
   val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
-  val zkRoot = config.getString(CONFIG_ZOOKEEPER_ROOT)
+  val zkRoot = config.getString(CoordinatorZk.CONFIG_ZOOKEEPER_ROOT)
   val groupRoot = s"$zkRoot/$group"
 
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)

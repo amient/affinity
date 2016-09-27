@@ -65,7 +65,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
   class MyTestPartition(topic: String) extends Partition {
     val data = storage {
-      new KafkaStorage[String, String](kafkaBootstrap, topic, partition, classOf[StringSerde], classOf[StringSerde])
+      new KafkaStorage[String, String](kafkaBootstrap, topic, partition, new StringSerde(), new StringSerde())
         with MemStoreSimpleMap[String, String]
     }
 

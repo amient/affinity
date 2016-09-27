@@ -23,15 +23,18 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{headers, _}
-import io.amient.affinity.example.{ConfigEntry, MyAvroSerde}
+import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
+import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.serde.primitive.StringSerde
 import io.amient.affinity.core.storage.MemStoreConcurrentMap
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.TimeCryptoProof
+import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.http.handler.WebApp
 import io.amient.affinity.example.rest.handler._
 
@@ -61,6 +64,9 @@ object HttpGateway {
 
 class HttpGateway extends Gateway with ActorState {
 
+  //FIXME serde access
+  val avroSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde]
+
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
@@ -68,7 +74,7 @@ class HttpGateway extends Gateway with ActorState {
     * can be modified by other nodes and need to be accessed concurrently
     */
   val settings = storage {
-    new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0, classOf[StringSerde], classOf[MyAvroSerde])
+    new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0, new StringSerde(), avroSerde)
       with MemStoreConcurrentMap[String, ConfigEntry]
   }
 

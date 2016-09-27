@@ -19,13 +19,13 @@
 
 package io.amient.affinity.example
 
+import io.amient.affinity.core.serde.avro.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
 
 class DomainSpec extends FlatSpec with Matchers {
 
-  val serde = new MyAvroSerde
   val c = Component(100, Set(101, 102))
-  val bytes = serde.toBinary(c)
-  serde.fromBinary(bytes) should be (c)
+  val bytes = AvroRecord.write(c, c.schema)
+  AvroRecord.read(bytes, classOf[Component], c.schema) should be (c)
 
 }

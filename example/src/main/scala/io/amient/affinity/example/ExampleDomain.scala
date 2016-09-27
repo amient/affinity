@@ -19,12 +19,13 @@
 
 package io.amient.affinity.example
 
+import akka.actor.ExtendedActorSystem
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 
-class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
+class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) {
   //0
   register(classOf[ConfigEntry])
   //1
@@ -41,6 +42,7 @@ class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
+
   override def hashCode(): Int = description.hashCode()
 }
 
@@ -59,6 +61,7 @@ final case class Component(vertex: Int, component: Set[Int] = Set()) extends Avr
 
 final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] {
   override def hashCode(): Int = vertex.hashCode
+
   def inverse = op match {
     case GOP.ADD => ModifyGraph(vertex, edge, GOP.REMOVE)
     case GOP.REMOVE => ModifyGraph(vertex, edge, GOP.ADD)

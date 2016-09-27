@@ -38,7 +38,9 @@ import scala.util.Random
 
 class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val gateway = new TestGatewayNode(new Gateway {
+  val config = configure("systemtests")
+
+  val gateway = new TestGatewayNode(config, new Gateway {
 
     import context.dispatcher
 
@@ -57,14 +59,14 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(new MyTestPartition("test") {
+  val region1 = new TestRegionNode(config, new MyTestPartition("test") {
     override def preStart(): Unit = {
       super.preStart()
       if (partition == 0) data.put("B", Some("initialValueB"))
       else if (partition == 1) data.put("A", Some("initialValueA"))
     }
   })
-  val region2 = new TestRegionNode(new MyTestPartition("test"))
+  val region2 = new TestRegionNode(config, new MyTestPartition("test"))
 
   override def afterAll(): Unit = {
     try {

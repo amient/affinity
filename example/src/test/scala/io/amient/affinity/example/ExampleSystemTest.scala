@@ -27,8 +27,10 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
+  val config = configure("example")
+
   //TODO Configure settings and graph storage to use `kafkaBootstrap`
-  val gateway = new TestGatewayNode(new HttpGateway with Ping)
+  val gateway = new TestGatewayNode(config, new HttpGateway with Ping)
 
   "ExampleApp Gateway" should "be able to play ping pong" in {
     gateway.http_sync(GET, s"/ping").entity should be(jsonStringEntity("pong"))

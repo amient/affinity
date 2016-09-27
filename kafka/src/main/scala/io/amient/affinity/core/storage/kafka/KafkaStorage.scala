@@ -35,11 +35,8 @@ import scala.collection.JavaConverters._
 abstract class KafkaStorage[K, V](brokers: String,
                                   topic: String,
                                   partition: Int,
-                                  keySerdeClass: Class[_ <: Serde],
-                                  valueSerdeClass: Class[_ <: Serde]) extends Storage[K, V] {
-
-  val keySerde: Serde = keySerdeClass.newInstance()
-  val valueSerde: Serde = valueSerdeClass.newInstance()
+                                  keySerde: Serde,
+                                  valueSerde: Serde) extends Storage[K, V] {
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", brokers)
@@ -90,7 +87,9 @@ abstract class KafkaStorage[K, V](brokers: String,
                 if (r.value == null) {
                   remove(key)
                 } else {
-                  update(key, valueSerde.fromBytes(r.value).asInstanceOf[V])
+                  //TODO store only bytes in the memstore and use serde when accessing the data
+                  val v = valueSerde.fromBytes(r.value).asInstanceOf[V]
+                  update(key, v)
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {

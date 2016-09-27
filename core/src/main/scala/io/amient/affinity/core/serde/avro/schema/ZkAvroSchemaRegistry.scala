@@ -18,21 +18,33 @@
  */
 
 package io.amient.affinity.core.serde.avro.schema
+
 import java.util
 
+import akka.actor.ExtendedActorSystem
+import io.amient.affinity.core.cluster.Node._
 import io.amient.affinity.core.serde.avro.AvroSerde
-import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
+import io.amient.affinity.core.util.ZooKeeperClient
+import org.I0Itec.zkclient.IZkChildListener
 import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
 
-import scala.collection.immutable
-import scala.collection.mutable
-import scala.reflect.runtime.universe._
 import scala.collection.JavaConverters._
+import scala.collection.{immutable, mutable}
+import scala.reflect.runtime.universe._
 
-class ZkAvroSchemaRegistry(zk: ZkClient) extends AvroSerde with AvroSchemaProvider {
+class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  val zkRoot = "/schema-registry"
+  private val config = system.settings.config
+  private val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
+  private val zkConnectTimeout = config.getInt(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
+  private val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
+  //TODO schmea registry zk root configuration
+  private val zkRoot = "/schema-registry"
+  private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
+  private val typeCache = mutable.Map[Class[_], Type]()
+  private var register = immutable.Map[Schema, (Int, Class[_], Type)]()
+
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
   updateRegistry(zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
@@ -40,28 +52,36 @@ class ZkAvroSchemaRegistry(zk: ZkClient) extends AvroSerde with AvroSchemaProvid
     }
   }))
 
-  private val typeCache = mutable.Map[Class[_], Type]()
-
-  private var register = immutable.Map[Schema, (Int, Class[_], Type)]()
-
   private def updateRegistry(ids: util.List[String]) = synchronized {
     register = ids.asScala.map { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
       val schemaId = id.toInt
       val schemaClass = Class.forName(schema.getFullName)
-      val schemaType = typeCache(schemaClass)
+      val schemaType: Type = typeCache.get(schemaClass) match {
+        case None => null
+        case Some(tpe) => tpe
+      }
       schema -> (schemaId, schemaClass, schemaType)
     }.toMap
   }
 
   override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     register.get(schema) match {
-      case Some((id2, cls2, tpe2)) if (cls2 == cls) => throw new IllegalArgumentException("Same class is already registered with that schema")
+      case Some((id2, cls2, tpe2)) if (cls2 == cls) =>
+        //TODO this is a general behaviour of any schema registry
+        register.foreach { case (s, (i, c, t)) =>
+          if (c == cls && t != tpe) register += s -> (i, c, tpe)
+        }
+        id2
       case _ =>
         typeCache += cls -> tpe
         val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
-        val id = path.substring(zkRoot.length+1).toInt
+        val id = path.substring(zkRoot.length + 1).toInt
         register += schema -> (id, cls, tpe)
+        //TODO this is a general behaviour of any schema registry
+        register.foreach { case (s, (i, c, t)) =>
+          if (c == cls && t != tpe) register += s -> (i, c, tpe)
+        }
         id
     }
   }

@@ -83,12 +83,6 @@ trait AvroSchemaProvider {
     id
   }
 
-  /**
-    * @param tpe
-    * @param cls
-    * @param schema
-    * @return unique schema id
-    */
   protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int
 
   protected def getAllSchemas(): immutable.List[(Int, Schema, Class[_], Type)]

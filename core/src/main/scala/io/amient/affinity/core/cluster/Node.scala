@@ -37,6 +37,12 @@ object Node {
   final val CONFIG_AKKA_SYSTEM_NAME = "affinity.node.name"
   final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.hostname"
   final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
+
+  //TODO move zookeeper settings under affinity.cluster.zookeeper
+  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.cluster.coordinator.zookeeper.connect"
+  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.connect.ms"
+  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.session.ms"
+
   final val CONFIG_PARTITION_LIST = "affinity.node.region.partitions"
 }
 
