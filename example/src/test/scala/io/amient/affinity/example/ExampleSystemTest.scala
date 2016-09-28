@@ -20,6 +20,9 @@
 package io.amient.affinity.example
 
 import akka.http.scaladsl.model.HttpMethods._
+import com.typesafe.config.ConfigValueFactory
+import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
@@ -28,8 +31,10 @@ import org.scalatest.{FlatSpec, Matchers}
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
   val config = configure("example")
+      .withValue(Node.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
+      .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS("settings"), ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+      .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS("graph"), ConfigValueFactory.fromAnyRef(kafkaBootstrap))
 
-  //TODO Configure settings and graph storage to use `kafkaBootstrap`
   val gateway = new TestGatewayNode(config, new HttpGateway with Ping)
 
   "ExampleApp Gateway" should "be able to play ping pong" in {
