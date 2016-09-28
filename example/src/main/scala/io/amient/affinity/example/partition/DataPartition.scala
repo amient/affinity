@@ -28,7 +28,7 @@ import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.serde.primitive.IntSerde
-import io.amient.affinity.core.storage.MemStoreSimpleMap
+import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.example._
 
@@ -57,11 +57,15 @@ object DataPartition {
 
 class DataPartition extends Partition {
 
-  val graph = storage {
-    new KafkaStorage[Int, VertexProps](brokers = "localhost:9092", topic = "graph", partition) with MemStoreSimpleMap {
+  private val config = context.system.settings.config
+
+  //TODO val graph = state("graph") // partition id should be passed as part of partition assignment process not config
+  val graph = state {
+    new State[Int, VertexProps](config) {
+      override val storage = new KafkaStorage("graph", config.withValue(KafkaStorage.CONFIG_KAFKA_PARTITION("graph"),
+        ConfigValueFactory.fromAnyRef(partition))) with MemStoreSimpleMap
       override val keySerde = new IntSerde()
       override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
-      //FIXME - storage serde configuration
     }
   }
 

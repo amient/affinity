@@ -22,10 +22,11 @@ package io.amient.affinity.testutil
 import java.io.File
 import java.util.Properties
 
+import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.serde.primitive.StringSerde
-import io.amient.affinity.core.storage.MemStoreSimpleMap
+import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.ZooKeeperClient
 import kafka.cluster.Broker
@@ -64,8 +65,15 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
   }
 
   class MyTestPartition(topic: String) extends Partition {
-    val data = storage {
-      new KafkaStorage[String, String](kafkaBootstrap, topic, partition) with MemStoreSimpleMap {
+
+    private val config = context.system.settings.config
+      .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS(topic), ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+      .withValue(KafkaStorage.CONFIG_KAFKA_TOPIC(topic), ConfigValueFactory.fromAnyRef(topic))
+      .withValue(KafkaStorage.CONFIG_KAFKA_PARTITION(topic), ConfigValueFactory.fromAnyRef(partition))
+
+    val data = state {
+      new State[String, String](config) {
+        override val storage = new KafkaStorage(topic, config) with MemStoreSimpleMap
         override val keySerde = new StringSerde()
         override val valueSerde = new StringSerde()
       }
@@ -78,4 +86,5 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
       }
     }
   }
+
 }

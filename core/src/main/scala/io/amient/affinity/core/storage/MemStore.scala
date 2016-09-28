@@ -38,13 +38,13 @@ trait MemStore {
     * @param value
     * @return optional value held at the key position before the update
     */
-  protected def update(key: MK, value: MV): Option[MV]
+  protected[storage] def update(key: MK, value: MV): Option[MV]
 
   /**
     *
     * @param key
     * @return optional value held at the key position before the update, None if the key doesn't exist
     */
-  protected def remove(key: MK): Option[MV]
+  protected[storage] def remove(key: MK): Option[MV]
 
 }

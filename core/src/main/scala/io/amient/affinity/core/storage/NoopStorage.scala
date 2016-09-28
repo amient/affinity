@@ -20,7 +20,9 @@ package io.amient.affinity.core.storage
 
 import java.util.concurrent.{CompletableFuture, Future}
 
-abstract class NoopStorage[K,V] extends Storage[K,V] {
+import com.typesafe.config.Config
+
+abstract class NoopStorage(name: String, config: Config) extends Storage(name, config) {
 
   override def write(key: MK, value: MV): Future[Unit] = CompletableFuture.completedFuture(())
 

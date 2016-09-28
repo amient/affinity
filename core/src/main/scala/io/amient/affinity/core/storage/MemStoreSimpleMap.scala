@@ -29,7 +29,7 @@ trait MemStoreSimpleMap extends MemStore {
 
   override def size: Long = internal.size
 
-  override protected def update(key: MK, value: MV): Option[MV] = internal.put(key, value)
+  override protected[storage] def update(key: MK, value: MV): Option[MV] = internal.put(key, value)
 
-  override protected def remove(key: MK):Option[MV] = internal.remove(key)
+  override protected[storage] def remove(key: MK):Option[MV] = internal.remove(key)
 }

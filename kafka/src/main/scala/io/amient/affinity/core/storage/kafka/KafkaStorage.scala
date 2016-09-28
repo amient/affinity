@@ -24,6 +24,7 @@ import java.util
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
+import com.typesafe.config.Config
 import io.amient.affinity.core.storage.Storage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
@@ -32,11 +33,24 @@ import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBuffer
 
 import scala.collection.JavaConverters._
 
-abstract class KafkaStorage[K, V](brokers: String, topic: String, partition: Int) extends Storage[K, V] {
+object KafkaStorage {
+  def CONFIG_KAFKA_BOOTSTRAP_SERVERS(name: String) = s"affinity.state.$name.kafka.bootstrap.servers"
+  def CONFIG_KAFKA_TOPIC(name: String) = s"affinity.state.$name.kafka.topic"
+  //TODO this should be part of partition assignment process not config
+  def CONFIG_KAFKA_PARTITION(name: String) = s"affinity.state.$name.kafka.partition"
+}
+
+abstract class KafkaStorage(name: String, config: Config) extends Storage(name, config) {
+
+  import KafkaStorage._
+
+  final val brokers: String = config.getString(CONFIG_KAFKA_BOOTSTRAP_SERVERS(name))
+  final val topic: String = config.getString(CONFIG_KAFKA_TOPIC(name))
+  final val partition: Int = config.getInt(CONFIG_KAFKA_PARTITION(name))
 
   val producerProps = new Properties()
   producerProps.put("bootstrap.servers", brokers)
-  //TODO storage options: no-ack, 1-ack all-ack should be available at the abstract level
+  //TODO anything under affinity.state.$name.kafka.producer._ should go here
   producerProps.put("acks", "all")
   producerProps.put("retries", "0")
   producerProps.put("linger.ms", "0")

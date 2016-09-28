@@ -31,7 +31,7 @@ import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.serde.primitive.StringSerde
-import io.amient.affinity.core.storage.MemStoreConcurrentMap
+import io.amient.affinity.core.storage.{MemStoreConcurrentMap, MemStoreSimpleMap, State}
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
@@ -61,20 +61,21 @@ object HttpGateway {
   }
 }
 
-
 class HttpGateway extends Gateway with ActorState {
 
+  private val config = context.system.settings.config
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
     * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
     * can be modified by other nodes and need to be accessed concurrently
     */
-  val settings = storage {
-    new KafkaStorage[String, ConfigEntry](brokers = "localhost:9092", topic = "settings", 0) with MemStoreConcurrentMap {
+  //TODO val settings = state("settings")
+  val settings = state {
+    new State[String, ConfigEntry](config) {
+      override val storage = new KafkaStorage("settings", config) with MemStoreConcurrentMap
       override val keySerde = new StringSerde()
       override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde]
-      //FIXME storage serde configuration
     }
   }
 

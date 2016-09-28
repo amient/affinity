@@ -19,14 +19,9 @@
 
 package io.amient.affinity.core.storage
 
-import java.nio.ByteBuffer
+import com.typesafe.config.Config
 
-import io.amient.affinity.core.serde.Serde
-
-trait Storage[K, V] extends MemStore {
-
-  val keySerde: Serde
-  val valueSerde: Serde
+abstract class Storage(name: String, config: Config) extends MemStore {
 
   /**
     * the contract of this method is that it should start a background process of restoring
@@ -55,40 +50,6 @@ trait Storage[K, V] extends MemStore {
     * close all resource and background processes
     */
   private[core] def close(): Unit
-
-  /**
-    * Storage offers only simple blocking put so that the mutations do not escape single-threaded actor
-    * context from which it is called
-    *
-    * @param key
-    * @param value if None is given as value the key will be removed from the underlying storage
-    *              otherwise the key will be updated with the value
-    * @return An optional value previously held at the key position, None if new value was inserted
-    */
-  final def put(key: K, value: Option[V]): Option[V] = {
-    val k = ByteBuffer.wrap(keySerde.toBytes(key))
-    value match {
-      case None => remove(k) map { prev =>
-        write(k, null).get()
-        valueSerde.fromBytes(prev.array).asInstanceOf[V]
-      }
-      case Some(data) => {
-        val v = ByteBuffer.wrap(valueSerde.toBytes(data))
-        update(k, v) match {
-          case Some(prev) if (prev == v) => Some(data)
-          case other: Option[MV] =>
-            //TODO storage options: non-blocking variant should be available
-            write(k, v).get()
-            other.map(x => valueSerde.fromBytes(x.array).asInstanceOf[V])
-        }
-      }
-    }
-  }
-
-  final def get(key: K): Option[V] = {
-    val k = ByteBuffer.wrap(keySerde.toBytes(key))
-    get(k).map(d => valueSerde.fromBytes(d.array).asInstanceOf[V])
-  }
 
   /**
     * @param key   of the pair
