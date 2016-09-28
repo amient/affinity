@@ -19,9 +19,11 @@
 
 package io.amient.affinity.core.storage
 
+import java.nio.ByteBuffer
+
 import com.typesafe.config.Config
 
-abstract class Storage(name: String, config: Config) extends MemStore {
+abstract class Storage(val name: String, config: Config, val memstore: MemStore) {
 
   /**
     * the contract of this method is that it should start a background process of restoring
@@ -56,6 +58,6 @@ abstract class Storage(name: String, config: Config) extends MemStore {
     * @param value of the pair
     * @return Future with metadata returned by the underlying implementation
     */
-  def write(key: MK, value: MV): java.util.concurrent.Future[_]
+  def write(key: ByteBuffer, value: ByteBuffer): java.util.concurrent.Future[_]
 
 }

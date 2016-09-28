@@ -25,7 +25,7 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.storage.Storage
+import io.amient.affinity.core.storage.{MemStore, Storage}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -40,7 +40,7 @@ object KafkaStorage {
   def CONFIG_KAFKA_PARTITION(name: String) = s"affinity.state.$name.kafka.partition"
 }
 
-abstract class KafkaStorage(name: String, config: Config) extends Storage(name, config) {
+class KafkaStorage(name: String, config: Config, memstore: MemStore) extends Storage(name, config, memstore) {
 
   import KafkaStorage._
 
@@ -94,9 +94,9 @@ abstract class KafkaStorage(name: String, config: Config) extends Storage(name, 
               for (r <- records.iterator().asScala) {
                 fetchedNumRecrods += 1
                 if (r.value == null) {
-                  remove(r.key)
+                  memstore.remove(r.key)
                 } else {
-                  update(r.key, r.value)
+                  memstore.update(r.key, r.value)
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {
@@ -158,7 +158,7 @@ abstract class KafkaStorage(name: String, config: Config) extends Storage(name, 
     }
   }
 
-  def write(key: MK, value: MV): java.util.concurrent.Future[RecordMetadata] = {
+  def write(key: ByteBuffer, value: ByteBuffer): java.util.concurrent.Future[RecordMetadata] = {
     kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
   }
 

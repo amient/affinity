@@ -24,7 +24,14 @@ import java.nio.ByteBuffer
 import com.typesafe.config.Config
 import io.amient.affinity.core.serde.Serde
 
-abstract class State[K,V](config: Config) {
+object State {
+  def CONFIG_STORAGE_CLASS(name: String) = s"affinity.state.$name.storage.class"
+  def CONFIG_MEMSTORE_CLASS(name: String) = s"affinity.state.$name.memstore.class"
+  def CONFIG_KEY_SERDE(name: String) = s"affinity.state.$name.key.serde"
+  def CONFIG_VALUE_SERDE(name: String) = s"affinity.state.$name.value.serde"
+}
+
+abstract class State[K, V](config: Config) {
 
   val storage: Storage
 
@@ -44,13 +51,13 @@ abstract class State[K,V](config: Config) {
   final def put(key: K, value: Option[V]): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBytes(key))
     value match {
-      case None => storage.remove(k) map { prev =>
+      case None => storage.memstore.remove(k) map { prev =>
         storage.write(k, null).get()
         valueSerde.fromBytes(prev.array).asInstanceOf[V]
       }
       case Some(data) => {
         val v = ByteBuffer.wrap(valueSerde.toBytes(data))
-        storage.update(k, v) match {
+        storage.memstore.update(k, v) match {
           case Some(prev) if (prev == v) => Some(data)
           case other: Option[ByteBuffer] =>
             //TODO storage options: non-blocking variant should be available
@@ -63,13 +70,13 @@ abstract class State[K,V](config: Config) {
 
   final def get(key: K): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBytes(key))
-    storage.get(k).map(d => valueSerde.fromBytes(d.array).asInstanceOf[V])
+    storage.memstore.get(k).map(d => valueSerde.fromBytes(d.array).asInstanceOf[V])
   }
 
-  def iterator: Iterator[(K,V)] = storage.iterator.map { case (mk, mv) =>
+  def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
     (keySerde.fromBytes(mk.array()).asInstanceOf[K], valueSerde.fromBytes(mv.array).asInstanceOf[V])
   }
 
-  def size: Long = storage.size
+  def size: Long = storage.memstore.size
 
 }

@@ -70,14 +70,7 @@ class HttpGateway extends Gateway with ActorState {
     * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
     * can be modified by other nodes and need to be accessed concurrently
     */
-  //TODO val settings = state("settings")
-  val settings = state {
-    new State[String, ConfigEntry](config) {
-      override val storage = new KafkaStorage("settings", config) with MemStoreConcurrentMap
-      override val keySerde = new StringSerde()
-      override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde]
-    }
-  }
+  val settings = state[String, ConfigEntry]("settings")
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessError => ResponseBuilder.json(Forbidden, "Forbidden" -> e.getMessage)

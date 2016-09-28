@@ -21,7 +21,7 @@ package io.amient.affinity.core.storage
 
 import java.util.concurrent.ConcurrentHashMap
 
-trait MemStoreConcurrentMap extends MemStore {
+class MemStoreConcurrentMap extends MemStore {
 
   private val internal = new ConcurrentHashMap[MK, MV]()
 

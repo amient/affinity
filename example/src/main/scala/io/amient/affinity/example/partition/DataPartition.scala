@@ -59,15 +59,16 @@ class DataPartition extends Partition {
 
   private val config = context.system.settings.config
 
-  //TODO val graph = state("graph") // partition id should be passed as part of partition assignment process not config
-  val graph = state {
-    new State[Int, VertexProps](config) {
-      override val storage = new KafkaStorage("graph", config.withValue(KafkaStorage.CONFIG_KAFKA_PARTITION("graph"),
-        ConfigValueFactory.fromAnyRef(partition))) with MemStoreSimpleMap
-      override val keySerde = new IntSerde()
-      override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
-    }
-  }
+  //FIXME val graph = state("graph") // partition id should be passed as part of partition assignment process not config
+  val graph = state[Int, VertexProps]("graph")
+//  val graph = state {
+//    new State[Int, VertexProps](config) {
+//      override val storage = new KafkaStorage("graph", config.withValue(KafkaStorage.CONFIG_KAFKA_PARTITION("graph"),
+//        ConfigValueFactory.fromAnyRef(partition))) with MemStoreSimpleMap
+//      override val keySerde = new IntSerde()
+//      override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
+//    }
+//  }
 
   override def handle: Receive = {
 

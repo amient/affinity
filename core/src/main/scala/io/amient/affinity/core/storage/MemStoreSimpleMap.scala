@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.storage
 
-trait MemStoreSimpleMap extends MemStore {
+class MemStoreSimpleMap extends MemStore {
 
   private val internal = scala.collection.mutable.Map[MK, MV]()
 

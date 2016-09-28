@@ -18,13 +18,14 @@
  */
 package io.amient.affinity.core.storage
 
+import java.nio.ByteBuffer
 import java.util.concurrent.{CompletableFuture, Future}
 
 import com.typesafe.config.Config
 
-abstract class NoopStorage(name: String, config: Config) extends Storage(name, config) {
+abstract class NoopStorage(name: String, config: Config, memstore: MemStore) extends Storage(name, config, memstore) {
 
-  override def write(key: MK, value: MV): Future[Unit] = CompletableFuture.completedFuture(())
+  override def write(key: ByteBuffer, value: ByteBuffer): Future[Unit] = CompletableFuture.completedFuture(())
 
   override private[core] def init(): Unit = ()
 

@@ -73,7 +73,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
     val data = state {
       new State[String, String](config) {
-        override val storage = new KafkaStorage(topic, config) with MemStoreSimpleMap
+        override val storage = new KafkaStorage(topic, config, new MemStoreSimpleMap())
         override val keySerde = new StringSerde()
         override val valueSerde = new StringSerde()
       }
