@@ -21,7 +21,8 @@ package io.amient.affinity.example
 
 import akka.http.scaladsl.model.HttpMethods._
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.cluster.CoordinatorZk
+import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
@@ -30,10 +31,13 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
+  import KafkaStorage._
+  import State._
+
   val config = configure("example")
-      .withValue(Node.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
-      .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS("settings"), ConfigValueFactory.fromAnyRef(kafkaBootstrap))
-      .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS("graph"), ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+      .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
+      .withValue(s"${CONFIG_STATE("settings")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+      .withValue(s"${CONFIG_STATE("graph")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
 
   val gateway = new TestGatewayNode(config, new HttpGateway with Ping)
 

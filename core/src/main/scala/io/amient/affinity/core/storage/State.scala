@@ -21,23 +21,47 @@ package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
 
+import akka.actor.ActorSystem
+import akka.serialization.{JSerializer, SerializationExtension}
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.Serde
+
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
 object State {
-  def CONFIG_STORAGE_CLASS(name: String) = s"affinity.state.$name.storage.class"
-  def CONFIG_MEMSTORE_CLASS(name: String) = s"affinity.state.$name.memstore.class"
-  def CONFIG_KEY_SERDE(name: String) = s"affinity.state.$name.key.serde"
-  def CONFIG_VALUE_SERDE(name: String) = s"affinity.state.$name.value.serde"
+  def CONFIG_STATE(name: String) = s"affinity.state.$name"
+  val CONFIG_STORAGE_CLASS = "storage.class"
+  val CONFIG_MEMSTORE_CLASS = "memstore.class"
 }
 
-abstract class State[K, V](config: Config) {
+class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(implicit val partition: Int) {
 
-  val storage: Storage
+  private val serialization = SerializationExtension(system)
 
-  val keySerde: Serde
+  //TODO verify that using JSerializer doesn't have performance impact becuase of primitive types casting to AnyRef
+  def serde[S: ClassTag]: JSerializer = {
+    val cls = implicitly[ClassTag[S]].runtimeClass
+    val serdeClass =
+      if (cls == classOf[Boolean]) classOf[java.lang.Boolean]
+      else if (cls == classOf[Byte]) classOf[java.lang.Byte]
+      else if (cls == classOf[Int]) classOf[java.lang.Integer]
+      else if (cls == classOf[Long]) classOf[java.lang.Long]
+      else if (cls == classOf[Float]) classOf[java.lang.Float]
+      else if (cls == classOf[Double]) classOf[java.lang.Double]
+      else cls
+    serialization.serializerFor(serdeClass).asInstanceOf[JSerializer]
+  }
 
-  val valueSerde: Serde
+  val keySerde = serde[K]
+  val valueSerde = serde[V]
+
+  private val storageClass = Class.forName(stateConfig.getString(State.CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
+  private val storageClassSymbol = rootMirror.classSymbol(storageClass)
+  private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
+  private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
+  private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
+
+  val storage = constructorMirror(stateConfig, partition).asInstanceOf[Storage]
 
   /**
     * Storage offers only simple blocking put so that the mutations do not escape single-threaded actor
@@ -49,32 +73,32 @@ abstract class State[K, V](config: Config) {
     * @return An optional value previously held at the key position, None if new value was inserted
     */
   final def put(key: K, value: Option[V]): Option[V] = {
-    val k = ByteBuffer.wrap(keySerde.toBytes(key))
+    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     value match {
       case None => storage.memstore.remove(k) map { prev =>
         storage.write(k, null).get()
-        valueSerde.fromBytes(prev.array).asInstanceOf[V]
+        valueSerde.fromBinary(prev.array).asInstanceOf[V]
       }
       case Some(data) => {
-        val v = ByteBuffer.wrap(valueSerde.toBytes(data))
+        val v = ByteBuffer.wrap(valueSerde.toBinary(data.asInstanceOf[AnyRef]))
         storage.memstore.update(k, v) match {
           case Some(prev) if (prev == v) => Some(data)
           case other: Option[ByteBuffer] =>
             //TODO storage options: non-blocking variant should be available
             storage.write(k, v).get()
-            other.map(x => valueSerde.fromBytes(x.array).asInstanceOf[V])
+            other.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V])
         }
       }
     }
   }
 
   final def get(key: K): Option[V] = {
-    val k = ByteBuffer.wrap(keySerde.toBytes(key))
-    storage.memstore.get(k).map(d => valueSerde.fromBytes(d.array).asInstanceOf[V])
+    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
+    storage.memstore.get(k).map(d => valueSerde.fromBinary(d.array).asInstanceOf[V])
   }
 
   def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
-    (keySerde.fromBytes(mk.array()).asInstanceOf[K], valueSerde.fromBytes(mv.array).asInstanceOf[V])
+    (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
   }
 
   def size: Long = storage.memstore.size

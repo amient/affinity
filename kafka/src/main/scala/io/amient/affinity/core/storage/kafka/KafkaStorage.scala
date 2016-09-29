@@ -25,7 +25,7 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.storage.{MemStore, Storage}
+import io.amient.affinity.core.storage.Storage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -34,41 +34,60 @@ import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBuffer
 import scala.collection.JavaConverters._
 
 object KafkaStorage {
-  def CONFIG_KAFKA_BOOTSTRAP_SERVERS(name: String) = s"affinity.state.$name.kafka.bootstrap.servers"
-  def CONFIG_KAFKA_TOPIC(name: String) = s"affinity.state.$name.kafka.topic"
-  //TODO this should be part of partition assignment process not config
-  def CONFIG_KAFKA_PARTITION(name: String) = s"affinity.state.$name.kafka.partition"
+  def CONFIG_KAFKA_BOOTSTRAP_SERVERS = "storage.kafka.bootstrap.servers"
+  def CONFIG_KAFKA_TOPIC = s"storage.kafka.topic"
+  def CONFIG_KAFKA_PRODUCER = s"storage.kafka.producer"
+  def CONFIG_KAFKA_CONSUMER = s"storage.kafka.consumer"
 }
 
-class KafkaStorage(name: String, config: Config, memstore: MemStore) extends Storage(name, config, memstore) {
+class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
 
   import KafkaStorage._
 
-  final val brokers: String = config.getString(CONFIG_KAFKA_BOOTSTRAP_SERVERS(name))
-  final val topic: String = config.getString(CONFIG_KAFKA_TOPIC(name))
-  final val partition: Int = config.getInt(CONFIG_KAFKA_PARTITION(name))
+  final val brokers: String = config.getString(CONFIG_KAFKA_BOOTSTRAP_SERVERS)
+  final val topic: String = config.getString(CONFIG_KAFKA_TOPIC)
 
-  val producerProps = new Properties()
-  producerProps.put("bootstrap.servers", brokers)
-  //TODO anything under affinity.state.$name.kafka.producer._ should go here
-  producerProps.put("acks", "all")
-  producerProps.put("retries", "0")
-  producerProps.put("linger.ms", "0")
-  producerProps.put("key.serializer", classOf[ByteBufferSerializer].getName)
-  producerProps.put("value.serializer", classOf[ByteBufferSerializer].getName)
-  val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
+  private val producerProps = new Properties() {
+    if (config.hasPath(CONFIG_KAFKA_PRODUCER)) {
+      val producerConfig = config.getConfig(CONFIG_KAFKA_PRODUCER)
+      if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
+      if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
+      if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
+      producerConfig.entrySet().asScala.foreach { case (entry) =>
+        put(entry.getKey, entry.getValue.unwrapped())
+      }
+    }
+    put("bootstrap.servers", brokers)
+    put("key.serializer", classOf[ByteBufferSerializer].getName)
+    put("value.serializer", classOf[ByteBufferSerializer].getName)
+  }
+
+  val consumerProps = new Properties() {
+    if (config.hasPath(CONFIG_KAFKA_CONSUMER)) {
+      val consumerConfig = config.getConfig(CONFIG_KAFKA_CONSUMER)
+      if (consumerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
+      if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
+      if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
+      if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
+      consumerConfig.entrySet().asScala.foreach { case (entry) =>
+        put(entry.getKey, entry.getValue.unwrapped())
+      }
+    }
+    put("bootstrap.servers", brokers)
+    put("enable.auto.commit", "false")
+    put("key.deserializer", classOf[ByteBufferDeserializer].getName)
+    put("value.deserializer", classOf[ByteBufferDeserializer].getName)
+  }
+
+  private val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
 
   private var tailing = true
+
   private val consumerError = new AtomicReference[Throwable](null)
 
   private val consumer = new Thread {
-    val consumerProps = new Properties()
-    consumerProps.put("bootstrap.servers", brokers)
-    consumerProps.put("enable.auto.commit", "false")
-    consumerProps.put("key.deserializer", classOf[ByteBufferDeserializer].getName)
-    consumerProps.put("value.deserializer", classOf[ByteBufferDeserializer].getName)
-    val kafkaConsumer = new KafkaConsumer[ByteBuffer, ByteBuffer](consumerProps)
 
+    val kafkaConsumer = new KafkaConsumer[ByteBuffer, ByteBuffer](consumerProps)
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
     kafkaConsumer.assign(consumerPartitions)

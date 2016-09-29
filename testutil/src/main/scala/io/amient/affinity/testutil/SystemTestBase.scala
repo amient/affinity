@@ -34,7 +34,7 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{Gateway, Partition}
-import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import org.apache.avro.util.ByteBufferInputStream
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -70,7 +70,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   def configure(confname: String): Config = configure(ConfigFactory.load(confname)
     .withFallback(ConfigFactory.defaultReference()))
   def configure(config: Config): Config = config
-    .withValue(Node.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
+    .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
   import SystemTestBase._

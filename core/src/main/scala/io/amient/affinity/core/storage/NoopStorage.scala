@@ -23,7 +23,7 @@ import java.util.concurrent.{CompletableFuture, Future}
 
 import com.typesafe.config.Config
 
-abstract class NoopStorage(name: String, config: Config, memstore: MemStore) extends Storage(name, config, memstore) {
+class NoopStorage(config: Config) extends Storage(config) {
 
   override def write(key: ByteBuffer, value: ByteBuffer): Future[Unit] = CompletableFuture.completedFuture(())
 

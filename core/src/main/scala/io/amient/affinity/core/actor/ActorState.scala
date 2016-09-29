@@ -23,12 +23,10 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor.Actor
 import akka.event.Logging
-import akka.serialization.SerializationExtension
-import com.typesafe.config.Config
-import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.storage.{MemStore, State, Storage}
+import io.amient.affinity.core.storage.State
 
 import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
 
 trait ActorState extends Actor {
 
@@ -38,27 +36,10 @@ trait ActorState extends Actor {
 
   private val config = context.system.settings.config
 
-  private val serialization = SerializationExtension(context.system)
+  import State._
 
-
-  def state[K, V](name: String): State[K, V] = {
-
-    def serde(id: String): Serde = {
-      val serdeFQN = config.getString(s"akka.actor.serializers.$id")
-      serialization.serializerOf(serdeFQN).asInstanceOf[Serde]
-    }
-
-    val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS(name))).asSubclass(classOf[MemStore])
-    val memstore = memstoreClass.newInstance()
-
-    val storageClass = Class.forName(config.getString(State.CONFIG_STORAGE_CLASS(name))).asSubclass(classOf[Storage])
-    val storageConstructor = storageClass.getConstructor(classOf[String], classOf[Config], classOf[MemStore])
-
-    new State[K, V](config) {
-      override val storage = storageConstructor.newInstance(name, config, memstore)
-      override val keySerde = serde(config.getString(State.CONFIG_KEY_SERDE(name)))
-      override val valueSerde = serde(config.getString(State.CONFIG_VALUE_SERDE(name)))
-    }
+  def state[K: ClassTag, V: ClassTag](name: String)(implicit partition: Int): State[K, V] = state[K,V] {
+    new State[K, V](context.system, config.getConfig(CONFIG_STATE(name)))
   }
 
   def state[K, V](creator: => State[K, V]): State[K, V] = {

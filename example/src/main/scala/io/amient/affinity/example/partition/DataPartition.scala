@@ -57,18 +57,11 @@ object DataPartition {
 
 class DataPartition extends Partition {
 
-  private val config = context.system.settings.config
 
-  //FIXME val graph = state("graph") // partition id should be passed as part of partition assignment process not config
-  val graph = state[Int, VertexProps]("graph")
-//  val graph = state {
-//    new State[Int, VertexProps](config) {
-//      override val storage = new KafkaStorage("graph", config.withValue(KafkaStorage.CONFIG_KAFKA_PARTITION("graph"),
-//        ConfigValueFactory.fromAnyRef(partition))) with MemStoreSimpleMap
-//      override val keySerde = new IntSerde()
-//      override val valueSerde = SerializationExtension(context.system).serializerFor(classOf[AvroRecord[_]]).asInstanceOf[Serde with AvroSchemaProvider]
-//    }
-//  }
+  val graph: State[Int, VertexProps] = state("graph")
+
+  //an example sate without persistent storage
+  val cache: State[Int, Int] = state[Int, Int]("cache")
 
   override def handle: Receive = {
 

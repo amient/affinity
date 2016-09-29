@@ -23,7 +23,11 @@ import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
 
-abstract class Storage(val name: String, config: Config, val memstore: MemStore) {
+abstract class Storage(val config: Config) {
+
+  val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
+  val memstore = memstoreClass.newInstance()
+
 
   /**
     * the contract of this method is that it should start a background process of restoring

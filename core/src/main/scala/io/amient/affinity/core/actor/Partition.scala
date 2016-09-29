@@ -28,7 +28,7 @@ trait Partition extends Service with ActorState {
   /**
     * physical partition id - this is read from the name of the Partition Actor;  assigned by the Region
     */
-  val partition = self.path.name.toInt
+  implicit val partition = self.path.name.toInt
 
   /**
     * onBecomeMaster is signalling that the partition should take over the responsibility

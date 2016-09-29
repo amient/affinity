@@ -23,16 +23,10 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{headers, _}
-import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
-import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.primitive.StringSerde
-import io.amient.affinity.core.storage.{MemStoreConcurrentMap, MemStoreSimpleMap, State}
-import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.http.handler.WebApp
@@ -70,6 +64,7 @@ class HttpGateway extends Gateway with ActorState {
     * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
     * can be modified by other nodes and need to be accessed concurrently
     */
+  implicit val partition = 0
   val settings = state[String, ConfigEntry]("settings")
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {

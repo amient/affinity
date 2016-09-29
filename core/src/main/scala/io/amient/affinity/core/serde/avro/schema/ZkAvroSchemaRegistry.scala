@@ -22,7 +22,7 @@ package io.amient.affinity.core.serde.avro.schema
 import java.util
 
 import akka.actor.ExtendedActorSystem
-import io.amient.affinity.core.cluster.Node._
+import io.amient.affinity.core.cluster.CoordinatorZk
 import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
@@ -35,11 +35,13 @@ import scala.reflect.runtime.universe._
 
 class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
+  //TODO separate configuration avro schemas in zookeeper - reusing here cooridnator's config - add zk root configuration
+  import CoordinatorZk._
+
   private val config = system.settings.config
   private val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
   private val zkConnectTimeout = config.getInt(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
   private val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
-  //TODO schmea registry zk root configuration
   private val zkRoot = "/schema-registry"
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
   private val typeCache = mutable.Map[Class[_], Type]()
@@ -68,7 +70,7 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     register.get(schema) match {
       case Some((id2, cls2, tpe2)) if (cls2 == cls) =>
-        //TODO this is a general behaviour of any schema registry
+        //TODO refreshing the compile types is a general behaviour of any schema registry
         register.foreach { case (s, (i, c, t)) =>
           if (c == cls && t != tpe) register += s -> (i, c, tpe)
         }
@@ -78,7 +80,7 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
         val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
         val id = path.substring(zkRoot.length + 1).toInt
         register += schema -> (id, cls, tpe)
-        //TODO this is a general behaviour of any schema registry
+        //TODO refreshing the compile types is a general behaviour of any schema registry
         register.foreach { case (s, (i, c, t)) =>
           if (c == cls && t != tpe) register += s -> (i, c, tpe)
         }

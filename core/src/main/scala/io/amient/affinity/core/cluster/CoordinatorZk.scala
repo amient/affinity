@@ -24,24 +24,26 @@ import java.util
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
 import io.amient.affinity.core.util.ZooKeeperClient
-import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
-import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.I0Itec.zkclient.IZkChildListener
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
 
 object CoordinatorZk {
   final val CONFIG_ZOOKEEPER_ROOT = "affinity.cluster.coordinator.zookeeper.root"
+  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.cluster.coordinator.zookeeper.connect"
+  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.connect.ms"
+  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.session.ms"
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  import Node._
+  import CoordinatorZk._
 
   val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
   val zkConnectTimeout = config.getInt(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
   val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
-  val zkRoot = config.getString(CoordinatorZk.CONFIG_ZOOKEEPER_ROOT)
+  val zkRoot = config.getString(CONFIG_ZOOKEEPER_ROOT)
   val groupRoot = s"$zkRoot/$group"
 
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
