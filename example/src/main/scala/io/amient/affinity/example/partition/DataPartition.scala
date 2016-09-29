@@ -57,11 +57,7 @@ object DataPartition {
 
 class DataPartition extends Partition {
 
-
   val graph: State[Int, VertexProps] = state("graph")
-
-  //an example sate without persistent storage
-  val cache: State[Int, Int] = state[Int, Int]("cache")
 
   override def handle: Receive = {
 
@@ -100,9 +96,9 @@ class DataPartition extends Partition {
     /**
       * Collect all connected vertices
       */
-    case Component(vertex, group) => graph.get(vertex) match {
-      case Some(existing) => sender ! Component(vertex, existing.edges.map(_.target))
-      case None => sender ! Component(vertex, Set())
+    case Component(vertex, ts, group) => graph.get(vertex) match {
+      case Some(existing) => sender ! Component(vertex, System.currentTimeMillis, existing.edges.map(_.target))
+      case None => sender ! Component(vertex, ts, Set())
     }
 
     /**
@@ -154,10 +150,10 @@ class DataPartition extends Partition {
       */
     case UpdateComponent(vertex, updatedComponent) => {
       graph.get(vertex) match {
-        case None => sender ! Component(vertex, Set())
+        case None => sender ! Component(vertex, System.currentTimeMillis, Set())
         case Some(existing) => try {
           graph.put(vertex, Some(VertexProps(existing.edges, updatedComponent)))
-          sender ! Component(vertex, existing.component)
+          sender ! Component(vertex, System.currentTimeMillis, existing.component)
         } catch {
           case NonFatal(e) => sender ! Status.Failure(e)
         }

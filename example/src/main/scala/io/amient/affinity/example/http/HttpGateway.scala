@@ -27,8 +27,9 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
+import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.TimeCryptoProof
-import io.amient.affinity.example.ConfigEntry
+import io.amient.affinity.example.{Component, ConfigEntry}
 import io.amient.affinity.example.http.handler.WebApp
 import io.amient.affinity.example.rest.handler._
 
@@ -58,6 +59,8 @@ object HttpGateway {
 class HttpGateway extends Gateway with ActorState {
 
   private val config = context.system.settings.config
+
+
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same

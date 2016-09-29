@@ -24,7 +24,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class DomainSpec extends FlatSpec with Matchers {
 
-  val c = Component(100, Set(101, 102))
+  val c = Component(100, 0, Set(101, 102))
   val bytes = AvroRecord.write(c, c.schema)
   AvroRecord.read(bytes, classOf[Component], c.schema) should be (c)
 

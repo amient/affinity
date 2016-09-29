@@ -40,6 +40,11 @@ trait Connect extends HttpGateway {
 
   implicit val timeout = Timeout(10 seconds)
 
+  /**
+    * an example sate without persistent storage (configured with NoopStorage class)
+    */
+  val cache = state[Int, Component]("cache")
+
   abstract override def handle: Receive = super.handle orElse {
 
     /**
@@ -57,9 +62,17 @@ trait Connect extends HttpGateway {
       * GET /component/<vertex>/
       */
     case HTTP(POST, PATH("component", INT(id)), query, response) =>
-      fulfillAndHandleErrors(response, getComponent(id), ContentTypes.`application/json`) {
-        case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
-        case component => ResponseBuilder.json(OK, component)
+      cache.get(id) match {
+        //TODO this should be an expiring state not just overwrite-old, e.g. rocksdb / leveldb with in-memory-only settings
+        case Some(component) if (component.ts + 10000 > System.currentTimeMillis) =>
+          response.success(ResponseBuilder.json(OK, component))
+        case _ =>
+          fulfillAndHandleErrors(response, getComponent(id), ContentTypes.`application/json`) {
+            case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
+            case component: Component =>
+              cache.put(id, Some(component))
+              ResponseBuilder.json(OK, component)
+          }
       }
 
     /**
@@ -91,13 +104,14 @@ trait Connect extends HttpGateway {
 
   }
 
-  private def getComponent(vertex: Int): Future[Set[Int]] = {
-    val promise = Promise[Set[Int]]()
+  private def getComponent(vertex: Int): Future[Component] = {
+    val promise = Promise[Component]()
+    val ts = System.currentTimeMillis
     implicit val timeout = Timeout(10 seconds)
     def collect(queue: Set[Int], agg: Set[Int]): Unit = {
-      if (queue.isEmpty) promise.success(agg)
-      else cluster ? Component(queue.head, agg) map {
-        case Component(_, add) => collect(queue.tail ++ (add -- agg), agg ++ add)
+      if (queue.isEmpty) promise.success(Component(vertex, ts, agg))
+      else cluster ? Component(queue.head, ts, agg) map {
+        case Component(_, _, add) => collect(queue.tail ++ (add -- agg), agg ++ add)
       }
     }
     collect(Set(vertex), Set(vertex))
@@ -138,8 +152,8 @@ trait Connect extends HttpGateway {
                 promise.failure(e)
               case Success(components) =>
                 Future.sequence(components.map { component =>
-                  Future.sequence(component.toSeq.map { v =>
-                    (cluster ? UpdateComponent(v, component)).asInstanceOf[Future[Component]] recover {
+                  Future.sequence(component.component.toSeq.map { v =>
+                    (cluster ? UpdateComponent(v, component.component)).asInstanceOf[Future[Component]] recover {
                       case e: Throwable => null.asInstanceOf[Component]
                     }
                   })

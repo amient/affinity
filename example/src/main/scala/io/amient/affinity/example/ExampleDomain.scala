@@ -55,7 +55,7 @@ object GOP extends Enumeration {
   val ADD, REMOVE = Value
 }
 
-final case class Component(vertex: Int, component: Set[Int] = Set()) extends AvroRecord[Component] {
+final case class Component(vertex: Int, ts: Long = 0L, component: Set[Int] = Set()) extends AvroRecord[Component] {
   override def hashCode(): Int = vertex.hashCode
 }
 

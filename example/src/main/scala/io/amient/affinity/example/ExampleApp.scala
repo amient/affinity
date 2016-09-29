@@ -30,7 +30,7 @@ object ExampleApp extends App {
 
   // gateways
   HttpGateway.main(Seq("8081").toArray)
-//  HttpGateway.main(Seq("8082").toArray)
+  HttpGateway.main(Seq("8082").toArray)
 
   // partition master(s)
   DataPartition.main(Seq("2551", "0,1").toArray)
