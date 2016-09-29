@@ -48,7 +48,7 @@ final case class ConfigEntry(description: String, @JsonIgnore salt: String) exte
 
 final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord[Edge]
 
-final case class VertexProps(edges: Set[Edge] = Set(), component: Set[Int] = Set()) extends AvroRecord[VertexProps]
+final case class VertexProps(ts: Long = 1475178519756L, edges: Set[Edge] = Set(), component: Set[Int] = Set()) extends AvroRecord[VertexProps]
 
 object GOP extends Enumeration {
   type Side = Value

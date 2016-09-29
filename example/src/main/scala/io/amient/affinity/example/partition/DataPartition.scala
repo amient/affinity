@@ -59,6 +59,8 @@ class DataPartition extends Partition {
 
   val graph: State[Int, VertexProps] = state("graph")
 
+  def now() = System.currentTimeMillis
+
   override def handle: Receive = {
 
     /**
@@ -97,7 +99,7 @@ class DataPartition extends Partition {
       * Collect all connected vertices
       */
     case Component(vertex, ts, group) => graph.get(vertex) match {
-      case Some(existing) => sender ! Component(vertex, System.currentTimeMillis, existing.edges.map(_.target))
+      case Some(existing) => sender ! Component(vertex, now(), existing.edges.map(_.target))
       case None => sender ! Component(vertex, ts, Set())
     }
 
@@ -110,7 +112,7 @@ class DataPartition extends Partition {
     case ModifyGraph(vertex, edge, GOP.ADD) => graph.get(vertex) match {
 
       case None => try {
-        graph.put(vertex, Some(VertexProps(Set(edge))))
+        graph.put(vertex, Some(VertexProps(now(), Set(edge))))
         sender ! true
       } catch {
         case NonFatal(e) => sender ! Status.Failure(e)
@@ -119,7 +121,7 @@ class DataPartition extends Partition {
       case Some(existing) if (existing.edges.exists(_.target == edge.target)) => sender ! false
 
       case Some(existing) => try {
-        graph.put(vertex, Some(VertexProps(existing.edges + edge, existing.component)))
+        graph.put(vertex, Some(VertexProps(now(), existing.edges + edge, existing.component)))
         sender ! true
       } catch {
         case NonFatal(e) => sender ! Status.Failure(e)
@@ -136,7 +138,7 @@ class DataPartition extends Partition {
       graph.get(vertex) match {
         case None => sender ! false
         case Some(existing) => try {
-          graph.put(vertex, Some(VertexProps(existing.edges.filter(_.target != edge.target), existing.component)))
+          graph.put(vertex, Some(VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component)))
           sender ! true
         } catch {
           case NonFatal(e) => sender ! Status.Failure(e)
@@ -150,10 +152,10 @@ class DataPartition extends Partition {
       */
     case UpdateComponent(vertex, updatedComponent) => {
       graph.get(vertex) match {
-        case None => sender ! Component(vertex, System.currentTimeMillis, Set())
+        case None => sender ! Component(vertex, now(), Set())
         case Some(existing) => try {
-          graph.put(vertex, Some(VertexProps(existing.edges, updatedComponent)))
-          sender ! Component(vertex, System.currentTimeMillis, existing.component)
+          graph.put(vertex, Some(VertexProps(now(), existing.edges, updatedComponent)))
+          sender ! Component(vertex, now(), existing.component)
         } catch {
           case NonFatal(e) => sender ! Status.Failure(e)
         }
