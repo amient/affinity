@@ -19,27 +19,35 @@
 
 package io.amient.affinity.core.serde.avro.schema
 
+import java.util.concurrent.ConcurrentHashMap
+
 import org.apache.avro.Schema
 
-import scala.collection.immutable
-import scala.reflect.runtime.universe._
+import scala.collection.JavaConverters._
 
 trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
 
-  private val register = scala.collection.mutable.LinkedHashMap[Schema, (Class[_], Type)]()
+  private val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
 
-  override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
-    register += schema -> (cls, tpe)
-    register.size - 1
-  }
-
-  override protected def getAllSchemas: immutable.List[(Int, Schema, Class[_], Type)] = synchronized {
-    register.toList.zipWithIndex.map { case ((schema, (cls, tpe)), schemaId) =>
-      (schemaId, schema, cls, tpe)
+  override def getSchema(id: Int): Option[Schema] = {
+    internal.getOrDefault(id,null) match {
+      case null => None
+      case value => Some(value._2)
     }
   }
 
-  override def getSchema(id: Int): Option[Schema] = {
-    None
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
+    val existing = internal.asScala.filter(_._2 == (cls, schema))
+    if (existing.isEmpty) {
+      val newId = internal.size
+      internal.put(newId, (cls, schema))
+      newId
+    } else {
+      existing.keys.max
+    }
+  }
+
+  override private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)] = {
+    internal.asScala.filter(_._2._1 == cls).mapValues(_._2).toList
   }
 }

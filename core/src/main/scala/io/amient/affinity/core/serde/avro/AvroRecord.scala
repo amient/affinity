@@ -80,8 +80,9 @@ object AvroRecord {
     *
     * @param bytes
     * @param schemaRegistry
-    * @return either a registered AvroRecord Type or GenericRecord if no type is registered for the schema
-    *         retrieved from the schemaRegistry
+    * @return AvroRecord for registered Type
+    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
+    *         null if bytes are null
     */
   def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
     if (bytes == null) null

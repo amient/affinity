@@ -31,54 +31,40 @@ import io.amient.affinity.core.serde.avro.AvroSerde
 import org.apache.avro.Schema
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.reflect.runtime.universe._
 
 /**
   * Confluent Schema Registry provider and serde
   * This provider uses Confluent Schema Registry but doesn't use the topic-key and topic-value subjects.
   * Instead a fully-qualified name of the class is the subject.
-  * TODO #9 test that the confluent deserializer works out-of-box - the subject should not be used only schema id
-  * TODO #9 provide a wrapper for the confluent serializer which uses FQN for subjects
+  * TODO #16 test that the confluent deserializer works out-of-box - the subject should not be used only schema id
+  * TODO #16 provide a wrapper for the confluent serializer which uses FQN for subjects
   */
 class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  private val register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
+  //TODO #16 cf registry configuration and add cftest.conf listen port 7011
+  val client = new ConfluentSchemaRegistryClient(Uri("http://localhost:7011"))
 
-  //TODO #9 cf registry configuration and add cftest.conf listen port 7011
-  val client = new ConfluentRegistryClient(Uri("http://localhost:7011"))
-
-  override def getSchema(id: Int): Option[Schema] = try {
+  override private[schema] def getSchema(id: Int): Option[Schema] = try {
     Some(client.getSchema(id))
   } catch {
     case e: Throwable => e.printStackTrace(); None
   }
 
-  override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = {
     val subject = cls.getName
+    client.registerSchema(subject, schema)
+  }
 
-    val alreadyRegisteredId: Int = (client.getVersions(subject).toList.map { version =>
-      val (id2, schema2) = client.getSchema(subject, version)
-      register += ((id2, schema2, cls, tpe))
-      if (schema2 == schema) id2 else -1
-    } :+ (-1)) .max
-
-    if (alreadyRegisteredId == -1) {
-      val newlyRegisteredId = client.registerSchema(subject, schema)
-      register += ((newlyRegisteredId, schema, cls, tpe))
-      newlyRegisteredId
-    } else {
-      alreadyRegisteredId
+  override private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)] = {
+    val subject = cls.getName
+    client.getVersions(subject).toList.map { version =>
+      client.getSchema(subject, version)
     }
   }
 
-  override protected def getAllSchemas(): List[(Int, Schema, Class[_], Type)] = synchronized {
-    register.toList
-  }
-
-  class ConfluentRegistryClient(baseUrl: Uri) {
+  class ConfluentSchemaRegistryClient(baseUrl: Uri) {
     implicit val system = CfAvroSchemaRegistry.this.system
 
     import system.dispatcher

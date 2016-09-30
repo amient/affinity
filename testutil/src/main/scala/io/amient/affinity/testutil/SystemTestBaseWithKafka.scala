@@ -79,7 +79,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
         val origin = sender
         for (value <- data(key)) origin ! value
 
-      case (key: String, value: String) => ack(sender) {
+      case (key: String, value: String) => reply(sender) {
         data.put(key, Some(value))
       }
     }

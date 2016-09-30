@@ -21,7 +21,7 @@ package io.amient.affinity.core.serde.avro
 
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
-import org.apache.avro.generic.GenericRecord
+import org.apache.avro.generic.IndexedRecord
 
 trait AvroSerde extends Serde with AvroSchemaProvider {
 
@@ -30,13 +30,15 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
   /**
     * Deserialize bytes to a concrete instance
     * @param bytes
-    * @return AvroRecord[T] if the Type T us a registered compile-time AvroRecord type
-    *         GenericRecord if there is no compile-time type assoicated with the schema of the record
+    * @return AvroRecord for registered Type
+    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
+    *         null if bytes are null
     */
-  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this) match {
+  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this) /*match {
+  TODO check this works with the schema evolution
     case avroRecord: AvroRecord[_] => avroRecord
     case record: GenericRecord => null
-  }
+  }*/
 
   /**
     * @param obj instance to serialize
@@ -45,17 +47,9 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else obj match {
-      //AvroRecords are capable of forward-compatible schema evolution
-      case record: AvroRecord[_] => schema(record.getSchema) match {
+      case record: IndexedRecord => schema(record.getSchema) match {
         case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
         case Some(schemaId) => AvroRecord.write(obj, record.getSchema, schemaId)
-      }
-      case _ => schema(obj.getClass) match {
-        case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
-        case Some(schemaId) => schema(schemaId) match {
-            case Some((_, writerSchema)) => AvroRecord.write (obj, writerSchema, schemaId)
-            case None => throw new IllegalArgumentException("Schema $schemaId doesn't exist")
-          }
       }
     }
   }

@@ -30,12 +30,11 @@ import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
-import scala.collection.{immutable, mutable}
-import scala.reflect.runtime.universe._
+import scala.collection.immutable
 
 class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  //TODO #9 separate configuration avro schemas in zookeeper - reusing here cooridnator's config - add zk root configuration
+  //TODO #16 separate configuration avro schemas in zookeeper - reusing here cooridnator's config - add zk root configuration
   import CoordinatorZk._
 
   private val config = system.settings.config
@@ -44,31 +43,15 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   private val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
   private val zkRoot = "/schema-registry"
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
-  private val typeCache = mutable.Map[Class[_], Type]()
 
-  private val register2 = mutable.HashSet[(Int, Schema, Class[_], Type)]()
-  //TODO #9 this structure may have conflicts if multiple classes happen to have same schema in various versions
-  //TODO #9 instead of this use a simillar technique used in cfregistry - update registry whenever registering a new type
-  private var register = immutable.Map[Schema, (Int, Class[_], Type)]()
+  @volatile private var internal = immutable.Map[String, List[(Int, Schema)]]()
+
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
-  updateRegistry(zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
+  updateInternal(zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
-      updateRegistry(children)
+      updateInternal(children)
     }
   }))
-
-  private def updateRegistry(ids: util.List[String]) = synchronized {
-    register = ids.asScala.map { id =>
-      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
-      val schemaId = id.toInt
-      val schemaClass = Class.forName(schema.getFullName)
-      val schemaType: Type = typeCache.get(schemaClass) match {
-        case None => null
-        case Some(tpe) => tpe
-      }
-      schema -> (schemaId, schemaClass, schemaType)
-    }.toMap
-  }
 
   override def getSchema(id: Int): Option[Schema] = try {
     Some(new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id")))
@@ -76,25 +59,31 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
     case e: Throwable => e.printStackTrace(); None
   }
 
-  override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
-    register.get(schema) match {
-      case Some((id2, cls2, tpe2)) if (cls2 == cls) => id2
-      case _ =>
-        typeCache += cls -> tpe
-        val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
-        val id = path.substring(zkRoot.length + 1).toInt
-        register += schema -> (id, cls, tpe)
-        id
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = {
+    val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
+    val id = path.substring(zkRoot.length + 1).toInt
+    id
+  }
+
+  override private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)] = {
+    val FQN = cls.getName
+    val ids = zk.getChildren(zkRoot)
+    ids.asScala.toList.map { id =>
+      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
+      val schemaId = id.toInt
+      (schemaId, schema)
+    } filter {
+      _._2.getFullName == FQN
     }
   }
 
-//  override protected def registerType2(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
-//
-//  }
-
-  override def getAllSchemas(): List[(Int, Schema, Class[_], Type)] = synchronized {
-    register.toList.map {
-      case (schema, (id, cls, tpe)) => (id, schema, cls, tpe)
-    }
+  private def updateInternal(ids: util.List[String]): Unit = {
+    internal = ids.asScala.toList.map { id =>
+      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
+      val FQN = schema.getFullName
+      val schemaId = id.toInt
+      (FQN, (schemaId, schema))
+    }.groupBy(_._1).mapValues(_.map(_._2))
   }
+
 }

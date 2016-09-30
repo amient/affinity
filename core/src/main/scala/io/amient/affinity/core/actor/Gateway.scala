@@ -115,12 +115,12 @@ abstract class Gateway extends Actor {
     //no handler matched the HttpExchange
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
-    case MasterStatusUpdate("regions", add, remove) => ack[Unit](sender) {
+    case MasterStatusUpdate("regions", add, remove) => reply[Unit](sender) {
       remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
     }
 
-    case MasterStatusUpdate("services", add, remove) => ack[Unit](sender) {
+    case MasterStatusUpdate("services", add, remove) => reply[Unit](sender) {
       add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
       remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
     }

@@ -31,6 +31,7 @@ import scala.reflect.runtime.universe._
 
 object State {
   def CONFIG_STATE(name: String) = s"affinity.state.$name"
+
   val CONFIG_STORAGE_CLASS = "storage.class"
   val CONFIG_MEMSTORE_CLASS = "memstore.class"
 }
@@ -68,6 +69,7 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
 
   /**
     * Retrieve a value from the store asynchronously
+    *
     * @param key
     * @return Future.Success(V) if the key exists and the value could be retrieved and deserialized
     *         Future.Failed(UnsupportedOperationException) if the key exists but the value class is not registered
@@ -76,13 +78,26 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     */
   def apply(key: K): Future[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    storage.memstore(k) flatMap  {
+    storage.memstore(k) flatMap {
       case d => valueSerde.fromBinary(d.array) match {
         case value: V => Future.successful(value)
         case _ => Future.failed(new UnsupportedOperationException(key.toString))
       }
     }
   }
+
+//  /**
+//    * Retrieve an optional value from the store asynchronously
+//    *
+//    * @param key
+//    * @return Future.Success(Some(V)) if the key exists and the value could be retrieved and deserialized
+//    *         Future.Success(None) if the key doesn't exist
+//    *         Future.Failed(UnsupportedOperationException) if the key exists but the value class is not registered
+//    *         Future.Failed(Throwable) if any other non-fatal exception occurs
+//    */
+//  def get(key: K): Future[Option[V]] = apply(key) map (Some(_)) recover {
+//    case e: NoSuchElementException => None
+//  }
 
   def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
     (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])

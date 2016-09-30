@@ -122,7 +122,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   class TestRegionNode(config: Config, partitionCreator: => Partition)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
-    Await.result(startRegion(partitionCreator), 3 seconds)
+    Await.result(startRegion(partitionCreator), 6 seconds)
   }
 
 }

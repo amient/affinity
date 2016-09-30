@@ -47,13 +47,6 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     register(classOf[Base])
   }
 
-  "Schema Registry" should "preserve strict ordering when registering classes" in {
-    oldSerde.schema(classOf[_V1_Composite]) should be(Some(1))
-    oldSerde.schema(classOf[Base]) should be(Some(2))
-    newSerde.schema(classOf[Composite]) should be(Some(1))
-    newSerde.schema(classOf[Base]) should be(Some(2))
-  }
-
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBinary(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10))
     val renderedValue = newSerde.fromBinary(oldValue)

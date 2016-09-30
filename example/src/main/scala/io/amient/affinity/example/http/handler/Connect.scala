@@ -32,6 +32,7 @@ import io.amient.affinity.example.service.UserInputMediator
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 trait Connect extends HttpGateway {
@@ -59,19 +60,26 @@ trait Connect extends HttpGateway {
     /**
       * GET /component/<vertex>/
       */
-    case HTTP(POST, PATH("component", INT(id)), query, response) => cache(id) map {
-      case component if (component.ts + 10000 > System.currentTimeMillis) =>
-        //TODO this should be an expiring state not just overwrite-old, e.g. rocksdb / leveldb with in-memory-only settings
-        response.success(ResponseBuilder.json(OK, component))
+    case HTTP(POST, PATH("component", INT(id)), query, response) =>
+      cache(id) map (Some(_)) recover {
+        case e: NoSuchElementException => None
+      } map {
+        case Some(component) if (component.ts + 10000 > System.currentTimeMillis) =>
+          //TODO this should be an expiring state not just overwrite-old, e.g. rocksdb / leveldb with in-memory-only settings
+          response.success(ResponseBuilder.json(OK, component))
 
-      case _ =>
-        delegateAndHandleErrors(response, getComponent(id)) {
-          case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
-          case component: Component =>
-            cache.put(id, Some(component))
-            ResponseBuilder.json(OK, component)
-        }
-    }
+        case _ =>
+          delegateAndHandleErrors(response, getComponent(id)) {
+            case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
+            case component: Component =>
+              cache.put(id, Some(component))
+              ResponseBuilder.json(OK, component)
+          }
+      } recover {
+        case NonFatal(e) =>
+          e.printStackTrace()
+          response.success(handleException(e))
+      }
 
     /**
       * POST /connect/<vertex1>/<vertex2>
@@ -110,6 +118,8 @@ trait Connect extends HttpGateway {
       if (queue.isEmpty) promise.success(Component(vertex, ts, agg))
       else cluster ? Component(queue.head, ts, agg) map {
         case Component(_, _, add) => collect(queue.tail ++ (add -- agg), agg ++ add)
+      } recover {
+        case NonFatal(e) => promise.failure(e)
       }
     }
     collect(Set(vertex), Set(vertex))

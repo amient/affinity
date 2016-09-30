@@ -23,8 +23,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.Uri.Path._
-import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
+import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Gateway

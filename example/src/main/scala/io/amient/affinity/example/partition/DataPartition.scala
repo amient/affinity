@@ -26,7 +26,7 @@ import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.example._
-
+import io.amient.affinity.core.ack._
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
 import scala.util.control.NonFatal
@@ -87,23 +87,21 @@ class DataPartition extends Partition {
     /**
       * getting VertexProps object by Vertex key
       */
-    case vertex: Int =>
-      val origin = sender
-      graph(vertex) map (origin ! _) recover {
-        case NonFatal(e) => origin ! Status.Failure(e)
-      }
+    case vertex: Int => replyWith(sender) {
+      graph(vertex)
+    }
 
 
     /**
       * Collect all connected vertices
       */
-    case Component(vertex, ts, group) =>
-      val origin = sender
+    case Component(vertex, ts, group) => replyWith(sender) {
       graph(vertex) map { existing =>
-        origin ! Component(vertex, now(), existing.edges.map(_.target))
+        Component(vertex, now(), existing.edges.map(_.target))
       } recover {
-        case e: NoSuchElementException => origin ! Component(vertex, ts, Set())
+        case e: NoSuchElementException => Component(vertex, ts, Set())
       }
+    }
 
     /**
       * Add an edge to the graph vertex.
@@ -111,39 +109,34 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
       */
-    case ModifyGraph(vertex, edge, GOP.ADD) =>
-      val origin = sender
+    case ModifyGraph(vertex, edge, GOP.ADD) => replyWith(sender) {
       graph(vertex) map {
-
-        case existing if (existing.edges.exists(_.target == edge.target)) => origin ! false
+        case existing if (existing.edges.exists(_.target == edge.target)) => false
         case existing =>
           graph.put(vertex, Some(VertexProps(now(), existing.edges + edge, existing.component)))
-          origin ! true
-
+          true
       } recover {
         case e: NoSuchElementException => try {
           graph.put(vertex, Some(VertexProps(now(), Set(edge))))
-          origin ! true
+          true
         } catch {
-          case NonFatal(e) => origin ! Status.Failure(e)
+          case NonFatal(e) => Status.Failure(e)
         }
-        case NonFatal(e) => origin ! Status.Failure(e)
       }
+    }
 
     /**
       * Remove an edge from the graph vertex.
       * This is a non-recursive operation, local to the
       * data shard owned by this partition.
-      * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
+      * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
-    case ModifyGraph(vertex, edge, GOP.REMOVE) => {
-      val origin = sender
+    case ModifyGraph(vertex, edge, GOP.REMOVE) => replyWith(sender) {
       graph(vertex) map { existing =>
         graph.put(vertex, Some(VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component)))
-        origin ! true
+        true
       } recover {
-        case e: NoSuchElementException => origin ! false
-        case NonFatal(e) => origin ! Status.Failure(e)
+        case e: NoSuchElementException => false
       }
     }
 
@@ -151,14 +144,12 @@ class DataPartition extends Partition {
       * Updated component of the vertex.
       * Responds with the Component data previously associated with the vertex
       */
-    case UpdateComponent(vertex, updatedComponent) => {
-      val origin = sender
+    case UpdateComponent(vertex, updatedComponent) => replyWith(sender) {
       graph(vertex) map { existing =>
         graph.put(vertex, Some(VertexProps(now(), existing.edges, updatedComponent)))
-        origin ! Component(vertex, now(), existing.component)
+        Component(vertex, now(), existing.component)
       } recover {
-        case e: NoSuchElementException => origin ! Component(vertex, now(), Set())
-        case NonFatal(e) => origin ! Status.Failure(e)
+        case e: NoSuchElementException => Component(vertex, now(), Set())
       }
     }
 

@@ -24,9 +24,6 @@ object CfRegistryTest extends App {
     val serialization = SerializationExtension(system)
     val serde = serialization.serializerFor(classOf[ID])
     assert(serde.fromBinary(serde.toBinary(ID(101))) == ID(101))
-
-    println(serde.asInstanceOf[AvroSchemaProvider].schema(64))
-    println(serde.asInstanceOf[AvroSchemaProvider].schema(64))
   } finally {
     system.terminate()
   }

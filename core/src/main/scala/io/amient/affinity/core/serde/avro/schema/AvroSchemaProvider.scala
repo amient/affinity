@@ -22,22 +22,29 @@ package io.amient.affinity.core.serde.avro.schema
 import io.amient.affinity.core.serde.avro.AvroRecord
 import org.apache.avro.Schema
 
-import scala.collection.immutable
+import scala.collection.{immutable, mutable}
 import scala.reflect.runtime.universe._
 
+/**
+  * This trait ensures that all the getters are fast and thread-safe.
+  * Implementing classes do not have to be thread-safe
+  */
 trait AvroSchemaProvider {
 
-  @volatile private var reg1: immutable.Map[Class[_], Int] = Map()
+  private val register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
 
-  @volatile private var reg2: immutable.Map[Int, (Type, Schema)] = Map()
+  @volatile private var cache1: immutable.Map[Int, (Type, Schema)] = Map()
 
-  @volatile private var reg3: immutable.Map[Schema, Int] = Map()
+  @volatile private var cache2: immutable.Map[Schema, Int] = Map()
 
-  private var forwardCache = immutable.Map[Int, Option[(Type, Schema)]]()
+  @volatile private var cache3 = immutable.Map[Int, Option[(Type, Schema)]]()
 
-  final def schema(cls: Class[_]): Option[Int] = reg1.get(cls)
-
-  final def schema(schema: Schema): Option[Int] = reg3.get(schema)
+  /**
+    * Get schema id which is associated with a concrete schema instance
+    * @param schema
+    * @return
+    */
+  final def schema(schema: Schema): Option[Int] = cache2.get(schema)
 
   /**
     * Get Type and Schema by a schema Id.
@@ -49,20 +56,19 @@ trait AvroSchemaProvider {
     * @return
     */
   final def schema(id: Int): Option[(Type, Schema)] = {
-    reg2.get(id) match {
+    cache1.get(id) match {
       case Some(existing) => Some(existing)
       case None =>
-        forwardCache.get(id) match {
+        cache3.get(id) match {
           case Some(cached) => cached
           case None => synchronized {
             val result = getSchema(id).map { schema =>
               //lookup type in the current registry, if the compile-time type is new, then null
-              val sameFQNs = reg2.values.filter(_._2.getFullName == schema.getFullName).map(_._1)
+              val sameFQNs = cache1.values.filter(_._2.getFullName == schema.getFullName).map(_._1)
               val tpe = sameFQNs.headOption.getOrElse(null)
               (tpe, schema)
             }
-            forwardCache = forwardCache + (id -> result)
-            println(s"!new $id $result")
+            cache3 = cache3 + (id -> result)
             result
           }
         }
@@ -93,22 +99,37 @@ trait AvroSchemaProvider {
     register(typeOf[T], cls, schema)
   }
 
-  private final def register(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
-    val id = registerType(tpe, cls, schema)
-    val register = getAllSchemas
-    reg1 = register.map { case (id2, schema2, cls2, tpe2) => cls2 -> id2 }.toMap
-    reg2 = register.map { case (id2, schema2, cls2, tpe2) =>
+  private def register(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
+
+    val alreadyRegisteredId: Int = (getVersions(cls).map { case (id2, schema2) =>
+      register += ((id2, schema2, cls, tpe))
+      if (schema2 == schema) id2 else -1
+    } :+ (-1)) .max
+
+    val id = if (alreadyRegisteredId == -1) {
+      val newlyRegisteredId = registerSchema(cls, schema)
+      register += ((newlyRegisteredId, schema, cls, tpe))
+      newlyRegisteredId
+    } else {
+      alreadyRegisteredId
+    }
+
+    cache1 = register.map { case (id2, schema2, cls2, tpe2) =>
       val tpe3 = if (cls == cls2) tpe else tpe2 //update all schema versions for the same class with its runtime type
       id2 -> (tpe3, schema2)
     }.toMap
-    reg3 = register.map { case (id2, schema2, cls2, tpe2) => schema2 -> id2 }.toMap
+
+    cache2 = register.map { case (id2, schema2, cls2, tpe2) => schema2 -> id2 }.toMap
+
     id
   }
 
-  protected def getSchema(id: Int): Option[Schema]
+  private[schema] def registerSchema(cls: Class[_], schema: Schema): Int
 
-  protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int
+  private[schema] def getSchema(id: Int): Option[Schema]
 
-  protected def getAllSchemas: immutable.List[(Int, Schema, Class[_], Type)]
+  private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)]
+
+
 
 }

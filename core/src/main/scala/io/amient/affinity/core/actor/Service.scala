@@ -54,11 +54,13 @@ trait Service extends Actor {
     super.postStop()
   }
 
-  final override def receive: Receive = handle orElse {
-    case BecomeMaster() => ack(sender) {
+  final override def receive: Receive = manage orElse handle
+
+  private def manage: Receive = {
+    case BecomeMaster() => reply(sender) {
       onBecomeMaster
     }
-    case BecomeStandby() => ack(sender) {
+    case BecomeStandby() => reply(sender) {
       onBecomeStandby
     }
   }

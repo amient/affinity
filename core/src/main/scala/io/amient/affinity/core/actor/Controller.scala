@@ -101,9 +101,13 @@ class Controller extends Actor {
           }
         }), name = "services")
         servicesPromise = Promise[Unit]()
-        ackWhen(sender, servicesPromise.future)
+        replyWith(sender) {
+          servicesPromise.future
+        }
       } catch {
-        case e: InvalidActorNameException => ackWhen(sender, servicesPromise.future)
+        case e: InvalidActorNameException => replyWith(sender) {
+          servicesPromise.future
+        }
       }
 
     case ContainerOnline("services") => servicesPromise.success(())
@@ -118,9 +122,13 @@ class Controller extends Actor {
           }
         }), name = "region")
         regionPromise = Promise[Unit]()
-        ackWhen(origin, regionPromise.future)
+        replyWith(origin) {
+          regionPromise.future
+        }
       } catch {
-        case e: InvalidActorNameException => ackWhen(origin, gatewayPromise.future)
+        case e: InvalidActorNameException => replyWith(origin) {
+          gatewayPromise.future
+        }
       }
 
     //FIXME when region shuts down due to partition exception CreateRegion is never called again and the promise will be 'already completed'
@@ -128,13 +136,16 @@ class Controller extends Actor {
 
 
     case CreateGateway(gatewayProps) =>
-      val origin = sender
       try {
         context.actorOf(gatewayProps, name = "gateway")
         gatewayPromise = Promise[Int]()
-        ackWhen(origin, gatewayPromise.future)
+        replyWith(sender) {
+          gatewayPromise.future
+        }
       } catch {
-        case e: InvalidActorNameException => ackWhen(origin, gatewayPromise.future)
+        case e: InvalidActorNameException => replyWith(sender) {
+          gatewayPromise.future
+        }
       }
 
     case GatewayCreated(httpPort) =>
@@ -145,9 +156,9 @@ class Controller extends Actor {
       //FIXME when gateway gets restarted CreateGateway is never called again and the promise will be 'already completed'
       gatewayPromise.success(httpPort)
 
-    case GracefulShutdown() => ack(sender) {
+    case GracefulShutdown() => replyWith(sender) {
       implicit val timeout = Timeout(500 milliseconds)
-      context.actorSelection("gateway") ? GracefulShutdown() onFailure {
+      context.actorSelection("gateway") ? GracefulShutdown() recover {
         case any => system.terminate()
       }
     }
