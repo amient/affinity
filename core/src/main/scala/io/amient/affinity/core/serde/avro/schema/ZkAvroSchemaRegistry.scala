@@ -45,8 +45,11 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   private val zkRoot = "/schema-registry"
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
   private val typeCache = mutable.Map[Class[_], Type]()
+  //TODO #9 this structure may have conflicts if multiple classes happen to have same schema in various versions
   private var register = immutable.Map[Schema, (Int, Class[_], Type)]()
 
+
+  //TODO #9 instead of this initialization, use a simillar technique used in cfregistry - update registry whenever registering a new type
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
   updateRegistry(zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
@@ -69,21 +72,12 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
 
   override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     register.get(schema) match {
-      case Some((id2, cls2, tpe2)) if (cls2 == cls) =>
-        //TODO #9 refreshing the compile types is a general behaviour of any schema registry
-        register.foreach { case (s, (i, c, t)) =>
-          if (c == cls && t != tpe) register += s -> (i, c, tpe)
-        }
-        id2
+      case Some((id2, cls2, tpe2)) if (cls2 == cls) => id2
       case _ =>
         typeCache += cls -> tpe
         val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
         val id = path.substring(zkRoot.length + 1).toInt
         register += schema -> (id, cls, tpe)
-        //TODO #9 refreshing the compile types is a general behaviour of any schema registry
-        register.foreach { case (s, (i, c, t)) =>
-          if (c == cls && t != tpe) register += s -> (i, c, tpe)
-        }
         id
     }
   }

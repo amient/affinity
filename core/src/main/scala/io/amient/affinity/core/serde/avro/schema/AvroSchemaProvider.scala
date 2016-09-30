@@ -42,7 +42,7 @@ trait AvroSchemaProvider {
   /**
     * register run-time type by its class name and a schema
     *
-    * @param schema schema variant for the type
+    * @param schema    schema variant for the type
     * @param className class name of the type
     * @return unique schema id
     */
@@ -77,9 +77,12 @@ trait AvroSchemaProvider {
   private final def register(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     val id = registerType(tpe, cls, schema)
     val register = getAllSchemas()
-    reg1 = register.map { case (id, schema, cls, tpe) => cls -> id }.toMap
-    reg2 = register.map { case (id, schema, cls, tpe) => id -> (tpe, cls, schema) }.toMap
-    reg3 = register.map { case (id, schema, cls, tpe) => schema -> id }.toMap
+    reg1 = register.map { case (id2, schema2, cls2, tpe2) => cls2 -> id2 }.toMap
+    reg2 = register.map { case (id2, schema2, cls2, tpe2) =>
+      val tpe3 = if (cls == cls2) tpe else tpe2 //update all schema versions for the same class with its runtime type
+      id2 -> (tpe3, cls2, schema2)
+    }.toMap
+    reg3 = register.map { case (id2, schema2, cls2, tpe2) => schema2 -> id2 }.toMap
     id
   }
 
