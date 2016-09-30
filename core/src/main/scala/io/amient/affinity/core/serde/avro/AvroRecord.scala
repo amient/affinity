@@ -90,15 +90,18 @@ object AvroRecord {
       decoder.readFixed(magicReader, 0, 1)
       val schemaId = decoder.readInt()
       require(schemaId >= 0)
-      val (tpe, _, writerSchema) = schemaRegistry.schema(schemaId)
-      if (tpe == null) {
-        val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
-        reader.read(null, decoder)
-      } else {
-        val readerSchema = inferSchema(tpe)
-        val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
-        val record = reader.read(null, decoder)
-        readDatum(record, tpe, readerSchema)
+      schemaRegistry.schema(schemaId) match {
+        case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
+        case Some((tpe, writerSchema)) =>
+          if (tpe == null) {
+            val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
+            reader.read(null, decoder)
+          } else {
+            val readerSchema = inferSchema(tpe)
+            val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
+            val record = reader.read(null, decoder)
+            readDatum(record, tpe, readerSchema)
+          }
       }
     }
   }

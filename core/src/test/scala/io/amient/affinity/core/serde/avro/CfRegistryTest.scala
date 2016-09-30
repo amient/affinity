@@ -3,7 +3,7 @@ package io.amient.affinity.core.serde.avro
 import akka.actor.{ActorSystem, ExtendedActorSystem}
 import akka.serialization.SerializationExtension
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.core.serde.avro.schema.{AvroSchemaProvider, CfAvroSchemaRegistry}
 
 
 class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
@@ -23,8 +23,10 @@ object CfRegistryTest extends App {
   try {
     val serialization = SerializationExtension(system)
     val serde = serialization.serializerFor(classOf[ID])
-    val bytes = serde.toBinary(ID(101))
-    println(serde.fromBinary(bytes))
+    assert(serde.fromBinary(serde.toBinary(ID(101))) == ID(101))
+
+    println(serde.asInstanceOf[AvroSchemaProvider].schema(64))
+    println(serde.asInstanceOf[AvroSchemaProvider].schema(64))
   } finally {
     system.terminate()
   }

@@ -52,9 +52,10 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
       }
       case _ => schema(obj.getClass) match {
         case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
-        case Some(schemaId) =>
-          val (_, _, writerSchema) = schema(schemaId)
-          AvroRecord.write(obj, writerSchema, schemaId)
+        case Some(schemaId) => schema(schemaId) match {
+            case Some((_, writerSchema)) => AvroRecord.write (obj, writerSchema, schemaId)
+            case None => throw new IllegalArgumentException("Schema $schemaId doesn't exist")
+          }
       }
     }
   }

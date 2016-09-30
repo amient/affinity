@@ -40,15 +40,21 @@ import scala.reflect.runtime.universe._
   * Confluent Schema Registry provider and serde
   * This provider uses Confluent Schema Registry but doesn't use the topic-key and topic-value subjects.
   * Instead a fully-qualified name of the class is the subject.
-  * TODO #9 test that the confluent deserializer works anyway - it should as the binary header is the same
+  * TODO #9 test that the confluent deserializer works out-of-box - the subject should not be used only schema id
   * TODO #9 provide a wrapper for the confluent serializer which uses FQN for subjects
   */
 class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  private var register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
+  private val register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
 
   //TODO #9 cf registry configuration and add cftest.conf listen port 7011
   val client = new ConfluentRegistryClient(Uri("http://localhost:7011"))
+
+  override def getSchema(id: Int): Option[Schema] = try {
+    Some(client.getSchema(id))
+  } catch {
+    case e: Throwable => e.printStackTrace(); None
+  }
 
   override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     val subject = cls.getName
@@ -61,11 +67,9 @@ class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
 
     if (alreadyRegisteredId == -1) {
       val newlyRegisteredId = client.registerSchema(subject, schema)
-      println(s"registering $subject to schema id $newlyRegisteredId")
       register += ((newlyRegisteredId, schema, cls, tpe))
       newlyRegisteredId
     } else {
-      println(s"$subject schema already registered with schema id $alreadyRegisteredId")
       alreadyRegisteredId
     }
   }
@@ -118,7 +122,7 @@ class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
     def getSchema(id: Int) = {
       val j = mapper.readValue(http(GET, s"/schemas/ids/$id").utf8String, classOf[JsonNode])
       if (j.has("error_code")) throw new RuntimeException(j.get("message").textValue())
-      new Schema.Parser().parse(j.textValue())
+      new Schema.Parser().parse(j.get("schema").textValue())
     }
 
     def checkSchema(subject: String, schema: Schema): Option[Int] = {

@@ -38,4 +38,8 @@ trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
       (schemaId, schema, cls, tpe)
     }
   }
+
+  override def getSchema(id: Int): Option[Schema] = {
+    None
+  }
 }

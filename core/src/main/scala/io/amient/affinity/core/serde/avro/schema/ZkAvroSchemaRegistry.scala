@@ -45,11 +45,11 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   private val zkRoot = "/schema-registry"
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
   private val typeCache = mutable.Map[Class[_], Type]()
+
+  private val register2 = mutable.HashSet[(Int, Schema, Class[_], Type)]()
   //TODO #9 this structure may have conflicts if multiple classes happen to have same schema in various versions
+  //TODO #9 instead of this use a simillar technique used in cfregistry - update registry whenever registering a new type
   private var register = immutable.Map[Schema, (Int, Class[_], Type)]()
-
-
-  //TODO #9 instead of this initialization, use a simillar technique used in cfregistry - update registry whenever registering a new type
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
   updateRegistry(zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
@@ -70,6 +70,12 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
     }.toMap
   }
 
+  override def getSchema(id: Int): Option[Schema] = try {
+    Some(new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id")))
+  } catch {
+    case e: Throwable => e.printStackTrace(); None
+  }
+
   override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     register.get(schema) match {
       case Some((id2, cls2, tpe2)) if (cls2 == cls) => id2
@@ -81,6 +87,10 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
         id
     }
   }
+
+//  override protected def registerType2(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
+//
+//  }
 
   override def getAllSchemas(): List[(Int, Schema, Class[_], Type)] = synchronized {
     register.toList.map {

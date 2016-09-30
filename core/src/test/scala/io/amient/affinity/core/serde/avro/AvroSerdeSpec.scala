@@ -33,7 +33,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     //Future schema V2 available in old version - slightly unrealistic for embedded registry but here we're testing
     //the API for handling serialization, not the embedded implementation of registry, i.e. this would be true
     //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
-    register(classOf[_V1_Composite].getName, AvroRecord.inferSchema(classOf[Composite]))
+    register(classOf[_V1_Composite], AvroRecord.inferSchema(classOf[Composite]))
     register(classOf[Base])
   }
 
