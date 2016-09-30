@@ -31,6 +31,7 @@ import io.amient.affinity.core.util.ZooKeeperClient
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.common.protocol.SecurityProtocol
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait SystemTestBaseWithKafka extends SystemTestBase {
 
@@ -74,7 +75,10 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     }
 
     override def handle: Receive = {
-      case key: String => sender ! data.get(key)
+      case key: String =>
+        val origin = sender
+        for (value <- data(key)) origin ! value
+
       case (key: String, value: String) => ack(sender) {
         data.put(key, Some(value))
       }

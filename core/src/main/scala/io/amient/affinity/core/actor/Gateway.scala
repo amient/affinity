@@ -31,7 +31,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
-import io.amient.affinity.core.http.{HttpExchange, HttpInterface, ResponseBuilder}
+import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -89,17 +89,21 @@ abstract class Gateway extends Actor {
   }
 
   def handleException: PartialFunction[Throwable, HttpResponse]= {
-    case e: IllegalAccessError => HttpResponse(Forbidden)
     case e: NoSuchElementException => HttpResponse(NotFound)
     case e: IllegalArgumentException => HttpResponse(BadRequest)
-    case e: NotImplementedError => e.printStackTrace(); HttpResponse(NotImplemented)
+    case e: UnsupportedOperationException => HttpResponse(NotImplemented)
     case NonFatal(e) => e.printStackTrace(); HttpResponse(InternalServerError)
     case e => e.printStackTrace(); HttpResponse(ServiceUnavailable)
   }
 
-  def fulfillAndHandleErrors(promise: Promise[HttpResponse], future: Future[Any], ct: ContentType)
-                            (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(future map f recover handleException)
+  def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
+                            (implicit ctx: ExecutionContext) {
+    promise.completeWith(f recover handleException)
+  }
+
+  def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
+                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
+    promise.completeWith(delegate map f recover handleException)
   }
 
   def handle: Receive = {

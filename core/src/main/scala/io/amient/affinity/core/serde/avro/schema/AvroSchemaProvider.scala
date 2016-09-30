@@ -33,8 +33,6 @@ trait AvroSchemaProvider {
 
   @volatile private var reg3: immutable.Map[Schema, Int] = Map()
 
-  //TODO how to handle schemas for unknown compile types - this is when another instance contains new types or when data contains types that have been removed from the new code
-
   final def schema(id: Int): (Type, Class[_], Schema) = reg2(id)
 
   final def schema(cls: Class[_]): Option[Int] = reg1.get(cls)

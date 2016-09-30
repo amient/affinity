@@ -19,17 +19,12 @@
 
 package io.amient.affinity.example.partition
 
+
 import akka.actor.Status
-import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
-import io.amient.affinity.core.serde.primitive.IntSerde
-import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
-import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.storage.State
 import io.amient.affinity.example._
 
 import scala.collection.JavaConverters._
@@ -61,6 +56,8 @@ class DataPartition extends Partition {
 
   def now() = System.currentTimeMillis
 
+  import context.dispatcher
+
   override def handle: Receive = {
 
     /**
@@ -90,18 +87,23 @@ class DataPartition extends Partition {
     /**
       * getting VertexProps object by Vertex key
       */
-    case vertex: Int => graph.get(vertex) match {
-      case None => sender ! false
-      case Some(vertexProps) => sender ! vertexProps
-    }
+    case vertex: Int =>
+      val origin = sender
+      graph(vertex) map (origin ! _) recover {
+        case NonFatal(e) => origin ! Status.Failure(e)
+      }
+
 
     /**
       * Collect all connected vertices
       */
-    case Component(vertex, ts, group) => graph.get(vertex) match {
-      case Some(existing) => sender ! Component(vertex, now(), existing.edges.map(_.target))
-      case None => sender ! Component(vertex, ts, Set())
-    }
+    case Component(vertex, ts, group) =>
+      val origin = sender
+      graph(vertex) map { existing =>
+        origin ! Component(vertex, now(), existing.edges.map(_.target))
+      } recover {
+        case e: NoSuchElementException => origin ! Component(vertex, ts, Set())
+      }
 
     /**
       * Add an edge to the graph vertex.
@@ -109,24 +111,24 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
       */
-    case ModifyGraph(vertex, edge, GOP.ADD) => graph.get(vertex) match {
+    case ModifyGraph(vertex, edge, GOP.ADD) =>
+      val origin = sender
+      graph(vertex) map {
 
-      case None => try {
-        graph.put(vertex, Some(VertexProps(now(), Set(edge))))
-        sender ! true
-      } catch {
-        case NonFatal(e) => sender ! Status.Failure(e)
+        case existing if (existing.edges.exists(_.target == edge.target)) => origin ! false
+        case existing =>
+          graph.put(vertex, Some(VertexProps(now(), existing.edges + edge, existing.component)))
+          origin ! true
+
+      } recover {
+        case e: NoSuchElementException => try {
+          graph.put(vertex, Some(VertexProps(now(), Set(edge))))
+          origin ! true
+        } catch {
+          case NonFatal(e) => origin ! Status.Failure(e)
+        }
+        case NonFatal(e) => origin ! Status.Failure(e)
       }
-
-      case Some(existing) if (existing.edges.exists(_.target == edge.target)) => sender ! false
-
-      case Some(existing) => try {
-        graph.put(vertex, Some(VertexProps(now(), existing.edges + edge, existing.component)))
-        sender ! true
-      } catch {
-        case NonFatal(e) => sender ! Status.Failure(e)
-      }
-    }
 
     /**
       * Remove an edge from the graph vertex.
@@ -135,14 +137,13 @@ class DataPartition extends Partition {
       * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
       */
     case ModifyGraph(vertex, edge, GOP.REMOVE) => {
-      graph.get(vertex) match {
-        case None => sender ! false
-        case Some(existing) => try {
-          graph.put(vertex, Some(VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component)))
-          sender ! true
-        } catch {
-          case NonFatal(e) => sender ! Status.Failure(e)
-        }
+      val origin = sender
+      graph(vertex) map { existing =>
+        graph.put(vertex, Some(VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component)))
+        origin ! true
+      } recover {
+        case e: NoSuchElementException => origin ! false
+        case NonFatal(e) => origin ! Status.Failure(e)
       }
     }
 
@@ -151,14 +152,13 @@ class DataPartition extends Partition {
       * Responds with the Component data previously associated with the vertex
       */
     case UpdateComponent(vertex, updatedComponent) => {
-      graph.get(vertex) match {
-        case None => sender ! Component(vertex, now(), Set())
-        case Some(existing) => try {
-          graph.put(vertex, Some(VertexProps(now(), existing.edges, updatedComponent)))
-          sender ! Component(vertex, now(), existing.component)
-        } catch {
-          case NonFatal(e) => sender ! Status.Failure(e)
-        }
+      val origin = sender
+      graph(vertex) map { existing =>
+        graph.put(vertex, Some(VertexProps(now(), existing.edges, updatedComponent)))
+        origin ! Component(vertex, now(), existing.component)
+      } recover {
+        case e: NoSuchElementException => origin ! Component(vertex, now(), Set())
+        case NonFatal(e) => origin ! Status.Failure(e)
       }
     }
 

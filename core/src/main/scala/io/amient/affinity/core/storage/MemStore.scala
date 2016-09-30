@@ -21,15 +21,25 @@ package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
 
+import scala.concurrent.Future
+
 trait MemStore {
 
   type MK = ByteBuffer
   type MV = ByteBuffer
 
-  def get(key: MK): Option[MV]
+  /**
+    * @param key ByteBuffer r
+    * @return Future.Success(ByteBuffer) if key exists
+    *         Future.Failure(NoSuchElementException) when the key doesn't exist
+    *         Future.Failure(Exception) when any exception occurs
+    */
+  def apply(key: MK): Future[MV]
 
+  //TODO instead of memstore iterator, provide an asynchronous Stream[(MK,MV)]
   def iterator: Iterator[(MK,MV)]
 
+  //TODO maybe size is not going to be possible when Stream and fully asynchronous mutations are implemented
   def size: Long
 
   /**

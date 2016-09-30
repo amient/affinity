@@ -28,7 +28,12 @@ import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.core.util.TimeCryptoProof
 
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+
 trait Access extends HttpGateway {
+
+  import context.dispatcher
 
   abstract override def handle: Receive = super.handle orElse {
 
@@ -41,20 +46,28 @@ trait Access extends HttpGateway {
 
 
     case http@HTTP(GET, PATH("settings"), _, _) => AUTH_ADMIN(http) { (user: String) =>
-      ResponseBuilder.json(OK, Map(
-        "credentials" -> user,
-        "settings" -> settings.iterator.toMap
-      ))
+      try {
+        Future.successful {
+          throw new RuntimeException("!")
+          ResponseBuilder.json(OK, Map(
+            "credentials" -> user,
+            "settings" -> settings.iterator.toMap
+          ))
+        }
+      } catch {
+        case NonFatal(e) => Future.failed(e)
+      }
     }
 
 
     case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
-      settings.get(key) match {
-        case Some(otherKey) => ResponseBuilder.json(BadRequest, "That key already exists" -> key)
-        case None =>
+      settings(key) map {
+        case _ => ResponseBuilder.json(BadRequest, "That key already exists" -> key)
+      } recover {
+        case e: NoSuchElementException =>
           val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
           settings.put(key, Some(ConfigEntry(key, salt)))
-          HttpResponse(SeeOther, headers = List(headers.Location( Uri("/settings"))))
+          HttpResponse(SeeOther, headers = List(headers.Location(Uri("/settings"))))
       }
     }
   }

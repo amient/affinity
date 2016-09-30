@@ -21,7 +21,7 @@ package io.amient.affinity.example.rest.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, SeeOther}
-import akka.http.scaladsl.model.{ContentTypes, HttpResponse, Uri, headers}
+import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
@@ -52,34 +52,32 @@ trait Connect extends HttpGateway {
       */
     case HTTP(GET, PATH("vertex", INT(id)), query, response) =>
       val task = cluster ? id
-      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
-        case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
-        case props => ResponseBuilder.json(OK, props)
+      delegateAndHandleErrors(response, task) {
+        ResponseBuilder.json(OK, _)
       }
-
 
     /**
       * GET /component/<vertex>/
       */
-    case HTTP(POST, PATH("component", INT(id)), query, response) =>
-      cache.get(id) match {
+    case HTTP(POST, PATH("component", INT(id)), query, response) => cache(id) map {
+      case component if (component.ts + 10000 > System.currentTimeMillis) =>
         //TODO this should be an expiring state not just overwrite-old, e.g. rocksdb / leveldb with in-memory-only settings
-        case Some(component) if (component.ts + 10000 > System.currentTimeMillis) =>
-          response.success(ResponseBuilder.json(OK, component))
-        case _ =>
-          fulfillAndHandleErrors(response, getComponent(id), ContentTypes.`application/json`) {
-            case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
-            case component: Component =>
-              cache.put(id, Some(component))
-              ResponseBuilder.json(OK, component)
-          }
-      }
+        response.success(ResponseBuilder.json(OK, component))
+
+      case _ =>
+        delegateAndHandleErrors(response, getComponent(id)) {
+          case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
+          case component: Component =>
+            cache.put(id, Some(component))
+            ResponseBuilder.json(OK, component)
+        }
+    }
 
     /**
       * POST /connect/<vertex1>/<vertex2>
       */
     case HTTP(POST, PATH("connect", INT(id), INT(id2)), query, response) =>
-      fulfillAndHandleErrors(response, connect(id, id2), ContentTypes.`application/json`) {
+      delegateAndHandleErrors(response, connect(id, id2)) {
         case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
         case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }
@@ -88,7 +86,7 @@ trait Connect extends HttpGateway {
       * POST /disconnect/<vertex1>/<vertex2>
       */
     case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), query, response) =>
-      fulfillAndHandleErrors(response, disconnect(id, id2), ContentTypes.`application/json`) {
+      delegateAndHandleErrors(response, disconnect(id, id2)) {
         case true => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
         case false => HttpResponse(MovedPermanently, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }
@@ -124,7 +122,7 @@ trait Connect extends HttpGateway {
 
   private def modify(v1: Int, v2: Int, op: GOP.Value): Future[Boolean] = {
 
-    //to handle fatal crash consistency we'd need somethin like def WAL(t: java.lang.Long = System.currentTimeMillis) = op -> t
+    //to handle fatal crash consistency we'd need something like def WAL(t: java.lang.Long = System.currentTimeMillis) = op -> t
 
     val ts = System.currentTimeMillis
     val promise = Promise[Boolean]()

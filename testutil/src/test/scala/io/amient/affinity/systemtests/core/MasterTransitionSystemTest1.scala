@@ -47,13 +47,13 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
-        fulfillAndHandleErrors(response, ack(cluster, key), ContentTypes.`application/json`) {
+        delegateAndHandleErrors(response, ack(cluster, key)) {
           case value => ResponseBuilder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
         implicit val timeout = Timeout(1500 milliseconds)
-        fulfillAndHandleErrors(response, ack(cluster, (key, value)), ContentTypes.`application/json`) {
+        delegateAndHandleErrors(response, ack(cluster, (key, value))) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }

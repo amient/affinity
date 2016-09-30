@@ -46,7 +46,6 @@ import scala.util.{Failure, Success}
   */
 package object ack {
 
-
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
     * from the target actor.

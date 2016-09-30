@@ -21,13 +21,27 @@ package io.amient.affinity.core.serde.avro
 
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
+import org.apache.avro.generic.GenericRecord
 
 trait AvroSerde extends Serde with AvroSchemaProvider {
 
   override def identifier: Int = 101
 
-  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this)
+  /**
+    * Deserialize bytes to a concrete instance
+    * @param bytes
+    * @return AvroRecord[T] if the Type T us a registered compile-time AvroRecord type
+    *         GenericRecord if there is no compile-time type assoicated with the schema of the record
+    */
+  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this) match {
+    case avroRecord: AvroRecord[_] => avroRecord
+    case record: GenericRecord => null
+  }
 
+  /**
+    * @param obj instance to serialize
+    * @return serialized byte array
+    */
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else obj match {

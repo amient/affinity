@@ -19,10 +19,8 @@
 
 package io.amient.affinity.example.rest.handler
 
-import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.Uri.Path._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
@@ -41,7 +39,7 @@ trait Status extends HttpGateway {
     case HTTP(GET, PATH("status", INT(p)), _, response) =>
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (p.toInt, "status")
-      fulfillAndHandleErrors(response, task, ContentTypes.`application/json`) {
+      delegateAndHandleErrors(response, task) {
         case any => ResponseBuilder.json(OK, any)
       }
 

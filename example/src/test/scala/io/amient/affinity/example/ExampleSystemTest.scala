@@ -44,4 +44,8 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
   "ExampleApp Gateway" should "be able to play ping pong" in {
     gateway.http_sync(GET, s"/ping").entity should be(jsonStringEntity("pong"))
   }
+
+  //TODO test basic auth
+  //TODO test admin auth
+  //TODO test DSA auth
 }

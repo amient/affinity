@@ -25,6 +25,7 @@ import akka.actor.ActorSystem
 import akka.serialization.{JSerializer, SerializationExtension}
 import com.typesafe.config.Config
 
+import scala.concurrent.Future
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
@@ -63,16 +64,43 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
 
   val storage = constructorMirror(stateConfig, partition).asInstanceOf[Storage]
 
+  import system.dispatcher
+
   /**
-    * Storage offers only simple blocking put so that the mutations do not escape single-threaded actor
+    * Retrieve a value from the store asynchronously
+    * @param key
+    * @return Future.Success(V) if the key exists and the value could be retrieved and deserialized
+    *         Future.Failed(UnsupportedOperationException) if the key exists but the value class is not registered
+    *         Future.Failed(NoSuchElementException) if the key doesn't exist
+    *         Future.Failed(Throwable) if any other non-fatal exception occurs
+    */
+  def apply(key: K): Future[V] = {
+    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
+    storage.memstore(k) flatMap  {
+      case d => valueSerde.fromBinary(d.array) match {
+        case value: V => Future.successful(value)
+        case _ => Future.failed(new UnsupportedOperationException(key.toString))
+      }
+    }
+  }
+
+  def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
+    (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
+  }
+
+  def size: Long = storage.memstore.size
+
+  /**
+    * Storage offers only simple blocking mutations do not escape single-threaded actor
     * context from which it is called
+    * TODO consider asynchronous non-blocking variant for special cases
     *
     * @param key
     * @param value if None is given as value the key will be removed from the underlying storage
     *              otherwise the key will be updated with the value
     * @return An optional value previously held at the key position, None if new value was inserted
     */
-  final def put(key: K, value: Option[V]): Option[V] = {
+  def put(key: K, value: Option[V]): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     value match {
       case None => storage.memstore.remove(k) map { prev =>
@@ -84,23 +112,11 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
         storage.memstore.update(k, v) match {
           case Some(prev) if (prev == v) => Some(data)
           case other: Option[ByteBuffer] =>
-            //TODO storage options: non-blocking variant should be available
             storage.write(k, v).get()
             other.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V])
         }
       }
     }
   }
-
-  final def get(key: K): Option[V] = {
-    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    storage.memstore.get(k).map(d => valueSerde.fromBinary(d.array).asInstanceOf[V])
-  }
-
-  def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
-    (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
-  }
-
-  def size: Long = storage.memstore.size
 
 }

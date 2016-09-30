@@ -35,6 +35,7 @@ trait Serde extends JSerializer  {
   override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj)
 
   override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes) match {
+    case null => null
     case ref: AnyRef => ref
     case u: Unit => u.asInstanceOf[AnyRef]
     case z: Boolean => z.asInstanceOf[AnyRef]

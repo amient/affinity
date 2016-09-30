@@ -19,6 +19,8 @@
 
 package io.amient.affinity.example.rest
 
+import java.util.NoSuchElementException
+
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
@@ -27,13 +29,13 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
-import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.TimeCryptoProof
-import io.amient.affinity.example.{Component, ConfigEntry}
+import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.http.handler.WebApp
 import io.amient.affinity.example.rest.handler._
 
-import scala.concurrent.Promise
+import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object HttpGateway {
@@ -58,9 +60,6 @@ object HttpGateway {
 
 class HttpGateway extends Gateway with ActorState {
 
-  private val config = context.system.settings.config
-
-
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
@@ -70,14 +69,13 @@ class HttpGateway extends Gateway with ActorState {
   implicit val partition = 0
   val settings = state[String, ConfigEntry]("settings")
 
+  import context.dispatcher
+
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: IllegalAccessError => ResponseBuilder.json(Forbidden, "Forbidden" -> e.getMessage)
-    //errorValue(Unauthorized, "Unauthorized")
+    case e: IllegalAccessException => ResponseBuilder.json(NotFound, "Unauthorized" -> e.getMessage)
     case e: NoSuchElementException => ResponseBuilder.json(NotFound, "Haven't got that" -> e.getMessage)
     case e: IllegalArgumentException => ResponseBuilder.json(BadRequest, "BadRequest" -> e.getMessage)
-    case e: NotImplementedError =>
-      e.printStackTrace()
-      ResponseBuilder.json(NotImplemented, "Eeek! We have a bug..")
+    case e: UnsupportedOperationException => ResponseBuilder.json(NotImplemented, "Probably maintenance- Please try again..")
     case NonFatal(e) =>
       e.printStackTrace()
       ResponseBuilder.json(InternalServerError, "Well, something went wrong but we should be back..")
@@ -101,16 +99,14 @@ class HttpGateway extends Gateway with ActorState {
           case None => throw new IllegalAccessError
           case Some(sig) =>
             sig.split(":") match {
-              case Array(k, clientSignature) => settings.get(k) match {
-                case Some(configEntry) =>
-                  if (configEntry.crypto.verify(clientSignature, path.toString)) {
-                    val serverSignature = configEntry.crypto.sign(clientSignature)
-                    response.success(code(serverSignature))
-                  } else {
-                    throw new IllegalAccessError(configEntry.crypto.sign(path.toString))
-                  }
-                case _ => throw new IllegalAccessError
-              }
+              case Array(k, clientSignature) =>
+                val configEntry = Await.result(settings(k), 1 second) //TODO make this timeout configurable within the state
+                if (configEntry.crypto.verify(clientSignature, path.toString)) {
+                  val serverSignature = configEntry.crypto.sign(clientSignature)
+                  response.success(code(serverSignature))
+                } else {
+                  throw new IllegalAccessError(configEntry.crypto.sign(path.toString))
+                }
               case _ => throw new IllegalAccessError
             }
         }
@@ -127,9 +123,18 @@ class HttpGateway extends Gateway with ActorState {
     */
   object AUTH_ADMIN {
 
-    val adminConfig = settings.get("admin")
+    val adminConfig: Option[ConfigEntry] = Await.result(settings("admin") map (Some(_)) recover {
+      case e: NoSuchElementException => None
+    }, 1 second) //TODO make this timeout configurable within the state
 
-    def apply(exchange: HttpExchange)(code: (String) => HttpResponse): Unit = {
+    def apply(exchange: HttpExchange)(code: (String) => Future[HttpResponse]): Unit = {
+
+      def executeCode(user: String): Future[HttpResponse] =  try {
+        code(user)
+      } catch {
+        case NonFatal(e) => Future.failed(e)
+      }
+
       val auth = exchange.request.header[Authorization]
       val response = exchange.promise
       val credentials = for (Authorization(c@BasicHttpCredentials(username, password)) <- auth) yield c
@@ -138,13 +143,18 @@ class HttpGateway extends Gateway with ActorState {
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
               settings.put("admin", Some(ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))))
-              response.success(code(username))
+              fulfillAndHandleErrors(response) {
+                executeCode(username)
+              }
             case _ => response.success(HttpResponse(
               Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
           }
         case Some(ConfigEntry(any, adminPassword)) => credentials match {
           case Some(BasicHttpCredentials(username, password)) if username == "admin"
-            && TimeCryptoProof.toHex(password.getBytes) == adminPassword => response.success(code(username))
+            && TimeCryptoProof.toHex(password.getBytes) == adminPassword =>
+            fulfillAndHandleErrors(response) {
+              executeCode(username)
+            }
           case _ =>
             response.success(HttpResponse(Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", None)))))
         }

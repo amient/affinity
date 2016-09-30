@@ -21,7 +21,6 @@ package io.amient.affinity.systemtests.core
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.actor.{Gateway, Partition}
@@ -42,7 +41,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
       case HTTP(GET, PATH("ping"), _, response) => response.success(ResponseBuilder.json(OK, "pong", gzip = false))
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
-        fulfillAndHandleErrors(response, cluster ? "ping", ContentTypes.`application/json`) {
+        delegateAndHandleErrors(response, cluster ? "ping") {
           case pong => ResponseBuilder.json(OK, pong, gzip = false)
         }
     }

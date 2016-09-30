@@ -92,7 +92,7 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       services -= ref
 
     case MasterStatusUpdate(_, add, remove) => ack(sender) {
-      //TODO global config bootstrap timeout
+      //TODO #12 global config bootstrap timeout
       val t = 30 seconds
       implicit val timeout = Timeout(t)
       Await.ready(Future.sequence(remove.toList.map(ref => ack(ref, BecomeStandby()))), t)

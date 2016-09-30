@@ -123,7 +123,7 @@ class Controller extends Actor {
         case e: InvalidActorNameException => ackWhen(origin, gatewayPromise.future)
       }
 
-
+    //FIXME when region shuts down due to partition exception CreateRegion is never called again and the promise will be 'already completed'
     case ContainerOnline("region") => regionPromise.success(())
 
 

@@ -21,16 +21,18 @@ package io.amient.affinity.core.storage
 
 import java.util.concurrent.ConcurrentHashMap
 
+import scala.concurrent.Future
+
 class MemStoreConcurrentMap extends MemStore {
 
   private val internal = new ConcurrentHashMap[MK, MV]()
 
-  override def get(key: MK): Option[MV] = internal.get(key) match {
-    case null => None
-    case other => Some(other)
+  override def apply(key: MK): Future[MV] = internal.get(key) match {
+    case null => Future.failed(new NoSuchElementException)
+    case other => Future.successful(other)
   }
 
-  override def iterator = new Iterator[(MK,MV)] {
+  override def iterator = new Iterator[(MK, MV)] {
     val it = internal.entrySet().iterator()
 
     override def hasNext: Boolean = it.hasNext
@@ -47,7 +49,7 @@ class MemStoreConcurrentMap extends MemStore {
     case prev => Some(prev)
   }
 
-  override protected[storage] def remove(key: MK): Option[MV] = internal.remove(key)  match {
+  override protected[storage] def remove(key: MK): Option[MV] = internal.remove(key) match {
     case null => None
     case prev => Some(prev)
   }

@@ -35,7 +35,7 @@ import scala.reflect.runtime.universe._
 
 class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  //TODO separate configuration avro schemas in zookeeper - reusing here cooridnator's config - add zk root configuration
+  //TODO #9 separate configuration avro schemas in zookeeper - reusing here cooridnator's config - add zk root configuration
   import CoordinatorZk._
 
   private val config = system.settings.config
@@ -70,7 +70,7 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   override protected def registerType(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
     register.get(schema) match {
       case Some((id2, cls2, tpe2)) if (cls2 == cls) =>
-        //TODO refreshing the compile types is a general behaviour of any schema registry
+        //TODO #9 refreshing the compile types is a general behaviour of any schema registry
         register.foreach { case (s, (i, c, t)) =>
           if (c == cls && t != tpe) register += s -> (i, c, tpe)
         }
@@ -80,7 +80,7 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
         val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
         val id = path.substring(zkRoot.length + 1).toInt
         register += schema -> (id, cls, tpe)
-        //TODO refreshing the compile types is a general behaviour of any schema registry
+        //TODO #9 refreshing the compile types is a general behaviour of any schema registry
         register.foreach { case (s, (i, c, t)) =>
           if (c == cls && t != tpe) register += s -> (i, c, tpe)
         }
