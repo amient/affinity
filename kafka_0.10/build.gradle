@@ -4,9 +4,16 @@ version = parent.version
 apply plugin: 'scala'
 apply plugin: 'java'
 
+ext {
+    kafkaVersion = '0.10.0.1'
+    confluentVersion = '3.0.0'
+}
+
 dependencies {
     compile project(':core')
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '0.10.0.1'
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
+    compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
+
 }
 
 

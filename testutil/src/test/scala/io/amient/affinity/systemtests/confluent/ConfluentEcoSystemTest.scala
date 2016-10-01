@@ -19,8 +19,6 @@
 
 package io.amient.affinity.systemtests.confluent
 
-import java.nio.ByteBuffer
-import java.util.Properties
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
@@ -29,10 +27,8 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.kafka.consumer.AffinityKafkaConsumer
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
-import io.confluent.kafka.serializers.KafkaAvroDeserializer
-import org.apache.avro.generic.IndexedRecord
-import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -40,6 +36,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRegistry with Matchers {
+
 
   val config = configure {
     ConfigFactory.load("systemtests")
@@ -69,14 +66,14 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (high throughput scenario)" in {
-    test("throughput-test")
+    testExternalKafkaConsumer("throughput-test")
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (failing writes scenario)" in {
-    test("failure-test")
+    testExternalKafkaConsumer("failure-test")
   }
 
-  private def test(stateStoreName: String) {
+  private def testExternalKafkaConsumer(stateStoreName: String) {
     implicit val partition = 0
     val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
     val state = new State[Int, TestRecord](system, stateStoreConfig)
@@ -94,16 +91,16 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
     println(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
     state.size should equal(numWrites.get)
 
-    val props = new Properties()
-    props.put("bootstrap.servers", kafkaBootstrap)
-    props.put("group.id", "group2")
-    props.put("auto.offset.reset", "earliest")
-    props.put("max.poll.records", "1000")
-    props.put("schema.registry.url", registryUrl)
-    props.put("key.deserializer", classOf[KafkaAvroDeserializer].getName)
-    props.put("value.deserializer", classOf[KafkaAvroDeserializer].getName)
+    val consumerProps = Map(
+      "bootstrap.servers" -> kafkaBootstrap,
+      "group.id" -> "group2",
+      "auto.offset.reset" ->  "earliest",
+      "max.poll.records" -> "1000",
+      "schema.registry.url" ->  registryUrl
+    )
 
-    val consumer = new KafkaConsumer[Int, IndexedRecord](props)
+    val consumer = new AffinityKafkaConsumer[Int, TestRecord](consumerProps)
+
     consumer.subscribe(List(stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)).asJava)
     try {
 
@@ -114,14 +111,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records.asScala) {
           read += 1
-          //TODO #16 provide an efficient KafkaAvroSerde either as a wrapper or from scratch
-          val key = KEY(record.value.get(0).asInstanceOf[IndexedRecord].get(0).asInstanceOf[Int])
-          val uuid = UUID(record.value.get(1).asInstanceOf[IndexedRecord].get(0).asInstanceOf[ByteBuffer])
-          val ts = record.value.get(2).asInstanceOf[Long]
-          key.id should equal(record.key)
-          AvroRecord.read[TestRecord](record.value) should equal {
-            TestRecord(key, uuid, ts, s"test value ${key.id}")
-          }
+          record.value.key.id should equal (record.key)
+          record.value.text should equal (s"test value ${record.key}")
         }
       }
     } finally {

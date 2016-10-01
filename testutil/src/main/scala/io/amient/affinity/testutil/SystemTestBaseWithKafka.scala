@@ -20,7 +20,6 @@
 package io.amient.affinity.testutil
 
 import java.io.File
-import java.util
 import java.util.Properties
 
 import com.typesafe.config.{Config, ConfigValueFactory}

@@ -5,23 +5,20 @@ apply plugin: 'scala'
 apply plugin: 'java'
 
 ext {
-    kafkaVersion = '0.10.0.1'
-    confluentVersion = '3.0.0'
-    baseKafkaVersion = kafkaVersion.split("\\.").reverse().drop(2).reverse().join(".")
+    kafkaMinorVersion = '0.10'
+    //
+    kafkaVersion = project(':kafka_' + kafkaMinorVersion).ext.kafkaVersion
+    confluentVersion = project(':kafka_' + kafkaMinorVersion).ext.confluentVersion
 }
 
 dependencies {
-    compile project(':core')
-    //
     compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
     compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
-    //
-    compile project(':kafka_' + baseKafkaVersion)
+    compile project(':core')
+    compile project(':kafka_' + kafkaMinorVersion)
     compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
-    //
     compile group: 'io.confluent', name: 'kafka-schema-registry-client', version: confluentVersion
-    compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
 
 }
 

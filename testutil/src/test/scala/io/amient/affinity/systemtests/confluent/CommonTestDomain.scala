@@ -38,7 +38,7 @@ case class UUID(val data: ByteBuffer) extends AvroRecord[UUID] {
 
 case class KEY(id: Int) extends AvroRecord[KEY]
 
-case class TestRecord(key: KEY, id: UUID, ts: Long = 0L, value: String = "") extends AvroRecord[TestRecord]
+case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord[TestRecord]
 
 class TestAvroRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
   register(classOf[Int])

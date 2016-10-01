@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.util.kafka
+package io.amient.affinity.kafka.producer
 
 import io.amient.affinity.core.util.ObjectHashPartitioner
 import org.apache.kafka.clients.producer.Partitioner

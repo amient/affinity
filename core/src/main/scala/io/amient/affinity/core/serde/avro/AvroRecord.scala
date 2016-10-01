@@ -26,7 +26,7 @@ import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
-import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord, IndexedRecord}
+import org.apache.avro.generic._
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.Utf8
@@ -68,7 +68,7 @@ object AvroRecord {
 
   def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
 
-  def read[T: TypeTag](record: IndexedRecord): T = {
+  def read[T: TypeTag](record: GenericContainer): T = {
     readDatum(record, typeOf[T], record.getSchema).asInstanceOf[T]
   }
 

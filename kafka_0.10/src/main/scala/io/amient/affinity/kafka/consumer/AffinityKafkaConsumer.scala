@@ -17,28 +17,16 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka
+package io.amient.affinity.kafka.consumer
 
-import java.util
+import org.apache.kafka.clients.consumer.KafkaConsumer
 
-import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.serde.avro.AvroSerde
-import io.amient.affinity.core.serde.primitive.{IntSerde, StringSerde}
-import org.apache.kafka.common.serialization.{Deserializer, Serializer}
+import scala.collection.JavaConverters._
+import scala.reflect.runtime.universe._
 
-trait KafkaSerde[T] extends Serde with Serializer[T] with Deserializer[T] {
+class AffinityKafkaConsumer[K: TypeTag, V: TypeTag](props: Map[String, Object]) extends KafkaConsumer[K, V](
+  props.asJava,
+  AffinityKafkaAvroDeserializer.create[K](props, true),
+  AffinityKafkaAvroDeserializer.create[V](props, false))
 
-  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = ()
 
-  override def close(): Unit = ()
-
-  override def serialize(topic: String, data: T): Array[Byte] = toBytes(data)
-
-  override def deserialize(topic: String, data: Array[Byte]): T = fromBytes(data).asInstanceOf[T]
-}
-
-trait KafkaAvroSerde extends AvroSerde with KafkaSerde[Any]
-
-class KafkaStringSerde extends StringSerde with KafkaSerde[String]
-
-class KafkaIntSerde extends IntSerde with KafkaSerde[Int]
