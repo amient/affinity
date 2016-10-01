@@ -22,7 +22,7 @@ package io.amient.affinity.core.storage
 import java.nio.ByteBuffer
 
 import akka.actor.ActorSystem
-import akka.serialization.{JSerializer, SerializationExtension}
+import akka.serialization.{JSerializer, SerializationExtension, Serializer}
 import com.typesafe.config.Config
 
 import scala.concurrent.Future
@@ -42,7 +42,7 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
   private val serialization = SerializationExtension(system)
 
   //TODO verify that using JSerializer doesn't have performance impact becuase of primitive types casting to AnyRef
-  def serde[S: ClassTag]: JSerializer = {
+  def serde[S: ClassTag]: Serializer = {
     val cls = implicitly[ClassTag[S]].runtimeClass
     val serdeClass =
       if (cls == classOf[Boolean]) classOf[java.lang.Boolean]
@@ -52,7 +52,7 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
       else if (cls == classOf[Float]) classOf[java.lang.Float]
       else if (cls == classOf[Double]) classOf[java.lang.Double]
       else cls
-    serialization.serializerFor(serdeClass).asInstanceOf[JSerializer]
+    serialization.serializerFor(serdeClass)
   }
 
   val keySerde = serde[K]

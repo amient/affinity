@@ -20,7 +20,6 @@
 package io.amient.affinity.core.serde.avro
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-import java.util.UUID
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
@@ -109,7 +108,7 @@ object AvroRecord {
             reader.read(null, decoder)
           } else {
             val readerSchema = inferSchema(tpe)
-            val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
+            val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
             val record = reader.read(null, decoder)
             readDatum(record, tpe, readerSchema)
           }
@@ -195,6 +194,10 @@ object AvroRecord {
             SchemaBuilder.builder().doubleType()
           } else if (tpe =:= typeOf[java.nio.ByteBuffer]) {
             SchemaBuilder.builder().bytesType()
+          } else if (tpe =:= typeOf[String]) {
+            SchemaBuilder.builder().stringType()
+          } else if (tpe =:= typeOf[Null]) {
+            SchemaBuilder.builder().nullType()
           } else if (tpe <:< typeOf[Map[_, _]]) {
             SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
           } else if (tpe <:< typeOf[Iterable[_]]) {
@@ -236,8 +239,6 @@ object AvroRecord {
                 }
             }
             assembler.endRecord()
-          } else if (tpe =:= typeOf[UUID]) {
-            SchemaBuilder.builder().fixed("java.lang.UUID").size(16)
           } else {
             throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
           }

@@ -1,13 +1,32 @@
-package io.amient.affinity.systemtests.core
+/*
+ * Copyright 2016 Michal Harish, michal.harish@gmail.com
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
+package io.amient.affinity.systemtests.confluent
+
+import java.nio.ByteBuffer
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.{ActorSystem, ExtendedActorSystem}
+import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
@@ -19,16 +38,6 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-
-//TODO #16 support basic avro types not just AvroRecord val id = registryClient/.register("topic-key", SchemaBuilder.builder().intType())
-case class INT(i: Int) extends AvroRecord[INT]
-
-case class TestRecord(id: INT, ts: Long = 0L, value: String = "") extends AvroRecord[TestRecord]
-
-class TestAvroRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
-  register(classOf[INT])
-  register(classOf[TestRecord])
-}
 
 class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRegistry with Matchers {
 
@@ -51,10 +60,12 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
   }
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
-    val testRecordId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
-    registryClient.getByID(testRecordId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
-    val intId = registryClient.getLatestSchemaMetadata(classOf[INT].getName).getId
-    registryClient.getByID(intId) should equal(AvroRecord.inferSchema(classOf[INT]))
+    val testRecordSchemaId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
+    registryClient.getByID(testRecordSchemaId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
+    val uuidSchemaId = registryClient.getLatestSchemaMetadata(classOf[UUID].getName).getId
+    registryClient.getByID(uuidSchemaId) should equal(AvroRecord.inferSchema(classOf[UUID]))
+    val intSchemaId = registryClient.getLatestSchemaMetadata(classOf[Int].getName).getId
+    registryClient.getByID(intSchemaId) should equal(AvroRecord.inferSchema(classOf[Int]))
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (high throughput scenario)" in {
@@ -68,14 +79,16 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
   private def test(stateStoreName: String) {
     implicit val partition = 0
     val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
-    val state = new State[INT, TestRecord](system, stateStoreConfig)
+    val state = new State[Int, TestRecord](system, stateStoreConfig)
     println(s"kafka available at zookeeper connection $zkConnect")
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-      state.put(INT(i), TestRecord(INT(i), System.currentTimeMillis(), s"test value $i")) transform (
-        (s) => s, (e: Throwable) => { numWrites.decrementAndGet(); e })
+      state.put(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+        (s) => s, (e: Throwable) => {
+        numWrites.decrementAndGet(); e
+      })
     })
     Await.ready(updates, 10 seconds)
     println(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
@@ -90,7 +103,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
     props.put("key.deserializer", classOf[KafkaAvroDeserializer].getName)
     props.put("value.deserializer", classOf[KafkaAvroDeserializer].getName)
 
-    val consumer = new KafkaConsumer[IndexedRecord, IndexedRecord](props)
+    val consumer = new KafkaConsumer[Int, IndexedRecord](props)
     consumer.subscribe(List(stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)).asJava)
     try {
 
@@ -102,10 +115,12 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
         for (record <- records.asScala) {
           read += 1
           //TODO #16 provide an efficient KafkaAvroSerde either as a wrapper or from scratch
-          val intKey = INT(record.key.get(0).asInstanceOf[Int])
-          AvroRecord.read[INT](record.key) should equal(intKey)
+          val key = KEY(record.value.get(0).asInstanceOf[IndexedRecord].get(0).asInstanceOf[Int])
+          val uuid = UUID(record.value.get(1).asInstanceOf[IndexedRecord].get(0).asInstanceOf[ByteBuffer])
+          val ts = record.value.get(2).asInstanceOf[Long]
+          key.id should equal(record.key)
           AvroRecord.read[TestRecord](record.value) should equal {
-            TestRecord(intKey, record.value.get(1).asInstanceOf[Long], s"test value ${intKey.i}")
+            TestRecord(key, uuid, ts, s"test value ${key.id}")
           }
         }
       }

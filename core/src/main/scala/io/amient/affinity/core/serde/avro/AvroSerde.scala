@@ -19,8 +19,11 @@
 
 package io.amient.affinity.core.serde.avro
 
+import java.nio.ByteBuffer
+
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
+import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 
 trait AvroSerde extends Serde with AvroSchemaProvider {
@@ -34,11 +37,15 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
     *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
     *         null if bytes are null
     */
-  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this) /*match {
-  TODO #16 check this works with the schema evolution
-    case avroRecord: AvroRecord[_] => avroRecord
-    case record: GenericRecord => null
-  }*/
+  override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this)
+
+  val INT_SCHEMA = Schema.create(Schema.Type.INT)
+  val BOOLEAN_SCHEMA = Schema.create(Schema.Type.BOOLEAN)
+  val LONG_SCHEMA = Schema.create(Schema.Type.LONG)
+  val FLOAT_SCHEMA = Schema.create(Schema.Type.FLOAT)
+  val DOUBLE_SCHEMA = Schema.create(Schema.Type.DOUBLE)
+  val STRING_SCHEMA = Schema.create(Schema.Type.STRING)
+  val BYTES_SCHEMA = Schema.create(Schema.Type.BYTES)
 
   /**
     * @param obj instance to serialize
@@ -46,11 +53,26 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
     */
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
-    else obj match {
-      case record: IndexedRecord => schema(record.getSchema) match {
-        case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
-        case Some(schemaId) => AvroRecord.write(obj, record.getSchema, schemaId)
+    else {
+      val writerSchema = obj match {
+        case record: IndexedRecord => record.getSchema
+        case _: Boolean => BOOLEAN_SCHEMA
+        case _: Byte => INT_SCHEMA
+        case _: Int => INT_SCHEMA
+        case _: Long => LONG_SCHEMA
+        case _: Float => FLOAT_SCHEMA
+        case _: Double => DOUBLE_SCHEMA
+        case _: String => STRING_SCHEMA
+        case _: ByteBuffer => BYTES_SCHEMA
+        case other => throw new IllegalArgumentException("Unsupported mapping from Any to Avro Type")
       }
+
+      val schemaId = schema(writerSchema) match {
+        case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
+        case Some(schemaId) => schemaId
+      }
+
+      AvroRecord.write(obj, writerSchema, schemaId)
     }
   }
 

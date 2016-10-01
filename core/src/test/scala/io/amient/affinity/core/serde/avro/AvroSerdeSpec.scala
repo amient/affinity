@@ -45,6 +45,13 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
     register(classOf[Composite])
     register(classOf[Base])
+    register(classOf[Boolean])
+    register(classOf[Int])
+    register(classOf[Long])
+    register(classOf[Float])
+    register(classOf[Double])
+    register(classOf[String])
+    register(classOf[Null])
   }
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
@@ -57,6 +64,15 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     val newValue = newSerde.toBinary(Composite(Seq(Base(ID(1), Side.LEFT)), Map("1" -> Base(ID(1), Side.LEFT))))
     val downgradedValue = oldSerde.fromBinary(newValue)
     downgradedValue should be(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 0))
+  }
+
+  "Primitive types" should "be handled directly without registration" in {
+    newSerde.fromBytes(newSerde.toBytes(true)) should equal(true)
+    newSerde.fromBytes(newSerde.toBytes(100)) should equal(100)
+    newSerde.fromBytes(newSerde.toBytes(100L)) should equal(100L)
+    newSerde.fromBytes(newSerde.toBytes(1.0f)) should equal(1.0f)
+    newSerde.fromBytes(newSerde.toBytes(10.01)) should equal(10.01)
+    newSerde.fromBytes(newSerde.toBytes("hello")) should equal("hello")
   }
 
 

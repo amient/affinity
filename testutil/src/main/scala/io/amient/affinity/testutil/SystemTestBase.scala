@@ -51,7 +51,6 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
   println(s"Test dir: $testDir")
-  deleteDirectory(testDir)
   testDir.mkdirs()
 
   private def deleteDirectory(path: File) = if (path.exists()) {
@@ -78,7 +77,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   import SystemTestBase._
 
   override def afterAll(): Unit = {
-    zkFactory.shutdown()
+    try {
+      zkFactory.shutdown()
+    } finally {
+      deleteDirectory(testDir)
+    }
   }
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))

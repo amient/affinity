@@ -45,7 +45,9 @@ trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
   override def configure(config: Config) = super.configure(config)
     .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
     .withValue("akka.actor.serialization-bindings", ConfigValueFactory.fromMap(Map(
-      "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro"
+      "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro",
+      "java.lang.String" -> "avro",
+      "java.lang.Integer" -> "avro"
     ).asJava))
 
   override def afterAll() {
