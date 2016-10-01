@@ -17,8 +17,10 @@
 
 package io.amient.affinity.core.util;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.UUID;
 
@@ -149,9 +151,17 @@ public class ByteUtils {
     }
 
     static public int asIntValue(byte[] value, int offset) {
-        return ((((int) value[offset + 0]) << 24) + (((int) value[offset + 1] & 0xff) << 16) + (((int) value[offset + 2] & 0xff) << 8) + (((int) value[offset + 3] & 0xff) << 0));
+        return ((((int) value[offset + 0]) << 24)
+                + (((int) value[offset + 1] & 0xff) << 16)
+                + (((int) value[offset + 2] & 0xff) << 8)
+                + (((int) value[offset + 3] & 0xff) << 0));
 
     }
+
+    static public int readIntValue(InputStream in) throws IOException {
+        return (in.read() << 24) + ((in.read() & 0xff) << 16) + ((in.read() & 0xff) << 8) + (in.read() & 0xff);
+    }
+
 
     static public long asLongValue(byte[] value, int o) {
         return (((long) value[o + 0] << 56) + (((long) value[o + 1] & 0xff) << 48) + (((long) value[o + 2] & 0xff) << 40)
@@ -165,6 +175,13 @@ public class ByteUtils {
         result[offset + 2] = (byte) ((value >>> 8) & 0xFF);
         result[offset + 3] = (byte) ((value >>> 0) & 0xFF);
         return result;
+    }
+
+    public static void writeIntValue(int value, OutputStream out) throws IOException {
+        out.write((value >>> 24) & 0xFF);
+        out.write((value >>> 16) & 0xFF);
+        out.write((value >>> 8) & 0xFF);
+        out.write((value >>> 0) & 0xFF);
     }
 
     public static byte[] putLongValue(long value, byte[] result, int offset) {

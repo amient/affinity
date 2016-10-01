@@ -56,8 +56,7 @@ object AvroRecord {
       val writer = new GenericDatumWriter[Any](schema)
       if (schemaId >= 0) {
         valueOut.write(MAGIC)
-        //TODO #16 efficient stream write int
-        valueOut.write(ByteUtils.putIntValue(schemaId, new Array[Byte](4), 0))
+        ByteUtils.writeIntValue(schemaId, valueOut)
       }
       writer.write(x, encoder)
       encoder.flush()
@@ -94,10 +93,7 @@ object AvroRecord {
     else {
       val bytesIn = new ByteArrayInputStream(bytes)
       require(bytesIn.read() == MAGIC)
-      //TODO #16 efficient stream read int
-      val idBytes = new Array[Byte](4)
-      bytesIn.read(idBytes)
-      val schemaId = ByteUtils.asIntValue(idBytes)
+      val schemaId = ByteUtils.readIntValue(bytesIn)
       require(schemaId >= 0)
       val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
       schemaRegistry.schema(schemaId) match {
