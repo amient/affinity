@@ -25,7 +25,7 @@ import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.confluent.kafka.schemaregistry.rest.{SchemaRegistryConfig, SchemaRegistryRestApplication}
-
+import scala.collection.JavaConverters._
 
 trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
 
@@ -40,11 +40,13 @@ trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
   private val server = app.createServer
   server.start()
   val registryUrl = s"http://0.0.0.0:" + server.getConnectors.head.getTransport.asInstanceOf[ServerSocketChannel].socket.getLocalPort
-  println(s"Server started, listening for requests at $registryUrl")
   val registryClient = new CachedSchemaRegistryClient(registryUrl, 20)
 
-  override def configure(config: Config) = super.configure(config).
-    withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
+  override def configure(config: Config) = super.configure(config)
+    .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
+    .withValue("akka.actor.serialization-bindings", ConfigValueFactory.fromMap(Map(
+      "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro"
+    ).asJava))
 
   override def afterAll() {
     server.stop()

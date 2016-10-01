@@ -36,8 +36,8 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
 
   val config = configure("example")
       .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
-      .withValue(s"${CONFIG_STATE("settings")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
-      .withValue(s"${CONFIG_STATE("graph")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+      .withValue(s"${CONFIG_STATE_STORE("settings")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+      .withValue(s"${CONFIG_STATE_STORE("graph")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
 
   val gateway = new TestGatewayNode(config, new HttpGateway with Ping)
 

@@ -39,7 +39,7 @@ trait ActorState extends Actor {
   import State._
 
   def state[K: ClassTag, V: ClassTag](name: String)(implicit partition: Int): State[K, V] = state[K,V] {
-    new State[K, V](context.system, config.getConfig(CONFIG_STATE(name)))
+    new State[K, V](context.system, config.getConfig(CONFIG_STATE_STORE(name)))
   }
 
   def state[K, V](creator: => State[K, V]): State[K, V] = {

@@ -19,11 +19,12 @@
 
 package io.amient.affinity.core.serde.avro
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.util.UUID
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
+import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericDatumReader, GenericDatumWriter, GenericRecord, IndexedRecord}
@@ -38,8 +39,7 @@ import scala.reflect.runtime.universe._
 
 object AvroRecord {
 
-  private val magicWriter = Array[Byte](0)
-  private val magicReader = Array[Byte](0)
+  private val MAGIC: Byte = 0
 
   private val typeSchemaCache = scala.collection.mutable.Map[Type, Schema]()
 
@@ -56,8 +56,9 @@ object AvroRecord {
       val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
       val writer = new GenericDatumWriter[Any](schema)
       if (schemaId >= 0) {
-        encoder.writeFixed(magicWriter, 0, 1)
-        encoder.writeInt(schemaId)
+        valueOut.write(MAGIC)
+        //TODO #16 efficient stream write int
+        valueOut.write(ByteUtils.putIntValue(schemaId, new Array[Byte](4), 0))
       }
       writer.write(x, encoder)
       encoder.flush()
@@ -69,12 +70,17 @@ object AvroRecord {
 
   def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
 
+  def read[T: TypeTag](record: IndexedRecord): T = {
+    readDatum(record, typeOf[T], record.getSchema).asInstanceOf[T]
+  }
+
   def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema): T = {
     val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
     val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
     val record: GenericRecord = reader.read(null, decoder)
-    readDatum(record, typeOf[T], readerSchema).asInstanceOf[T]
+    read(record)
   }
+
 
   /**
     *
@@ -87,10 +93,14 @@ object AvroRecord {
   def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
     if (bytes == null) null
     else {
-      val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytes, null)
-      decoder.readFixed(magicReader, 0, 1)
-      val schemaId = decoder.readInt()
+      val bytesIn = new ByteArrayInputStream(bytes)
+      require(bytesIn.read() == MAGIC)
+      //TODO #16 efficient stream read int
+      val idBytes = new Array[Byte](4)
+      bytesIn.read(idBytes)
+      val schemaId = ByteUtils.asIntValue(idBytes)
       require(schemaId >= 0)
+      val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
       schemaRegistry.schema(schemaId) match {
         case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
         case Some((tpe, writerSchema)) =>

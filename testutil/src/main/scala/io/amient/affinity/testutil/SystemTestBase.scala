@@ -66,9 +66,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   val zkConnect = "localhost:" + zkFactory.getLocalPort
   zkFactory.startup(zookeeper)
 
-  def configure(): Config = configure(ConfigFactory.defaultReference())
-  def configure(confname: String): Config = configure(ConfigFactory.load(confname)
+  final def configure(): Config = configure(ConfigFactory.defaultReference())
+
+  final def configure(confname: String): Config = configure(ConfigFactory.load(confname)
     .withFallback(ConfigFactory.defaultReference()))
+
   def configure(config: Config): Config = config
     .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))

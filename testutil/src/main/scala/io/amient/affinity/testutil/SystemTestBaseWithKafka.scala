@@ -20,9 +20,10 @@
 package io.amient.affinity.testutil
 
 import java.io.File
+import java.util
 import java.util.Properties
 
-import com.typesafe.config.ConfigValueFactory
+import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.State
@@ -31,6 +32,8 @@ import io.amient.affinity.core.util.ZooKeeperClient
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.common.protocol.SecurityProtocol
+
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 trait SystemTestBaseWithKafka extends SystemTestBase {
@@ -55,6 +58,18 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
   val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
   tmpZkClient.close
 
+  override def configure(config: Config): Config = super.configure(config) match {
+    case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
+    case cfg =>
+      cfg.getConfig(State.CONFIG_STATE).entrySet().asScala
+        .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
+        .filter { case (p, c) => p.endsWith("storage.class")  && c == classOf[KafkaStorage].getName }
+        .map { case (p, c) => (State.CONFIG_STATE + "." + p.split("\\.")(0) , c) }
+        .foldLeft(cfg) { case (cfg, (p, c)) =>
+          cfg.withValue(p + "." + KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS, ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+        }
+  }
+
   override def afterAll(): Unit = {
     try {
       kafka.shutdown()
@@ -68,8 +83,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
     import MyTestPartition._
 
-    private val stateConfig = context.system.settings.config.getConfig(State.CONFIG_STATE(topic))
-      .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS, ConfigValueFactory.fromAnyRef(kafkaBootstrap))
+    private val stateConfig = context.system.settings.config.getConfig(State.CONFIG_STATE_STORE(topic))
       .withValue(KafkaStorage.CONFIG_KAFKA_TOPIC, ConfigValueFactory.fromAnyRef(topic))
 
     val data = state {
@@ -100,5 +114,6 @@ object MyTestPartition {
   case class PutValue(key: String, value: String) extends Reply[String] {
     override def hashCode(): Int = key.hashCode
   }
+
 }
 

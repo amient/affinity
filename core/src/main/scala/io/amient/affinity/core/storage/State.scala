@@ -30,7 +30,8 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 object State {
-  def CONFIG_STATE(name: String) = s"affinity.state.$name"
+  val CONFIG_STATE = "affinity.state"
+  def CONFIG_STATE_STORE(name: String) = s"affinity.state.$name"
 
   val CONFIG_STORAGE_CLASS = "storage.class"
   val CONFIG_MEMSTORE_CLASS = "memstore.class"

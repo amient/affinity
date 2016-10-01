@@ -35,7 +35,7 @@ trait AvroSerde extends Serde with AvroSchemaProvider {
     *         null if bytes are null
     */
   override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this) /*match {
-  TODO check this works with the schema evolution
+  TODO #16 check this works with the schema evolution
     case avroRecord: AvroRecord[_] => avroRecord
     case record: GenericRecord => null
   }*/
