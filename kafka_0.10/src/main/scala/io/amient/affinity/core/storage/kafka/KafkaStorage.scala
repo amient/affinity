@@ -32,11 +32,16 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBufferSerializer}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object KafkaStorage {
   def CONFIG_KAFKA_BOOTSTRAP_SERVERS = "storage.kafka.bootstrap.servers"
+
   def CONFIG_KAFKA_TOPIC = s"storage.kafka.topic"
+
   def CONFIG_KAFKA_PRODUCER = s"storage.kafka.producer"
+
   def CONFIG_KAFKA_CONSUMER = s"storage.kafka.consumer"
 }
 
@@ -79,7 +84,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     put("value.deserializer", classOf[ByteBufferDeserializer].getName)
   }
 
-  private val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
+  protected val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
 
   private var tailing = true
 
@@ -177,8 +182,10 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     }
   }
 
-  def write(key: ByteBuffer, value: ByteBuffer): java.util.concurrent.Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
+  def write(key: ByteBuffer, value: ByteBuffer): Future[RecordMetadata] = {
+    kafkaProducer.send(new ProducerRecord(topic, partition, key, value)) match {
+      case jfuture => Future(jfuture.get)
+    }
   }
 
 }

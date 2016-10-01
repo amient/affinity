@@ -142,7 +142,7 @@ class HttpGateway extends Gateway with ActorState {
         case None =>
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
-              settings.put("admin", Some(ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))))
+              settings.put("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes)))
               fulfillAndHandleErrors(response) {
                 executeCode(username)
               }

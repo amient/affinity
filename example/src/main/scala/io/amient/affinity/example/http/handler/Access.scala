@@ -66,7 +66,7 @@ trait Access extends HttpGateway {
       } recover {
         case e: NoSuchElementException =>
           val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
-          settings.put(key, Some(ConfigEntry(key, salt)))
+          settings.put(key, ConfigEntry(key, salt))
           HttpResponse(SeeOther, headers = List(headers.Location(Uri("/settings"))))
       }
     }

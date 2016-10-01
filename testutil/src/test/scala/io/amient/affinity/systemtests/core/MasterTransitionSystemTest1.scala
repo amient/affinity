@@ -60,14 +60,14 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(config, new MyTestPartition("test") {
+  val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test") {
     override def preStart(): Unit = {
       super.preStart()
-      if (partition == 0) data.put("B", Some("initialValueB"))
-      else if (partition == 1) data.put("A", Some("initialValueA"))
+      if (partition == 0) data.put("B", "initialValueB")
+      else if (partition == 1) data.put("A", "initialValueA")
     }
   })
-  val region2 = new TestRegionNode(config, new MyTestPartition("test"))
+  val region2 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
 
   override def afterAll(): Unit = {
     try {

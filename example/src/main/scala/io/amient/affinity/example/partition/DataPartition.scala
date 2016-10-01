@@ -113,11 +113,11 @@ class DataPartition extends Partition {
       graph(vertex) map {
         case existing if (existing.edges.exists(_.target == edge.target)) => false
         case existing =>
-          graph.put(vertex, Some(VertexProps(now(), existing.edges + edge, existing.component)))
+          graph.put(vertex, VertexProps(now(), existing.edges + edge, existing.component))
           true
       } recover {
         case e: NoSuchElementException => try {
-          graph.put(vertex, Some(VertexProps(now(), Set(edge))))
+          graph.put(vertex, VertexProps(now(), Set(edge)))
           true
         } catch {
           case NonFatal(e) => Status.Failure(e)
@@ -133,7 +133,7 @@ class DataPartition extends Partition {
       */
     case ModifyGraph(vertex, edge, GOP.REMOVE) => replyWith(sender) {
       graph(vertex) map { existing =>
-        graph.put(vertex, Some(VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component)))
+        graph.put(vertex, VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component))
         true
       } recover {
         case e: NoSuchElementException => false
@@ -146,7 +146,7 @@ class DataPartition extends Partition {
       */
     case UpdateComponent(vertex, updatedComponent) => replyWith(sender) {
       graph(vertex) map { existing =>
-        graph.put(vertex, Some(VertexProps(now(), existing.edges, updatedComponent)))
+        graph.put(vertex, VertexProps(now(), existing.edges, updatedComponent))
         Component(vertex, now(), existing.component)
       } recover {
         case e: NoSuchElementException => Component(vertex, now(), Set())

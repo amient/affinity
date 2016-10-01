@@ -23,6 +23,8 @@ import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
 
+import scala.concurrent.Future
+
 abstract class Storage(val config: Config) {
 
   val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
@@ -62,6 +64,6 @@ abstract class Storage(val config: Config) {
     * @param value of the pair
     * @return Future with metadata returned by the underlying implementation
     */
-  def write(key: ByteBuffer, value: ByteBuffer): java.util.concurrent.Future[_]
+  def write(key: ByteBuffer, value: ByteBuffer): Future[_]
 
 }

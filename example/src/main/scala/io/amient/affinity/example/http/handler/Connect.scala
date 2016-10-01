@@ -72,7 +72,7 @@ trait Connect extends HttpGateway {
           delegateAndHandleErrors(response, getComponent(id)) {
             case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
             case component: Component =>
-              cache.put(id, Some(component))
+              cache.put(id, component)
               ResponseBuilder.json(OK, component)
           }
       } recover {

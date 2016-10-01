@@ -63,7 +63,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     case cfg =>
       cfg.getConfig(State.CONFIG_STATE).entrySet().asScala
         .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
-        .filter { case (p, c) => p.endsWith("storage.class")  && c == classOf[KafkaStorage].getName }
+        .filter { case (p, c) => p.endsWith("storage.class")  && classOf[KafkaStorage].isAssignableFrom(Class.forName(c)) }
         .map { case (p, c) => (State.CONFIG_STATE + "." + p.split("\\.")(0) , c) }
         .foldLeft(cfg) { case (cfg, (p, c)) =>
           cfg.withValue(p + "." + KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS, ConfigValueFactory.fromAnyRef(kafkaBootstrap))
@@ -92,13 +92,13 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
     override def handle: Receive = {
       //TODO how to enforce the Reply[T] on the replyWith(sender):Future[T]
-      case GetValue(key) => replyWith(sender) {
+      case GetValue(key) => replyWith[String](sender) {
         data(key)
       }
 
       //TODO how to enforce the Reply[T] on the reply(sender):T
-      case PutValue(key, value) => reply(sender) {
-        data.put(key, Some(value)).getOrElse("")
+      case PutValue(key, value) => replyWith[String](sender) {
+        data.put(key, value) map(_.getOrElse(""))
       }
     }
   }

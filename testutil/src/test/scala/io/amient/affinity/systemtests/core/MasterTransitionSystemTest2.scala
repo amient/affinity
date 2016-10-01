@@ -37,6 +37,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
+
 class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
   val config = configure("systemtests")
@@ -60,8 +61,8 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(config, new MyTestPartition("test"))
-  val region2 = new TestRegionNode(config, new MyTestPartition("test"))
+  val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
+  val region2 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
 
   override def afterAll(): Unit = {
     try {

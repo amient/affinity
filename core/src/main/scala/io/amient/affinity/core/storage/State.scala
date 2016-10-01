@@ -94,32 +94,57 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
   def size: Long = storage.memstore.size
 
   /**
-    * Storage offers only simple blocking mutations do not escape single-threaded actor
-    * context from which it is called
-    * TODO consider asynchronous non-blocking variant for special cases
+    * An asynchronous non-blocking put operation which inserts or updates the value
+    * at the given key. The value is first updated in the memstore and then a future is created
+    * for reflecting the modification in the underlying storage. If the storage write fails
+    * the previous value is rolled back in the memstore and the failure is propagated into
+    * the result future.
     *
     * @param key
-    * @param value if None is given as value the key will be removed from the underlying storage
-    *              otherwise the key will be updated with the value
-    * @return An optional value previously held at the key position, None if new value was inserted
+    * @param value
+    * @return A a future optional value previously held at the key position
+    *         the future option will be equal to None if new a value was inserted
     */
-  def put(key: K, value: Option[V]): Option[V] = {
+  def put(key: K, value: V): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    value match {
-      case None => storage.memstore.remove(k) map { prev =>
-        storage.write(k, null).get()
-        valueSerde.fromBinary(prev.array).asInstanceOf[V]
-      }
-      case Some(data) => {
-        val v = ByteBuffer.wrap(valueSerde.toBinary(data.asInstanceOf[AnyRef]))
-        storage.memstore.update(k, v) match {
-          case Some(prev) if (prev == v) => Some(data)
-          case other: Option[ByteBuffer] =>
-            storage.write(k, v).get()
-            other.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V])
-        }
-      }
+    val write = if (value == null) null else ByteBuffer.wrap (valueSerde.toBinary (value.asInstanceOf[AnyRef]))
+    storage.memstore.update (k, write) match {
+      case Some(prev) if (prev == write) => Future.successful(Some(value))
+      case differentOrNone => writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))
     }
   }
 
+  /**
+    * An asynchronous non-blocking removal operation which deletes the value
+    * at the given key. The value is first removed from the memstore and then a future is created
+    * for reflecting the modification in the underlying storage. If the storage write fails
+    * the previous value is rolled back in the memstore and the failure is propagated into
+    * the result future.
+    *
+    * @param key
+    * @return A a future optional value previously held at the key position
+    *         the future option will be equal to None if new a value was inserted
+    */
+  def remove(key: K): Future[Option[V]] = {
+    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
+    storage.memstore.remove(k) match {
+      case None => Future.successful(None)
+      case differentOrNone =>  writeWithMemstoreRollback(k, differentOrNone, storage.write(k, null))
+    }
+  }
+
+  private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
+    write transform (
+      (success) => prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V]),
+      (failure: Throwable) => {
+        //write to storage failed - reverting the memstore modification
+        //TODO use cell versioning or timestamp to cancel revert if another write succeeded in the mean-time
+        prev match {
+          case None => storage.memstore.remove(k)
+          case Some(rollback) => storage.memstore.update(k, rollback)
+        }
+        failure
+      }
+      )
+  }
 }
