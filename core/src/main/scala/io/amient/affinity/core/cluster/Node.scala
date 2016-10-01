@@ -75,12 +75,12 @@ class Node(config: Config) {
     */
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
-    ack(controller, CreateGateway(Props(creator)))
+    ack[Int](controller, CreateGateway(Props(creator)))
   }
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    ack(controller, CreateRegion(Props(partitionCreator)))
+    ack[Unit](controller, CreateRegion(Props(partitionCreator)))
   }
 
   def startServices(services: Props*): Future[Unit] = {

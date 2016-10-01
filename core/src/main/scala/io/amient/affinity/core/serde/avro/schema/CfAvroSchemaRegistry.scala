@@ -34,6 +34,9 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
+object CfAvroSchemaRegistry {
+  final val CONFIG_CF_REGISTRY_URL_BASE = "affinity.confluent-schema-registry.url.base"
+}
 /**
   * Confluent Schema Registry provider and serde
   * This provider uses Confluent Schema Registry but doesn't use the topic-key and topic-value subjects.
@@ -43,8 +46,9 @@ import scala.concurrent.{Await, Future}
   */
 class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  //TODO #16 cf registry configuration and add cftest.conf listen port 7011
-  val client = new ConfluentSchemaRegistryClient(Uri("http://localhost:7011"))
+  import CfAvroSchemaRegistry._
+  val config = system.settings.config
+  val client = new ConfluentSchemaRegistryClient(Uri(config.getString(CONFIG_CF_REGISTRY_URL_BASE)))
 
   override private[schema] def getSchema(id: Int): Option[Schema] = try {
     Some(client.getSchema(id))

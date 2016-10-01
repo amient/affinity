@@ -26,9 +26,9 @@ import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
 
 object Service {
 
-  case class BecomeStandby()
+  case class BecomeStandby() extends Reply[Unit]
 
-  case class BecomeMaster()
+  case class BecomeMaster() extends Reply[Unit]
 
 }
 

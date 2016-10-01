@@ -66,6 +66,8 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
   class MyTestPartition(topic: String) extends Partition {
 
+    import MyTestPartition._
+
     private val stateConfig = context.system.settings.config.getConfig(State.CONFIG_STATE(topic))
       .withValue(KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS, ConfigValueFactory.fromAnyRef(kafkaBootstrap))
       .withValue(KafkaStorage.CONFIG_KAFKA_TOPIC, ConfigValueFactory.fromAnyRef(topic))
@@ -75,14 +77,28 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     }
 
     override def handle: Receive = {
-      case key: String =>
-        val origin = sender
-        for (value <- data(key)) origin ! value
+      //TODO how to enforce the Reply[T] on the replyWith(sender):Future[T]
+      case GetValue(key) => replyWith(sender) {
+        data(key)
+      }
 
-      case (key: String, value: String) => reply(sender) {
-        data.put(key, Some(value))
+      //TODO how to enforce the Reply[T] on the reply(sender):T
+      case PutValue(key, value) => reply(sender) {
+        data.put(key, Some(value)).getOrElse("")
       }
     }
   }
 
 }
+
+object MyTestPartition {
+
+  case class GetValue(key: String) extends Reply[String] {
+    override def hashCode(): Int = key.hashCode
+  }
+
+  case class PutValue(key: String, value: String) extends Reply[String] {
+    override def hashCode(): Int = key.hashCode
+  }
+}
+

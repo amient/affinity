@@ -138,7 +138,7 @@ running the standalone jar which is created during the gradlew build
     java -jar example/build/libs/example-<VERSION>-standalone.jar
     
 ExampleApp starts several nodes in a pseudo-distributed mode:
-    2 Gateways listen on http ports 8081 and 8082
+    2 Gateways listen on http ports 8881 and 8882
     4 Regions each serving two physical partitions
     1 Singleton service node for demonstration purpose
 

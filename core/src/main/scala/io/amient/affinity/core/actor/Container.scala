@@ -91,13 +91,13 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       coordinator.unregister(services(ref))
       services -= ref
 
-    case MasterStatusUpdate(_, add, remove) => replyWith(sender) {
+    case MasterStatusUpdate(_, add, remove) => replyWith[Unit](sender) {
       //TODO #12 global config bootstrap timeout
       val t = 30 seconds
       implicit val timeout = Timeout(t)
-      val removals = remove.toList.map(ref => ack(ref, BecomeStandby()))
-      val additions = add.toList.map(ref => ack(ref, BecomeMaster()))
-      Future.sequence(removals ++ additions)
+      val removals = remove.toList.map(ref => ack[Unit](ref, BecomeStandby()))
+      val additions = add.toList.map(ref => ack[Unit](ref, BecomeMaster()))
+      Future.sequence(removals ++ additions).map(_ => ())
     }
   }
 }

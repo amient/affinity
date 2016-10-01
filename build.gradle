@@ -7,7 +7,6 @@ ext {
     akkaVersion = '2.4.10'
     zkClientVersion = '0.9'
     rocksDbVersion = '4.9.0'
-    kafkaVersion = '0.10.0.1'
     avroVersion = '1.8.1'
     jacksonVersion = '2.7.5'
 }
@@ -29,6 +28,9 @@ allprojects {
         repositories {
             mavenLocal()
             mavenCentral()
+            maven {
+                url "http://packages.confluent.io/maven/"
+            }
         }
 
         configurations {

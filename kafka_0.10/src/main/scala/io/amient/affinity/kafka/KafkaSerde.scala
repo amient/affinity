@@ -17,26 +17,28 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.kafka
 
-import io.amient.affinity.example.partition.DataPartition
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
+import java.util
 
-object ExampleApp extends App {
+import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.serde.avro.AvroSerde
+import io.amient.affinity.core.serde.primitive.{IntSerde, StringSerde}
+import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 
-  // singleton services
-  ServiceNode.main(Seq("2550").toArray)
+trait KafkaSerde[T] extends Serde with Serializer[T] with Deserializer[T] {
 
-  // gateways
-  HttpGateway.main(Seq("8881").toArray)
-  HttpGateway.main(Seq("8882").toArray)
+  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = ()
 
-  // partition master(s)
-  DataPartition.main(Seq("2551", "0,1").toArray)
-  DataPartition.main(Seq("2552", "1,2").toArray)
-  // partition standby(s)
-  DataPartition.main(Seq("2553", "2,3").toArray)
-  DataPartition.main(Seq("2554", "3,0").toArray)
+  override def close(): Unit = ()
 
+  override def serialize(topic: String, data: T): Array[Byte] = toBytes(data)
+
+  override def deserialize(topic: String, data: Array[Byte]): T = fromBytes(data).asInstanceOf[T]
 }
+
+trait KafkaAvroSerde extends AvroSerde with KafkaSerde[Any]
+
+class KafkaStringSerde extends StringSerde with KafkaSerde[String]
+
+class KafkaIntSerde extends IntSerde with KafkaSerde[Int]

@@ -86,19 +86,6 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     }
   }
 
-//  /**
-//    * Retrieve an optional value from the store asynchronously
-//    *
-//    * @param key
-//    * @return Future.Success(Some(V)) if the key exists and the value could be retrieved and deserialized
-//    *         Future.Success(None) if the key doesn't exist
-//    *         Future.Failed(UnsupportedOperationException) if the key exists but the value class is not registered
-//    *         Future.Failed(Throwable) if any other non-fatal exception occurs
-//    */
-//  def get(key: K): Future[Option[V]] = apply(key) map (Some(_)) recover {
-//    case e: NoSuchElementException => None
-//  }
-
   def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
     (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
   }

@@ -29,6 +29,7 @@ import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.testutil.MyTestPartition._
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -47,13 +48,13 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
-        delegateAndHandleErrors(response, ack(cluster, key)) {
+        delegateAndHandleErrors(response, ack(cluster, GetValue(key))) {
           case value => ResponseBuilder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
         implicit val timeout = Timeout(1500 milliseconds)
-        delegateAndHandleErrors(response, ack(cluster, (key, value))) {
+        delegateAndHandleErrors(response, ack(cluster, PutValue(key, value))) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }

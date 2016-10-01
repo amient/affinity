@@ -2,9 +2,12 @@ package io.amient.affinity.core.serde.avro
 
 import akka.actor.{ActorSystem, ExtendedActorSystem}
 import akka.serialization.SerializationExtension
-import com.typesafe.config.ConfigFactory
-import io.amient.affinity.core.serde.avro.schema.{AvroSchemaProvider, CfAvroSchemaRegistry}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
+import org.scalatest.FlatSpec
 
+import scala.collection.JavaConverters._
 
 class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
   register(classOf[ID])
@@ -12,19 +15,23 @@ class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegis
   register(classOf[Composite])
 }
 
-/**
-  * This is not a unit test but a manual system test application which requires a Confluent Schema Registry
-  * to be running on port 7011.
-  */
+class CfRegistryTest extends FlatSpec with SystemTestBaseWithConfluentRegistry {
 
-object CfRegistryTest extends App {
+  val config = configure { ConfigFactory.defaultReference()
+      .withValue("akka.actor.serializers.avro", ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))
+      .withValue("akka.actor.serialization-bindings", ConfigValueFactory.fromMap(Map(
+        "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro"
+      ).asJava))
+  }
 
-  val system = ActorSystem.create("CfTest", ConfigFactory.load("cftest"))
-  try {
-    val serialization = SerializationExtension(system)
-    val serde = serialization.serializerFor(classOf[ID])
-    assert(serde.fromBinary(serde.toBinary(ID(101))) == ID(101))
-  } finally {
-    system.terminate()
+  "Confluent Schema Registry Provider" should "be available via akk SerializationExtension" in {
+    val system = ActorSystem.create("CfTest", config)
+    try {
+      val serialization = SerializationExtension(system)
+      val serde = serialization.serializerFor(classOf[ID])
+      assert(serde.fromBinary(serde.toBinary(ID(101))) == ID(101))
+    } finally {
+      system.terminate()
+    }
   }
 }

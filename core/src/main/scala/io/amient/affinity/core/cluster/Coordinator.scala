@@ -35,7 +35,7 @@ object Coordinator {
 
   final val CONFIG_COORDINATOR_CLASS = "affinity.cluster.coordinator.class"
 
-  final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef]) {
+  final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
     def localTo(actor: ActorRef): MasterStatusUpdate = {
       MasterStatusUpdate(
         group,

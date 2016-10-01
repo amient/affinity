@@ -24,6 +24,9 @@ import akka.pattern.ask
 import akka.util.Timeout
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.reflect.ClassTag
+import scala.reflect.classTag
+import scala.runtime.BoxedUnit
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -46,6 +49,8 @@ import scala.util.{Failure, Success}
   */
 package object ack {
 
+  trait Reply[T] extends Serializable
+
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
     * from the target actor.
@@ -56,14 +61,18 @@ package object ack {
     * @param context
     * @return
     */
-  def ack[T](target: ActorRef, message: Any)(implicit timeout: Timeout, context: ExecutionContext): Future[T] = {
+  def ack[T](target: ActorRef, message: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
     //TODO ACK - configurable ack retries
     val promise = Promise[T]()
     def attempt(retry: Int = 3): Unit = {
-      target ? message onComplete {
-        case Success(result) => promise.success(result.asInstanceOf[T])
-        case Failure(cause) if (retry == 0) => promise.failure(cause)
-        case Failure(_) => attempt(retry - 1)
+      target ? message map {
+        case result: T => promise.success(result)
+        case result: BoxedUnit if (tag == classTag[Unit]) => promise.success(().asInstanceOf[T])
+        case i => promise.failure(new RuntimeException(
+          s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
+      } recover {
+        case cause if (retry == 0) => promise.failure(cause)
+        case _ => attempt(retry - 1)
       }
     }
     attempt()

@@ -6,7 +6,7 @@ apply plugin: 'java'
 
 dependencies {
     compile project(':core')
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '0.10.0.1'
 }
 
 

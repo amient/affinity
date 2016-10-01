@@ -23,6 +23,7 @@ import java.util
 
 import akka.actor.ExtendedActorSystem
 import io.amient.affinity.core.cluster.CoordinatorZk
+import io.amient.affinity.core.cluster.CoordinatorZk._
 import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
@@ -32,10 +33,16 @@ import org.apache.zookeeper.CreateMode
 import scala.collection.JavaConverters._
 import scala.collection.immutable
 
+object ZkAvroSchemaRegistry {
+  final val CONFIG_ZOOKEEPER_ROOT = "affinity.zookeeper-schema-registry.zookeeper.root"
+  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.zookeeper-schema-registry.zookeeper.connect"
+  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.zookeeper-schema-registry.zookeeper.timeout.connect.ms"
+  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.zookeeper-schema-registry.zookeeper.timeout.session.ms"
+}
+
 class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
 
-  //TODO #16 separate configuration avro schemas in zookeeper - reusing here cooridnator's config - add zk root configuration
-  import CoordinatorZk._
+  import ZkAvroSchemaRegistry._
 
   private val config = system.settings.config
   private val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)

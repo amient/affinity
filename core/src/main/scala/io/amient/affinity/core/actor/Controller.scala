@@ -32,13 +32,13 @@ import scala.collection.JavaConverters._
 
 object Controller {
 
-  final case class CreateRegion(partitionProps: Props)
+  final case class CreateRegion(partitionProps: Props) extends Reply[Unit]
 
   final case class ContainerOnline(group: String)
 
-  final case class CreateGateway(handlerProps: Props)
+  final case class CreateGateway(handlerProps: Props) extends Reply[Int]
 
-  final case class CreateServiceContainer(services: Seq[Props])
+  final case class CreateServiceContainer(services: Seq[Props]) extends Reply[Unit]
 
   final case class GatewayCreated(httpPort: Int)
 
