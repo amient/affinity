@@ -90,12 +90,12 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     }
 
     override def handle: Receive = {
-      //TODO how to enforce the Reply[T] on the replyWith(sender):Future[T]
-      case GetValue(key) => replyWith[String](sender) {
+      //TODO #20 enforce the Reply[T] on the replyWith(sender):Future[T] by adding the request to replyWith as argument
+      case request @ GetValue(key) => replyWith[String](sender) {
         data(key)
       }
 
-      //TODO how to enforce the Reply[T] on the reply(sender):T
+      //TODO #20 enforce the Reply[T] on the replyWith(sender):Future[T] by adding the request to replyWith as argument
       case PutValue(key, value) => replyWith[String](sender) {
         data.put(key, value) map(_.getOrElse(""))
       }

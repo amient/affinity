@@ -41,7 +41,6 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
 
   private val serialization = SerializationExtension(system)
 
-  //TODO verify that using JSerializer doesn't have performance impact becuase of primitive types casting to AnyRef
   def serde[S: ClassTag]: Serializer = {
     val cls = implicitly[ClassTag[S]].runtimeClass
     val serdeClass =

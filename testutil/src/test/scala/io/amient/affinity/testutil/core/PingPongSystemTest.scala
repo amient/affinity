@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.core
+package io.amient.affinity.testutil.core
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._

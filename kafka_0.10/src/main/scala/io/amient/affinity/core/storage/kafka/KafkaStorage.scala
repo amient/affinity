@@ -148,9 +148,9 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     }
   }
 
-  private[core] def init(): Unit = consumer.start()
+  private[affinity] def init(): Unit = consumer.start()
 
-  private[core] def boot(): Unit = {
+  private[affinity] def boot(): Unit = {
     consumer.synchronized {
       if (tailing) {
         tailing = false
@@ -164,7 +164,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     }
   }
 
-  private[core] def tail(): Unit = {
+  private[affinity] def tail(): Unit = {
     consumer.synchronized {
       if (!tailing) {
         tailing = true
@@ -173,7 +173,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     }
   }
 
-  private[core] def close(): Unit = {
+  private[affinity] def close(): Unit = {
     //stop tailing and shutdown
     try {
       consumer.interrupt()

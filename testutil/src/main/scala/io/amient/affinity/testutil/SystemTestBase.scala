@@ -59,6 +59,8 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   }
 
   private val embeddedZkPath = new File(testDir, "local-zookeeper")
+  // smaller testDir footprint, default zookeeper file blocks are 65535Kb
+  System.getProperties().setProperty("zookeeper.preAllocSize", "64")
   private val zookeeper = new ZooKeeperServer(new File(embeddedZkPath, "snapshots"), new File(embeddedZkPath, "logs"), 3000)
   private val zkFactory = new NIOServerCnxnFactory
   zkFactory.configure(new InetSocketAddress(0), 10)

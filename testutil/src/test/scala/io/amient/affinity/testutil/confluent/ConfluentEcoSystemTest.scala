@@ -17,18 +17,20 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.confluent
+package io.amient.affinity.testutil.confluent
 
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.kafka.consumer.AffinityKafkaConsumer
+import io.amient.affinity.kafka.producer.AffinityKafkaProducer
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -74,17 +76,17 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
   }
 
   private def testExternalKafkaConsumer(stateStoreName: String) {
-    implicit val partition = 0
     val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
-    val state = new State[Int, TestRecord](system, stateStoreConfig)
-    println(s"kafka available at zookeeper connection $zkConnect")
+    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+    val state = createStateStoreForPartition(stateStoreConfig)(0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
       state.put(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
         (s) => s, (e: Throwable) => {
-        numWrites.decrementAndGet(); e
+        numWrites.decrementAndGet()
+        e
       })
     })
     Await.ready(updates, 10 seconds)
@@ -94,14 +96,14 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
       "group.id" -> "group2",
-      "auto.offset.reset" ->  "earliest",
-      "max.poll.records" -> "1000",
-      "schema.registry.url" ->  registryUrl
+      "auto.offset.reset" -> "earliest",
+      "max.poll.records" -> 1000,
+      "schema.registry.url" -> registryUrl
     )
 
     val consumer = new AffinityKafkaConsumer[Int, TestRecord](consumerProps)
 
-    consumer.subscribe(List(stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)).asJava)
+    consumer.subscribe(List(topic).asJava)
     try {
 
       var read = 0
@@ -111,14 +113,60 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records.asScala) {
           read += 1
-          record.value.key.id should equal (record.key)
-          record.value.text should equal (s"test value ${record.key}")
+          record.value.key.id should equal(record.key)
+          record.value.text should equal(s"test value ${record.key}")
         }
       }
     } finally {
       consumer.close()
     }
 
+  }
+
+  private def createStateStoreForPartition(stateStoreConfig: Config)(implicit partition: Int) = {
+    new State[Int, TestRecord](system, stateStoreConfig)
+  }
+
+  "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
+
+    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE("consistency-test"))
+    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+
+    val producerProps = Map(
+      "bootstrap.servers" -> kafkaBootstrap,
+      "acks" -> "all",
+      "linger.ms" -> 20,
+      "batch.size" -> 20,
+      "schema.registry.url" -> registryUrl
+    )
+    val numWrites = new AtomicInteger(1000)
+    val producer = new AffinityKafkaProducer[Int, TestRecord](producerProps)
+    try {
+      val numToWrite = numWrites.get
+      val l = System.currentTimeMillis()
+      val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
+        val record = TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")
+        val f = producer.send(new ProducerRecord[Int, TestRecord](topic, i, record))
+        Future(f.get) transform(
+          (s) => s, (e: Throwable) => {
+          numWrites.decrementAndGet()
+          e
+        })
+      })
+      Await.ready(updates, 10 seconds)
+      println(s"produced ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
+
+    } finally {
+      producer.close()
+    }
+    //now bootstrap the state
+    val state0 = createStateStoreForPartition(stateStoreConfig)(0)
+    val state1 = createStateStoreForPartition(stateStoreConfig)(1)
+    state0.storage.init()
+    state1.storage.init()
+    state0.storage.boot()
+    state1.storage.boot()
+    (state0.size + state1.size) should equal(numWrites.get)
   }
 
 }

@@ -28,11 +28,11 @@ class NoopStorage(config: Config) extends Storage(config) {
 
   override def write(key: ByteBuffer, value: ByteBuffer): Future[Unit] = Future.successful(())
 
-  override private[core] def init(): Unit = ()
+  override private[affinity] def init(): Unit = ()
 
-  override private[core] def boot(): Unit = ()
+  override private[affinity] def boot(): Unit = ()
 
-  override private[core] def tail(): Unit = ()
+  override private[affinity] def tail(): Unit = ()
 
-  override private[core] def close(): Unit = ()
+  override private[affinity] def close(): Unit = ()
 }

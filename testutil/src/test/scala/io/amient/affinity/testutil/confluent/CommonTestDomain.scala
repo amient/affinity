@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.confluent
+package io.amient.affinity.testutil.confluent
 
 import java.nio.ByteBuffer
 
@@ -36,9 +36,13 @@ case class UUID(val data: ByteBuffer) extends AvroRecord[UUID] {
   def javaUUID: java.util.UUID = ByteUtils.uuid(data.array)
 }
 
-case class KEY(id: Int) extends AvroRecord[KEY]
+case class KEY(id: Int) extends AvroRecord[KEY] {
+  override def hashCode(): Int = id.hashCode()
+}
 
-case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord[TestRecord]
+case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord[TestRecord] {
+  override def hashCode(): Int = key.hashCode()
+}
 
 class TestAvroRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
   register(classOf[Int])

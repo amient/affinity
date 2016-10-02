@@ -35,7 +35,7 @@ abstract class Storage(val config: Config) {
     * the contract of this method is that it should start a background process of restoring
     * the state from the underlying storage.
     */
-  private[core] def init(): Unit
+  private[affinity] def init(): Unit
 
   /**
     * The implementation should stop listening for updates on the underlying topic after it has
@@ -46,18 +46,18 @@ abstract class Storage(val config: Config) {
     * for serving requests and so the state must be in a fully consistent state.
     *
     */
-  private[core] def boot(): Unit
+  private[affinity] def boot(): Unit
 
   /**
     * the implementation should start listening for updates and keep the memstore up to date.
     * The tailing must be done asychrnously - this method must return immediately and be idempotent.
     */
-  private[core] def tail(): Unit
+  private[affinity] def tail(): Unit
 
   /**
     * close all resource and background processes
     */
-  private[core] def close(): Unit
+  private[affinity] def close(): Unit
 
   /**
     * @param key   of the pair

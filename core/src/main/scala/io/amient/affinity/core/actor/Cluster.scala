@@ -37,7 +37,7 @@ class Cluster extends Actor {
 
   private val routes = mutable.Map[Int, Routee]()
 
-  //TODO configurable partitioner
+  //TODO #17 partitioner should be configurable via blackbox
   val partitioner = new ObjectHashPartitioner
 
 

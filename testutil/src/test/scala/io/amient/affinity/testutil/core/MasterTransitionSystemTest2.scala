@@ -17,33 +17,34 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.core
+package io.amient.affinity.testutil.core
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
+import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.testutil.MyTestPartition._
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.scalatest.{FlatSpec, Matchers}
-import io.amient.affinity.testutil.MyTestPartition
+
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+
+class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
   val config = configure("systemtests")
 
   val gateway = new TestGatewayNode(config, new Gateway {
 
     import context.dispatcher
-    import MyTestPartition._
 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
@@ -60,34 +61,25 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test") {
-    override def preStart(): Unit = {
-      super.preStart()
-      if (partition == 0) data.put("B", "initialValueB")
-      else if (partition == 1) data.put("A", "initialValueA")
-    }
-  })
+  val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
   val region2 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
 
   override def afterAll(): Unit = {
     try {
       gateway.shutdown()
-      region2.shutdown()
       region1.shutdown()
+      region2.shutdown()
     } finally {
       super.afterAll()
     }
   }
 
-  "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
-
-    gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("initialValueA"))
-    gateway.http_sync(GET, "/B").entity should be(jsonStringEntity("initialValueB"))
-    gateway.http_sync(POST, "/A/updatedValueA").status.intValue should be(303)
-    gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("updatedValueA"))
-
+  "Master Transition" should "not lead to inconsistent state" in {
+    val requestCount = new AtomicLong(0L)
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
+    val expected = scala.collection.mutable.Map[String, String]()
+
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -97,20 +89,25 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
         val random = new Random()
         val requests = scala.collection.mutable.ListBuffer[Future[String]]()
         while (!stopSignal.get) {
-          Thread.sleep(1)
+          Thread.sleep(2)
           if (isInterrupted) throw new InterruptedException
-          val path = if (random.nextBoolean()) "/A" else "/B"
-          requests += gateway.http(GET, path) map {
-            case response => response.status.value
+          val key = random.nextInt.toString
+          val value = random.nextInt.toString
+          val path = s"/$key/$value"
+          requests += gateway.http(POST, path) map {
+            case response =>
+              expected += key -> value
+              response.status.value
           } recover {
             case e: Throwable => e.getMessage
           }
         }
+        requestCount.set(requests.size)
         try {
           val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
             case (status, list) => (status, list.length)
           }
-          errorCount.set(requests.size - statuses("200 OK"))
+          errorCount.set(requestCount.get - statuses("303 See Other"))
         } catch {
           case e: Throwable => errorCount.set(requests.size)
         }
@@ -118,12 +115,23 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
       }
     }
     client.start
-    Thread.sleep(100)
-    region1.shutdown()
-    stopSignal.set(true)
-    client.join()
-    errorCount.get should be(0L)
-  }
+    try {
+      Thread.sleep(100)
+      region1.shutdown()
+      stopSignal.set(true)
+      client.join()
+      Thread.sleep(100)
+      errorCount.get should be(0L)
+      val x = Await.result(Future.sequence(expected.map { case (key, value) =>
+        gateway.http(GET, s"/$key").map {
+          response => (response.entity, jsonStringEntity(value))
+        }
+      }), 10 seconds)
+      x.count { case (entity, expected) => entity != expected } should be(0)
+    } finally {
+      client.interrupt()
+    }
 
+  }
 
 }

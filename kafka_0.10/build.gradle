@@ -13,7 +13,6 @@ dependencies {
     compile project(':core')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
-
 }
 
 

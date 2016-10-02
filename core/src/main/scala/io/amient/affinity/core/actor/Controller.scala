@@ -131,7 +131,7 @@ class Controller extends Actor {
         }
       }
 
-    //FIXME when region shuts down due to partition exception CreateRegion is never called again and the promise will be 'already completed'
+    //FIXME #22 when region shuts down due to partition exception CreateRegion is never called again and the promise will be 'already completed'
     case ContainerOnline("region") => regionPromise.success(())
 
 
@@ -153,7 +153,7 @@ class Controller extends Actor {
       regionCoordinator.watch(sender, global = true)
       serviceCoordinator.watch(sender, global = true)
       context.watch(sender)
-      //FIXME when gateway gets restarted CreateGateway is never called again and the promise will be 'already completed'
+      //FIXME #22 when gateway gets restarted CreateGateway is never called again and the promise will be 'already completed'
       gatewayPromise.success(httpPort)
 
     case GracefulShutdown() => replyWith(sender) {
@@ -164,7 +164,7 @@ class Controller extends Actor {
     }
 
     case Terminated(gateway) => val gateway = sender
-      //FIXME this code doesn't differntiate between termination caused by GracefulShutdown and gateway failure
+      //FIXME #22 this code doesn't differntiate between termination caused by GracefulShutdown and gateway failure
       regionCoordinator.unwatch(gateway)
       serviceCoordinator.unwatch(gateway)
       log.info("graceful shutdown completed, terminating actor system")

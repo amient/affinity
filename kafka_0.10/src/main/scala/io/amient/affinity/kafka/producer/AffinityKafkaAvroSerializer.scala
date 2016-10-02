@@ -17,30 +17,35 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka.consumer
+package io.amient.affinity.kafka.producer
 
-import io.amient.affinity.core.serde.avro.AvroRecord
-import io.confluent.kafka.serializers.KafkaAvroDeserializer
-import org.apache.avro.generic.GenericContainer
-import org.apache.kafka.common.serialization.Deserializer
+import io.confluent.kafka.serializers.KafkaAvroSerializer
+import org.apache.kafka.common.serialization.Serializer
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
-
-object AffinityKafkaAvroDeserializer {
-  def create[T: TypeTag](props: Map[String, Any], isKey: Boolean): Deserializer[T] = {
+object AffinityKafkaAvroSerializer {
+  def create[T: TypeTag](props: Map[String, Any], isKey: Boolean): Serializer[T] = {
     if (props.contains("schema.registry.url")) {
-      new TypedKafkaAvroDeserializer(props, isKey)
+      new TypedKafkaAvroSerializer(props, isKey)
     } else {
-      //TODO #21 implement Kafka Deserializer for ZkAvroSchemaProvider
+      //TODO #21 implement ZkAvroSchemaProvider Serializer
       throw new RuntimeException("schema.registry configuration is missing in the consumer properties")
     }
   }
 }
-class TypedKafkaAvroDeserializer[T: TypeTag](props: Map[String, Any], isKey: Boolean) extends Deserializer[T] {
 
-  val internal = new KafkaAvroDeserializer()
+class TypedKafkaAvroSerializer[T: TypeTag](props: Map[String, Any], isKey: Boolean) extends Serializer[T] {
+
+  val newSubject = rootMirror.runtimeClass(typeOf[T]).getName
+
+  val internal = new KafkaAvroSerializer() {
+    override protected def serializeImpl(subject: String, data: Any): Array[Byte] = {
+      //internal registry will lookup the schema by <topic>-value or <topic>-key so we need to intercept
+      super.serializeImpl(newSubject, data)
+    }
+  }
 
   internal.configure(props.asJava, isKey)
 
@@ -50,11 +55,8 @@ class TypedKafkaAvroDeserializer[T: TypeTag](props: Map[String, Any], isKey: Boo
 
   override def close(): Unit = internal.close
 
-  override def deserialize(topic: String, bytes: Array[Byte]): T = {
-    internal.deserialize(topic, bytes) match {
-      case container: GenericContainer => AvroRecord.read[T](container)
-      case other => other.asInstanceOf[T]
-    }
+  override def serialize(topic: String, data: T): Array[Byte] = {
+    internal.serialize(topic, data)
   }
 
 }

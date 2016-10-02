@@ -17,16 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka.consumer
+package io.amient.affinity.kafka.producer
 
-import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.producer.KafkaProducer
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
-class AffinityKafkaConsumer[K: TypeTag, V: TypeTag](props: Map[String, Any]) extends KafkaConsumer[K, V](
-  props.mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
-  AffinityKafkaAvroDeserializer.create[K](props, true),
-  AffinityKafkaAvroDeserializer.create[V](props, false))
-
+class AffinityKafkaProducer[K: TypeTag, V: TypeTag](props: Map[String, Any]) extends KafkaProducer[K,V](
+  (props ++ Map("partitioner.class" -> classOf[KafkaObjectHashPartitioner].getName))
+    .mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
+  AffinityKafkaAvroSerializer.create[K](props, true),
+  AffinityKafkaAvroSerializer.create[V](props, false)) {
+}
 
