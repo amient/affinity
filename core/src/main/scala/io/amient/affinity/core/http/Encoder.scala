@@ -39,6 +39,7 @@ object Encoder {
   mapper.registerModule(DefaultScalaModule)
 
   def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+    //FIXME if value.isInstanceOf[AvroRecord[_]] then use to string instead of DefaultScalaModule
     val h = mutable.ListBuffer[HttpHeader]()
     h += headers.Date(DateTime.now)
     h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)

@@ -26,6 +26,7 @@ import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, See
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example._
@@ -51,8 +52,7 @@ trait Connect extends HttpGateway {
       * GET /vertex/<vertex>
       */
     case HTTP(GET, PATH("vertex", INT(id)), query, response) =>
-      val task = cluster ? id
-      delegateAndHandleErrors(response, task) {
+      delegateAndHandleErrors(response, ack(cluster, GetVertexProps(id))) {
         Encoder.json(OK, _)
       }
 
@@ -66,7 +66,7 @@ trait Connect extends HttpGateway {
           response.success(cached)
 
         case _ =>
-          delegateAndHandleErrors(response, getComponent(id)) {
+          delegateAndHandleErrors(response, collectComponent(id)) {
             case false => Encoder.json(NotFound, "Vertex not found" -> id)
             case component: Component =>
               val response = Encoder.json(OK, component)
@@ -105,13 +105,13 @@ trait Connect extends HttpGateway {
 
   }
 
-  private def getComponent(vertex: Int): Future[Component] = {
+  private def collectComponent(vertex: Int): Future[Component] = {
     val promise = Promise[Component]()
     val ts = System.currentTimeMillis
     implicit val timeout = Timeout(10 seconds)
     def collect(queue: Set[Int], agg: Set[Int]): Unit = {
       if (queue.isEmpty) promise.success(Component(vertex, ts, agg))
-      else cluster ? Component(queue.head, ts, agg) map {
+      else ack(cluster, CollectComponent(queue.head)) map {
         case Component(_, _, add) => collect(queue.tail ++ (add -- agg), agg ++ add)
       } recover {
         case NonFatal(e) => promise.failure(e)
@@ -132,12 +132,12 @@ trait Connect extends HttpGateway {
     val ts = System.currentTimeMillis
     val promise = Promise[Boolean]()
     val m1 = ModifyGraph(v1, Edge(v2, ts), op)
-    cluster ? m1 onComplete {
+    ack(cluster, m1) onComplete {
       case Failure(e) => promise.failure(e) //earliest possible failure, nothing to rollback just report failure
       case Success(false) => promise.success(false)
       case Success(_) =>
         val m2 = ModifyGraph(v2, Edge(v1, ts), op)
-        cluster ? m2 onComplete {
+        ack(cluster, m2) onComplete {
           case Failure(e) =>
             //second failure case we have to rollback the first edge modification
             cluster ! m1.inverse
@@ -145,8 +145,8 @@ trait Connect extends HttpGateway {
           case Success(false) => promise.failure(new IllegalStateException)
           case Success(_) =>
             Future.sequence(op match {
-              case GOP.ADD => List(getComponent(v2))
-              case GOP.REMOVE => List(getComponent(v1), getComponent(v2))
+              case GOP.ADD => List(collectComponent(v2))
+              case GOP.REMOVE => List(collectComponent(v1), collectComponent(v2))
             }) onComplete {
               case Failure(e) =>
                 //third failure case we have to rollback both edge modifications
@@ -156,7 +156,7 @@ trait Connect extends HttpGateway {
               case Success(components) =>
                 Future.sequence(components.map { component =>
                   Future.sequence(component.component.toSeq.map { v =>
-                    (cluster ? UpdateComponent(v, component.component)).asInstanceOf[Future[Component]] recover {
+                    ack(cluster, UpdateComponent(v, component.component)) recover {
                       case e: Throwable => null.asInstanceOf[Component]
                     }
                   })

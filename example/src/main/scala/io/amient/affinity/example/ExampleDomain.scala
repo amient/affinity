@@ -21,6 +21,7 @@ package io.amient.affinity.example
 
 import akka.actor.ExtendedActorSystem
 import com.fasterxml.jackson.annotation.JsonIgnore
+import io.amient.affinity.core.ack.Reply
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
@@ -38,6 +39,10 @@ class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(syst
   register(classOf[Component])
   //5
   register(classOf[UpdateComponent])
+  //6
+  register(classOf[CollectComponent])
+  //7
+  register(classOf[GetVertexProps])
 }
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
@@ -50,16 +55,16 @@ final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord[Edge
 
 final case class VertexProps(ts: Long = 1475178519756L, edges: Set[Edge] = Set(), component: Set[Int] = Set()) extends AvroRecord[VertexProps]
 
+final case class Component(vertex: Int, ts: Long = 0L, component: Set[Int] = Set()) extends AvroRecord[Component] {
+  override def hashCode(): Int = vertex.hashCode
+}
+
 object GOP extends Enumeration {
   type Side = Value
   val ADD, REMOVE = Value
 }
 
-final case class Component(vertex: Int, ts: Long = 0L, component: Set[Int] = Set()) extends AvroRecord[Component] {
-  override def hashCode(): Int = vertex.hashCode
-}
-
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] {
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] with Reply[Boolean] {
   override def hashCode(): Int = vertex.hashCode
 
   def inverse = op match {
@@ -68,7 +73,15 @@ final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) e
   }
 }
 
-final case class UpdateComponent(vertex: Int, component: Set[Int]) extends AvroRecord[UpdateComponent] {
+final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[VertexProps] {
+  override def hashCode(): Int = vertex.hashCode
+}
+
+final case class CollectComponent(vertex: Int) extends AvroRecord[CollectComponent] with Reply[Component] {
+  override def hashCode(): Int = vertex.hashCode
+}
+
+final case class UpdateComponent(vertex: Int, component: Set[Int]) extends AvroRecord[UpdateComponent] with Reply[Component] {
   override def hashCode(): Int = vertex.hashCode
 }
 

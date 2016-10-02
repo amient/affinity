@@ -91,7 +91,7 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       coordinator.unregister(services(ref))
       services -= ref
 
-    case MasterStatusUpdate(_, add, remove) => replyWith[Unit](sender) {
+    case request @ MasterStatusUpdate(_, add, remove) => replyWith(request, sender) {
       //TODO #12 global config bootstrap timeout
       val t = 30 seconds
       implicit val timeout = Timeout(t)

@@ -45,7 +45,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     gateway.http_sync(GET, s"/ping").entity should be(jsonStringEntity("pong"))
   }
 
-  //TODO test basic auth
-  //TODO test admin auth
-  //TODO test DSA auth
+  //FIXME test basic auth
+  //FIXME test admin auth
+  //FIXME test DSA auth
 }

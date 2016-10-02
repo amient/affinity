@@ -20,16 +20,16 @@
 package io.amient.affinity.example.partition
 
 
-import akka.actor.Status
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.example._
-import io.amient.affinity.core.ack._
+
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
-import scala.util.control.NonFatal
+import scala.concurrent.Future
 
 
 object DataPartition {
@@ -87,19 +87,18 @@ class DataPartition extends Partition {
     /**
       * getting VertexProps object by Vertex key
       */
-    case vertex: Int => replyWith(sender) {
+    case request@GetVertexProps(vertex) => replyWith(request, sender) {
       graph(vertex)
     }
-
 
     /**
       * Collect all connected vertices
       */
-    case Component(vertex, ts, group) => replyWith(sender) {
+    case request@CollectComponent(vertex) => replyWith(request, sender) {
       graph(vertex) map { existing =>
         Component(vertex, now(), existing.edges.map(_.target))
       } recover {
-        case e: NoSuchElementException => Component(vertex, ts, Set())
+        case e: NoSuchElementException => Component(vertex, System.currentTimeMillis, Set())
       }
     }
 
@@ -109,21 +108,19 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
       */
-    case ModifyGraph(vertex, edge, GOP.ADD) => replyWith(sender) {
-      graph(vertex) map {
-        case existing if (existing.edges.exists(_.target == edge.target)) => false
+    case request@ModifyGraph(vertex, edge, GOP.ADD) => replyWith(request, sender) {
+      graph(vertex) recover {
+        case e: NoSuchElementException => VertexProps(now(), Set())
+      } flatMap {
+        case existing if (existing.edges.exists(_.target == edge.target)) =>
+          Future.successful(false)
         case existing =>
-          graph.put(vertex, VertexProps(now(), existing.edges + edge, existing.component))
-          true
-      } recover {
-        case e: NoSuchElementException => try {
-          graph.put(vertex, VertexProps(now(), Set(edge)))
-          true
-        } catch {
-          case NonFatal(e) => Status.Failure(e)
-        }
+          graph.put(vertex, VertexProps(now(), existing.edges + edge, existing.component)) map {
+            case _ => true
+          }
       }
     }
+
 
     /**
       * Remove an edge from the graph vertex.
@@ -131,7 +128,7 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
-    case ModifyGraph(vertex, edge, GOP.REMOVE) => replyWith(sender) {
+    case request @ ModifyGraph(vertex, edge, GOP.REMOVE) => replyWith(request, sender) {
       graph(vertex) map { existing =>
         graph.put(vertex, VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component))
         true
@@ -144,10 +141,11 @@ class DataPartition extends Partition {
       * Updated component of the vertex.
       * Responds with the Component data previously associated with the vertex
       */
-    case UpdateComponent(vertex, updatedComponent) => replyWith(sender) {
-      graph(vertex) map { existing =>
-        graph.put(vertex, VertexProps(now(), existing.edges, updatedComponent))
-        Component(vertex, now(), existing.component)
+    case request@UpdateComponent(vertex, updatedComponent) => replyWith(request, sender) {
+      graph(vertex) flatMap { existing =>
+        graph.put(vertex, VertexProps(now(), existing.edges, updatedComponent)) map {
+          case _ => Component(vertex, now(), existing.component)
+        }
       } recover {
         case e: NoSuchElementException => Component(vertex, now(), Set())
       }

@@ -49,7 +49,7 @@ import scala.util.{Failure, Success}
   */
 package object ack {
 
-  trait Reply[T] extends Serializable
+  trait Reply[T]
 
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
@@ -62,7 +62,7 @@ package object ack {
     * @return
     */
   def ack[T](target: ActorRef, message: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
-    //TODO ACK - configurable ack retries
+    //FIXME configurable ack retries
     val promise = Promise[T]()
     def attempt(retry: Int = 3): Unit = {
       target ? message map {
@@ -81,12 +81,13 @@ package object ack {
 
   /**
     * Intermediate ack with future. An ack is sent to the `replyTo` actor when the future completes.
-    * @param replyTo
+    * @param request which is being replied to
+    * @param replyTo sender who sent the request and expects the reply
     * @param closure which must return future on which the acknowledgement depends
     * @tparam T
     */
 
-  def replyWith[T](replyTo: ActorRef)(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
+  def replyWith[T](request: Reply[T], replyTo: ActorRef)(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
     val f: Future[T] = closure
     f onComplete {
       case Success(result) => replyTo ! result

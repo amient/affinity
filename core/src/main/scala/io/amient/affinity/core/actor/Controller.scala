@@ -26,9 +26,10 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Iterable
 
 object Controller {
 
@@ -42,7 +43,7 @@ object Controller {
 
   final case class GatewayCreated(httpPort: Int)
 
-  final case class GracefulShutdown()
+  final case class GracefulShutdown() extends Reply[Unit]
 
 }
 
@@ -93,7 +94,7 @@ class Controller extends Actor {
 
   override def receive: Receive = {
 
-    case CreateServiceContainer(services) =>
+    case request@CreateServiceContainer(services) =>
       try {
         context.actorOf(Props(new Container(serviceCoordinator, "services") {
           services.foreach { serviceProps =>
@@ -101,18 +102,18 @@ class Controller extends Actor {
           }
         }), name = "services")
         servicesPromise = Promise[Unit]()
-        replyWith(sender) {
+        replyWith(request, sender) {
           servicesPromise.future
         }
       } catch {
-        case e: InvalidActorNameException => replyWith(sender) {
+        case e: InvalidActorNameException => replyWith(request, sender) {
           servicesPromise.future
         }
       }
 
     case ContainerOnline("services") => servicesPromise.success(())
 
-    case CreateRegion(partitionProps) =>
+    case request@CreateRegion(partitionProps) =>
       val origin = sender
       try {
         context.actorOf(Props(new Container(regionCoordinator, "region") {
@@ -122,12 +123,12 @@ class Controller extends Actor {
           }
         }), name = "region")
         regionPromise = Promise[Unit]()
-        replyWith(origin) {
+        replyWith(request, origin) {
           regionPromise.future
         }
       } catch {
-        case e: InvalidActorNameException => replyWith(origin) {
-          gatewayPromise.future
+        case e: InvalidActorNameException => replyWith(request, origin) {
+          regionPromise.future
         }
       }
 
@@ -135,15 +136,15 @@ class Controller extends Actor {
     case ContainerOnline("region") => regionPromise.success(())
 
 
-    case CreateGateway(gatewayProps) =>
+    case request@CreateGateway(gatewayProps) =>
       try {
         context.actorOf(gatewayProps, name = "gateway")
         gatewayPromise = Promise[Int]()
-        replyWith(sender) {
+        replyWith(request, sender) {
           gatewayPromise.future
         }
       } catch {
-        case e: InvalidActorNameException => replyWith(sender) {
+        case e: InvalidActorNameException => replyWith(request, sender) {
           gatewayPromise.future
         }
       }
@@ -156,9 +157,12 @@ class Controller extends Actor {
       //FIXME #22 when gateway gets restarted CreateGateway is never called again and the promise will be 'already completed'
       gatewayPromise.success(httpPort)
 
-    case GracefulShutdown() => replyWith(sender) {
+    case request@GracefulShutdown() => replyWith(request, sender) {
       implicit val timeout = Timeout(500 milliseconds)
-      context.actorSelection("gateway") ? GracefulShutdown() recover {
+      Future.sequence(context.children map { child =>
+        log.info("Requesting GracefulShutdown from " + child)
+        ack(child, GracefulShutdown())
+      }).map(_ => ()) recover {
         case any => system.terminate()
       }
     }
