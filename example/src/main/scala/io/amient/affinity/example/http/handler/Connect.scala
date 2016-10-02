@@ -19,13 +19,15 @@
 
 package io.amient.affinity.example.rest.handler
 
+import java.util.concurrent.ConcurrentHashMap
+
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{MovedPermanently, NotFound, OK, SeeOther}
-import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
+import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.http.ResponseBuilder
 import io.amient.affinity.example._
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.UserInputMediator
@@ -41,10 +43,7 @@ trait Connect extends HttpGateway {
 
   implicit val timeout = Timeout(10 seconds)
 
-  /**
-    * an example sate without persistent storage (configured with NoopStorage class)
-    */
-  val cache = state[Int, Component]("cache")
+  val cache = new ConcurrentHashMap[Int, HttpResponse]()
 
   abstract override def handle: Receive = super.handle orElse {
 
@@ -54,32 +53,28 @@ trait Connect extends HttpGateway {
     case HTTP(GET, PATH("vertex", INT(id)), query, response) =>
       val task = cluster ? id
       delegateAndHandleErrors(response, task) {
-        ResponseBuilder.json(OK, _)
+        Encoder.json(OK, _)
       }
 
     /**
       * GET /component/<vertex>/
       */
     case HTTP(POST, PATH("component", INT(id)), query, response) =>
-      cache(id) map (Some(_)) recover {
-        case e: NoSuchElementException => None
-      } map {
-        case Some(component) if (component.ts + 10000 > System.currentTimeMillis) =>
-          //TODO this should be an expiring state not just overwrite-old, e.g. rocksdb / leveldb with in-memory-only settings
-          response.success(ResponseBuilder.json(OK, component))
+
+      cache.get(id) match {
+        case cached if (cached != null && cached.header[headers.Date].get.date.plus(5000) > DateTime.now) =>
+          response.success(cached)
 
         case _ =>
           delegateAndHandleErrors(response, getComponent(id)) {
-            case false => ResponseBuilder.json(NotFound, "Vertex not found" -> id)
+            case false => Encoder.json(NotFound, "Vertex not found" -> id)
             case component: Component =>
-              cache.put(id, component)
-              ResponseBuilder.json(OK, component)
+              val response = Encoder.json(OK, component)
+              cache.put(id, response)
+              response
           }
-      } recover {
-        case NonFatal(e) =>
-          e.printStackTrace()
-          response.success(handleException(e))
       }
+
 
     /**
       * POST /connect/<vertex1>/<vertex2>
@@ -105,7 +100,7 @@ trait Connect extends HttpGateway {
     case HTTP(PUT, PATH("delegate"), query, response) =>
       val userInputMediator = service(classOf[UserInputMediator])
       userInputMediator ? "hello" onSuccess {
-        case userInput: String => response.success(ResponseBuilder.json(OK, Map("userInput" -> userInput)))
+        case userInput: String => response.success(Encoder.json(OK, Map("userInput" -> userInput)))
       }
 
   }

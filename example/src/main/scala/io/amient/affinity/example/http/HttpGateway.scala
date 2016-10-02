@@ -28,7 +28,7 @@ import akka.http.scaladsl.model.{headers, _}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.{HttpExchange, ResponseBuilder}
+import io.amient.affinity.core.http.{HttpExchange, Encoder}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.http.handler.WebApp
@@ -72,16 +72,16 @@ class HttpGateway extends Gateway with ActorState {
   import context.dispatcher
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: IllegalAccessException => ResponseBuilder.json(NotFound, "Unauthorized" -> e.getMessage)
-    case e: NoSuchElementException => ResponseBuilder.json(NotFound, "Haven't got that" -> e.getMessage)
-    case e: IllegalArgumentException => ResponseBuilder.json(BadRequest, "BadRequest" -> e.getMessage)
-    case e: UnsupportedOperationException => ResponseBuilder.json(NotImplemented, "Probably maintenance- Please try again..")
+    case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)
+    case e: NoSuchElementException => Encoder.json(NotFound, "Haven't got that" -> e.getMessage)
+    case e: IllegalArgumentException => Encoder.json(BadRequest, "BadRequest" -> e.getMessage)
+    case e: UnsupportedOperationException => Encoder.json(NotImplemented, "Probably maintenance- Please try again..")
     case NonFatal(e) =>
       e.printStackTrace()
-      ResponseBuilder.json(InternalServerError, "Well, something went wrong but we should be back..")
+      Encoder.json(InternalServerError, "Well, something went wrong but we should be back..")
     case e =>
       e.printStackTrace()
-      ResponseBuilder.json(ServiceUnavailable, "Something is seriously wrong with our servers..")
+      Encoder.json(ServiceUnavailable, "Something is seriously wrong with our servers..")
   }
 
 
@@ -111,7 +111,7 @@ class HttpGateway extends Gateway with ActorState {
             }
         }
       } catch {
-        case e: IllegalAccessError => response.success(ResponseBuilder.json(Unauthorized, "Unauthorized, expecting " -> e.getMessage))
+        case e: IllegalAccessError => response.success(Encoder.json(Unauthorized, "Unauthorized, expecting " -> e.getMessage))
         case e: Throwable => response.success(handleException(e))
       }
     }

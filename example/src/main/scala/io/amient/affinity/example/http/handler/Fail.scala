@@ -26,7 +26,7 @@ import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.rest.HttpGateway
 
 import scala.concurrent.duration._
@@ -73,7 +73,7 @@ trait Fail extends HttpGateway {
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (partition, "message-that-can't-be-handled")
       delegateAndHandleErrors(response, task) {
-        case any => ResponseBuilder.json(OK, any)
+        case any => Encoder.json(OK, any)
       }
 
   }

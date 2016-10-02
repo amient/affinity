@@ -22,14 +22,14 @@ package io.amient.affinity.example.rest.handler
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.rest.HttpGateway
 
 trait Ping extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, PATH("ping"), _, response) => response.success(ResponseBuilder.json(OK, "pong"))
+    case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong"))
   }
 
 }

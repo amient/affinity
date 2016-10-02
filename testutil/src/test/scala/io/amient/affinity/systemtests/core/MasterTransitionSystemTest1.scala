@@ -28,7 +28,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.scalatest.{FlatSpec, Matchers}
 import io.amient.affinity.testutil.MyTestPartition
@@ -49,7 +49,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
         delegateAndHandleErrors(response, ack(cluster, GetValue(key))) {
-          case value => ResponseBuilder.json(OK, value, gzip = false)
+          case value => Encoder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>

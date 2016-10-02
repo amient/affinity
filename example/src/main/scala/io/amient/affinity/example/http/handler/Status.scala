@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.rest.HttpGateway
 
 import scala.collection.Map
@@ -40,11 +40,11 @@ trait Status extends HttpGateway {
       implicit val timeout = Timeout(1 second)
       val task = cluster ? (p.toInt, "status")
       delegateAndHandleErrors(response, task) {
-        case any => ResponseBuilder.json(OK, any)
+        case any => Encoder.json(OK, any)
       }
 
     case HTTP(GET, PATH("status"), _, response) =>
-      response.success(ResponseBuilder.json(OK, Map(
+      response.success(Encoder.json(OK, Map(
         "singleton-services" -> describeServices,
         "partition-masters" -> describeRegions
       )))

@@ -31,38 +31,50 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.avro.util.ByteBufferOutputStream
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
-object ResponseBuilder {
+object Encoder {
 
   private val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
 
   def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
-    encode(status, ContentTypes.`application/json`, gzip) { writer =>
+    val h = mutable.ListBuffer[HttpHeader]()
+    h += headers.Date(DateTime.now)
+    h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
+    HttpResponse(status, entity = json(value, gzip), headers = h.toList)
+  }
+
+  def json(value: Any, gzip: Boolean): MessageEntity = {
+    encode(ContentTypes.`application/json`, gzip) { writer =>
       mapper.writeValue(writer, value)
     }
   }
 
-  def html(status: StatusCode, value: String, gzip: Boolean = true): HttpResponse = {
-    encode(status, ContentTypes.`text/html(UTF-8)`, gzip) { writer =>
-      writer.append(value)
+  def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+    val h = mutable.ListBuffer[HttpHeader]()
+    h += headers.Date(DateTime.now)
+    h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
+    HttpResponse(status, entity = html(value, gzip), headers = h.toList)
+  }
+
+  def html(value: Any, gzip: Boolean): MessageEntity = {
+    encode(ContentTypes.`text/html(UTF-8)`, gzip) { writer =>
+      writer.append(value.toString)
       writer.close()
     }
   }
 
-  private def encode(status: StatusCode, contentType: ContentType, gzip: Boolean = false)(f: (Writer) => Unit) = {
+  private def encode(contentType: ContentType, gzip: Boolean )(f: (Writer) => Unit): MessageEntity = {
+
     val out = new ByteBufferOutputStream()
-
     val writer = if (gzip) new OutputStreamWriter(new GZIPOutputStream(out)) else new OutputStreamWriter(out)
-
     f(writer)
-
     val buffers = out.getBufferList
 
-    HttpResponse(status
-      , entity = buffers.size match {
-        case 1 => HttpEntity(contentType, ByteString(buffers.get(0)))
-        case _ => HttpEntity(contentType, Source(buffers.asScala.map(ByteString(_)).toList))
-      }, headers = if (!gzip) List() else List(headers.`Content-Encoding`(HttpEncodings.gzip)))
+    buffers.size match {
+      case 1 => HttpEntity(contentType, ByteString(buffers.get(0)))
+      case _ => HttpEntity(contentType, Source(buffers.asScala.map(ByteString(_)).toList))
+    }
   }
 }

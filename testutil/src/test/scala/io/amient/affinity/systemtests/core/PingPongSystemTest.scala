@@ -25,7 +25,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.actor.{Gateway, Partition}
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -38,11 +38,11 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
   val gateway = new TestGatewayNode(config, new Gateway {
     import context.dispatcher
     override def handle: Receive = {
-      case HTTP(GET, PATH("ping"), _, response) => response.success(ResponseBuilder.json(OK, "pong", gzip = false))
+      case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
         delegateAndHandleErrors(response, cluster ? "ping") {
-          case pong => ResponseBuilder.json(OK, pong, gzip = false)
+          case pong => Encoder.json(OK, pong, gzip = false)
         }
     }
   })

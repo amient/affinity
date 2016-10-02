@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.http.ResponseBuilder
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.core.util.TimeCryptoProof
 
@@ -38,7 +38,7 @@ trait Access extends HttpGateway {
   abstract override def handle: Receive = super.handle orElse {
 
     case HTTP(GET, uri@PATH("p", "access", pii), query, response) => AUTH_CRYPTO(uri, query, response) { (sig: String) =>
-      ResponseBuilder.json(OK, Map(
+      Encoder.json(OK, Map(
         "signature" -> sig,
         "pii" -> pii
       ))
@@ -49,7 +49,7 @@ trait Access extends HttpGateway {
       try {
         Future.successful {
           throw new RuntimeException("!")
-          ResponseBuilder.json(OK, Map(
+          Encoder.json(OK, Map(
             "credentials" -> user,
             "settings" -> settings.iterator.toMap
           ))
@@ -62,7 +62,7 @@ trait Access extends HttpGateway {
 
     case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
       settings(key) map {
-        case _ => ResponseBuilder.json(BadRequest, "That key already exists" -> key)
+        case _ => Encoder.json(BadRequest, "That key already exists" -> key)
       } recover {
         case e: NoSuchElementException =>
           val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
