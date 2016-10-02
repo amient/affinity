@@ -19,15 +19,17 @@
 
 package io.amient.affinity.core.http
 
-import java.io.{OutputStreamWriter, Writer}
+import java.io.{OutputStream, OutputStreamWriter, Writer}
 import java.util.zip.GZIPOutputStream
 
-import akka.http.scaladsl.model.{HttpEntity, _}
 import akka.http.scaladsl.model.headers.HttpEncodings
+import akka.http.scaladsl.model.{HttpEntity, _}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import org.apache.avro.generic.{GenericDatumWriter, IndexedRecord}
+import org.apache.avro.io.EncoderFactory
 import org.apache.avro.util.ByteBufferOutputStream
 
 import scala.collection.JavaConverters._
@@ -39,7 +41,6 @@ object Encoder {
   mapper.registerModule(DefaultScalaModule)
 
   def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
-    //FIXME if value.isInstanceOf[AvroRecord[_]] then use to string instead of DefaultScalaModule
     val h = mutable.ListBuffer[HttpHeader]()
     h += headers.Date(DateTime.now)
     h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
@@ -47,8 +48,17 @@ object Encoder {
   }
 
   def json(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`application/json`, gzip) { writer =>
-      mapper.writeValue(writer, value)
+    encode(ContentTypes.`application/json`, gzip) { (out, writer) =>
+      value match {
+        case record: IndexedRecord =>
+          val schema = record.getSchema
+          val avroEncoder = EncoderFactory.get().jsonEncoder(schema, out)
+          val datumWriter = new GenericDatumWriter[Any](schema)
+          datumWriter.write(record, avroEncoder)
+          avroEncoder.flush()
+          writer.close()
+        case other => mapper.writeValue(writer, other)
+      }
     }
   }
 
@@ -60,17 +70,18 @@ object Encoder {
   }
 
   def html(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`text/html(UTF-8)`, gzip) { writer =>
+    encode(ContentTypes.`text/html(UTF-8)`, gzip) { (out, writer) =>
       writer.append(value.toString)
       writer.close()
     }
   }
 
-  private def encode(contentType: ContentType, gzip: Boolean )(f: (Writer) => Unit): MessageEntity = {
+  private def encode(contentType: ContentType, gzip: Boolean )(f: (OutputStream, Writer) => Unit): MessageEntity = {
 
     val out = new ByteBufferOutputStream()
-    val writer = if (gzip) new OutputStreamWriter(new GZIPOutputStream(out)) else new OutputStreamWriter(out)
-    f(writer)
+    val gout = if (gzip) new GZIPOutputStream(out) else out
+    val writer = new OutputStreamWriter(gout)
+    f(gout, writer)
     val buffers = out.getBufferList
 
     buffers.size match {
