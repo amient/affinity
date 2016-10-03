@@ -25,6 +25,7 @@ import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.confluent.kafka.schemaregistry.rest.{SchemaRegistryConfig, SchemaRegistryRestApplication}
+
 import scala.collection.JavaConverters._
 
 trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {

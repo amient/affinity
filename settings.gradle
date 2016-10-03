@@ -1,1 +1,3 @@
-include ':core', ':kafka_0.10', ':example', ':testutil'
+include ':core', ':testutil:system_core',
+        ':kafka_0.10', ':testutil:system_kafka_0.10',
+        ':example'

@@ -17,15 +17,15 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.testutil.core
+package io.amient.affinity.systemtests.http
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.actor.{Gateway, Partition}
-import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
 

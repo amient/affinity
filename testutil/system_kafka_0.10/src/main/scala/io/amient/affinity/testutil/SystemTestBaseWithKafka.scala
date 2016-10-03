@@ -23,9 +23,9 @@ import java.io.File
 import java.util.Properties
 
 import com.typesafe.config.{Config, ConfigValueFactory}
-import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.ZooKeeperClient
 import kafka.cluster.Broker
@@ -33,7 +33,6 @@ import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.common.protocol.SecurityProtocol
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 trait SystemTestBaseWithKafka extends SystemTestBase {
 
@@ -81,6 +80,8 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
   class MyTestPartition(topic: String) extends Partition {
 
     import MyTestPartition._
+
+    import context.dispatcher
 
     private val stateConfig = context.system.settings.config.getConfig(State.CONFIG_STATE_STORE(topic))
       .withValue(KafkaStorage.CONFIG_KAFKA_TOPIC, ConfigValueFactory.fromAnyRef(topic))

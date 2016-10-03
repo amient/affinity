@@ -1,0 +1,29 @@
+group = parent.group
+version = parent.version
+
+apply plugin: 'scala'
+apply plugin: 'java'
+
+ext {
+    kafkaMinorVersion = '0.10'
+    kafkaVersion = project(':kafka_' + kafkaMinorVersion).ext.kafkaVersion
+    confluentVersion = project(':kafka_' + kafkaMinorVersion).ext.confluentVersion
+}
+
+dependencies {
+    compile project(':core')
+    compile project(':testutil:system_core')
+    compile project(':kafka_' + kafkaMinorVersion)
+    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
+    compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
+    compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
+    compile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
+    compile group: 'io.confluent', name: 'kafka-schema-registry-client', version: confluentVersion
+
+}
+
+
+

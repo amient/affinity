@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.testutil.confluent
+package io.amient.affinity.systemtests.confluent
 
 import java.nio.ByteBuffer
 

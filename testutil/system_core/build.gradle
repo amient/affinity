@@ -4,22 +4,18 @@ version = parent.version
 apply plugin: 'scala'
 apply plugin: 'java'
 
-
 dependencies {
-
-    testCompile project(':testutil:system_core')
-    testCompile project(':testutil:system_kafka_0.10')
-    testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
+    compile project(':core')
+    compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
+    compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
+    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
-//    compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
     compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: '2.7.5'
-
 }
 
 

@@ -17,10 +17,11 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro
+package io.amient.affinity.systemtests.avro
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
+import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.util.ZooKeeperClient
 import io.amient.affinity.testutil.SystemTestBase
