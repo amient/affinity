@@ -49,7 +49,7 @@ import scala.util.{Failure, Success}
   */
 package object ack {
 
-  trait Reply[T]
+  trait Reply[+T]
 
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
@@ -68,11 +68,13 @@ package object ack {
       target ? message map {
         case result: T => promise.success(result)
         case result: BoxedUnit if (tag == classTag[Unit]) => promise.success(().asInstanceOf[T])
-        case i => promise.failure(new RuntimeException(
-          s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
+        case i =>
+          promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
         case cause if (retry == 0) => promise.failure(cause)
-        case _ => attempt(retry - 1)
+        case x =>
+          //TODO if this returns too quickly schedule the retry up to the implicit timeout
+          attempt(retry - 1)
       }
     }
     attempt()
