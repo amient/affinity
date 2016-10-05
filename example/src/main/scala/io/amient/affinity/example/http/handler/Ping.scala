@@ -31,6 +31,8 @@ import scala.concurrent.duration._
 
 trait Ping extends HttpGateway {
 
+  import context.dispatcher
+
   abstract override def handle: Receive = super.handle orElse {
 
     /**

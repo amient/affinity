@@ -19,29 +19,21 @@
 
 package io.amient.affinity.example.http.handler
 
-import java.util.concurrent.ConcurrentHashMap
-
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.http.scaladsl.model.StatusCodes._
-import akka.util.Timeout
-import akka.pattern.ask
+import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.UserInputMediator
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 trait Admin extends HttpGateway {
 
   import context.dispatcher
-
-  val cache = new ConcurrentHashMap[Int, HttpResponse]()
 
   abstract override def handle: Receive = super.handle orElse {
 
