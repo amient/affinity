@@ -64,11 +64,11 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
 
   "A Simple Gateway" should "play ping pong well" in {
-    gateway.http_sync(GET, s"/ping").entity should be(jsonStringEntity("pong"))
+    gateway.http_get(gateway.uri("/ping")).entity should be(jsonStringEntity("pong"))
   }
 
   "A Simple Cluster" should "play ping pong too" in {
-    gateway.http_sync(GET, s"/clusterping").entity should be(jsonStringEntity("pong"))
+    gateway.http_get(gateway.uri("/clusterping")).entity should be(jsonStringEntity("pong"))
   }
 
 }

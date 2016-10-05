@@ -64,6 +64,8 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
+  import gateway._
+
   val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test") {
     override def preStart(): Unit = {
       super.preStart()
@@ -85,10 +87,10 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
   "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
 
-    gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("initialValueA"))
-    gateway.http_sync(GET, "/B").entity should be(jsonStringEntity("initialValueB"))
-    gateway.http_sync(POST, "/A/updatedValueA").status.intValue should be(303)
-    gateway.http_sync(GET, "/A").entity should be(jsonStringEntity("updatedValueA"))
+    http_get(uri("/A")).entity should be(jsonStringEntity("initialValueA"))
+    http_get(uri("/B")).entity should be(jsonStringEntity("initialValueB"))
+    http_post(uri("/A/updatedValueA")).status.intValue should be(303)
+    http_get(uri("/A")).entity should be(jsonStringEntity("updatedValueA"))
 
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
@@ -103,8 +105,8 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
         while (!stopSignal.get) {
           Thread.sleep(1)
           if (isInterrupted) throw new InterruptedException
-          val path = if (random.nextBoolean()) "/A" else "/B"
-          requests += gateway.http(GET, path) map {
+          val uri = gateway.uri(if (random.nextBoolean()) "/A" else "/B")
+          requests += http(GET, uri) map {
             case response => response.status.value
           } recover {
             case e: Throwable => e.getMessage

@@ -22,20 +22,15 @@ package io.amient.affinity.example.rest
 import java.util.NoSuchElementException
 
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.Uri._
-import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
-import akka.http.scaladsl.model.{headers, _}
+import akka.http.scaladsl.model._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.{Encoder, HttpExchange}
-import io.amient.affinity.core.util.TimeCryptoProof
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.ConfigEntry
-import io.amient.affinity.example.http.handler.{Admin, Graph, WebApp}
+import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi, WebApp}
 import io.amient.affinity.example.rest.handler._
 
-import scala.concurrent.{Await, Future, Promise}
-import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object HttpGateway {
@@ -47,11 +42,11 @@ object HttpGateway {
 
     new Node(config) {
       startGateway(new HttpGateway
-        with Ping
         with Graph
-        with WebApp
         with Admin
-        with Status
+        with PublicApi
+        with WebApp
+        with Ping
         with Fail
       )
     }
@@ -69,8 +64,6 @@ class HttpGateway extends Gateway with ActorState {
   implicit val partition = 0
   val settings = state[String, ConfigEntry]("settings")
 
-  import context.dispatcher
-
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)
     case e: NoSuchElementException => Encoder.json(NotFound, "Haven't got that" -> e.getMessage)
@@ -82,88 +75,6 @@ class HttpGateway extends Gateway with ActorState {
     case e =>
       e.printStackTrace()
       Encoder.json(ServiceUnavailable, "Something is seriously wrong with our servers..")
-  }
-
-
-  /**
-    * AUTH_CRYPTO can be applied to requests that have been matched in the handler Receive method.
-    * It is a partial function with curried closure that is invoked on succesful authentication with
-    * the server signature that needs to be returned as part of response.
-    * This is an encryption-based authentication using the keys and salts stored in the settings state.
-    */
-  object AUTH_CRYPTO {
-
-    def apply(path: Path, query: Query, response: Promise[HttpResponse])(code: (String) => HttpResponse): Unit = {
-      try {
-        query.get("signature") match {
-          case None => throw new IllegalAccessError
-          case Some(sig) =>
-            sig.split(":") match {
-              case Array(k, clientSignature) =>
-                settings.get(k) match {
-                  case None => throw new IllegalAccessError(s"Invalid api key $k")
-                  case Some(configEntry) =>
-                    if (configEntry.crypto.verify(clientSignature, path.toString)) {
-                      val serverSignature = configEntry.crypto.sign(clientSignature)
-                      response.success(code(serverSignature))
-                    } else {
-                      throw new IllegalAccessError(configEntry.crypto.sign(path.toString))
-                    }
-                }
-
-              case _ => throw new IllegalAccessError
-            }
-        }
-      } catch {
-        case e: IllegalAccessError => response.success(Encoder.json(Unauthorized, "Unauthorized, expecting " -> e.getMessage))
-        case e: Throwable => response.success(handleException(e))
-      }
-    }
-  }
-
-  /**
-    * AUTH_ADMIN is a pattern match extractor that can be used in handlers that want to
-    * use Basic HTTP Authentication for administrative tasks like creating new keys etc.
-    */
-  object AUTH_ADMIN {
-
-    val adminConfig: Option[ConfigEntry] = settings.get("admin")
-
-    def apply(exchange: HttpExchange)(code: (String) => Future[HttpResponse]): Unit = {
-
-      def executeCode(user: String): Future[HttpResponse] =  try {
-        code(user)
-      } catch {
-        case NonFatal(e) => Future.failed(e)
-      }
-
-      val auth = exchange.request.header[Authorization]
-      val response = exchange.promise
-      val credentials = for (Authorization(c@BasicHttpCredentials(username, password)) <- auth) yield c
-      adminConfig match {
-        case None =>
-          credentials match {
-            case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
-              settings.put("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes)))
-              fulfillAndHandleErrors(response) {
-                executeCode(username)
-              }
-            case _ => response.success(HttpResponse(
-              Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
-          }
-        case Some(ConfigEntry(any, adminPassword)) => credentials match {
-          case Some(BasicHttpCredentials(username, password)) if username == "admin"
-            && TimeCryptoProof.toHex(password.getBytes) == adminPassword =>
-            fulfillAndHandleErrors(response) {
-              executeCode(username)
-            }
-          case _ =>
-            response.success(HttpResponse(Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", None)))))
-        }
-      }
-
-    }
-
   }
 
 }

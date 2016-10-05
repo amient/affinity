@@ -94,8 +94,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
           if (isInterrupted) throw new InterruptedException
           val key = random.nextInt.toString
           val value = random.nextInt.toString
-          val path = s"/$key/$value"
-          requests += gateway.http(POST, path) map {
+          requests += gateway.http(POST, gateway.uri(s"/$key/$value")) map {
             case response =>
               expected += key -> value
               response.status.value
@@ -110,7 +109,9 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
           }
           errorCount.set(requestCount.get - statuses("303 See Other"))
         } catch {
-          case e: Throwable => errorCount.set(requests.size)
+          case e: Throwable =>
+            e.printStackTrace()
+            errorCount.set(requests.size)
         }
 
       }
@@ -124,7 +125,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
       Thread.sleep(100)
       errorCount.get should be(0L)
       val x = Await.result(Future.sequence(expected.map { case (key, value) =>
-        gateway.http(GET, s"/$key").map {
+        gateway.http(GET, gateway.uri(s"/$key")).map {
           response => (response.entity, jsonStringEntity(value))
         }
       }), 10 seconds)

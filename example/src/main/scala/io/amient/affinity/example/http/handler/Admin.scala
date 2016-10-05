@@ -21,14 +21,18 @@ package io.amient.affinity.example.http.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
-import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
+import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
+import akka.http.scaladsl.model.{HttpResponse, headers}
+import akka.pattern.ask
+import akka.util.Timeout
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
+import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 trait Admin extends HttpGateway {
@@ -37,18 +41,9 @@ trait Admin extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, uri@PATH("p", "access", pii), query, response) => AUTH_CRYPTO(uri, query, response) { (sig: String) =>
-      Encoder.json(OK, Map(
-        "signature" -> sig,
-        "pii" -> pii
-      ))
-    }
-
-
     case http@HTTP(GET, PATH("settings"), _, _) => AUTH_ADMIN(http) { (user: String) =>
       try {
         Future.successful {
-          throw new RuntimeException("!")
           Encoder.json(OK, Map(
             "credentials" -> user,
             "settings" -> settings.iterator.toMap
@@ -62,13 +57,70 @@ trait Admin extends HttpGateway {
 
     case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
       settings(key) map {
-        case _ => Encoder.json(BadRequest, "That key already exists" -> key)
-      } recover {
-        case e: NoSuchElementException =>
+        case Some(existinKey) => Encoder.json(BadRequest, "That key already exists" -> key)
+        case None =>
           val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
           settings.put(key, ConfigEntry(key, salt))
-          HttpResponse(SeeOther, headers = List(headers.Location(Uri("/settings"))))
+          Encoder.json(OK, salt)
       }
+    }
+
+    case http@HTTP(GET, PATH("status", INT(p)), _, response) => AUTH_ADMIN(http) { (user: String) =>
+      implicit val timeout = Timeout(1 second)
+      cluster ? (p.toInt, "status") map {
+        case any => Encoder.json(OK, any)
+      }
+    }
+
+    case http@HTTP(GET, PATH("status"), _, response) => AUTH_ADMIN(http)(user => Future.successful {
+      Encoder.json(OK, Map(
+        "singleton-services" -> describeServices,
+        "partition-masters" -> describeRegions
+      ))
+    })
+
+  }
+
+  /**
+    * AUTH_ADMIN is a pattern match extractor that can be used in handlers that want to
+    * use Basic HTTP Authentication for administrative tasks like creating new keys etc.
+    */
+  object AUTH_ADMIN {
+
+    def apply(exchange: HttpExchange)(code: (String) => Future[HttpResponse]): Unit = {
+
+      def executeCode(user: String): Future[HttpResponse] = try {
+        code(user)
+      } catch {
+        case NonFatal(e) => Future.failed(e)
+      }
+
+      val auth = exchange.request.header[Authorization]
+      val response = exchange.promise
+      val credentials = for (Authorization(c@BasicHttpCredentials(username, password)) <- auth) yield c
+      settings.get("admin") match {
+        case None =>
+          credentials match {
+            case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
+              settings.put("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes)))
+              fulfillAndHandleErrors(response) {
+                executeCode(username)
+              }
+            case _ => response.success(HttpResponse(
+              Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
+          }
+        case Some(ConfigEntry(any, adminPassword)) => credentials match {
+          case Some(BasicHttpCredentials(username, password)) if username == "admin"
+            && TimeCryptoProof.toHex(password.getBytes) == adminPassword =>
+
+            fulfillAndHandleErrors(response) {
+              executeCode(username)
+            }
+          case _ =>
+            response.success(HttpResponse(Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", None)))))
+        }
+      }
+
     }
 
   }

@@ -20,7 +20,7 @@
 package io.amient.affinity.testutil
 
 import java.io.File
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress}
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPInputStream
@@ -104,9 +104,26 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       println(s"TestGatewayNode listening on $httpPort")
     }
 
-    def http(method: HttpMethod, path: String): Future[HttpResponse] = {
-      val uri = Uri(s"http://localhost:$httpPort$path")
-      val decodedResponse: Future[HttpResponse] = Http().singleRequest(HttpRequest(method = method, uri = uri)) flatMap {
+    def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
+
+    def http(method: HttpMethod, uri: Uri): Future[HttpResponse] = {
+      http(HttpRequest(method = method, uri = uri))
+    }
+
+    def http_get(uri: Uri, headers: List[HttpHeader] = List()): HttpResponse = {
+      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri, headers = headers)), 2 seconds)
+    }
+
+    def http_get(uri: Uri): HttpResponse = {
+      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri)), 2 seconds)
+    }
+
+    def http_post(uri: Uri, entity: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
+      Await.result(http(HttpRequest(method = HttpMethods.POST, uri = uri, headers = headers)), 2 seconds)
+    }
+
+    def http(req: HttpRequest) = {
+      val decodedResponse: Future[HttpResponse] = Http().singleRequest(req) flatMap {
         response => response.header[headers.`Content-Encoding`] match {
           case Some(c) if (c.encodings.contains(HttpEncodings.gzip)) =>
             response.entity.dataBytes.map(_.asByteBuffer).runWith(Sink.seq).map {
@@ -119,10 +136,6 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
         }
       }
       decodedResponse.flatMap(_.toStrict(2 seconds))
-    }
-
-    def http_sync(method: HttpMethod, path: String): HttpResponse = {
-      Await.result(http(method, path), 2 seconds)
     }
 
   }

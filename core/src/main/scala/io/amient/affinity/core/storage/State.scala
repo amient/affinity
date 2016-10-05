@@ -153,7 +153,7 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
       (success) => prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V]),
       (failure: Throwable) => {
         //write to storage failed - reverting the memstore modification
-        //TODO use cell versioning or timestamp to cancel revert if another write succeeded in the mean-time
+        //TODO use cell versioning or timestamp to cancel revert if another write succeeded after the one being reverted
         prev match {
           case None => storage.memstore.remove(k)
           case Some(rollback) => storage.memstore.update(k, rollback)

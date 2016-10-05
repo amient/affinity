@@ -20,7 +20,6 @@
 package io.amient.affinity.core.util;
 
 import javax.xml.bind.DatatypeConverter;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.time.ZoneOffset;
@@ -60,33 +59,5 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
         String hexHash = DatatypeConverter.printHexBinary(hash);
         return hexHash;
     }
-
-    /**
-     * Example sign URL function
-     *
-     * @param url
-     * @param apiKey
-     * @param apiSalt
-     * @return
-     * @throws Exception
-     */
-    public URL signURL(URL url, String apiKey, String apiSalt, int shift) throws Exception {
-        String signature = timeBasedHash(url.getPath().toString(), apiSalt, shift);
-        String params = url.getQuery() == null ? "?" : "?" + url.getQuery() + "&";
-        return new URL(url, params + "signature=" + apiKey + ":" + signature);
-    }
-
-//    public void verifiedApiCall(URL url, String apiKey, String apiSalt) throws Exception {
-//        String signature = timeBasedHash(url.getPath().toString(), apiSalt, 0);
-//        String params = url.getQuery() == null ? "?" : "?" + url.getQuery() + "&";
-//        URL request = new URL(url, params + "signature=" + apiKey + ":" + signature);
-//        HttpResponse response = http.request(request);
-//        JsonNode json = jsonMapper.readValue(response.entity);
-//        String responseSignature = json.get("signature");
-//        assert (timeBasedHash(signature, apiSalt, 0) == responseSignature)
-//                || timeBasedHash(signature, apiSalt, -1) == responseSignature
-//                || timeBasedHash(signature, apiSalt, +1) == responseSignature;
-//        return json;
-//    }
 
 }

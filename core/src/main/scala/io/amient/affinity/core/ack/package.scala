@@ -67,7 +67,7 @@ package object ack {
     * @return
     */
   def ack[T](target: ActorRef, message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
-    val maxRetries = 3 //FIXME configurable ack retries
+    val maxRetries = 3
     val promise = Promise[T]()
     def attempt(retry: Int, delay: Duration = 0 seconds): Unit = {
       val f = if (delay.toMillis == 0) target ? message else after(timeout.duration, scheduler)(target ? message)

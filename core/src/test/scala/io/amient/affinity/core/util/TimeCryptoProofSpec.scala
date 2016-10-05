@@ -86,10 +86,10 @@ class TimeCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
         val crypto2 = new TimeCryptoProofSHA256(salt2)
         val url = new URL("https://example.com/xyz?param=123456")
         val urlNoQuery = new URL("https://example.com/xyz")
-        val sig1 = crypto1.signURL(url, apiKey, salt1, 0)
-        val sig1NoQuery = crypto1.signURL(urlNoQuery, apiKey, salt1, 0)
-        val sig2 = crypto2.signURL(url, apiKey, salt2, 0)
-        val sig2NoQuery = crypto2.signURL(urlNoQuery, apiKey, salt2, 0)
+        val sig1 = crypto1.sign(url.getPath)
+        val sig1NoQuery = crypto1.sign(urlNoQuery.getPath)
+        val sig2 = crypto2.sign(url.toString)
+        val sig2NoQuery = crypto2.sign(urlNoQuery.toString)
         assert(sig1 != sig2)
       }
     }

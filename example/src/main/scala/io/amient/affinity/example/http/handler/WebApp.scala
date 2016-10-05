@@ -21,16 +21,19 @@ package io.amient.affinity.example.http.handler
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.Path._
-import io.amient.affinity.core.http.RequestMatchers.HTTP
 import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.http.RequestMatchers.HTTP
 import io.amient.affinity.example.rest.HttpGateway
 
 
 trait WebApp extends HttpGateway {
 
   abstract override def handle: Receive = super.handle orElse {
+
     case HTTP(GET, SingleSlash, _, response) =>
       response.success(Encoder.html(OK, "<html><body><h1>Hello World!</h1></body>"))
+
+
   }
 
 }
