@@ -26,9 +26,12 @@ import io.amient.affinity.core.util.ByteUtils
 class OptionSerde(val system: ExtendedActorSystem) extends JSerializer {
 
   override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = {
-    if (bytes.length == 0) None else {
-      val delegate = ByteUtils.asIntValue(bytes, bytes.length - 4)
-      Some(SerializationExtension(system).serializerByIdentity(delegate).fromBinary(bytes))
+    if (bytes.length == 0) None
+    else {
+      val serializerIdentifier = ByteUtils.asIntValue(bytes, 0)
+      val data = new Array[Byte](bytes.length - 4)
+      Array.copy(bytes, 4, data, 0, bytes.length - 4)
+      Some(SerializationExtension(system).serializerByIdentity(serializerIdentifier).fromBinary(data))
     }
   }
 
@@ -40,8 +43,8 @@ class OptionSerde(val system: ExtendedActorSystem) extends JSerializer {
       val delegate = SerializationExtension(system).findSerializerFor(other)
       val bytes = delegate.toBinary(other)
       val result = new Array[Byte](bytes.length + 4)
-      Array.copy(bytes, 0, result, 0, bytes.length)
-      ByteUtils.putIntValue(delegate.identifier, result, bytes.length)
+      ByteUtils.putIntValue(delegate.identifier, result, 0)
+      Array.copy(bytes, 0, result, 4, bytes.length)
       result
   }
 

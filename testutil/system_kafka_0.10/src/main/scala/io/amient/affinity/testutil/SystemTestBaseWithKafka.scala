@@ -95,8 +95,8 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
         data(key)
       }
 
-      case request @ PutValue(key, value) => replyWith[String](request, sender) {
-        data.put(key, value) map(_.getOrElse(""))
+      case request @ PutValue(key, value) => replyWith(request, sender) {
+        data.put(key, value)
       }
     }
   }
@@ -105,11 +105,11 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
 
 object MyTestPartition {
 
-  case class GetValue(key: String) extends Reply[String] {
+  case class GetValue(key: String) extends Reply[Option[String]] {
     override def hashCode(): Int = key.hashCode
   }
 
-  case class PutValue(key: String, value: String) extends Reply[String] {
+  case class PutValue(key: String, value: String) extends Reply[Option[String]] {
     override def hashCode(): Int = key.hashCode
   }
 

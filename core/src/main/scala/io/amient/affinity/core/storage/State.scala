@@ -22,19 +22,22 @@ package io.amient.affinity.core.storage
 import java.nio.ByteBuffer
 
 import akka.actor.ActorSystem
-import akka.serialization.{JSerializer, SerializationExtension, Serializer}
-import com.typesafe.config.Config
+import akka.serialization.{SerializationExtension, Serializer}
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import scala.concurrent.duration._
 
 object State {
   val CONFIG_STATE = "affinity.state"
+
   def CONFIG_STATE_STORE(name: String) = s"affinity.state.$name"
 
   val CONFIG_STORAGE_CLASS = "storage.class"
   val CONFIG_MEMSTORE_CLASS = "memstore.class"
+  val CONFIG_MEMSTORE_READ_TIMEOUT_MS = "memstore.read.timeout.ms"
 }
 
 class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(implicit val partition: Int) {
@@ -54,16 +57,24 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     serialization.serializerFor(serdeClass)
   }
 
+  import State._
+
+  val config = stateConfig.withFallback(ConfigFactory.empty()
+    .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
+    .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
+  )
+
   val keySerde = serde[K]
   val valueSerde = serde[V]
+  val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
-  private val storageClass = Class.forName(stateConfig.getString(State.CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
+  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
   private val storageClassSymbol = rootMirror.classSymbol(storageClass)
   private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage = constructorMirror(stateConfig, partition).asInstanceOf[Storage]
+  val storage = constructorMirror(config, partition).asInstanceOf[Storage]
 
   import system.dispatcher
 
@@ -71,19 +82,24 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     * Retrieve a value from the store asynchronously
     *
     * @param key
-    * @return Future.Success(V) if the key exists and the value could be retrieved and deserialized
-    *         Future.Failed(UnsupportedOperationException) if the key exists but the value class is not registered
-    *         Future.Failed(NoSuchElementException) if the key doesn't exist
-    *         Future.Failed(Throwable) if any other non-fatal exception occurs
+    * @return Future.Success(Some(V)) if the key exists and the value could be retrieved and deserialized
+    *         Future.Success(None) if the key doesn't exist
+    *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
-  def apply(key: K): Future[V] = {
+  def apply(key: K): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    storage.memstore(k) flatMap {
-      case d => valueSerde.fromBinary(d.array) match {
-        case value: V => Future.successful(value)
-        case _ => Future.failed(new UnsupportedOperationException(key.toString))
+    storage.memstore(k) map {
+      _ map[V] {
+        case d => valueSerde.fromBinary(d.array) match {
+          case value: V => value
+          case _ => throw new UnsupportedOperationException(key.toString)
+        }
       }
     }
+  }
+
+  def get(key: K): Option[V] = {
+    Await.result(apply(key), readTimeout)
   }
 
   def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
@@ -106,8 +122,8 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     */
   def put(key: K, value: V): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    val write = if (value == null) null else ByteBuffer.wrap (valueSerde.toBinary (value.asInstanceOf[AnyRef]))
-    storage.memstore.update (k, write) match {
+    val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBinary(value.asInstanceOf[AnyRef]))
+    storage.memstore.update(k, write) match {
       case Some(prev) if (prev == write) => Future.successful(Some(value))
       case differentOrNone => writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))
     }
@@ -128,12 +144,12 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     storage.memstore.remove(k) match {
       case None => Future.successful(None)
-      case differentOrNone =>  writeWithMemstoreRollback(k, differentOrNone, storage.write(k, null))
+      case differentOrNone => writeWithMemstoreRollback(k, differentOrNone, storage.write(k, null))
     }
   }
 
   private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
-    write transform (
+    write transform(
       (success) => prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V]),
       (failure: Throwable) => {
         //write to storage failed - reverting the memstore modification

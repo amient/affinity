@@ -47,13 +47,12 @@ object HttpGateway {
 
     new Node(config) {
       startGateway(new HttpGateway
+        with Ping
+        with Graph
+        with WebApp
         with Admin
         with Status
-        with Ping
         with Fail
-        with Graph
-        with GraphConnect
-        with WebApp
       )
     }
   }
@@ -101,13 +100,17 @@ class HttpGateway extends Gateway with ActorState {
           case Some(sig) =>
             sig.split(":") match {
               case Array(k, clientSignature) =>
-                val configEntry = Await.result(settings(k), 1 second) //TODO make this timeout configurable within the state
-                if (configEntry.crypto.verify(clientSignature, path.toString)) {
-                  val serverSignature = configEntry.crypto.sign(clientSignature)
-                  response.success(code(serverSignature))
-                } else {
-                  throw new IllegalAccessError(configEntry.crypto.sign(path.toString))
+                settings.get(k) match {
+                  case None => throw new IllegalAccessError(s"Invalid api key $k")
+                  case Some(configEntry) =>
+                    if (configEntry.crypto.verify(clientSignature, path.toString)) {
+                      val serverSignature = configEntry.crypto.sign(clientSignature)
+                      response.success(code(serverSignature))
+                    } else {
+                      throw new IllegalAccessError(configEntry.crypto.sign(path.toString))
+                    }
                 }
+
               case _ => throw new IllegalAccessError
             }
         }
@@ -124,9 +127,7 @@ class HttpGateway extends Gateway with ActorState {
     */
   object AUTH_ADMIN {
 
-    val adminConfig: Option[ConfigEntry] = Await.result(settings("admin") map (Some(_)) recover {
-      case e: NoSuchElementException => None
-    }, 1 second) //TODO make this timeout configurable within the state
+    val adminConfig: Option[ConfigEntry] = settings.get("admin")
 
     def apply(exchange: HttpExchange)(code: (String) => Future[HttpResponse]): Unit = {
 

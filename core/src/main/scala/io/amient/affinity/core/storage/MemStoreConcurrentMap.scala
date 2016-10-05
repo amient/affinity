@@ -22,14 +22,19 @@ package io.amient.affinity.core.storage
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 class MemStoreConcurrentMap extends MemStore {
 
   private val internal = new ConcurrentHashMap[MK, MV]()
 
-  override def apply(key: MK): Future[MV] = internal.get(key) match {
-    case null => Future.failed(new NoSuchElementException)
-    case other => Future.successful(other)
+  override def apply(key: MK): Future[Option[MV]] = try {
+    internal.get(key) match {
+      case null => Future.successful(None)
+      case value => Future.successful(Some(value))
+    }
+  } catch {
+    case NonFatal(e) => Future.failed(e)
   }
 
   override def iterator = new Iterator[(MK, MV)] {

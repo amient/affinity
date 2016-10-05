@@ -88,7 +88,7 @@ class DataPartition extends Partition {
       * getting Component object by the Component ID
       */
     case request@GetComponent(cid) => replyWith(request, sender) {
-        components(cid)
+      components(cid)
     }
 
     /**
@@ -112,9 +112,13 @@ class DataPartition extends Partition {
 
     case request@UpdateVertexComponent(vid, cid) => replyWith(request, sender) {
       graph(vid) flatMap {
-        case props if (props.component == cid) => Future.successful(cid)
-        case props => graph.put(vid, props.withComponent(cid)) map {
-          case _ => cid
+        _ match {
+          case None => Future.failed(new NoSuchElementException)
+          case Some(props) if (props.component == cid) => Future.successful(cid)
+          case Some(props) => graph.put(vid, props.withComponent(cid)) map {
+            case _ => cid
+          }
+
         }
       }
     }
@@ -126,16 +130,16 @@ class DataPartition extends Partition {
       * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
       */
     case request@ModifyGraph(vertex, edge, GOP.ADD) => replyWith(request, sender) {
-      graph(vertex) recover {
-        case e: NoSuchElementException => VertexProps(0L, -1, Set())
-      } flatMap {
-        case existing if (existing.edges.exists(_.target == edge.target)) =>
-          Future.successful(existing)
-        case existing =>
-          val updated = existing.withEdges(existing.edges + edge)
-          graph.put(vertex, updated) map {
-            case _ => updated
-          }
+      graph(vertex) flatMap {
+        _ match {
+          case None => Future.failed(new NoSuchElementException)
+          case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Future.successful(existing)
+          case Some(existing) =>
+            val updated = existing.withEdges(existing.edges + edge)
+            graph.put(vertex, updated) map {
+              case _ => updated
+            }
+        }
       }
     }
 
@@ -147,14 +151,18 @@ class DataPartition extends Partition {
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
     case request@ModifyGraph(vid, edge, GOP.REMOVE) => replyWith(request, sender) {
-      graph(vid) flatMap { existing =>
-        if (!existing.edges.exists(_.target == edge.target)) {
-          Future.failed(throw new IllegalArgumentException("not connected"))
-        } else {
-          val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
-          graph.put(vid, updated) map {
-            case _ => updated
-          }
+      graph(vid) flatMap {
+        _ match {
+          case None => Future.failed(new NoSuchElementException)
+          case Some(existing) =>
+            if (!existing.edges.exists(_.target == edge.target)) {
+              Future.failed(throw new IllegalArgumentException("not connected"))
+            } else {
+              val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
+              graph.put(vid, updated) map {
+                case _ => updated
+              }
+            }
         }
       }
     }

@@ -30,11 +30,11 @@ trait MemStore {
 
   /**
     * @param key ByteBuffer r
-    * @return Future.Success(ByteBuffer) if key exists
-    *         Future.Failure(NoSuchElementException) when the key doesn't exist
+    * @return Future.Success(Some(MV) if key exists
+    *         Future.Success(None) if the key doesn't exist
     *         Future.Failure(Exception) when any exception occurs
     */
-  def apply(key: MK): Future[MV]
+  def apply(key: MK): Future[Option[MV]]
 
   //TODO #18 instead of memstore iterator, provide an asynchronous Stream[(MK,MV)]
   def iterator: Iterator[(MK,MV)]

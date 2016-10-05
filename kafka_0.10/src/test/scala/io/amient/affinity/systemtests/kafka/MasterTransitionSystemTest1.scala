@@ -49,7 +49,10 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
         delegateAndHandleErrors(response, ack(cluster, GetValue(key))) {
-          case value => Encoder.json(OK, value, gzip = false)
+          _ match {
+            case None => HttpResponse(NotFound)
+            case Some(value) => Encoder.json(OK, value, gzip = false)
+          }
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>

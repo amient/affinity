@@ -26,8 +26,8 @@ class MemStoreSimpleMap extends MemStore {
 
   private val internal = scala.collection.mutable.Map[MK, MV]()
 
-  override def apply(key: MK): Future[MV] = try {
-    Future.successful(internal(key))
+  override def apply(key: MK): Future[Option[MV]] = try {
+    Future.successful(internal.get(key))
   } catch {
     case NonFatal(e) => Future.failed(e)
   }

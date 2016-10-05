@@ -61,11 +61,11 @@ final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edg
 final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord[Component]
 
 
-final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[VertexProps] {
+final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[Option[VertexProps]] {
   override def hashCode(): Int = vertex.hashCode
 }
 
-final case class GetComponent(cid: Int) extends AvroRecord[GetComponent] with Reply[Component] {
+final case class GetComponent(cid: Int) extends AvroRecord[GetComponent] with Reply[Option[Component]] {
   override def hashCode(): Int = cid.hashCode
 }
 
