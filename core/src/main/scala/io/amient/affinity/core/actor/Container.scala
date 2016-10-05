@@ -74,7 +74,8 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
     super.postStop()
   }
 
-  import context.dispatcher
+  implicit val dispatcher = context.dispatcher
+  implicit val scheduler = context.system.scheduler
 
   override def receive: Receive = {
     case ServiceOnline(ref) =>

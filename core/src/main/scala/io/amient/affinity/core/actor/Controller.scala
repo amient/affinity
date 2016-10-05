@@ -55,15 +55,13 @@ class Controller extends Actor {
 
   import Controller._
 
-  implicit val system = context.system
-
-  //controller terminates the system so cannot use system.dispatcher for Futures execution
-  import scala.concurrent.ExecutionContext.Implicits.global
+  val system = context.system
 
   val regionCoordinator = try {
     Coordinator.create(system, "regions")
   } catch {
     case e: Throwable =>
+      import scala.concurrent.ExecutionContext.Implicits.global
       system.terminate() onComplete { _ =>
         e.printStackTrace()
         System.exit(10)
@@ -75,6 +73,7 @@ class Controller extends Actor {
     Coordinator.create(system, "services")
   } catch {
     case e: Throwable =>
+      import scala.concurrent.ExecutionContext.Implicits.global
       system.terminate() onComplete { _ =>
         e.printStackTrace()
         System.exit(11)
@@ -86,11 +85,15 @@ class Controller extends Actor {
   private var regionPromise: Promise[Unit] = null
   private var servicesPromise: Promise[Unit] = null
 
+
   override def postStop(): Unit = {
     regionCoordinator.close()
     serviceCoordinator.close()
     super.postStop()
   }
+
+  import system.dispatcher
+  implicit val scheduler = context.system.scheduler
 
   override def receive: Receive = {
 

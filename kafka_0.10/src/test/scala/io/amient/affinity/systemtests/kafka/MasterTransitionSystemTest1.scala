@@ -44,6 +44,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
     import MyTestPartition._
     import context.dispatcher
+    implicit val scheduler = context.system.scheduler
 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>

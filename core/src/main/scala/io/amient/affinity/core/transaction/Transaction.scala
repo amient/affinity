@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.transaction
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Scheduler}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 
@@ -58,7 +58,7 @@ class Transaction(cluster: ActorRef) {
     stack.foreach { case (completed: CompletedInstruction[_]) =>
       completed.reverse.foreach {
         case reversal =>
-          //println("REVERTING " + completed.instr + " WITH " + reversal)
+//          println("REVERTING " + completed.instr + " WITH " + reversal)
           cluster ! reversal
       }
     }
@@ -66,28 +66,28 @@ class Transaction(cluster: ActorRef) {
 
   def execute[T: ClassTag](read: Future[T])(implicit context: ExecutionContext): Future[T] = {
     val promise = Promise[T]()
-    implicit val timeout = Timeout(10 seconds)
+    implicit val timeout = Timeout(1 seconds)
     read onComplete {
       case Success(result) =>
-        //println(s"SUCCESS $result")
+//        println(s"SUCCESS $result")
         promise.success(result)
       case Failure(e) =>
-        //println(s"FAILURE ${e.getMessage}")
+//        println(s"FAILURE ${e.getMessage}")
         promise.failure(e)
     }
     promise.future
   }
 
-  def execute[T: ClassTag](instr: Instruction[T])(implicit context: ExecutionContext): Future[T] = {
+  def execute[T: ClassTag](instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
-    implicit val timeout = Timeout(10 seconds)
+    implicit val timeout = Timeout(1 seconds)
     ack[T](cluster, instr) onComplete {
       case Success(result: T) =>
-        //println(s"SUCCESS $instr")
+//        println(s"SUCCESS $instr")
         stack = stack :+ CompletedInstruction(instr, result)
         promise.success(result)
       case Failure(e) =>
-        //println(s"FAILURE $instr")
+//        println(s"FAILURE $instr: $e")
         promise.failure(e)
     }
     promise.future

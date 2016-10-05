@@ -61,6 +61,7 @@ class Node(config: Config) {
   }
 
   import system.dispatcher
+  implicit val scheduler = system.scheduler
 
   final def shutdown(): Unit = {
     controller ! GracefulShutdown()

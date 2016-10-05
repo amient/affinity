@@ -45,6 +45,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
   val gateway = new TestGatewayNode(config, new Gateway {
 
     import context.dispatcher
+    implicit val scheduler = context.system.scheduler
 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>

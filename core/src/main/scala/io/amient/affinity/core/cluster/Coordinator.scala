@@ -61,6 +61,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   import Coordinator._
   import system.dispatcher
+  implicit val scheduler = system.scheduler
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
 

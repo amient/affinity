@@ -19,16 +19,21 @@
 
 package io.amient.affinity.core
 
-import akka.actor.{ActorRef, Status}
+import java.util.concurrent.TimeoutException
+
+import akka.actor.{ActorRef, Scheduler, Status}
 import akka.pattern.ask
+import akka.pattern.after
 import akka.util.Timeout
 
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.reflect.ClassTag
 import scala.reflect.classTag
 import scala.runtime.BoxedUnit
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+import scala.concurrent.duration._
 
 /**
   * These are utilities for stateless Akka Ack pattern.
@@ -61,23 +66,23 @@ package object ack {
     * @param context
     * @return
     */
-  def ack[T](target: ActorRef, message: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
-    //FIXME configurable ack retries
+  def ack[T](target: ActorRef, message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
+    val maxRetries = 3 //FIXME configurable ack retries
     val promise = Promise[T]()
-    def attempt(retry: Int = 3): Unit = {
-      target ? message map {
+    def attempt(retry: Int, delay: Duration = 0 seconds): Unit = {
+      val f = if (delay.toMillis == 0) target ? message else after(timeout.duration, scheduler)(target ? message)
+      f map {
         case result: T => promise.success(result)
         case result: BoxedUnit if (tag == classTag[Unit]) => promise.success(().asInstanceOf[T])
         case i =>
           promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
         case cause if (retry == 0) => promise.failure(cause)
-        case x =>
-          //TODO if this returns too quickly schedule the retry up to the implicit timeout
-          attempt(retry - 1)
+        case cause: TimeoutException => attempt(retry - 1)
+        case x => attempt(retry - 1, timeout.duration)
       }
     }
-    attempt()
+    attempt(maxRetries)
     promise.future
   }
 

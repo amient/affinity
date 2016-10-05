@@ -40,6 +40,7 @@ import scala.util.control.NonFatal
 trait Graph extends HttpGateway {
 
   import context.dispatcher
+  implicit val scheduler = context.system.scheduler
 
   val cache = new ConcurrentHashMap[Int, HttpResponse]()
 
@@ -133,7 +134,7 @@ trait Graph extends HttpGateway {
   private def collectComponent(vertex: Int): Future[Component] = {
     val promise = Promise[Component]()
     val ts = System.currentTimeMillis
-    implicit val timeout = Timeout(10 seconds)
+    implicit val timeout = Timeout(1 seconds)
     def collect(queue: Set[Int], agg: Set[Int]): Unit = {
       if (queue.isEmpty) {
         promise.success(Component(ts, agg))

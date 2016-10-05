@@ -118,7 +118,6 @@ class DataPartition extends Partition {
           case Some(props) => graph.put(vid, props.withComponent(cid)) map {
             case _ => cid
           }
-
         }
       }
     }
@@ -127,15 +126,17 @@ class DataPartition extends Partition {
       * Add an edge to the graph vertex.
       * This is a non-recursive operation, local to the
       * data shard owned by this partition.
-      * Responds Status.Failure if the opeartion fails, true if the data was modified, false otherwise
+      * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
     case request@ModifyGraph(vertex, edge, GOP.ADD) => replyWith(request, sender) {
       graph(vertex) flatMap {
         _ match {
-          case None => Future.failed(new NoSuchElementException)
           case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Future.successful(existing)
-          case Some(existing) =>
-            val updated = existing.withEdges(existing.edges + edge)
+          case None => val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
+            graph.put(vertex, inserted) map {
+              case _ => inserted
+            }
+          case Some(existing) => val updated = existing.withEdges(existing.edges + edge)
             graph.put(vertex, updated) map {
               case _ => updated
             }
