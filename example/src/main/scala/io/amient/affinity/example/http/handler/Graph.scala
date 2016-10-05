@@ -24,14 +24,12 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.model._
-import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example._
 import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.UserInputMediator
 
 import scala.concurrent.duration._
 
@@ -59,16 +57,6 @@ trait Graph extends HttpGateway {
       implicit val timeout = Timeout(1 seconds)
       delegateAndHandleErrors(response, ack(cluster, GetComponent(cid))) {
         Encoder.json(OK, _)
-      }
-
-    /**
-      * PUT /delegate
-      */
-    case HTTP(PUT, PATH("delegate"), query, response) =>
-      val userInputMediator = service(classOf[UserInputMediator])
-      implicit val timeout = Timeout(1 minute)
-      userInputMediator ? "hello" onSuccess {
-        case userInput: String => response.success(Encoder.json(OK, Map("userInput" -> userInput)))
       }
 
   }

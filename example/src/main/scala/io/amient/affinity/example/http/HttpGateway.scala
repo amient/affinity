@@ -31,7 +31,7 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
-import io.amient.affinity.example.http.handler.{Graph, WebApp}
+import io.amient.affinity.example.http.handler.{Admin, Graph, WebApp}
 import io.amient.affinity.example.rest.handler._
 
 import scala.concurrent.{Await, Future, Promise}
@@ -47,12 +47,12 @@ object HttpGateway {
 
     new Node(config) {
       startGateway(new HttpGateway
+        with Admin
         with Status
         with Ping
         with Fail
         with Graph
         with GraphConnect
-        with Access
         with WebApp
       )
     }
