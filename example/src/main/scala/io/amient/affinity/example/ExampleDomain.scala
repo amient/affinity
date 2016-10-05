@@ -24,25 +24,21 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.ack.Reply
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.core.transaction.Instruction
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 
 class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) {
-  //0
   register(classOf[ConfigEntry])
-  //1
   register(classOf[Edge])
-  //2
   register(classOf[VertexProps])
-  //3
-  register(classOf[ModifyGraph])
-  //4
-  register(classOf[Component])
-  //5
-  register(classOf[UpdateComponent])
-  //6
-  register(classOf[CollectComponent])
-  //7
   register(classOf[GetVertexProps])
+  register(classOf[ModifyGraph])
+  register(classOf[UpdateVertexComponent])
+
+  register(classOf[Component])
+  register(classOf[GetComponent])
+  register(classOf[UpdateComponent])
+  register(classOf[DeleteComponent])
 }
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
@@ -53,10 +49,40 @@ final case class ConfigEntry(description: String, @JsonIgnore salt: String) exte
 
 final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord[Edge]
 
-final case class VertexProps(ts: Long = 1475178519756L, edges: Set[Edge] = Set(), component: Set[Int] = Set()) extends AvroRecord[VertexProps]
+object Edges {
+  def unapply(edges: Set[Edge]): Option[Set[Int]] = Some(edges.map(_.target))
+}
 
-final case class Component(vertex: Int, ts: Long = 0L, component: Set[Int] = Set()) extends AvroRecord[Component] {
+final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord[VertexProps] {
+  def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)
+  def withEdges(newEdges: Set[Edge]) = VertexProps(System.currentTimeMillis, component, newEdges)
+}
+
+final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord[Component]
+
+
+final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[VertexProps] {
   override def hashCode(): Int = vertex.hashCode
+}
+
+final case class GetComponent(cid: Int) extends AvroRecord[GetComponent] with Reply[Component] {
+  override def hashCode(): Int = cid.hashCode
+}
+
+
+
+
+sealed trait AvroInstruction[T, R] extends AvroRecord[T] with Instruction[R] {
+  def reverse(result: R): Option[AvroInstruction[_, _]]
+}
+
+final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroInstruction[UpdateVertexComponent, Int] {
+  override def hashCode(): Int = vertex.hashCode
+
+  override def reverse(result: Int): Option[UpdateVertexComponent] = {
+    if (result == component) None else Some(UpdateVertexComponent(vertex, result))
+  }
+
 }
 
 object GOP extends Enumeration {
@@ -64,26 +90,32 @@ object GOP extends Enumeration {
   val ADD, REMOVE = Value
 }
 
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] with Reply[Boolean] {
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroInstruction[ModifyGraph, VertexProps] {
   override def hashCode(): Int = vertex.hashCode
 
-  def inverse = op match {
-    case GOP.ADD => ModifyGraph(vertex, edge, GOP.REMOVE)
-    case GOP.REMOVE => ModifyGraph(vertex, edge, GOP.ADD)
+  def reverse(props: VertexProps) = op match {
+    case GOP.ADD => Some(ModifyGraph(vertex, edge, GOP.REMOVE))
+    case GOP.REMOVE => Some(ModifyGraph(vertex, edge, GOP.ADD))
   }
 }
 
-final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[VertexProps] {
-  override def hashCode(): Int = vertex.hashCode
+
+final case class UpdateComponent(cid: Int, component: Component) extends AvroInstruction[UpdateComponent, Option[Component]] {
+  override def hashCode(): Int = cid.hashCode
+  override def reverse(c: Option[Component]) = c match {
+    case Some(result) if (result == component) => None
+    case None => Some(DeleteComponent(cid))
+    case Some(result) => Some(UpdateComponent(cid, result))
+  }
 }
 
-final case class CollectComponent(vertex: Int) extends AvroRecord[CollectComponent] with Reply[Component] {
-  override def hashCode(): Int = vertex.hashCode
-}
+final case class DeleteComponent(cid: Int) extends AvroInstruction[DeleteComponent, Option[Component]] {
+  override def hashCode(): Int = cid.hashCode
 
-final case class UpdateComponent(vertex: Int, component: Set[Int]) extends AvroRecord[UpdateComponent] with Reply[Component] {
-  override def hashCode(): Int = vertex.hashCode
+  override def reverse(c: Option[Component]) = c match {
+    case None => None
+    case Some(result) => Some(UpdateComponent(cid, result))
+  }
 }
-
 
 

@@ -54,7 +54,7 @@ class DataPartition extends Partition {
 
   val graph: State[Int, VertexProps] = state("graph")
 
-  def now() = System.currentTimeMillis
+  val components: State[Int, Component] = state("components")
 
   import context.dispatcher
 
@@ -85,20 +85,37 @@ class DataPartition extends Partition {
         ))
 
     /**
-      * getting VertexProps object by Vertex key
+      * getting Component object by the Component ID
       */
-    case request@GetVertexProps(vertex) => replyWith(request, sender) {
-      graph(vertex)
+    case request@GetComponent(cid) => replyWith(request, sender) {
+        components(cid)
     }
 
     /**
-      * Collect all connected vertices
+      * Updated component of the vertex.
+      * Responds with the Component data previously associated with the vertex
       */
-    case request@CollectComponent(vertex) => replyWith(request, sender) {
-      graph(vertex) map { existing =>
-        Component(vertex, now(), existing.edges.map(_.target))
-      } recover {
-        case e: NoSuchElementException => Component(vertex, System.currentTimeMillis, Set())
+    case request@UpdateComponent(cid, updatedComponent) => replyWith(request, sender) {
+      components.put(cid, updatedComponent)
+    }
+
+    case request@DeleteComponent(cid) => replyWith(request, sender) {
+      components.remove(cid)
+    }
+
+    /**
+      * getting VertexProps object by Vertex ID
+      */
+    case request@GetVertexProps(vid) => replyWith(request, sender) {
+      graph(vid)
+    }
+
+    case request@UpdateVertexComponent(vid, cid) => replyWith(request, sender) {
+      graph(vid) flatMap {
+        case props if (props.component == cid) => Future.successful(cid)
+        case props => graph.put(vid, props.withComponent(cid)) map {
+          case _ => cid
+        }
       }
     }
 
@@ -110,13 +127,14 @@ class DataPartition extends Partition {
       */
     case request@ModifyGraph(vertex, edge, GOP.ADD) => replyWith(request, sender) {
       graph(vertex) recover {
-        case e: NoSuchElementException => VertexProps(now(), Set())
+        case e: NoSuchElementException => VertexProps(0L, -1, Set())
       } flatMap {
         case existing if (existing.edges.exists(_.target == edge.target)) =>
-          Future.successful(false)
+          Future.successful(existing)
         case existing =>
-          graph.put(vertex, VertexProps(now(), existing.edges + edge, existing.component)) map {
-            case _ => true
+          val updated = existing.withEdges(existing.edges + edge)
+          graph.put(vertex, updated) map {
+            case _ => updated
           }
       }
     }
@@ -128,28 +146,19 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
-    case request @ ModifyGraph(vertex, edge, GOP.REMOVE) => replyWith(request, sender) {
-      graph(vertex) map { existing =>
-        graph.put(vertex, VertexProps(now(), existing.edges.filter(_.target != edge.target), existing.component))
-        true
-      } recover {
-        case e: NoSuchElementException => false
+    case request@ModifyGraph(vid, edge, GOP.REMOVE) => replyWith(request, sender) {
+      graph(vid) flatMap { existing =>
+        if (!existing.edges.exists(_.target == edge.target)) {
+          Future.failed(throw new IllegalArgumentException("not connected"))
+        } else {
+          val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
+          graph.put(vid, updated) map {
+            case _ => updated
+          }
+        }
       }
     }
 
-    /**
-      * Updated component of the vertex.
-      * Responds with the Component data previously associated with the vertex
-      */
-    case request@UpdateComponent(vertex, updatedComponent) => replyWith(request, sender) {
-      graph(vertex) flatMap { existing =>
-        graph.put(vertex, VertexProps(now(), existing.edges, updatedComponent)) map {
-          case _ => Component(vertex, now(), existing.component)
-        }
-      } recover {
-        case e: NoSuchElementException => Component(vertex, now(), Set())
-      }
-    }
 
   }
 

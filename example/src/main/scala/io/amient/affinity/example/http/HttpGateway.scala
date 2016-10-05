@@ -28,10 +28,10 @@ import akka.http.scaladsl.model.{headers, _}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.{HttpExchange, Encoder}
+import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.ConfigEntry
-import io.amient.affinity.example.http.handler.WebApp
+import io.amient.affinity.example.http.handler.{Graph, WebApp}
 import io.amient.affinity.example.rest.handler._
 
 import scala.concurrent.{Await, Future, Promise}
@@ -50,7 +50,8 @@ object HttpGateway {
         with Status
         with Ping
         with Fail
-        with Connect
+        with Graph
+        with GraphConnect
         with Access
         with WebApp
       )

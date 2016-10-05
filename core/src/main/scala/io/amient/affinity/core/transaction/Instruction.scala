@@ -17,15 +17,10 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.core.transaction
 
-import io.amient.affinity.core.serde.avro.AvroRecord
-import org.scalatest.{FlatSpec, Matchers}
+import io.amient.affinity.core.ack.Reply
 
-class DomainSpec extends FlatSpec with Matchers {
-
-  val c = Component(0, Set(101, 102))
-  val bytes = AvroRecord.write(c, c.schema)
-  AvroRecord.read(bytes, classOf[Component], c.schema) should be (c)
-
+trait Instruction[R] extends Reply[R] {
+    def reverse(result: R): Option[Instruction[_]]
 }
