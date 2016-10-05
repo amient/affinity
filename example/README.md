@@ -70,9 +70,9 @@ To view a graph vertex (vertex id is a simple Int)
 
     GET http://127.0.0.1:808x/vertex/<vertex-id> 
 
-To compute component on the fly starting from the given vertex
+To view a graph component (component id is the smallest vertex id in the component) 
 
-    GET http://127.0.0.1:808x/component/<vertex-id> 
+    GET http://127.0.0.1:808x/component/<component-id> 
 
 To connect 2 vertices into a component(non-existent vertices will be created):
 
