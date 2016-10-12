@@ -78,7 +78,7 @@ The following core features are already in place:
  - If there are multiple Partition Actors for the same physical partition
     Coordinator uses distributed logic to choose one of them as master
     and the others become standby.    
- - On becoming a Master, the Partition Actor stops consuming (tailng) 
+ - On becoming a Master, the Partition Actor stops consuming (tailing) 
     the the underlying topic, because the master receives all the writes, 
     its in-memory state is consistent and it only publishes to the kafka 
     for future bootstrap and keeping other standby(s) for the partitions 
