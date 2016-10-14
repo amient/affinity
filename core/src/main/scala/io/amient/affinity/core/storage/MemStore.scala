@@ -30,17 +30,12 @@ trait MemStore {
 
   /**
     * @param key ByteBuffer r
-    * @return Future.Success(Some(MV) if key exists
-    *         Future.Success(None) if the key doesn't exist
-    *         Future.Failure(Exception) when any exception occurs
+    * @return Some(MV) if key exists
+    *         None if the key doesn't exist
     */
-  def apply(key: MK): Future[Option[MV]]
+  def apply(key: MK): Option[MV]
 
-  //TODO #18 instead of memstore iterator, provide an asynchronous Stream[(MK,MV)]
   def iterator: Iterator[(MK,MV)]
-
-  //TODO #18 maybe size is not going to be possible when Stream and fully asynchronous mutations are implemented
-  def size: Long
 
   /**
     *

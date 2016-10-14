@@ -87,8 +87,8 @@ package object ack {
   }
 
   /**
-    * Intermediate ack with future. An ack is sent to the `replyTo` actor when the future completes.
-    * @param request which is being replied to
+    * Intermediate reply with future. An ack is sent to the `replyTo` actor when the future completes.
+    * @param request message which is being replied to
     * @param replyTo sender who sent the request and expects the reply
     * @param closure which must return future on which the acknowledgement depends
     * @tparam T
@@ -103,13 +103,14 @@ package object ack {
   }
 
   /**
-    * end of chain ack() which runs the given closure and reports either a success or failure
-    * back.
+    * end of chain reply which runs the given closure and reports either a success or failure
+    * back to the ack requester.
     *
+    * @param request message which is being replied to
     * @param replyTo an actor which required the ack. this actor will receive the result of the closure
-    * @param closure of which result will be send as acknowledgement
+    * @param closure of which result will be send as the acknowledgement value
     */
-  def reply[T](replyTo: ActorRef)(closure: => T): Unit = {
+  def reply[T](request: Reply[T], replyTo: ActorRef)(closure: => T): Unit = {
     try {
       val result: T = closure
       replyTo ! result

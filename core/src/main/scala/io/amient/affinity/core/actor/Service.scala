@@ -57,10 +57,10 @@ trait Service extends Actor {
   final override def receive: Receive = manage orElse handle
 
   private def manage: Receive = {
-    case BecomeMaster() => reply(sender) {
+    case msg @ BecomeMaster() => reply(msg, sender) {
       onBecomeMaster
     }
-    case BecomeStandby() => reply(sender) {
+    case msg @ BecomeStandby() => reply(msg, sender) {
       onBecomeStandby
     }
   }

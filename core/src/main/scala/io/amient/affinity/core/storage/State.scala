@@ -86,27 +86,22 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     *         Future.Success(None) if the key doesn't exist
     *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
-  def apply(key: K): Future[Option[V]] = {
+  def apply(key: K): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    storage.memstore(k) map {
-      _ map[V] {
-        case d => valueSerde.fromBinary(d.array) match {
-          case value: V => value
-          case _ => throw new UnsupportedOperationException(key.toString)
-        }
+    storage.memstore(k) map[V] {
+      case d => valueSerde.fromBinary(d.array) match {
+        case value: V => value
+        case _ => throw new UnsupportedOperationException(key.toString)
       }
     }
   }
 
-  def get(key: K): Option[V] = {
-    Await.result(apply(key), readTimeout)
-  }
 
   def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
     (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
   }
 
-  def size: Long = storage.memstore.size
+  def size: Long = storage.memstore.iterator.size
 
   /**
     * An asynchronous non-blocking put operation which inserts or updates the value
