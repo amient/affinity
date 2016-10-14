@@ -87,7 +87,7 @@ class DataPartition extends Partition {
     /**
       * getting Component object by the Component ID
       */
-    case request@GetComponent(cid) => replyWith(request, sender) {
+    case request@GetComponent(cid) => reply(request, sender) {
       components(cid)
     }
 
@@ -106,18 +106,16 @@ class DataPartition extends Partition {
     /**
       * getting VertexProps object by Vertex ID
       */
-    case request@GetVertexProps(vid) => replyWith(request, sender) {
+    case request@GetVertexProps(vid) => reply(request, sender) {
       graph(vid)
     }
 
     case request@UpdateVertexComponent(vid, cid) => replyWith(request, sender) {
-      graph(vid) flatMap {
-        _ match {
-          case None => Future.failed(new NoSuchElementException)
-          case Some(props) if (props.component == cid) => Future.successful(cid)
-          case Some(props) => graph.put(vid, props.withComponent(cid)) map {
-            case _ => cid
-          }
+      graph(vid) match {
+        case None => Future.failed(new NoSuchElementException)
+        case Some(props) if (props.component == cid) => Future.successful(cid)
+        case Some(props) => graph.put(vid, props.withComponent(cid)) map {
+          case _ => cid
         }
       }
     }
@@ -129,18 +127,16 @@ class DataPartition extends Partition {
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
     case request@ModifyGraph(vertex, edge, GOP.ADD) => replyWith(request, sender) {
-      graph(vertex) flatMap {
-        _ match {
-          case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Future.successful(existing)
-          case None => val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
-            graph.put(vertex, inserted) map {
-              case _ => inserted
-            }
-          case Some(existing) => val updated = existing.withEdges(existing.edges + edge)
-            graph.put(vertex, updated) map {
-              case _ => updated
-            }
-        }
+      graph(vertex) match {
+        case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Future.successful(existing)
+        case None => val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
+          graph.put(vertex, inserted) map {
+            case _ => inserted
+          }
+        case Some(existing) => val updated = existing.withEdges(existing.edges + edge)
+          graph.put(vertex, updated) map {
+            case _ => updated
+          }
       }
     }
 
@@ -152,23 +148,19 @@ class DataPartition extends Partition {
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
     case request@ModifyGraph(vid, edge, GOP.REMOVE) => replyWith(request, sender) {
-      graph(vid) flatMap {
-        _ match {
-          case None => Future.failed(new NoSuchElementException)
-          case Some(existing) =>
-            if (!existing.edges.exists(_.target == edge.target)) {
-              Future.failed(throw new IllegalArgumentException("not connected"))
-            } else {
-              val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
-              graph.put(vid, updated) map {
-                case _ => updated
-              }
+      graph(vid) match {
+        case None => Future.failed(new NoSuchElementException)
+        case Some(existing) =>
+          if (!existing.edges.exists(_.target == edge.target)) {
+            Future.failed(throw new IllegalArgumentException("not connected"))
+          } else {
+            val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
+            graph.put(vid, updated) map {
+              case _ => updated
             }
-        }
+          }
       }
     }
-
-
   }
 
 }

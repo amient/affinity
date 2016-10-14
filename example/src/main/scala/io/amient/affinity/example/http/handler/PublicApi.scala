@@ -58,7 +58,7 @@ trait PublicApi extends HttpGateway {
           case Some(sig) =>
             sig.split(":") match {
               case Array(k, clientSignature) =>
-                settings.get(k) match {
+                settings(k) match {
                   case None => throw new IllegalAccessError(s"Invalid api key $k")
                   case Some(configEntry) =>
                     if (configEntry.crypto.verify(clientSignature, path.toString)) {

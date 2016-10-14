@@ -56,12 +56,14 @@ trait Admin extends HttpGateway {
 
 
     case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
-      settings(key) map {
-        case Some(existinKey) => Encoder.json(BadRequest, "That key already exists" -> key)
-        case None =>
-          val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
-          settings.put(key, ConfigEntry(key, salt))
-          Encoder.json(OK, salt)
+      Future.successful {
+        settings(key) match {
+          case Some(existinKey) => Encoder.json(BadRequest, "That key already exists" -> key)
+          case None =>
+            val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
+            settings.put(key, ConfigEntry(key, salt))
+            Encoder.json(OK, salt)
+        }
       }
     }
 
@@ -98,7 +100,7 @@ trait Admin extends HttpGateway {
       val auth = exchange.request.header[Authorization]
       val response = exchange.promise
       val credentials = for (Authorization(c@BasicHttpCredentials(username, password)) <- auth) yield c
-      settings.get("admin") match {
+      settings("admin") match {
         case None =>
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>

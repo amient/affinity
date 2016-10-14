@@ -91,7 +91,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     }
 
     override def handle: Receive = {
-      case request @ GetValue(key) => replyWith(request, sender) {
+      case request @ GetValue(key) => reply(request, sender) {
         data(key)
       }
 

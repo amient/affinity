@@ -19,18 +19,11 @@
 
 package io.amient.affinity.core.storage
 
-import scala.concurrent.Future
-import scala.util.control.NonFatal
-
 class MemStoreSimpleMap extends MemStore {
 
   private val internal = scala.collection.mutable.Map[MK, MV]()
 
-  override def apply(key: MK): Future[Option[MV]] = try {
-    Future.successful(internal.get(key))
-  } catch {
-    case NonFatal(e) => Future.failed(e)
-  }
+  override def apply(key: MK): Option[MV] = internal.get(key)
 
   override def iterator = internal.iterator
 
