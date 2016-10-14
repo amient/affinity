@@ -39,9 +39,6 @@ trait MemStore {
   //TODO #18 instead of memstore iterator, provide an asynchronous Stream[(MK,MV)]
   def iterator: Iterator[(MK,MV)]
 
-  //TODO #18 maybe size is not going to be possible when Stream and fully asynchronous mutations are implemented
-  def size: Long
-
   /**
     *
     * @param key

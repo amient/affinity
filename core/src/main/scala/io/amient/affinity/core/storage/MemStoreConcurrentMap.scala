@@ -47,8 +47,6 @@ class MemStoreConcurrentMap extends MemStore {
     }
   }
 
-  override def size: Long = internal.size
-
   override protected[storage] def update(key: MK, value: MV): Option[MV] = internal.put(key, value) match {
     case null => None
     case prev => Some(prev)

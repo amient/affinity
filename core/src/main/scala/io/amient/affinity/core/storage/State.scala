@@ -106,7 +106,7 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
   }
 
-  def size: Long = storage.memstore.size
+  def size: Long = storage.memstore.iterator.size
 
   /**
     * An asynchronous non-blocking put operation which inserts or updates the value

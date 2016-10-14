@@ -34,8 +34,6 @@ class MemStoreSimpleMap extends MemStore {
 
   override def iterator = internal.iterator
 
-  override def size: Long = internal.size
-
   override protected[storage] def update(key: MK, value: MV): Option[MV] = internal.put(key, value)
 
   override protected[storage] def remove(key: MK):Option[MV] = internal.remove(key)
