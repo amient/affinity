@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example
 
-import akka.actor.ExtendedActorSystem
+import akka.actor.{ActorRef, ExtendedActorSystem}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.ack.Reply
 import io.amient.affinity.core.serde.avro.AvroRecord
@@ -39,6 +39,7 @@ class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(syst
   register(classOf[GetComponent])
   register(classOf[UpdateComponent])
   register(classOf[DeleteComponent])
+
 }
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
@@ -59,7 +60,6 @@ final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edg
 }
 
 final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord[Component]
-
 
 sealed trait AvroInstruction[T, R] extends AvroRecord[T] with Instruction[R] {
   def reverse(result: R): Option[AvroInstruction[_, _]]

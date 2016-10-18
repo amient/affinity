@@ -19,7 +19,20 @@
 
 package io.amient.affinity.core.actor
 
+import akka.actor.{Actor, ActorRef, Props}
 import akka.event.Logging
+import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
+import io.amient.affinity.core.ack._
+import io.amient.affinity.core.actor.Partition.Subscription
+import io.amient.affinity.core.storage.State
+
+object Partition {
+
+  final case class Subscription(stateStoreName: String, key: Any) extends Reply[ActorRef] {
+    override def hashCode(): Int = key.hashCode
+  }
+
+}
 
 trait Partition extends Service with ActorState {
 
@@ -56,4 +69,30 @@ trait Partition extends Service with ActorState {
     closeState()
   }
 
+  override protected def manage: Receive = super.manage orElse {
+    case request@Subscription(stateStoreName, key) => reply(request, sender) {
+      val state = getStateStore(stateStoreName)
+      context.actorOf(Props(new ChangeStream(state, key)))
+    }
+  }
 }
+
+class ChangeStream(state: State[_, _], key: Any) extends Actor {
+
+  override def postStop(): Unit = {
+    println("stopping websocket input")
+    state.removeWebSocket(key, self)
+  }
+
+  override def receive: Receive = {
+    case frontend: ActorRef => state.addWebSocket(key, self, frontend)
+    case tm: TextMessage =>
+      println(tm.getStrictText)
+    //TODO use json as default text instruction format
+    case bm: BinaryMessage =>
+      println("Unsupported binary message " + bm)
+    //TODO maybe use javascript avro
+  }
+
+}
+

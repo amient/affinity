@@ -39,7 +39,7 @@ trait ActorState extends Actor {
   import State._
 
   def state[K: ClassTag, V: ClassTag](name: String)(implicit partition: Int): State[K, V] = state[K,V] {
-    new State[K, V](context.system, config.getConfig(CONFIG_STATE_STORE(name)))
+    new State[K, V](name, context.system, config.getConfig(CONFIG_STATE_STORE(name)))
   }
 
   def state[K, V](creator: => State[K, V]): State[K, V] = {
@@ -51,10 +51,16 @@ trait ActorState extends Actor {
     stateStorage
   }
 
+  def getStateStore(stateStoreName: String): State[_, _] = {
+    storageRegistry.asScala.find(_.name == stateStoreName).get
+  }
+
   def bootState(): Unit = storageRegistry.asScala.foreach(_.storage.boot())
 
   def tailState(): Unit = storageRegistry.asScala.foreach(_.storage.tail())
 
   def closeState(): Unit = storageRegistry.asScala.foreach(_.storage.close())
+
+
 
 }

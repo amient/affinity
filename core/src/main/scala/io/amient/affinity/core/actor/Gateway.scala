@@ -21,15 +21,20 @@ package io.amient.affinity.core.actor
 
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Props, Terminated}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.event.Logging
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ws.{Message, UpgradeToWebSocket}
 import akka.pattern.ask
 import akka.routing._
+import akka.stream.ActorMaterializer
+import akka.stream.actor.ActorPublisher
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
+import io.amient.affinity.core.actor.Partition.Subscription
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
@@ -132,5 +137,44 @@ abstract class Gateway extends Actor {
 
   }
 
+  def openWebSocket(http: HttpExchange, stateStoreName: String, key: Any): Unit = {
+    import context.dispatcher
+    http.request.header[UpgradeToWebSocket] match {
+      case None => http.promise.success(HttpResponse(BadRequest))
+      case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
+        openWebSocket(upgrade, stateStoreName, key)
+      }
+    }
+  }
 
+  private def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any): Future[HttpResponse] = {
+    import context.dispatcher
+    implicit val scheduler = system.scheduler
+    implicit val materializer = ActorMaterializer.create(system)
+    implicit val timeout = Timeout(1 second)
+
+    ack(cluster, Subscription(stateStoreName, key)) map {
+      case source =>
+        val clientMessageSink = Sink.actorRef[Message](source, PoisonPill)
+        val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
+
+          override def preStart(): Unit = {
+            context.watch(source)
+            source ! self
+          }
+
+          override def postStop(): Unit = {
+            println("stopping websocket output")
+          }
+
+          override def receive: Receive = {
+            case Terminated(source) => context.stop(self)
+            case msg: Message if (totalDemand > 0) => onNext(msg); sender ! true
+            case msg: Message => sender ! false
+          }
+        }))
+        val flow = Flow.fromSinkAndSource(clientMessageSink, serverMessageSource)
+        upgrade.handleMessages(flow)
+    }
+  }
 }

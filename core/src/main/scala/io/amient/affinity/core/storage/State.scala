@@ -21,10 +21,14 @@ package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.serialization.{SerializationExtension, Serializer}
+import akka.util.Timeout
+import akka.pattern.ask
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
+import scala.annotation.tailrec
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -40,7 +44,8 @@ object State {
   val CONFIG_MEMSTORE_READ_TIMEOUT_MS = "memstore.read.timeout.ms"
 }
 
-class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(implicit val partition: Int) {
+class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, stateConfig: Config)
+                                     (implicit val partition: Int) {
 
   private val serialization = SerializationExtension(system)
 
@@ -86,7 +91,7 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
     *         Future.Success(None) if the key doesn't exist
     *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
-  def apply(key: K): Option[V] = {
+  def apply(key: Any): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     storage.memstore(k) map[V] {
       case d => valueSerde.fromBinary(d.array) match {
@@ -157,4 +162,28 @@ class State[K: ClassTag, V: ClassTag](system: ActorSystem, stateConfig: Config)(
       }
       )
   }
+
+  def removeWebSocket(key: Any, backend: ActorRef): Unit = {
+    //TODO remove from the list of websockets
+  }
+
+  def addWebSocket(key: Any, backend: ActorRef, frontend: ActorRef): Unit = {
+    //TODO add to the list of front-ends for the key
+    push(frontend, TextMessage(apply(key) match {
+      case None => ""
+      case Some(props) => props.toString
+    }))
+  }
+
+  @tailrec private def push(frontend: ActorRef, msg: Message): Unit = {
+    val t = 5 seconds
+    implicit val timeout = Timeout(t)
+    if (!Await.result((frontend ? msg).asInstanceOf[Future[Boolean]], t)) {
+      Thread.sleep(t.toMillis)
+      push(frontend, msg)
+    } else {
+      return
+    }
+  }
+
 }

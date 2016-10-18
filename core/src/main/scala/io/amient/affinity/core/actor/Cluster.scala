@@ -21,21 +21,25 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.routing._
+import io.amient.affinity.core.ack._
 import io.amient.affinity.core.util.ObjectHashPartitioner
 
 import scala.collection.mutable
 
 object Cluster {
   final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
+  final case class GetRoutee(msg: Any) extends Reply[ActorRefRoutee]
 }
 
 class Cluster extends Actor {
 
+  import Cluster._
+
   private val config = context.system.settings.config
 
-  private val numPartitions = config.getInt(Cluster.CONFIG_NUM_PARTITIONS)
+  private val numPartitions = config.getInt(CONFIG_NUM_PARTITIONS)
 
-  private val routes = mutable.Map[Int, Routee]()
+  private val routes = mutable.Map[Int, ActorRefRoutee]()
 
   //TODO #17 partitioner should be configurable via blackbox
   val partitioner = new ObjectHashPartitioner
@@ -59,23 +63,23 @@ class Cluster extends Actor {
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
 
-    case message => route(message)
+    case request @ GetRoutee(message) => reply(request, sender) {
+      getRoutee(message)
+    }
+    case message => getRoutee(message).send(message, sender)
 
   }
 
-  private def route(message: Any): Unit = {
+  private def getRoutee(message: Any): ActorRefRoutee = {
     val partition = message match {
       case (k, v) => partitioner.partition(k, numPartitions)
       case v => partitioner.partition(v, numPartitions)
     }
 
     routes.get(partition) match {
-      case Some(routee) =>
-        //println(s"routing $message to partition $partition represented by $routee")
-        routee.send(message, sender)
+      case Some(routee) => routee
       case None =>
         throw new IllegalStateException(s"Partition $partition is not represented in the cluster")
-
       /**
         * This means that no region has registered the partition which may happen for 2 reasons:
         * 1. all regions representing that partition are genuinely down and not coming back
@@ -86,7 +90,6 @@ class Cluster extends Actor {
         */
 
     }
-
   }
 
 

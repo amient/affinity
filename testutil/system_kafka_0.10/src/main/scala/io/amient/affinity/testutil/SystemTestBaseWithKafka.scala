@@ -87,7 +87,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
       .withValue(KafkaStorage.CONFIG_KAFKA_TOPIC, ConfigValueFactory.fromAnyRef(topic))
 
     val data = state {
-      new State[String, String](context.system, stateConfig)
+      new State[String, String](topic, context.system, stateConfig)
     }
 
     override def handle: Receive = {

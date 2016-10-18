@@ -56,7 +56,7 @@ trait Service extends Actor {
 
   final override def receive: Receive = manage orElse handle
 
-  private def manage: Receive = {
+  protected def manage: Receive = {
     case msg @ BecomeMaster() => reply(msg, sender) {
       onBecomeMaster
     }

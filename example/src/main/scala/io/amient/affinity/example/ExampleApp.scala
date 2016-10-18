@@ -29,18 +29,18 @@ object ExampleApp extends App {
 
   try {
     // singleton services
-    ServiceNode.main(Seq("2550").toArray)
+//    ServiceNode.main(Seq("2550").toArray)
 
 
     // partition masters and standbys
     DataPartition.main(Seq("2551", "0,1").toArray)
-    DataPartition.main(Seq("2552", "1,2").toArray)
+//    DataPartition.main(Seq("2552", "1,2").toArray)
     DataPartition.main(Seq("2553", "2,3").toArray)
-    DataPartition.main(Seq("2554", "3,0").toArray)
+//    DataPartition.main(Seq("2554", "3,0").toArray)
 
     // gateways
     HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
+//    HttpGateway.main(Seq("8882").toArray)
 
   } catch {
     case NonFatal(e) =>

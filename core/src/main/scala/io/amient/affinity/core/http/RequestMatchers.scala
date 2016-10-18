@@ -19,8 +19,10 @@
 
 package io.amient.affinity.core.http
 
+import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpMethod, HttpResponse}
 import akka.http.scaladsl.model.Uri.{Path, Query}
+import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 
 import scala.annotation.tailrec
 import scala.concurrent.Promise
@@ -59,4 +61,5 @@ object RequestMatchers {
   object QUERY {
     def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
   }
+
 }

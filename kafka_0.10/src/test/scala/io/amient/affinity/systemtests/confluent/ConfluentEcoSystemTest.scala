@@ -78,7 +78,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
   private def testExternalKafkaConsumer(stateStoreName: String) {
     val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
     val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-    val state = createStateStoreForPartition(stateStoreConfig)(0)
+    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
@@ -123,8 +123,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
 
   }
 
-  private def createStateStoreForPartition(stateStoreConfig: Config)(implicit partition: Int) = {
-    new State[Int, TestRecord](system, stateStoreConfig)
+  private def createStateStoreForPartition(name: String, stateStoreConfig: Config)(implicit partition: Int) = {
+    new State[Int, TestRecord](name, system, stateStoreConfig)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
@@ -160,8 +160,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
       producer.close()
     }
     //now bootstrap the state
-    val state0 = createStateStoreForPartition(stateStoreConfig)(0)
-    val state1 = createStateStoreForPartition(stateStoreConfig)(1)
+    val state0 = createStateStoreForPartition(topic, stateStoreConfig)(0)
+    val state1 = createStateStoreForPartition(topic, stateStoreConfig)(1)
     state0.storage.init()
     state1.storage.init()
     state0.storage.boot()
