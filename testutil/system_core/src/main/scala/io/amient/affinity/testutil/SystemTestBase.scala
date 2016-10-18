@@ -95,11 +95,10 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
     implicit val materializer = ActorMaterializer.create(system)
 
-    val timeout: Duration = (5 seconds)
-    val httpPort: Int = Await.result(startGateway(gateway), 10 seconds)
+    val httpPort: Int = Await.result(startGateway(gateway), startupTimeout)
 
     if (httpPort <= 0) {
-      throw new IllegalStateException(s"Node did not startup within $timeout")
+      throw new IllegalStateException(s"Gateway node failed to start")
     } else {
       println(s"TestGatewayNode listening on $httpPort")
     }

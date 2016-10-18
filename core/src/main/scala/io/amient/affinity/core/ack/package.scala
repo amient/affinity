@@ -21,7 +21,8 @@ package io.amient.affinity.core
 
 import java.util.concurrent.TimeoutException
 
-import akka.actor.{ActorRef, Scheduler, Status}
+import akka.AkkaException
+import akka.actor.{ActorInitializationException, ActorRef, Scheduler, Status}
 import akka.pattern.ask
 import akka.pattern.after
 import akka.util.Timeout
@@ -74,12 +75,12 @@ package object ack {
       f map {
         case result: T => promise.success(result)
         case result: BoxedUnit if (tag == classTag[Unit]) => promise.success(().asInstanceOf[T])
-        case i =>
-          promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
+        case i => promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
+        case cause: AkkaException => promise.failure(cause)
         case cause if (retry == 0) => promise.failure(cause)
         case cause: TimeoutException => attempt(retry - 1)
-        case x => attempt(retry - 1, timeout.duration)
+        case cause => attempt(retry - 1, timeout.duration)
       }
     }
     attempt(maxRetries)

@@ -19,17 +19,16 @@
 
 package io.amient.affinity.core.actor
 
+import akka.AkkaException
 import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
-import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 
-import scala.concurrent.{Future, Promise}
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
-import scala.collection.immutable.Iterable
+import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 
 object Controller {
 
@@ -93,6 +92,7 @@ class Controller extends Actor {
   }
 
   import system.dispatcher
+
   implicit val scheduler = context.system.scheduler
 
   override def receive: Receive = {
@@ -114,7 +114,10 @@ class Controller extends Actor {
         }
       }
 
-    case ContainerOnline("services") => servicesPromise.success(())
+    case msg@Terminated(child) if (child.path.name == "services") =>
+      if (!servicesPromise.isCompleted) servicesPromise.failure(new AkkaException("Services Container initialisation failed"))
+
+    case ContainerOnline("services") => if (!servicesPromise.isCompleted) servicesPromise.success(())
 
     case request@CreateRegion(partitionProps) =>
       val origin = sender
@@ -135,47 +138,45 @@ class Controller extends Actor {
         }
       }
 
-    //FIXME #22 when region shuts down due to partition exception CreateRegion is never called again and the promise will be 'already completed'
-    case ContainerOnline("region") => regionPromise.success(())
+    case msg@Terminated(child) if (child.path.name == "region") =>
+      if (!regionPromise.isCompleted) regionPromise.failure(new AkkaException("Region initialisation failed"))
 
+    case ContainerOnline("region") => if (!regionPromise.isCompleted) regionPromise.success(())
 
-    case request@CreateGateway(gatewayProps) =>
-      try {
-        context.actorOf(gatewayProps, name = "gateway")
-        gatewayPromise = Promise[Int]()
-        replyWith(request, sender) {
-          gatewayPromise.future
-        }
-      } catch {
-        case e: InvalidActorNameException => replyWith(request, sender) {
-          gatewayPromise.future
-        }
+    case request@CreateGateway(gatewayProps) => try {
+      context.watch(context.actorOf(gatewayProps, name = "gateway"))
+      gatewayPromise = Promise[Int]()
+      replyWith(request, sender) {
+        gatewayPromise.future
       }
+    } catch {
+      case e: InvalidActorNameException => replyWith(request, sender) {
+        gatewayPromise.future
+      }
+    }
+
+    case msg@Terminated(child) if (child.path.name == "gateway") =>
+      regionCoordinator.unwatch(child)
+      serviceCoordinator.unwatch(child)
+      if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
     case GatewayCreated(httpPort) =>
-      log.info("gateway is online " + sender)
       regionCoordinator.watch(sender, global = true)
       serviceCoordinator.watch(sender, global = true)
-      context.watch(sender)
-      //FIXME #22 when gateway gets restarted CreateGateway is never called again and the promise will be 'already completed'
-      gatewayPromise.success(httpPort)
+      if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
 
     case request@GracefulShutdown() => replyWith(request, sender) {
       implicit val timeout = Timeout(500 milliseconds)
       Future.sequence(context.children map { child =>
         log.info("Requesting GracefulShutdown from " + child)
         ack(child, GracefulShutdown())
-      }).map(_ => ()) recover {
-        case any => system.terminate()
-      }
+      }) map (_ => system.terminate()) recover {
+        case any =>
+          any.printStackTrace()
+          system.terminate()
+      } map (_ => ())
     }
 
-    case Terminated(gateway) => val gateway = sender
-      //FIXME #22 this code doesn't differntiate between termination caused by GracefulShutdown and gateway failure
-      regionCoordinator.unwatch(gateway)
-      serviceCoordinator.unwatch(gateway)
-      log.info("graceful shutdown completed, terminating actor system")
-      context.system.terminate()
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
   }
