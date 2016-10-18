@@ -53,14 +53,11 @@ abstract class Gateway extends Actor {
 
   val cluster = context.actorOf(Props(new Cluster()), name = "cluster")
 
-  context.watch(cluster)
-
   import context.system
 
   private val httpInterface: HttpInterface = new HttpInterface(
     config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
 
-  httpInterface.bind(self)
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }
 
@@ -72,8 +69,9 @@ abstract class Gateway extends Actor {
 
   override def preStart(): Unit = {
     log.info("starting gateway")
+    httpInterface.bind(self)
+    context.watch(cluster)
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
-
   }
 
   override def postStop(): Unit = {
@@ -88,7 +86,7 @@ abstract class Gateway extends Actor {
     }
   }
 
-  def handleException: PartialFunction[Throwable, HttpResponse]= {
+  def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: NoSuchElementException => HttpResponse(NotFound)
     case e: IllegalArgumentException => HttpResponse(BadRequest)
     case e: UnsupportedOperationException => HttpResponse(NotImplemented)
@@ -115,19 +113,19 @@ abstract class Gateway extends Actor {
     //no handler matched the HttpExchange
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
-    case msg @ MasterStatusUpdate("regions", add, remove) => reply[Unit](msg, sender) {
+    case msg@MasterStatusUpdate("regions", add, remove) => reply[Unit](msg, sender) {
       remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
     }
 
-    case msg @ MasterStatusUpdate("services", add, remove) => reply[Unit](msg, sender) {
+    case msg@MasterStatusUpdate("services", add, remove) => reply[Unit](msg, sender) {
       add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
       remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
     }
 
-    case GracefulShutdown() =>
-      sender ! GracefulShutdown()
+    case request@GracefulShutdown() => reply(request, sender) {
       context.stop(self)
+    }
 
     case Terminated(ref) =>
       throw new IllegalStateException("Cluster Actor terminated - must restart the gateway: " + ref)

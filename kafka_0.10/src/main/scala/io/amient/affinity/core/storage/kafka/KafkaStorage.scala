@@ -29,6 +29,7 @@ import io.amient.affinity.core.storage.Storage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBufferSerializer}
 
 import scala.collection.JavaConverters._
@@ -86,18 +87,20 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
 
   protected val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
 
-  private var tailing = true
+  @volatile private var tailing = true
+
+  @volatile private var consuming = false
 
   private val consumerError = new AtomicReference[Throwable](null)
 
   private val consumer = new Thread {
 
     val kafkaConsumer = new KafkaConsumer[ByteBuffer, ByteBuffer](consumerProps)
+
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
     kafkaConsumer.assign(consumerPartitions)
     kafkaConsumer.seekToBeginning(consumerPartitions)
-
 
     override def run(): Unit = {
 
@@ -106,14 +109,15 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
 
           if (isInterrupted) throw new InterruptedException
 
-          var keepConsuming = true
-
-          while (keepConsuming) {
+          consuming = true
+          while (consuming) {
 
             if (isInterrupted) throw new InterruptedException
 
+            consumerError.set(new BrokerNotAvailableException("Could not connect to Kafka"))
             try {
               val records = kafkaConsumer.poll(500)
+              consumerError.set(null)
               var fetchedNumRecrods = 0
               for (r <- records.iterator().asScala) {
                 fetchedNumRecrods += 1
@@ -124,26 +128,26 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {
-                keepConsuming = false
+                consuming = false
               }
             } catch {
               case e: Throwable =>
-                e.printStackTrace()
                 synchronized {
                   consumerError.set(e)
-                  notify
+                  notify //boot failure
                 }
             }
           }
 
           synchronized {
-            notify()
-            wait()
+            notify() //boot complete
+            wait() //wait for tail instruction
           }
-
         }
       } catch {
-        case e: InterruptedException => kafkaConsumer.close()
+        case e: InterruptedException => return
+      } finally {
+        kafkaConsumer.close()
       }
     }
   }
@@ -154,11 +158,14 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     consumer.synchronized {
       if (tailing) {
         tailing = false
-        //TODO #12 instead of infinite wait do interval wait with health-check
-        // the health check cannot be trivial because kafka may block infinitely when corruption occurs in the broker
-        consumer.synchronized(consumer.wait)
-        if (consumerError.get != null) {
-          throw consumerError.get
+        while (true) {
+          consumer.wait(3000)
+          if (consumerError.get != null) {
+            consumer.kafkaConsumer.wakeup()
+            throw consumerError.get
+          } else if (!consuming) {
+            return
+          }
         }
       }
     }

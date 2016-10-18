@@ -24,13 +24,13 @@ import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.core.ack._
 import io.amient.affinity.core.actor.Container._
-import io.amient.affinity.core.actor.Controller.ContainerOnline
+import io.amient.affinity.core.actor.Controller.{ContainerOnline, GracefulShutdown}
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
-import scala.concurrent.duration._
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 object Container {
 
@@ -78,6 +78,7 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
   implicit val scheduler = context.system.scheduler
 
   override def receive: Receive = {
+
     case ServiceOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
       val handle = coordinator.register(partitionActorPath)
@@ -100,5 +101,10 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       val additions = add.toList.map(ref => ack[Unit](ref, BecomeMaster()))
       Future.sequence(removals ++ additions).map(_ => ())
     }
+
+    case request@GracefulShutdown() => reply(request, sender) {
+      context.stop(self)
+    }
+
   }
 }

@@ -23,19 +23,28 @@ import io.amient.affinity.example.partition.DataPartition
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.ServiceNode
 
+import scala.util.control.NonFatal
+
 object ExampleApp extends App {
 
-  // singleton services
-  ServiceNode.main(Seq("2550").toArray)
+  try {
+    // singleton services
+    ServiceNode.main(Seq("2550").toArray)
 
-  // gateways
-  HttpGateway.main(Seq("8881").toArray)
-  HttpGateway.main(Seq("8882").toArray)
 
-  // partition masters and standbys
-  DataPartition.main(Seq("2551", "0,1").toArray)
-  DataPartition.main(Seq("2552", "1,2").toArray)
-  DataPartition.main(Seq("2553", "2,3").toArray)
-  DataPartition.main(Seq("2554", "3,0").toArray)
+    // partition masters and standbys
+    DataPartition.main(Seq("2551", "0,1").toArray)
+    DataPartition.main(Seq("2552", "1,2").toArray)
+    DataPartition.main(Seq("2553", "2,3").toArray)
+    DataPartition.main(Seq("2554", "3,0").toArray)
 
+    // gateways
+    HttpGateway.main(Seq("8881").toArray)
+    HttpGateway.main(Seq("8882").toArray)
+
+  } catch {
+    case NonFatal(e) =>
+      e.printStackTrace()
+      System.exit(1)
+  }
 }

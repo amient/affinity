@@ -30,6 +30,7 @@ import io.amient.affinity.core.actor._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 object Node {
   final val CONFIG_AKKA_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"
@@ -46,51 +47,60 @@ class Node(config: Config) {
   import Node._
 
   private val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
-  private val startupTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
-  private val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
+  val startupTimeout = config.getInt(CONFIG_AKKA_STARTUP_TIMEOUT_MS) milliseconds
+  val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
-  //in case the process is stopped from outside
   sys.addShutdownHook {
-    controller ! GracefulShutdown()
-    //we cannot use the future returned by system.terminate() above because shutdown may have already been invoked
-    Await.ready(system.whenTerminated, shutdownTimeout)
+    //in case the process is stopped from outside
+    shutdown()
   }
-
-  import system.dispatcher
-  implicit val scheduler = system.scheduler
 
   final def shutdown(): Unit = {
     controller ! GracefulShutdown()
     Await.ready(system.whenTerminated, shutdownTimeout)
   }
 
-  /**
-    * @param creator
-    * @param tag
-    * @tparam T
-    * @return Future holding the httpPort on which the gateway listens
-    */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
-    implicit val timeout = Timeout(startupTimeout)
-    ack[Int](controller, CreateGateway(Props(creator)))
+  import system.dispatcher
+  implicit val scheduler = system.scheduler
+
+  implicit def serviceCreatorToProps[T <: Service](creator: => T)(implicit tag: ClassTag[T]): Props = {
+    Props(creator)
   }
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    ack[Unit](controller, CreateRegion(Props(partitionCreator)))
+    startupFutureWithShutdownFuse(ack[Unit](controller, CreateRegion(Props(partitionCreator))))
   }
 
   def startServices(services: Props*): Future[Unit] = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
     implicit val timeout = Timeout(startupTimeout)
-    ack(controller, CreateServiceContainer(services))
+    startupFutureWithShutdownFuse(ack(controller, CreateServiceContainer(services)))
   }
 
-  implicit def serviceCreatorToProps[T <: Service](creator: => T)(implicit tag: ClassTag[T]): Props = {
-    Props(creator)
+  /**
+    * @param creator
+    * @param tag
+    * @tparam T
+    * @return the httpPort on which the gateway is listening
+    */
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
+    implicit val timeout = Timeout(startupTimeout)
+    startupFutureWithShutdownFuse(ack[Int](controller, CreateGateway(Props(creator))))
   }
+
+  private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {
+    eventual onFailure {
+      case NonFatal(e) =>
+        e.printStackTrace()
+        shutdown()
+    }
+    eventual
+  }
+
+
 }

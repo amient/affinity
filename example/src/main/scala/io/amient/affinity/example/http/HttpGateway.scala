@@ -30,7 +30,6 @@ import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.ConfigEntry
 import io.amient.affinity.example.http.handler._
 import io.amient.affinity.example.rest.handler._
-
 import scala.util.control.NonFatal
 
 object HttpGateway {
@@ -51,6 +50,7 @@ object HttpGateway {
       )
     }
   }
+
 }
 
 class HttpGateway extends Gateway with ActorState {
