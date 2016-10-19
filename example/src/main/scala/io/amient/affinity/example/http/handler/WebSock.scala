@@ -34,7 +34,7 @@ trait WebSock extends HttpGateway {
   import context.dispatcher
 
   abstract override def handle: Receive = super.handle orElse {
-    
+
     case http@HTTP(GET, PATH("wsclient.js"), _, response) => response.success(Encoder.plain(OK, js))
 
     case http@HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>

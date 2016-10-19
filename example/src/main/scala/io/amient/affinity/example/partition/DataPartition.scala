@@ -163,7 +163,7 @@ class DataPartition extends Partition {
         case None => Future.failed(new NoSuchElementException)
         case Some(existing) =>
           if (!existing.edges.exists(_.target == edge.target)) {
-            Future.failed(throw new IllegalArgumentException("not connected"))
+            Future.failed(new IllegalArgumentException("not connected"))
           } else {
             val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
             graph.put(vid, updated) map {

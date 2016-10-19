@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
@@ -33,6 +34,8 @@ import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.concurrent.duration._
+
+import scala.collection.JavaConverters._
 
 object State {
   val CONFIG_STATE = "affinity.state"
@@ -125,7 +128,11 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBinary(value.asInstanceOf[AnyRef]))
     storage.memstore.update(k, write) match {
       case Some(prev) if (prev == write) => Future.successful(Some(value))
-      case differentOrNone => writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))
+      case differentOrNone =>
+        writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write)) map {
+          case prev => frontends.get(key).foreach(_.values.asScala.foreach(push(_, value)))
+            prev
+        }
     }
   }
 
@@ -144,41 +151,71 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     storage.memstore.remove(k) match {
       case None => Future.successful(None)
-      case differentOrNone => writeWithMemstoreRollback(k, differentOrNone, storage.write(k, null))
+      case some =>
+        writeWithMemstoreRollback(k, some, storage.write(k, null)) map {
+          case prev => frontends.get(key).foreach(_.values.asScala.foreach(push(_, None)))
+            prev
+        }
     }
   }
 
+  /**
+    *
+    * @param k     serialized key
+    * @param prev  serialized bytes held at the given key before the write operation was invoked
+    * @param write write operation which is expected to succeed otherwise the memstore will be reverted to the prev value
+    * @return Future.Success(Option[ByteBuffer]) deserialized value previously held at the given key
+    *         Future.Failure(Throwable) if the failure occurs
+    */
   private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
-    write transform(
-      (success) => prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V]),
-      (failure: Throwable) => {
-        //write to storage failed - reverting the memstore modification
-        //TODO use cell versioning or timestamp to cancel revert if another write succeeded after the one being reverted
-        prev match {
-          case None => storage.memstore.remove(k)
-          case Some(rollback) => storage.memstore.update(k, rollback)
-        }
-        failure
+    def commit(success: Any) = prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V])
+    def revert(failure: Throwable) = {
+      //write to storage failed - reverting the memstore modification
+      //TODO use cell versioning or timestamp to cancel revert if another write succeeded after the one being reverted
+      prev match {
+        case None => storage.memstore.remove(k)
+        case Some(rollback) => storage.memstore.update(k, rollback)
       }
-      )
+      failure
+    }
+    write transform(commit, revert)
   }
 
+  /*
+   * WebSocket Support methods
+   */
+
+  @volatile private var frontends = Map[Any, ConcurrentHashMap[ActorRef, ActorRef]]()
+
   def removeWebSocket(key: Any, backend: ActorRef): Unit = {
-    //TODO remove from the list of websockets
+    frontends.get(key).foreach(_.remove(backend))
   }
 
   def addWebSocket(key: Any, backend: ActorRef, frontend: ActorRef): Unit = {
-    //TODO add to the list of front-ends for the key
-    push(frontend, TextMessage(apply(key) match {
-      case None => ""
-      case Some(props) => props.toString
-    }))
+    val listeners = frontends.get(key) match {
+      case Some(listeners) => listeners
+      case None =>
+        val listeners = new ConcurrentHashMap[ActorRef, ActorRef]()
+        frontends += key -> listeners
+        listeners
+    }
+    listeners.put(backend, frontend)
+
+    push(frontend, apply(key))
   }
 
-  @tailrec private def push(frontend: ActorRef, msg: Message): Unit = {
+  //TODO #23 abstract push into an observer api in the State and move all the web-socket specific logic to another package
+  //TODO #23 async push which can 1) detect dead-letters 2) with atomic cell versioning can cancel out redundant updates
+  @tailrec private def push(frontend: ActorRef, msg: Any): Unit = {
+    val wsMessage = TextMessage(msg match {
+      case None => ""
+      case Some(props) => props.toString
+      case other => other.toString
+    })
+    println("Pushing " + wsMessage)
     val t = 5 seconds
     implicit val timeout = Timeout(t)
-    if (!Await.result((frontend ? msg).asInstanceOf[Future[Boolean]], t)) {
+    if (!Await.result((frontend ? wsMessage).asInstanceOf[Future[Boolean]], t)) {
       Thread.sleep(t.toMillis)
       push(frontend, msg)
     } else {

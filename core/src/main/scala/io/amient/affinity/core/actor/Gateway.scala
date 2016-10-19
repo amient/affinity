@@ -137,18 +137,40 @@ abstract class Gateway extends Actor {
 
   }
 
+  /*
+   * WebSocket support methods
+   */
+
   protected def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any): Future[HttpResponse] = {
     import context.dispatcher
     implicit val scheduler = system.scheduler
     implicit val materializer = ActorMaterializer.create(system)
     implicit val timeout = Timeout(1 second)
 
+    println("OPENING NEW WEB SOCKET!")
+
     ack(cluster, Subscription(stateStoreName, key)) map {
       case source =>
+
+        /**
+          * Sink.actorRef supports custom termination message which will be sent to the source
+          * by the websocket materialized flow when the client closes the connection.
+          * Using PoisonPill as termination message in combination with context.watch(source)
+          * allows for closing the whole bidi flow in case the client closes the connection.
+          */
         val clientMessageSink = Sink.actorRef[Message](source, PoisonPill)
+
+        /**
+          * Source.actorPublisher doesn't detect connections closed by the server so websockets
+          * connections which are closed akka-server-side due to being idle leave zombie
+          * flows materialized.
+          */
+        //FIXME At the moment this is solved by disabling idle connections but the real fix is in akka/akka#21549
+        //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
         val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           override def preStart(): Unit = {
+            println("starting websocket output")
             context.watch(source)
             source ! self
           }

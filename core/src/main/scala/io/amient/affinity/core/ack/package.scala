@@ -78,6 +78,7 @@ package object ack {
         case i => promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
         case cause: AkkaException => promise.failure(cause)
+        case cause: IllegalArgumentException => promise.failure(cause)
         case cause if (retry == 0) => promise.failure(cause)
         case cause: TimeoutException => attempt(retry - 1)
         case cause => attempt(retry - 1, timeout.duration)

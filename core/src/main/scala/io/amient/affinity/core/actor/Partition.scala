@@ -28,6 +28,7 @@ import io.amient.affinity.core.storage.State
 
 object Partition {
 
+  //TODO #23 use protobuf for internal messages that extend Reply but not say AvroRecord
   final case class Subscription(stateStoreName: String, key: Any) extends Reply[ActorRef] {
     override def hashCode(): Int = key.hashCode
   }
@@ -79,6 +80,10 @@ trait Partition extends Service with ActorState {
 
 class ChangeStream(state: State[_, _], key: Any) extends Actor {
 
+  override def preStart(): Unit = {
+    println("starting websocket input")
+  }
+
   override def postStop(): Unit = {
     println("stopping websocket input")
     state.removeWebSocket(key, self)
@@ -88,10 +93,10 @@ class ChangeStream(state: State[_, _], key: Any) extends Actor {
     case frontend: ActorRef => state.addWebSocket(key, self, frontend)
     case tm: TextMessage =>
       println(tm.getStrictText)
-    //TODO use json as default text instruction format
+    //TODO #23 use json as default text instruction format
     case bm: BinaryMessage =>
       println("Unsupported binary message " + bm)
-    //TODO maybe use javascript avro
+    //TODO #23 end-to-end avro with js websocket client holding schema registry and using BinaryMessage
   }
 
 }

@@ -105,6 +105,10 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
 
   }
 
+  //FIXME test consistency of connect/disconnect features under failure/rollback scenarios
+  // have noticed inconsistent state when encountering failures while experimenting with websockets
+
+
   //TODO time-based DSA implementation and test, i.e. instead of shared salt, there will be a proper private key
 
 }
