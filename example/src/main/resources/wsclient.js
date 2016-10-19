@@ -30,7 +30,13 @@ function AffinityWebSocket(location, receiver) {
     return {
         send: function(text) {
             internalEnsureOpenSocket();
-            webSocket.send(text);
+            try {
+                webSocket.send(text);
+            } catch(err) {
+                webSocket.close();
+                internalEnsureOpenSocket();
+                webSocket.send(text);
+            }
         }
     }
 

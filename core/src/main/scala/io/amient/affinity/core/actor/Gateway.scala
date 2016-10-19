@@ -34,7 +34,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.Partition.Subscription
+import io.amient.affinity.core.actor.Partition.{Observe, WSMessage}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
@@ -147,7 +147,7 @@ abstract class Gateway extends Actor {
     implicit val materializer = ActorMaterializer.create(system)
     implicit val timeout = Timeout(1 second)
 
-    cluster.ack(Subscription(stateStoreName, key)) map {
+    cluster.ack(Observe(stateStoreName, key)) map {
       case source =>
 
         /**
@@ -163,24 +163,20 @@ abstract class Gateway extends Actor {
           * connections which are closed akka-server-side due to being idle leave zombie
           * flows materialized.
           */
-        //TODO At the moment this is solved by disabling idle connections but the real fix is in akka/akka#21549
+        //TODO akka/akka#21549 - at the moment worked around by never closing idle connections
         //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
         val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           override def preStart(): Unit = {
-            println("starting websocket output")
             context.watch(source)
             source ! self
           }
 
-          override def postStop(): Unit = {
-            println("stopping websocket output")
-          }
-
           override def receive: Receive = {
             case Terminated(source) => context.stop(self)
-            case msg: Message if (totalDemand > 0) => onNext(msg); sender ! true
-            case msg: Message => sender ! false
+            case request@WSMessage(msg) => sender.reply(request) {
+              onNext(msg) //will throw an exception if no messages well demanded
+            }
           }
         }))
         val flow = Flow.fromSinkAndSource(clientMessageSink, serverMessageSource)

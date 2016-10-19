@@ -23,24 +23,25 @@ import java.util.{Observable, Observer}
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.event.Logging
-import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import akka.pattern.ask
+import akka.http.scaladsl.model.ws.Message
+import akka.http.scaladsl.model.ws.TextMessage.Strict
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Partition.Subscription
+import io.amient.affinity.core.actor.Partition.Observe
+import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
-import scala.annotation.tailrec
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 object Partition {
 
-  //TODO #23 use protobuf for internal messages that extend Reply but not say AvroRecord
-  final case class Subscription(stateStoreName: String, key: Any) extends Reply[ActorRef] {
+  //TODO use protobuf for internal messages that extend Reply but not say AvroRecord
+  final case class Observe(stateStoreName: String, key: Any) extends Reply[ActorRef] {
     override def hashCode(): Int = key.hashCode
   }
+
+  final case class WSMessage(msg: Message) extends Reply[Unit]
 
 }
 
@@ -80,7 +81,7 @@ trait Partition extends Service with ActorState {
   }
 
   override protected def manage: Receive = super.manage orElse {
-    case request@Subscription(stateStoreName, key) => sender.reply(request) {
+    case request@Observe(stateStoreName, key) => sender.reply(request) {
       val state = getStateStore(stateStoreName)
       context.actorOf(Props(new ChangeStream(state, key)))
     }
@@ -91,43 +92,35 @@ class ChangeStream(state: State[_, _], key: Any) extends Actor {
 
   private var observer: Option[Observer] = None
 
-  override def preStart(): Unit = {
-    println("starting websocket input")
-  }
+  import context.dispatcher
+  implicit val scheduler = context.system.scheduler
 
   override def postStop(): Unit = {
-    println("stopping websocket input")
     observer.foreach(state.removeObserver(key, _))
   }
 
   override def receive: Receive = {
-    case frontend: ActorRef => addWebSocketObserver(key, self, frontend)
-    case tm: TextMessage => println(tm.getStrictText) //TODO #23 use json as default text instruction format
-    case bm: BinaryMessage => println("Unsupported binary message " + bm)
-    //TODO #23 end-to-end avro with js websocket client holding schema registry and using BinaryMessage
+    case frontend: ActorRef => addWebSocketObserver(key, frontend)
+    //case tm: TextMessage => //TODO look into using websocket client json messages
+    //case bm: BinaryMessage => //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
   }
 
-  def addWebSocketObserver(key: Any, backend: ActorRef, frontend: ActorRef): Unit = {
+  def addWebSocketObserver(key: Any, frontend: ActorRef): Unit = {
     observer = Some(state.addObserver(key, new Observer() {
       override def update(o: Observable, arg: scala.Any): Unit = {
-        push(arg)
-      }
-
-      //TODO #23 async push which can 1) detect dead-letters 2) with atomic cell versioning can cancel out redundant updates
-      @tailrec private def push(msg: Any): Unit = {
-        val wsMessage = TextMessage(msg match {
+        //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
+        val textRepr = arg match {
           case None => ""
-          case Some(props) => props.toString
-          case other => other.toString
-        })
-        println("Pushing " + wsMessage)
-        val t = 5 seconds
+          case Some(value) => Encoder.json(value)
+          case other => Encoder.json(other)
+        }
+
+        val wsMessage = Partition.WSMessage(new Strict(textRepr))
+
+        val t = 1 seconds
         implicit val timeout = Timeout(t)
-        if (!Await.result((frontend ? wsMessage).asInstanceOf[Future[Boolean]], t)) {
-          Thread.sleep(t.toMillis)
-          push(frontend, msg)
-        } else {
-          return
+        frontend ack wsMessage onFailure {
+          case any => context.stop(self)
         }
       }
     }))

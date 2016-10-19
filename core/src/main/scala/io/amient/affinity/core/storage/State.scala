@@ -181,13 +181,21 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
    * Observer Support - the following code enables per-key observer pattern
    */
 
-  private var observables = Map[Any, Observable]()
+  class ObservableState extends Observable {
+    override def notifyObservers(arg: scala.Any): Unit = {
+      //TODO with atomic cell versioning can cancel out redundant updates
+      setChanged()
+      super.notifyObservers(arg)
+    }
+  }
+
+  private var observables = Map[Any, ObservableState]()
 
   def addObserver(key: Any, observer: Observer): Observer = {
     val observable = observables.get(key) match {
       case Some(observable) => observable
       case None =>
-        val observable = new Observable()
+        val observable = new ObservableState()
         observables += key -> observable
         observable
     }
@@ -199,6 +207,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def removeObserver(key: Any, observer: Observer): Unit = {
     observables.get(key).foreach {
       observable => observable.deleteObserver(observer)
+        if (observable.countObservers() == 0) observables -= key
     }
   }
 

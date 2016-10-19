@@ -26,7 +26,7 @@ import io.amient.affinity.example.service.ServiceNode
 import scala.util.control.NonFatal
 
 object ExampleApp extends App {
-
+  //FIXME #23 re-enalble all example nodes
   try {
     // singleton services
 //    ServiceNode.main(Seq("2550").toArray)

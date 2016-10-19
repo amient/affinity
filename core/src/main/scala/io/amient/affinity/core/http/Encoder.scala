@@ -62,6 +62,8 @@ object Encoder {
     }
   }
 
+  def json(value: Any) = mapper.writeValueAsString(value) // TODO reuse AvroRecord matcher
+
   def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
     h += headers.Date(DateTime.now)
