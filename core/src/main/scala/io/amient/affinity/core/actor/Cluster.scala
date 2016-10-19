@@ -21,8 +21,8 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.routing._
-import io.amient.affinity.core.ack._
-import io.amient.affinity.core.util.ObjectHashPartitioner
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
 
 import scala.collection.mutable
 
@@ -63,7 +63,7 @@ class Cluster extends Actor {
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
 
-    case request @ GetRoutee(message) => reply(request, sender) {
+    case request @ GetRoutee(message) => sender.reply(request) {
       getRoutee(message)
     }
     case message => getRoutee(message).send(message, sender)

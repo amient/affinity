@@ -21,8 +21,9 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.event.Logging
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
+import io.amient.affinity.core.util.Reply
 
 object Service {
 
@@ -57,10 +58,10 @@ trait Service extends Actor {
   final override def receive: Receive = manage orElse handle
 
   protected def manage: Receive = {
-    case msg @ BecomeMaster() => reply(msg, sender) {
+    case msg@BecomeMaster() => sender.reply(msg) {
       onBecomeMaster
     }
-    case msg @ BecomeStandby() => reply(msg, sender) {
+    case msg@BecomeStandby() => sender.reply(msg) {
       onBecomeStandby
     }
   }

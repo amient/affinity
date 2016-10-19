@@ -25,7 +25,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -50,13 +50,13 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
-        delegateAndHandleErrors(response, ack(cluster, GetValue(key))) {
+        delegateAndHandleErrors(response, cluster ack GetValue(key)) {
           case value => Encoder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
         implicit val timeout = Timeout(1500 milliseconds)
-        delegateAndHandleErrors(response, ack(cluster, PutValue(key, value))) {
+        delegateAndHandleErrors(response, cluster ack PutValue(key, value)) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }

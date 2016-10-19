@@ -20,22 +20,16 @@
 package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
-import java.util.concurrent.ConcurrentHashMap
+import java.util.{Observable, Observer}
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.actor.ActorSystem
 import akka.serialization.{SerializationExtension, Serializer}
-import akka.util.Timeout
-import akka.pattern.ask
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
-import scala.annotation.tailrec
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.concurrent.duration._
-
-import scala.collection.JavaConverters._
 
 object State {
   val CONFIG_STATE = "affinity.state"
@@ -130,7 +124,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       case Some(prev) if (prev == write) => Future.successful(Some(value))
       case differentOrNone =>
         writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write)) map {
-          case prev => frontends.get(key).foreach(_.values.asScala.foreach(push(_, value)))
+          case prev =>
+            observables.get(key).foreach(_.notifyObservers(value))
             prev
         }
     }
@@ -153,7 +148,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       case None => Future.successful(None)
       case some =>
         writeWithMemstoreRollback(k, some, storage.write(k, null)) map {
-          case prev => frontends.get(key).foreach(_.values.asScala.foreach(push(_, None)))
+          case prev =>
+            observables.get(key).foreach(_.notifyObservers(None))
             prev
         }
     }
@@ -182,44 +178,27 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /*
-   * WebSocket Support methods
+   * Observer Support - the following code enables per-key observer pattern
    */
 
-  @volatile private var frontends = Map[Any, ConcurrentHashMap[ActorRef, ActorRef]]()
+  private var observables = Map[Any, Observable]()
 
-  def removeWebSocket(key: Any, backend: ActorRef): Unit = {
-    frontends.get(key).foreach(_.remove(backend))
-  }
-
-  def addWebSocket(key: Any, backend: ActorRef, frontend: ActorRef): Unit = {
-    val listeners = frontends.get(key) match {
-      case Some(listeners) => listeners
+  def addObserver(key: Any, observer: Observer): Observer = {
+    val observable = observables.get(key) match {
+      case Some(observable) => observable
       case None =>
-        val listeners = new ConcurrentHashMap[ActorRef, ActorRef]()
-        frontends += key -> listeners
-        listeners
+        val observable = new Observable()
+        observables += key -> observable
+        observable
     }
-    listeners.put(backend, frontend)
-
-    push(frontend, apply(key))
+    observable.addObserver(observer)
+    observer.update(observable, apply(key)) // send initial value on subscription
+    observer
   }
 
-  //TODO #23 abstract push into an observer api in the State and move all the web-socket specific logic to another package
-  //TODO #23 async push which can 1) detect dead-letters 2) with atomic cell versioning can cancel out redundant updates
-  @tailrec private def push(frontend: ActorRef, msg: Any): Unit = {
-    val wsMessage = TextMessage(msg match {
-      case None => ""
-      case Some(props) => props.toString
-      case other => other.toString
-    })
-    println("Pushing " + wsMessage)
-    val t = 5 seconds
-    implicit val timeout = Timeout(t)
-    if (!Await.result((frontend ? wsMessage).asInstanceOf[Future[Boolean]], t)) {
-      Thread.sleep(t.toMillis)
-      push(frontend, msg)
-    } else {
-      return
+  def removeObserver(key: Any, observer: Observer): Unit = {
+    observables.get(key).foreach {
+      observable => observable.deleteObserver(observer)
     }
   }
 

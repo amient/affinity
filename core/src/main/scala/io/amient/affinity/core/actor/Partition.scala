@@ -19,12 +19,21 @@
 
 package io.amient.affinity.core.actor
 
+import java.util.{Observable, Observer}
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.event.Logging
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import io.amient.affinity.core.ack._
+import akka.pattern.ask
+import akka.util.Timeout
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition.Subscription
 import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.util.Reply
+
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 object Partition {
 
@@ -71,7 +80,7 @@ trait Partition extends Service with ActorState {
   }
 
   override protected def manage: Receive = super.manage orElse {
-    case request@Subscription(stateStoreName, key) => reply(request, sender) {
+    case request@Subscription(stateStoreName, key) => sender.reply(request) {
       val state = getStateStore(stateStoreName)
       context.actorOf(Props(new ChangeStream(state, key)))
     }
@@ -80,24 +89,50 @@ trait Partition extends Service with ActorState {
 
 class ChangeStream(state: State[_, _], key: Any) extends Actor {
 
+  private var observer: Option[Observer] = None
+
   override def preStart(): Unit = {
     println("starting websocket input")
   }
 
   override def postStop(): Unit = {
     println("stopping websocket input")
-    state.removeWebSocket(key, self)
+    observer.foreach(state.removeObserver(key, _))
   }
 
   override def receive: Receive = {
-    case frontend: ActorRef => state.addWebSocket(key, self, frontend)
-    case tm: TextMessage =>
-      println(tm.getStrictText)
-    //TODO #23 use json as default text instruction format
-    case bm: BinaryMessage =>
-      println("Unsupported binary message " + bm)
+    case frontend: ActorRef => addWebSocketObserver(key, self, frontend)
+    case tm: TextMessage => println(tm.getStrictText) //TODO #23 use json as default text instruction format
+    case bm: BinaryMessage => println("Unsupported binary message " + bm)
     //TODO #23 end-to-end avro with js websocket client holding schema registry and using BinaryMessage
   }
+
+  def addWebSocketObserver(key: Any, backend: ActorRef, frontend: ActorRef): Unit = {
+    observer = Some(state.addObserver(key, new Observer() {
+      override def update(o: Observable, arg: scala.Any): Unit = {
+        push(arg)
+      }
+
+      //TODO #23 async push which can 1) detect dead-letters 2) with atomic cell versioning can cancel out redundant updates
+      @tailrec private def push(msg: Any): Unit = {
+        val wsMessage = TextMessage(msg match {
+          case None => ""
+          case Some(props) => props.toString
+          case other => other.toString
+        })
+        println("Pushing " + wsMessage)
+        val t = 5 seconds
+        implicit val timeout = Timeout(t)
+        if (!Await.result((frontend ? wsMessage).asInstanceOf[Future[Boolean]], t)) {
+          Thread.sleep(t.toMillis)
+          push(frontend, msg)
+        } else {
+          return
+        }
+      }
+    }))
+  }
+
 
 }
 

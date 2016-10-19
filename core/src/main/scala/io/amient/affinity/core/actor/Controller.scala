@@ -23,8 +23,9 @@ import akka.AkkaException
 import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
 import akka.util.Timeout
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.cluster.{Coordinator, Node}
+import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -105,11 +106,11 @@ class Controller extends Actor {
           }
         }), name = "services")
         servicesPromise = Promise[Unit]()
-        replyWith(request, sender) {
+        sender.replyWith(request) {
           servicesPromise.future
         }
       } catch {
-        case e: InvalidActorNameException => replyWith(request, sender) {
+        case e: InvalidActorNameException => sender.replyWith(request) {
           servicesPromise.future
         }
       }
@@ -119,8 +120,7 @@ class Controller extends Actor {
 
     case ContainerOnline("services") => if (!servicesPromise.isCompleted) servicesPromise.success(())
 
-    case request@CreateRegion(partitionProps) =>
-      val origin = sender
+    case request@CreateRegion(partitionProps) => sender.replyWith(request) {
       try {
         context.actorOf(Props(new Container(regionCoordinator, "region") {
           val partitions = config.getIntList(Node.CONFIG_PARTITION_LIST).asScala
@@ -129,14 +129,11 @@ class Controller extends Actor {
           }
         }), name = "region")
         regionPromise = Promise[Unit]()
-        replyWith(request, origin) {
-          regionPromise.future
-        }
+        regionPromise.future
       } catch {
-        case e: InvalidActorNameException => replyWith(request, origin) {
-          regionPromise.future
-        }
+        case e: InvalidActorNameException => regionPromise.future
       }
+    }
 
     case msg@Terminated(child) if (child.path.name == "region") =>
       if (!regionPromise.isCompleted) regionPromise.failure(new AkkaException("Region initialisation failed"))
@@ -146,11 +143,11 @@ class Controller extends Actor {
     case request@CreateGateway(gatewayProps) => try {
       context.watch(context.actorOf(gatewayProps, name = "gateway"))
       gatewayPromise = Promise[Int]()
-      replyWith(request, sender) {
+      sender.replyWith(request) {
         gatewayPromise.future
       }
     } catch {
-      case e: InvalidActorNameException => replyWith(request, sender) {
+      case e: InvalidActorNameException => sender.replyWith(request) {
         gatewayPromise.future
       }
     }
@@ -165,11 +162,11 @@ class Controller extends Actor {
       serviceCoordinator.watch(sender, global = true)
       if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
 
-    case request@GracefulShutdown() => replyWith(request, sender) {
+    case request@GracefulShutdown() => sender.replyWith(request) {
       implicit val timeout = Timeout(500 milliseconds)
       Future.sequence(context.children map { child =>
         log.info("Requesting GracefulShutdown from " + child)
-        ack(child, GracefulShutdown())
+        child.ack(GracefulShutdown())
       }) map (_ => system.terminate()) recover {
         case any =>
           any.printStackTrace()

@@ -17,10 +17,8 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.transaction
+package io.amient.affinity
 
-import io.amient.affinity.core.util.Reply
+import io.amient.affinity.core.util.AckSupport
 
-trait Instruction[R] extends Reply[R] {
-    def reverse(result: R): Option[Instruction[_]]
-}
+package object core extends AckSupport

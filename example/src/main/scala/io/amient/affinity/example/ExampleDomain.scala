@@ -21,11 +21,10 @@ package io.amient.affinity.example
 
 import akka.actor.{ActorRef, ExtendedActorSystem}
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.ack.Reply
 import io.amient.affinity.core.serde.avro.AvroRecord
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.transaction.Instruction
-import io.amient.affinity.core.util.TimeCryptoProofSHA256
+import io.amient.affinity.core.util.{Reply, TimeCryptoProofSHA256}
 
 class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) {
   register(classOf[ConfigEntry])

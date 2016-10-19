@@ -20,27 +20,16 @@
 package io.amient.affinity.example.partition
 
 
-import akka.actor.Actor.Receive
-import akka.actor.{Actor, ActorRef, Props}
-import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
-import akka.pattern.ask
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl.Source
-import akka.util.Timeout
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.core.actor.Partition.Subscription
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.example._
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
-import scala.runtime.BoxedUnit
+import scala.concurrent.Future
 
 
 object DataPartition {
@@ -98,7 +87,7 @@ class DataPartition extends Partition {
     /**
       * getting Component object by the Component ID
       */
-    case request@GetComponent(cid) => reply(request, sender) {
+    case request@GetComponent(cid) => sender.reply(request) {
       components(cid)
     }
 
@@ -106,22 +95,22 @@ class DataPartition extends Partition {
       * Updated component of the vertex.
       * Responds with the Component data previously associated with the vertex
       */
-    case request@UpdateComponent(cid, updatedComponent) => replyWith(request, sender) {
+    case request@UpdateComponent(cid, updatedComponent) => sender.replyWith(request) {
       components.put(cid, updatedComponent)
     }
 
-    case request@DeleteComponent(cid) => replyWith(request, sender) {
+    case request@DeleteComponent(cid) => sender.replyWith(request) {
       components.remove(cid)
     }
 
     /**
       * getting VertexProps object by Vertex ID
       */
-    case request@GetVertexProps(vid) => reply(request, sender) {
+    case request@GetVertexProps(vid) => sender.reply(request) {
       graph(vid)
     }
 
-    case request@UpdateVertexComponent(vid, cid) => replyWith(request, sender) {
+    case request@UpdateVertexComponent(vid, cid) => sender.replyWith(request) {
       graph(vid) match {
         case None => Future.failed(new NoSuchElementException)
         case Some(props) if (props.component == cid) => Future.successful(cid)
@@ -137,7 +126,7 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
-    case request@ModifyGraph(vertex, edge, GOP.ADD) => replyWith(request, sender) {
+    case request@ModifyGraph(vertex, edge, GOP.ADD) => sender.replyWith(request) {
       graph(vertex) match {
         case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Future.successful(existing)
         case None => val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
@@ -158,7 +147,7 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
-    case request@ModifyGraph(vid, edge, GOP.REMOVE) => replyWith(request, sender) {
+    case request@ModifyGraph(vid, edge, GOP.REMOVE) => sender.replyWith(request) {
       graph(vid) match {
         case None => Future.failed(new NoSuchElementException)
         case Some(existing) =>

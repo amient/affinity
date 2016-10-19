@@ -24,7 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.util.Reply
 
 import scala.collection.Set
 import scala.concurrent.Await
@@ -61,6 +62,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   import Coordinator._
   import system.dispatcher
+
   implicit val scheduler = system.scheduler
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
@@ -104,7 +106,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       val update = MasterStatusUpdate(group, currentMasters, Set())
       //TODO  #12 global config bootstrap timeout
       implicit val timeout = Timeout(30 seconds)
-      ack[Unit](watcher, if (global) update else update.localTo(watcher)) onFailure {
+      watcher.ack[Unit](if (global) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
           e.printStackTrace()
           system.terminate()
@@ -168,7 +170,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       //TODO  #12 global config bootstrap timeout
       implicit val timeout = Timeout(30 seconds)
       try {
-        ack[Unit](watcher, if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
+        watcher ack[Unit] (if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
           case e: Throwable => if (!closed.get) {
             e.printStackTrace()
             system.terminate()

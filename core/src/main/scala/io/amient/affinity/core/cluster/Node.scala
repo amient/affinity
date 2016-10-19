@@ -23,7 +23,7 @@ package io.amient.affinity.core.cluster
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
 
@@ -73,13 +73,13 @@ class Node(config: Config) {
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(ack[Unit](controller, CreateRegion(Props(partitionCreator))))
+    startupFutureWithShutdownFuse(controller ack[Unit](CreateRegion(Props(partitionCreator))))
   }
 
   def startServices(services: Props*): Future[Unit] = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(ack(controller, CreateServiceContainer(services)))
+    startupFutureWithShutdownFuse(controller ack(CreateServiceContainer(services)))
   }
 
   /**
@@ -90,7 +90,7 @@ class Node(config: Config) {
     */
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(ack[Int](controller, CreateGateway(Props(creator))))
+    startupFutureWithShutdownFuse(controller ack[Int](CreateGateway(Props(creator))))
   }
 
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {

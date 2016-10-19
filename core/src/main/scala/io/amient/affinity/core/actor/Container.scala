@@ -22,7 +22,7 @@ package io.amient.affinity.core.actor
 import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
 import akka.util.Timeout
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.actor.Controller.{ContainerOnline, GracefulShutdown}
 import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
@@ -93,16 +93,16 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       coordinator.unregister(services(ref))
       services -= ref
 
-    case request @ MasterStatusUpdate(_, add, remove) => replyWith(request, sender) {
+    case request @ MasterStatusUpdate(_, add, remove) => sender.replyWith(request) {
       //TODO #12 global config bootstrap timeout
       val t = 30 seconds
       implicit val timeout = Timeout(t)
-      val removals = remove.toList.map(ref => ack[Unit](ref, BecomeStandby()))
-      val additions = add.toList.map(ref => ack[Unit](ref, BecomeMaster()))
+      val removals = remove.toList.map(ref => ref.ack[Unit](BecomeStandby()))
+      val additions = add.toList.map(ref => ref.ack[Unit](BecomeMaster()))
       Future.sequence(removals ++ additions).map(_ => ())
     }
 
-    case request@GracefulShutdown() => reply(request, sender) {
+    case request@GracefulShutdown() => sender.reply(request) {
       context.stop(self)
     }
 

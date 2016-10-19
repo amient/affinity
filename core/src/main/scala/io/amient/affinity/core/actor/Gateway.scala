@@ -32,7 +32,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.actor.ActorPublisher
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.actor.Partition.Subscription
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
@@ -118,17 +118,17 @@ abstract class Gateway extends Actor {
     //no handler matched the HttpExchange
     case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
 
-    case msg@MasterStatusUpdate("regions", add, remove) => reply[Unit](msg, sender) {
+    case msg@MasterStatusUpdate("regions", add, remove) => sender.reply[Unit](msg) {
       remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
     }
 
-    case msg@MasterStatusUpdate("services", add, remove) => reply[Unit](msg, sender) {
+    case msg@MasterStatusUpdate("services", add, remove) => sender.reply[Unit](msg) {
       add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
       remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
     }
 
-    case request@GracefulShutdown() => reply(request, sender) {
+    case request@GracefulShutdown() => sender.reply(request) {
       context.stop(self)
     }
 
@@ -147,9 +147,7 @@ abstract class Gateway extends Actor {
     implicit val materializer = ActorMaterializer.create(system)
     implicit val timeout = Timeout(1 second)
 
-    println("OPENING NEW WEB SOCKET!")
-
-    ack(cluster, Subscription(stateStoreName, key)) map {
+    cluster.ack(Subscription(stateStoreName, key)) map {
       case source =>
 
         /**
@@ -165,7 +163,7 @@ abstract class Gateway extends Actor {
           * connections which are closed akka-server-side due to being idle leave zombie
           * flows materialized.
           */
-        //FIXME At the moment this is solved by disabling idle connections but the real fix is in akka/akka#21549
+        //TODO At the moment this is solved by disabling idle connections but the real fix is in akka/akka#21549
         //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
         val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 

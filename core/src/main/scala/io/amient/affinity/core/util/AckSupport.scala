@@ -17,24 +17,21 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.util
 
 import java.util.concurrent.TimeoutException
 
 import akka.AkkaException
-import akka.actor.{ActorInitializationException, ActorRef, Scheduler, Status}
-import akka.pattern.ask
-import akka.pattern.after
+import akka.actor.{ActorRef, Scheduler, Status}
+import akka.pattern.{after, ask}
 import akka.util.Timeout
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.reflect.ClassTag
-import scala.reflect.classTag
+import scala.reflect.{ClassTag, classTag}
 import scala.runtime.BoxedUnit
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-import scala.concurrent.duration._
 
 /**
   * These are utilities for stateless Akka Ack pattern.
@@ -53,21 +50,26 @@ import scala.concurrent.duration._
   *
   * Likewise in-order processing must be taken care of by the code relying on the ack.
   */
-package object ack {
+trait AckSupport {
 
-  trait Reply[+T]
+  implicit def ack(actorRef: ActorRef): AckableActorRef = new AckableActorRef(actorRef)
+
+}
+
+trait Reply[+T]
+
+final class AckableActorRef(val target: ActorRef) extends AnyVal {
 
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
     * from the target actor.
     *
-    * @param target
     * @param message
     * @param timeout
     * @param context
     * @return
     */
-  def ack[T](target: ActorRef, message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
+  def ack[T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
     val maxRetries = 3
     val promise = Promise[T]()
     def attempt(retry: Int, delay: Duration = 0 seconds): Unit = {
@@ -89,37 +91,34 @@ package object ack {
   }
 
   /**
-    * Intermediate reply with future. An ack is sent to the `replyTo` actor when the future completes.
+    * Intermediate reply with future. An ack is sent to the `target` actor when the future completes.
     * @param request message which is being replied to
-    * @param replyTo sender who sent the request and expects the reply
     * @param closure which must return future on which the acknowledgement depends
     * @tparam T
     */
 
-  def replyWith[T](request: Reply[T], replyTo: ActorRef)(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
+  def replyWith[T](request: Reply[T])(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
     val f: Future[T] = closure
     f onComplete {
-      case Success(result) => replyTo ! result
-      case Failure(e) => replyTo ! Status.Failure(e)
+      case Success(result) => target ! result
+      case Failure(e) => target ! Status.Failure(e)
     }
   }
 
   /**
     * end of chain reply which runs the given closure and reports either a success or failure
-    * back to the ack requester.
+    * back to the target requester.
     *
     * @param request message which is being replied to
-    * @param replyTo an actor which required the ack. this actor will receive the result of the closure
     * @param closure of which result will be send as the acknowledgement value
     */
-  def reply[T](request: Reply[T], replyTo: ActorRef)(closure: => T): Unit = {
+  def reply[T](request: Reply[T])(closure: => T): Unit = {
     try {
       val result: T = closure
-      replyTo ! result
+      target ! result
     } catch {
-      case NonFatal(e) => replyTo ! Status.Failure(e)
+      case NonFatal(e) => target ! Status.Failure(e)
     }
   }
-
 
 }

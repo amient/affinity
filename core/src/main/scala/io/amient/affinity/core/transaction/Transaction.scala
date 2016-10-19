@@ -21,7 +21,7 @@ package io.amient.affinity.core.transaction
 
 import akka.actor.{ActorRef, Scheduler}
 import akka.util.Timeout
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.reflect.ClassTag
@@ -81,7 +81,7 @@ class Transaction(cluster: ActorRef) {
   def execute[T: ClassTag](instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
     implicit val timeout = Timeout(1 seconds)
-    ack[T](cluster, instr) onComplete {
+    cluster ack[T](instr) onComplete {
       case Success(result: T) =>
 //        println(s"SUCCESS $instr")
         stack = stack :+ CompletedInstruction(instr, result)

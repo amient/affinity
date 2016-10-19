@@ -25,9 +25,9 @@ import java.util.Properties
 import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.core.util.ZooKeeperClient
+import io.amient.affinity.core.util.{Reply, ZooKeeperClient}
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.kafka.common.protocol.SecurityProtocol
@@ -91,11 +91,11 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     }
 
     override def handle: Receive = {
-      case request @ GetValue(key) => reply(request, sender) {
+      case request @ GetValue(key) => sender.reply(request) {
         data(key)
       }
 
-      case request @ PutValue(key, value) => replyWith(request, sender) {
+      case request @ PutValue(key, value) => sender.replyWith(request) {
         data.put(key, value)
       }
     }

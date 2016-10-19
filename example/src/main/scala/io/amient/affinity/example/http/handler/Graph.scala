@@ -25,7 +25,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
 import akka.http.scaladsl.model._
 import akka.util.Timeout
-import io.amient.affinity.core.ack._
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.transaction.Transaction
@@ -51,7 +51,7 @@ trait Graph extends HttpGateway {
       */
     case HTTP(GET, PATH("vertex", INT(vid)), query, response) =>
       implicit val timeout = Timeout(1 seconds)
-      delegateAndHandleErrors(response, ack(cluster, GetVertexProps(vid))) {
+      delegateAndHandleErrors(response, cluster ack GetVertexProps(vid)) {
         _ match {
           case None => throw new NoSuchElementException
           case Some(vertexProps) => Encoder.json(OK, vertexProps)
@@ -63,7 +63,7 @@ trait Graph extends HttpGateway {
       */
     case HTTP(GET, PATH("component", INT(cid)), query, response) =>
       implicit val timeout = Timeout(1 seconds)
-      delegateAndHandleErrors(response, ack(cluster, GetComponent(cid))) {
+      delegateAndHandleErrors(response, cluster ack GetComponent(cid)) {
         _ match {
           case None => throw new NoSuchElementException
           case Some(component) => Encoder.json(OK, component)
@@ -139,7 +139,7 @@ trait Graph extends HttpGateway {
       if (queue.isEmpty) {
         promise.success(Component(ts, agg))
       }
-      else ack(cluster, GetVertexProps(queue.head)) map {
+      else cluster ack GetVertexProps(queue.head) map {
         _ match {
           case None => throw new NoSuchElementException
           case Some(VertexProps(_, cid, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)
