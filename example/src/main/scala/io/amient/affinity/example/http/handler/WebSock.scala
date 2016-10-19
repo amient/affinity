@@ -21,25 +21,32 @@ package io.amient.affinity.example.http.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.rest.HttpGateway
 
 trait WebSock extends HttpGateway {
 
+  val js = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/wsclient.js")).mkString
   val html = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/wsclient.html")).mkString
 
+  import context.dispatcher
+
   abstract override def handle: Receive = super.handle orElse {
+    
+    case http@HTTP(GET, PATH("wsclient.js"), _, response) => response.success(Encoder.plain(OK, js))
 
-    case HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>
-      response.success(Encoder.html(OK, html))
+    case http@HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>
 
-    case http@HTTP(GET, PATH("listen"), QUERY(("id", INT(vertex))), response) => {
-      openWebSocket(http, "graph", vertex)
-    }
+      http.request.header[UpgradeToWebSocket] match {
+        case None => response.success(Encoder.html(OK, html))
+        case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
+          openWebSocket(upgrade, "graph", vertex)
+        }
+      }
+
   }
-
-
 
 }
 

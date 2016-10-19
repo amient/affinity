@@ -5,61 +5,28 @@
     <title>Echo Chamber</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width">
+    <script type="text/javascript" src="/wsclient.js"></script>
+    <script type="text/javascript">
+
+        var ws = AffinityWebSocket(window.location, function(receive) {
+            var messages = document.getElementById("messages");
+            messages.innerHTML = receive.data + "<br/>" + messages.innerHTML;
+        })
+
+    </script>
+
 </head>
 <body>
 
-<div>
-    <input type="text" id="messageinput"/>
-</div>
-<div>
-    <button type="button" onclick="send();" >Send</button>
-</div>
+    <div>
+        <input type="text" id="messageinput"/>
+    </div>
+    <div>
+        <button type="button" onclick="ws.send(document.getElementById('messageinput').value);" >Send</button>
+    </div>
 
-<div id="messages"></div>
+    <div id="messages"></div>
 
-<script type="text/javascript">
-
-    var webSocket;
-    var messages = document.getElementById("messages");
-
-    function ensureOpenSocket(){
-        if(webSocket !== undefined && webSocket.readyState !== WebSocket.CLOSED){
-           return;
-        }
-
-        var wsUrl = "ws://" + window.location.host + "/listen" + window.location.search;
-        webSocket = new WebSocket(wsUrl);
-
-        webSocket.onopen = function(event){
-            writeResponse("Connection established: " + webSocket.url);
-        };
-
-        webSocket.onmessage = function(event){
-            writeResponse(event.data);
-        };
-
-        webSocket.onclose = function(event){
-            if (event.code != 1000) {
-                writeResponse("Connection interrupted, reconnecting in 30 seconds..");
-                setTimeout(ensureOpenSocket, 30000);
-            }
-        };
-    }
-
-    function send(){
-        ensureOpenSocket();
-        var text = document.getElementById("messageinput").value;
-        webSocket.send(text);
-    }
-
-
-    function writeResponse(text){
-        messages.innerHTML = text + "<br/>" + messages.innerHTML;
-    }
-
-    ensureOpenSocket();
-
-</script>
 
 </body>
 </html>

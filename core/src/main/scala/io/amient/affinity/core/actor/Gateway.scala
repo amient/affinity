@@ -137,17 +137,7 @@ abstract class Gateway extends Actor {
 
   }
 
-  def openWebSocket(http: HttpExchange, stateStoreName: String, key: Any): Unit = {
-    import context.dispatcher
-    http.request.header[UpgradeToWebSocket] match {
-      case None => http.promise.success(HttpResponse(BadRequest))
-      case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-        openWebSocket(upgrade, stateStoreName, key)
-      }
-    }
-  }
-
-  private def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any): Future[HttpResponse] = {
+  protected def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any): Future[HttpResponse] = {
     import context.dispatcher
     implicit val scheduler = system.scheduler
     implicit val materializer = ActorMaterializer.create(system)

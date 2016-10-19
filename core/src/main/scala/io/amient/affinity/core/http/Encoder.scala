@@ -76,6 +76,20 @@ object Encoder {
     }
   }
 
+  def plain(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+    val h = mutable.ListBuffer[HttpHeader]()
+    h += headers.Date(DateTime.now)
+    h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
+    HttpResponse(status, entity = plain(value, gzip), headers = h.toList)
+  }
+
+  def plain(value: Any, gzip: Boolean): MessageEntity = {
+    encode(ContentTypes.`text/plain(UTF-8)`, gzip) { (out, writer) =>
+      writer.append(value.toString)
+      writer.close()
+    }
+  }
+
   private def encode(contentType: ContentType, gzip: Boolean )(f: (OutputStream, Writer) => Unit): MessageEntity = {
 
     val out = new ByteBufferOutputStream()
