@@ -23,12 +23,10 @@ import java.util.{Observable, Observer}
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.event.Logging
-import akka.http.scaladsl.model.ws.Message
-import akka.http.scaladsl.model.ws.TextMessage.Strict
+import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition.Observe
-import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
@@ -40,8 +38,6 @@ object Partition {
   final case class Observe(stateStoreName: String, key: Any) extends Reply[ActorRef] {
     override def hashCode(): Int = key.hashCode
   }
-
-  final case class WSMessage(msg: Message) extends Reply[Unit]
 
 }
 
@@ -108,18 +104,9 @@ class ChangeStream(state: State[_, _], key: Any) extends Actor {
   def addWebSocketObserver(key: Any, frontend: ActorRef): Unit = {
     observer = Some(state.addObserver(key, new Observer() {
       override def update(o: Observable, arg: scala.Any): Unit = {
-        //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
-        val textRepr = arg match {
-          case None => ""
-          case Some(value) => Encoder.json(value)
-          case other => Encoder.json(other)
-        }
-
-        val wsMessage = Partition.WSMessage(new Strict(textRepr))
-
         val t = 1 seconds
         implicit val timeout = Timeout(t)
-        frontend ack wsMessage onFailure {
+        (frontend ? arg) onFailure {
           case any => context.stop(self)
         }
       }

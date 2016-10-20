@@ -19,22 +19,12 @@
 
 package io.amient.affinity.core.serde.primitive
 
-import akka.actor.ExtendedActorSystem
+import io.amient.affinity.core.serde.Serde
 
-class OptionSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) {
+class UnitSerde extends Serde {
+  override def fromBytes(bytes: Array[Byte]): Any = ()
 
-  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = {
-    if (bytes.length == 0) None else Some(fromBinaryWrapped(bytes))
-  }
+  override def toBytes(obj: Any): Array[Byte] = Array()
 
-  override def identifier: Int = 29
-
-  override def toBinary(o: AnyRef): Array[Byte] = o match {
-    case None => Array[Byte]()
-    case Some(other: AnyRef) => toBinaryWrapped(other)
-  }
-
-  override def includeManifest: Boolean = {
-    false
-  }
+  override def identifier: Int = 30
 }

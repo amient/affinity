@@ -21,6 +21,7 @@ package io.amient.affinity.example.http.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.ws.TextMessage.Strict
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
@@ -42,7 +43,10 @@ trait WebSock extends HttpGateway {
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          openWebSocket(upgrade, "graph", vertex)
+          openWebSocket(upgrade, "graph", vertex) {
+            case None => new Strict("null")
+            case Some(value) => new Strict(Encoder.json(value))
+          }
         }
       }
 

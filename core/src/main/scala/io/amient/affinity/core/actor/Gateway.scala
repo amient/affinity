@@ -30,11 +30,12 @@ import akka.pattern.ask
 import akka.routing._
 import akka.stream.ActorMaterializer
 import akka.stream.actor.ActorPublisher
+import akka.stream.actor.ActorPublisherMessage.Request
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.Partition.{Observe, WSMessage}
+import io.amient.affinity.core.actor.Partition.Observe
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
@@ -141,7 +142,8 @@ abstract class Gateway extends Actor {
    * WebSocket support methods
    */
 
-  protected def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any): Future[HttpResponse] = {
+  protected def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+                             (pf: PartialFunction[Any, Message]): Future[HttpResponse] = {
     import context.dispatcher
     implicit val scheduler = system.scheduler
     implicit val materializer = ActorMaterializer.create(system)
@@ -174,9 +176,8 @@ abstract class Gateway extends Actor {
 
           override def receive: Receive = {
             case Terminated(source) => context.stop(self)
-            case request@WSMessage(msg) => sender.reply(request) {
-              onNext(msg) //will throw an exception if no messages well demanded
-            }
+            case Request(_) =>
+            case msg => sender ! onNext(pf(msg))  //will throw an exception if no messages well demanded
           }
         }))
         val flow = Flow.fromSinkAndSource(clientMessageSink, serverMessageSource)
