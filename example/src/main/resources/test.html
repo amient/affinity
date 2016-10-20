@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>Affinity JS Demo</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width">
+    <script type="text/javascript" src="affinity.js"></script>
+    <script type="text/javascript">
+
+        var ws = AvroWebSocket("ws://localhost:8881/vertex?id=1", function(message) {
+            console.log(message.constructor.name);
+            console.log(message.ts);
+            var messages = document.getElementById("messages");
+            messages.innerHTML = message + "<br/>" + messages.innerHTML;
+        })
+
+    </script>
+
+</head>
+<body>
+
+<div>
+    <input type="text" id="messageinput"/>
+</div>
+<div>
+    <button type="button" onclick="ws.send(document.getElementById('messageinput').value);" >Send</button>
+</div>
+
+<div id="messages"></div>
+
+
+</body>
+</html>

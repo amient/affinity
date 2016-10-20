@@ -95,7 +95,6 @@ class KeyValueStreamActor(state: State[_, _], key: Any) extends Actor {
 
   override def receive: Receive = {
     case frontend: ActorRef => creatKeyValueObserver(key, frontend)
-    //TODO handle state updates coming from the fronted actor
   }
 
   def creatKeyValueObserver(key: Any, frontend: ActorRef): Unit = {

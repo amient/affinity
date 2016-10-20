@@ -142,7 +142,8 @@ abstract class Gateway extends Actor {
    */
 
   protected def keyValueWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
-                                 (pf: PartialFunction[Any, Message]): Future[HttpResponse] = {
+                                 (pfPush: PartialFunction[Any, Message])
+                                 (pfDown: PartialFunction[Message, Any]): Future[HttpResponse] = {
     import context.dispatcher
     implicit val scheduler = system.scheduler
     implicit val materializer = ActorMaterializer.create(system)
@@ -157,12 +158,23 @@ abstract class Gateway extends Actor {
           * Using PoisonPill as termination message in combination with context.watch(source)
           * allows for closing the whole bidi flow in case the client closes the connection.
           */
-        val clientMessageSink = Sink.actorRef[Message](keyValueActor, PoisonPill)
-        //TODO create actorSubscribe which translates the ws messages and passes them on to the keyValueActor
-//        override def receive: Receive = {
-//          //case tm: TextMessage => //TODO look into using websocket client json messages
-//          //case bm: BinaryMessage => //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
-//        }
+        val clientMessageReceiver = context.actorOf(Props(new Actor {
+          private var frontend: Option[ActorRef] = None
+
+          override def postStop(): Unit = {
+            keyValueActor ! PoisonPill
+          }
+
+          override def receive: Receive = {
+            case frontend: ActorRef => this.frontend = Some(frontend)
+            case msg: Message => pfDown(msg) match {
+              case Unit =>
+              case response: Array[Byte] => frontend.foreach(_ ! response)
+              case other: Any => keyValueActor ! other
+            }
+          }
+        }))
+        val downMessageSink = Sink.actorRef[Message](clientMessageReceiver, PoisonPill)
 
         /**
           * Source.actorPublisher doesn't detect connections closed by the server so websockets
@@ -171,20 +183,21 @@ abstract class Gateway extends Actor {
           */
         //TODO akka/akka#21549 - at the moment worked around by never closing idle connections
         //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
-        val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
+        val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           override def preStart(): Unit = {
             context.watch(keyValueActor)
             keyValueActor ! self
+            clientMessageReceiver ! self
           }
 
           override def receive: Receive = {
             case Request(_) =>
             case Terminated(source) => context.stop(self)
-            case msg => sender ! onNext(pf(msg))  //will throw an exception if no messages well demanded
+            case msg => sender ! onNext(pfPush(msg)) //will throw an exception if no messages well demanded
           }
         }))
-        val flow = Flow.fromSinkAndSource(clientMessageSink, serverMessageSource)
+        val flow = Flow.fromSinkAndSource(downMessageSink, pushMessageSource)
         upgrade.handleMessages(flow)
     }
   }

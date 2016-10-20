@@ -2,15 +2,18 @@
 
 <html>
 <head>
-    <title>Echo Chamber</title>
+    <title>Affinity JS Demo</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width">
-    <script type="text/javascript" src="/wsclient.js"></script>
+    <script type="text/javascript" src="affinity.js"></script>
     <script type="text/javascript">
 
-        var ws = AffinityWebSocket(window.location, function(receive) {
-            var messages = document.getElementById("messages");
-            messages.innerHTML = receive.data + "<br/>" + messages.innerHTML;
+        var address = "ws://" + window.location.host + window.location.pathname + window.location.search;
+        var ws = AvroWebSocket(address, function(message) {
+            document.getElementById("messages").innerHTML =
+                message.constructor.name + "\n"
+                + message.ts + "\n\n"
+                + message;
         })
 
     </script>
@@ -25,7 +28,7 @@
         <button type="button" onclick="ws.send(document.getElementById('messageinput').value);" >Send</button>
     </div>
 
-    <div id="messages"></div>
+    <textarea id="messages" style = "width: 90%; height: 350px;"></textarea>
 
 
 </body>
