@@ -72,7 +72,8 @@ class Cluster extends Actor {
 
   private def getRoutee(message: Any): ActorRefRoutee = {
     val partition = message match {
-      case (k, v) => partitioner.partition(k, numPartitions)
+      //case (k, v) => partitioner.partition(k, numPartitions)
+      case p: Product => partitioner.partition(p.productElement(0), numPartitions)
       case v => partitioner.partition(v, numPartitions)
     }
 

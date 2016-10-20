@@ -43,9 +43,9 @@ trait WebSock extends HttpGateway {
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          openWebSocket(upgrade, "graph", vertex) {
-            case None => new Strict("null")
+          keyValueWebSocket(upgrade, "graph", vertex) {
             case Some(value) => new Strict(Encoder.json(value))
+            case None => new Strict("null")
           }
         }
       }

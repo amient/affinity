@@ -35,7 +35,6 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.Partition.Observe
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
 
@@ -142,15 +141,15 @@ abstract class Gateway extends Actor {
    * WebSocket support methods
    */
 
-  protected def openWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
-                             (pf: PartialFunction[Any, Message]): Future[HttpResponse] = {
+  protected def keyValueWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+                                 (pf: PartialFunction[Any, Message]): Future[HttpResponse] = {
     import context.dispatcher
     implicit val scheduler = system.scheduler
     implicit val materializer = ActorMaterializer.create(system)
     implicit val timeout = Timeout(1 second)
 
-    cluster.ack(Observe(stateStoreName, key)) map {
-      case source =>
+    cluster ? (key, stateStoreName, Partition.INTERNAL_KEY_VALUE_OBSERVER) map {
+      case keyValueActor: ActorRef =>
 
         /**
           * Sink.actorRef supports custom termination message which will be sent to the source
@@ -158,7 +157,12 @@ abstract class Gateway extends Actor {
           * Using PoisonPill as termination message in combination with context.watch(source)
           * allows for closing the whole bidi flow in case the client closes the connection.
           */
-        val clientMessageSink = Sink.actorRef[Message](source, PoisonPill)
+        val clientMessageSink = Sink.actorRef[Message](keyValueActor, PoisonPill)
+        //TODO create actorSubscribe which translates the ws messages and passes them on to the keyValueActor
+//        override def receive: Receive = {
+//          //case tm: TextMessage => //TODO look into using websocket client json messages
+//          //case bm: BinaryMessage => //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
+//        }
 
         /**
           * Source.actorPublisher doesn't detect connections closed by the server so websockets
@@ -170,13 +174,13 @@ abstract class Gateway extends Actor {
         val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           override def preStart(): Unit = {
-            context.watch(source)
-            source ! self
+            context.watch(keyValueActor)
+            keyValueActor ! self
           }
 
           override def receive: Receive = {
-            case Terminated(source) => context.stop(self)
             case Request(_) =>
+            case Terminated(source) => context.stop(self)
             case msg => sender ! onNext(pf(msg))  //will throw an exception if no messages well demanded
           }
         }))

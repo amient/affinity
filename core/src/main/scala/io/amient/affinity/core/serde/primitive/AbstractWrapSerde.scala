@@ -25,10 +25,10 @@ import io.amient.affinity.core.util.ByteUtils
 
 abstract class AbstractWrapSerde(val system: ExtendedActorSystem) extends JSerializer {
 
-  def fromBinaryWrapped(bytes: Array[Byte], offset: Int = 0, len: Int = -1) = {
-    val serializerIdentifier = ByteUtils.asIntValue(bytes, offset)
-    val data = new Array[Byte](bytes.length - 4 - offset)
-    Array.copy(bytes, 4 + offset, data, 0, (if (len == -1) bytes.length - offset else len) - 4)
+  def fromBinaryWrapped(bytes: Array[Byte]) = {
+    val serializerIdentifier = ByteUtils.asIntValue(bytes)
+    val data = new Array[Byte](bytes.length - 4)
+    Array.copy(bytes, 4, data, 0, bytes.length - 4)
     SerializationExtension(system).serializerByIdentity(serializerIdentifier).fromBinary(data)
   }
 

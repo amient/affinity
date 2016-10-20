@@ -46,9 +46,9 @@ class WrapSerdesSpec extends ActorUnitTestBase with Matchers {
       serde.fromBinary(bytes) should be(Some(()))
     }
     "work with wrapped tuple" in {
-      val bytes = serde.toBinary(Some((10, "XYZ")))
-      bytes.mkString(".") should equal("0.0.0.31.0.0.0.2.0.0.0.8.0.0.0.20.0.0.0.10.0.0.0.7.0.0.0.21.88.89.90")
-      serde.fromBinary(bytes) should be(Some((10, "XYZ")))
+      val bytes = serde.toBinary(Some(("XYZ", 10)))
+      bytes.mkString(".") should equal("0.0.0.31.0.0.0.2.0.0.0.7.0.0.0.21.88.89.90.0.0.0.8.0.0.0.20.0.0.0.10")
+      serde.fromBinary(bytes) should be(Some(("XYZ", 10)))
     }
   }
 }

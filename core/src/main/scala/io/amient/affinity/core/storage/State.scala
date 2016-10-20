@@ -125,7 +125,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       case differentOrNone =>
         writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write)) map {
           case prev =>
-            observables.get(key).foreach(_.notifyObservers(value))
+            observables.get(key).foreach(_.notifyObservers(Some(value)))
             prev
         }
     }

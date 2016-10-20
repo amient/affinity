@@ -21,27 +21,22 @@ package io.amient.affinity.core.actor
 
 import java.util.{Observable, Observer}
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props, Status}
 import akka.event.Logging
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Partition.Observe
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 object Partition {
-
-  //TODO use protobuf for internal messages that extend Reply but not say AvroRecord
-  final case class Observe(stateStoreName: String, key: Any) extends Reply[ActorRef] {
-    override def hashCode(): Int = key.hashCode
-  }
-
+  final val INTERNAL_KEY_VALUE_OBSERVER = "INTERNAL_KEY_VALUE_OBSERVER"
 }
 
 trait Partition extends Service with ActorState {
+
+  import Partition._
 
   private val log = Logging.getLogger(context.system, this)
 
@@ -77,18 +72,21 @@ trait Partition extends Service with ActorState {
   }
 
   override protected def manage: Receive = super.manage orElse {
-    case request@Observe(stateStoreName, key) => sender.reply(request) {
+    case (key: Any, stateStoreName: String, INTERNAL_KEY_VALUE_OBSERVER) => try {
       val state = getStateStore(stateStoreName)
-      context.actorOf(Props(new ChangeStream(state, key)))
+      sender ! context.actorOf(Props(new KeyValueStreamActor(state, key)))
+    } catch {
+      case NonFatal(e) => sender ! Status.Failure(e)
     }
   }
 }
 
-class ChangeStream(state: State[_, _], key: Any) extends Actor {
+class KeyValueStreamActor(state: State[_, _], key: Any) extends Actor {
 
   private var observer: Option[Observer] = None
 
   import context.dispatcher
+
   implicit val scheduler = context.system.scheduler
 
   override def postStop(): Unit = {
@@ -96,12 +94,11 @@ class ChangeStream(state: State[_, _], key: Any) extends Actor {
   }
 
   override def receive: Receive = {
-    case frontend: ActorRef => addWebSocketObserver(key, frontend)
-    //case tm: TextMessage => //TODO look into using websocket client json messages
-    //case bm: BinaryMessage => //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
+    case frontend: ActorRef => creatKeyValueObserver(key, frontend)
+    //TODO handle state updates coming from the fronted actor
   }
 
-  def addWebSocketObserver(key: Any, frontend: ActorRef): Unit = {
+  def creatKeyValueObserver(key: Any, frontend: ActorRef): Unit = {
     observer = Some(state.addObserver(key, new Observer() {
       override def update(o: Observable, arg: scala.Any): Unit = {
         val t = 1 seconds

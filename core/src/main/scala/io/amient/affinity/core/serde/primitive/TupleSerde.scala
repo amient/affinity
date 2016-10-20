@@ -50,7 +50,9 @@ class TupleSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) 
     (1 to arity).foreach { a =>
       val len = ByteUtils.asIntValue(bytes, offset)
       offset += 4
-      val element = fromBinaryWrapped(bytes, offset, len)
+      val b = new Array[Byte](len)
+      Array.copy(bytes, offset, b, 0, len)
+      val element = fromBinaryWrapped(b)
       offset += len
       tmp :+= element
     }

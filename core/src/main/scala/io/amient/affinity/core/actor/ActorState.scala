@@ -61,6 +61,4 @@ trait ActorState extends Actor {
 
   def closeState(): Unit = storageRegistry.asScala.foreach(_.storage.close())
 
-
-
 }
