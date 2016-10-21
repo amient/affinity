@@ -124,7 +124,7 @@ class DataPartition extends Partition {
         case Some(props) => (Some(command), Some(props.withComponent(cid)), cid)
       }
     }
-  
+
     /**
       * Add an edge to the graph vertex.
       * This is a non-recursive operation, local to the

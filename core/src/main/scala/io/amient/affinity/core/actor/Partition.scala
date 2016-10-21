@@ -102,7 +102,7 @@ class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
       override def update(o: Observable, arg: scala.Any): Unit = {
         val t = 1 seconds
         implicit val timeout = Timeout(t)
-        (frontend ? arg) onFailure {
+        (frontend ? arg) recover {
           case any => context.stop(self)
         }
       }
