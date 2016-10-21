@@ -10,10 +10,16 @@
 
         var address = "ws://" + window.location.host + window.location.pathname + window.location.search;
         var ws = AvroWebSocket(address, function(message) {
-            document.getElementById("messages").innerHTML =
-                message.constructor.name + "\n"
-                + message.ts + "\n\n"
-                + message;
+            if (message == null) {
+                console.log("[doesn't exist]");
+                document.getElementById("messages").innerHTML = null;
+            } else {
+                document.getElementById("messages").innerHTML =
+                    message._name + "\n"
+                    + message.ts + "\n\n"
+                    + message;
+            }
+
         })
 
     </script>

@@ -31,7 +31,7 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object Partition {
-  final val INTERNAL_KEY_VALUE_OBSERVER = "INTERNAL_KEY_VALUE_OBSERVER"
+  final val INTERNAL_CREATE_KEY_VALUE_MEDIATOR = "INTERNAL_CREATE_KEY_VALUE_MEDIATOR"
 }
 
 trait Partition extends Service with ActorState {
@@ -72,16 +72,16 @@ trait Partition extends Service with ActorState {
   }
 
   override protected def manage: Receive = super.manage orElse {
-    case (key: Any, stateStoreName: String, INTERNAL_KEY_VALUE_OBSERVER) => try {
+    case (key: Any, INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName: String) => try {
       val state = getStateStore(stateStoreName)
-      sender ! context.actorOf(Props(new KeyValueStreamActor(state, key)))
+      sender ! context.actorOf(Props(new KeyValueMediator(state, key)))
     } catch {
       case NonFatal(e) => sender ! Status.Failure(e)
     }
   }
 }
 
-class KeyValueStreamActor(state: State[_, _], key: Any) extends Actor {
+class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
 
   private var observer: Option[Observer] = None
 

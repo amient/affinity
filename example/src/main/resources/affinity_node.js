@@ -10,6 +10,12 @@ window.AvroWebSocket = function (wsAddress, receiver) {
     function notifyReceiver(view, type) {
         var bytes = new Uint8Array(view.buffer).subarray(5);
         var record = type.fromBuffer(bytes);
+        var _name = type._name.split(".");
+        record._name = _name.pop();
+        record._namespace = _name.pop();
+        while((n=_name.pop()) != null) {
+         record._namespace = n + "." + record._namespace;
+        }
         receiver(record);
     }
 
@@ -60,6 +66,10 @@ window.AvroWebSocket = function (wsAddress, receiver) {
                 return;
             }
             var view = new DataView(event.data);
+            if (view.byteLength == 0) {
+                receiver(null);
+                return;
+            }
             if (view.getInt8(0) == 123) {
                 registerSchema(view);
             } else if (view.getInt8(0) == 0) {
@@ -87,7 +97,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
     internalEnsureOpenSocket();
 
     return {
-        send: function(data) {
+        sendText: function(data) {
             internalEnsureOpenSocket();
             try {
                 webSocket.send(data);
@@ -97,6 +107,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
                 webSocket.send(data);
             }
         },
+        //TODO sendAvro
         sendBinaryUTF8: function (str) {
             var str = unescape(encodeURIComponent(str));
             var charList = str.split('');

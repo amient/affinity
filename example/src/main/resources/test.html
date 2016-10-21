@@ -9,10 +9,15 @@
     <script type="text/javascript">
 
         var ws = AvroWebSocket("ws://localhost:8881/vertex?id=1", function(message) {
-            console.log(message.constructor.name);
-            console.log(message.ts);
             var messages = document.getElementById("messages");
             messages.innerHTML = message + "<br/>" + messages.innerHTML;
+            if (message == null) {
+                console.log("[doesn't exist]");
+            } else {
+                console.log(message._name);
+                console.log(message._namespace);
+                console.log(message.ts);
+            }
         })
 
     </script>
