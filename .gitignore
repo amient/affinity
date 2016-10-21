@@ -4,4 +4,4 @@
 .DS_Store
 build/
 node_modules/
-resources/affinity.js
+core/src/main/resources/affinity.js

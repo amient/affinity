@@ -30,6 +30,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import scala.util.control.NonFatal
 
 object State {
   val CONFIG_STATE = "affinity.state"
@@ -106,6 +107,50 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def size: Long = storage.memstore.iterator.size
 
   /**
+    * set is a syntactic sugar for update where the value is always overriden
+    * @param key
+    * @param value
+    * @return
+    */
+  def set(key: K, value: V): Future[Option[V]] = update(key) {
+    case prev => (Some(value), Some(value), prev)
+  }
+
+  /**
+    * update enables per-key observer pattern for incremental updates
+    *
+    * @param key  key which is going to be updated
+    * @param pf   update function which maps the current value Option[V] at the given key to 3 values:
+    *             1. Option[Any] is the incremental update event
+    *             2. Option[V] is the new state for the given key as a result of the incremntal update
+    *             3. R which is the result value expected by the caller
+    * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
+    */
+  def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
+    try {
+      pf(apply(key)) match {
+        case (None, unchanged, result) => Future.successful(result)
+        case (Some(increment), changed, result) => changed match {
+          case Some(updatedValue) =>
+            put(key, updatedValue) andThen {
+              case _ => push(key, increment)
+            } map {
+              case _ => result
+            }
+          case None =>
+            remove(key) andThen {
+              case _ => push(key, increment)
+            } map {
+              case _ => result
+            }
+        }
+      }
+    } catch {
+      case NonFatal(e) => Future.failed(e)
+    }
+  }
+
+  /**
     * An asynchronous non-blocking put operation which inserts or updates the value
     * at the given key. The value is first updated in the memstore and then a future is created
     * for reflecting the modification in the underlying storage. If the storage write fails
@@ -117,15 +162,13 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * @return A a future optional value previously held at the key position
     *         the future option will be equal to None if new a value was inserted
     */
-  def put(key: K, value: V): Future[Option[V]] = {
+  private def put(key: K, value: V): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBinary(value.asInstanceOf[AnyRef]))
     storage.memstore.update(k, write) match {
       case Some(prev) if (prev == write) => Future.successful(Some(value))
       case differentOrNone =>
-        writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))/* map {
-          case prev => push(key, Some(value)); prev
-        }*/
+        writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))
     }
   }
 
@@ -140,14 +183,12 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * @return A a future optional value previously held at the key position
     *         the future option will be equal to None if new a value was inserted
     */
-  def remove(key: K): Future[Option[V]] = {
+  private def remove(key: K): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     storage.memstore.remove(k) match {
       case None => Future.successful(None)
       case some =>
-        writeWithMemstoreRollback(k, some, storage.write(k, null))/* map {
-          case prev => push(key, None); prev
-        }*/
+        writeWithMemstoreRollback(k, some, storage.write(k, null))
     }
   }
 
@@ -174,10 +215,10 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /*
-   * Observer Support - the following code enables per-key observer pattern
+   * Observable State Support
    */
 
-  def push(key: Any, event: Any): Unit = {
+  private def push(key: Any, event: Any): Unit = {
     observables.get(key).foreach(_.notifyObservers(event))
   }
 

@@ -107,13 +107,12 @@ which requires browserify tool to generate browser version:
 When working on this script the browser script affinity.js can
 be generated then by:
 
-    browserify example/src/main/resources/affinity_node.js -o example/src/main/resources/affinity.js
+    browserify core/src/main/resources/affinity_node.js -o core/src/main/resources/affinity.js
     
 When doing a lot of work on the javascript watchify can be used
   to automatically generate the new affinity.js when the affinity_node.js
   is modified:
 
     npm install -g watchify
-    watchify example/src/main/resources/affinity_node.js -v -o example/src/main/resources/affinity.js -d
-    
-//TODO use gradle-node-plugin to generate affinity.js during build 
+    watchify core/src/main/resources/affinity_node.js -v -o core/src/main/resources/affinity.js -d
+ 

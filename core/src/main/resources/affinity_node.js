@@ -1,5 +1,7 @@
 window.avro = require('avsc');
 
+//TODO use gradle-node-plugin to generate affinity.js during build
+
 window.AvroWebSocket = function (wsAddress, receiver) {
 
     var webSocket;
@@ -16,7 +18,6 @@ window.AvroWebSocket = function (wsAddress, receiver) {
         while((n=_name.pop()) != null) {
          record._namespace = n + "." + record._namespace;
         }
-        console.log(record);
         receiver(record);
     }
 
@@ -108,7 +109,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
                 webSocket.send(data);
             }
         },
-        //TODO sendAvro
+        //TODO send(avro_object, avro_type)
         sendBinaryUTF8: function (str) {
             var str = unescape(encodeURIComponent(str));
             var charList = str.split('');
