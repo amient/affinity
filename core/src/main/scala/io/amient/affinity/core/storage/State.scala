@@ -123,11 +123,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     storage.memstore.update(k, write) match {
       case Some(prev) if (prev == write) => Future.successful(Some(value))
       case differentOrNone =>
-        writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write)) map {
-          case prev =>
-            observables.get(key).foreach(_.notifyObservers(Some(value)))
-            prev
-        }
+        writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))/* map {
+          case prev => push(key, Some(value)); prev
+        }*/
     }
   }
 
@@ -147,11 +145,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     storage.memstore.remove(k) match {
       case None => Future.successful(None)
       case some =>
-        writeWithMemstoreRollback(k, some, storage.write(k, null)) map {
-          case prev =>
-            observables.get(key).foreach(_.notifyObservers(None))
-            prev
-        }
+        writeWithMemstoreRollback(k, some, storage.write(k, null))/* map {
+          case prev => push(key, None); prev
+        }*/
     }
   }
 
@@ -180,6 +176,10 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   /*
    * Observer Support - the following code enables per-key observer pattern
    */
+
+  def push(key: Any, event: Any): Unit = {
+    observables.get(key).foreach(_.notifyObservers(event))
+  }
 
   class ObservableState extends Observable {
     override def notifyObservers(arg: scala.Any): Unit = {

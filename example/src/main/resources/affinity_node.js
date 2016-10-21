@@ -16,6 +16,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
         while((n=_name.pop()) != null) {
          record._namespace = n + "." + record._namespace;
         }
+        console.log(record);
         receiver(record);
     }
 

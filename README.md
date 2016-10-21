@@ -115,3 +115,5 @@ When doing a lot of work on the javascript watchify can be used
 
     npm install -g watchify
     watchify example/src/main/resources/affinity_node.js -v -o example/src/main/resources/affinity.js -d
+    
+//TODO use gradle-node-plugin to generate affinity.js during build 

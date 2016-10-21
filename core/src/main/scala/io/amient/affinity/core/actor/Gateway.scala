@@ -200,7 +200,7 @@ trait WebSocketSupport extends Gateway {
           case 0 =>
             //process avro message request
             val record: AvroRecord[_] = null
-            //FIXME avroSerde.fromBytes(buf...) this means the client must know the schemas so the websocket will have to send all the schemas on startup
+            //FIXME #24 avroSerde.fromBytes(buf...) this means the client must know the schemas so the websocket will have to send all the schemas on startup
             val handleAvroClientMessage: PartialFunction[AvroRecord[_], Any] = pfCustomHandle.orElse {
               case forwardToBackend: AvroRecord[_] => forwardToBackend
             }
@@ -216,10 +216,11 @@ trait WebSocketSupport extends Gateway {
             ByteString(echoBytes) //ByteString is a direct response over the push channel
         }
     } {
-      case None => BinaryMessage.Strict(ByteString()) //FIXME what should really be sent is a typed empty record
-        //FIXME the above comes back to the issue of representing a zero-value of avro record
-      case Some(value: AvroRecord[_]) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
       case direct: ByteString => BinaryMessage.Strict(direct) //ByteString as the direct response from above
+      case None => BinaryMessage.Strict(ByteString()) //FIXME #24 what should really be sent is a typed empty record
+        //FIXME #24 the above comes back to the issue of representing a zero-value of avro record
+      case Some(value: AvroRecord[_]) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
+      case value: AvroRecord[_] => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
     }
   }
 
