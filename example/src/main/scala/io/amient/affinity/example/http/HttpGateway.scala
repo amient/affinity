@@ -61,8 +61,7 @@ class HttpGateway extends Gateway with ActorState {
     * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
     * can be modified by other nodes and need to be accessed concurrently
     */
-  implicit val partition = 0
-  val settings = state[String, ConfigEntry]("settings")
+  val settings = state[String, ConfigEntry]("settings", partition = 0)
 
   override def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)

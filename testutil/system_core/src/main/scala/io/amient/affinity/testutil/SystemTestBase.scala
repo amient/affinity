@@ -20,7 +20,7 @@
 package io.amient.affinity.testutil
 
 import java.io.File
-import java.net.{InetSocketAddress}
+import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPInputStream
@@ -32,8 +32,9 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{Gateway, Partition}
+import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import org.apache.avro.util.ByteBufferInputStream
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
@@ -73,6 +74,8 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     .withFallback(ConfigFactory.defaultReference()))
 
   def configure(config: Config): Config = config
+    .withValue(Cluster.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2))
+    .withValue(Node.CONFIG_AKKA_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
     .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
@@ -114,8 +117,15 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
 
     def http_get(uri: Uri): HttpResponse = {
-      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri)), 2 seconds)
+      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri)), 5 seconds)
     }
+
+    val mapper = new ObjectMapper()
+    def get_json(response: HttpResponse): JsonNode = {
+      val json = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
+      mapper.readValue(json, classOf[JsonNode])
+    }
+
 
     def http_post(uri: Uri, entity: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
       Await.result(http(HttpRequest(method = HttpMethods.POST, uri = uri, headers = headers)), 2 seconds)
@@ -141,7 +151,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   class TestRegionNode(config: Config, partitionCreator: => Partition)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
-    Await.result(startRegion(partitionCreator), 6 seconds)
+    Await.result(startRegion(partitionCreator), 36 seconds)
   }
 
 }

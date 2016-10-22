@@ -109,7 +109,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * set is a syntactic sugar for update where the value is always overriden
     * @param key
     * @param value new value to be associated with the key
-    * @return Future Optional of the value prviously held at the key position
+    * @return Future Optional of the value previously held at the key position
     */
   def update(key: K, value: V): Future[Option[V]] = update(key) {
     case Some(prev) if (prev == value) => (None, Some(prev), Some(prev))

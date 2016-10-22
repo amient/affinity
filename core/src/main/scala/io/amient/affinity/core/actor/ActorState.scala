@@ -38,6 +38,11 @@ trait ActorState extends Actor {
 
   import State._
 
+  def state[K: ClassTag, V: ClassTag](name: String, partition: Int): State[K, V] = {
+    implicit val p = partition
+    state(name)
+  }
+
   def state[K: ClassTag, V: ClassTag](name: String)(implicit partition: Int): State[K, V] = state[K,V] {
     new State[K, V](name, context.system, config.getConfig(CONFIG_STATE_STORE(name)))
   }

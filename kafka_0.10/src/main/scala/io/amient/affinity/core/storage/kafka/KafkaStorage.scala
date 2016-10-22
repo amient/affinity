@@ -159,7 +159,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
       if (tailing) {
         tailing = false
         while (true) {
-          consumer.wait(3000)
+          consumer.wait(6000)
           if (consumerError.get != null) {
             consumer.kafkaConsumer.wakeup()
             throw consumerError.get

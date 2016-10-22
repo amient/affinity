@@ -29,7 +29,6 @@ import io.amient.affinity.example._
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
-import scala.concurrent.Future
 
 
 object DataPartition {
