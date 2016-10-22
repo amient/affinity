@@ -19,7 +19,8 @@
 
 package io.amient.affinity.core.serde.avro
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
+import java.nio.ByteBuffer
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
@@ -29,7 +30,7 @@ import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
-import org.apache.avro.util.Utf8
+import org.apache.avro.util.{ByteBufferInputStream, Utf8}
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
 
 import scala.collection.JavaConverters._
@@ -89,26 +90,46 @@ object AvroRecord {
     *         null if bytes are null
     */
   def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
-    if (bytes == null) null
-    else {
-      val bytesIn = new ByteArrayInputStream(bytes)
-      require(bytesIn.read() == MAGIC)
-      val schemaId = ByteUtils.readIntValue(bytesIn)
-      require(schemaId >= 0)
-      val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
-      schemaRegistry.schema(schemaId) match {
-        case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
-        case Some((tpe, writerSchema)) =>
-          if (tpe == null) {
-            val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
-            reader.read(null, decoder)
-          } else {
-            val readerSchema = inferSchema(tpe)
-            val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-            val record = reader.read(null, decoder)
-            readDatum(record, tpe, readerSchema)
-          }
-      }
+    if (bytes == null) null else read(new ByteArrayInputStream(bytes), schemaRegistry)
+  }
+
+  /**
+    *
+    * @param bytes ByteBuffer version of the registered avro reader
+    * @param schemaRegistry
+    * @return AvroRecord for registered Type
+    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
+    *         null if bytes are null
+    */
+  def read(bytes: ByteBuffer, schemaRegistry: AvroSchemaProvider): Any = {
+    if (bytes == null) null else read(new ByteBufferInputStream(List(bytes).asJava), schemaRegistry)
+  }
+
+  /**
+    *
+    * @param bytesIn InputStream implementation for the registered avro reader
+    * @param schemaRegistry
+    * @return AvroRecord for registered Type
+    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
+    *         null if bytes are null
+    */
+  def read(bytesIn: InputStream, schemaRegistry: AvroSchemaProvider): Any = {
+    require(bytesIn.read() == MAGIC)
+    val schemaId = ByteUtils.readIntValue(bytesIn)
+    require(schemaId >= 0)
+    val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
+    schemaRegistry.schema(schemaId) match {
+      case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
+      case Some((tpe, writerSchema)) =>
+        if (tpe == null) {
+          val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
+          reader.read(null, decoder)
+        } else {
+          val readerSchema = inferSchema(tpe)
+          val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
+          val record = reader.read(null, decoder)
+          readDatum(record, tpe, readerSchema)
+        }
     }
   }
 

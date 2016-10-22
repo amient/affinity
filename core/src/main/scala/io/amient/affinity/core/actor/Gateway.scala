@@ -175,14 +175,23 @@ trait WebSocketSupport extends Gateway {
   }
 
   protected def avroWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
-                             (pfCustomHandle: PartialFunction[AvroRecord[_], Unit]): Future[HttpResponse] = {
+                             (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
 
     if (!serializers.contains(101)) throw new IllegalArgumentException("No AvroSerde is registered")
     val avroSerde = serializers(101).asInstanceOf[AvroSerde]
 
+    def buildSchemaPushMessage(schemaId: Int): ByteString = {
+      val schemaBytes = avroSerde.schema(schemaId).get._2.toString(true).getBytes()
+      val echoBytes = new Array[Byte](schemaBytes.length + 5)
+      echoBytes(0) = 123
+      ByteUtils.putIntValue(schemaId, echoBytes, 1)
+      Array.copy(schemaBytes, 0, echoBytes, 5, schemaBytes.length)
+      ByteString(echoBytes) //ByteString is a direct response over the push channel
+    }
+
     /** Avro Web Socket Protocol:
       *
-      * downstream TextMessage is considered a log event
+      * downstream TextMessage is considered a request for a schema of the given name
       * downstream BinaryMessage starts with a magic byte
       * 0   Is a binary avro message prefixed with BIG ENDIAN 32INT representing the schemId
       * 123 Is a schema request - binary buffer contains only BIG ENDIAN 32INT Schema and the client expects json schema to be sent back
@@ -192,33 +201,36 @@ trait WebSocketSupport extends Gateway {
       * upstream ByteString will be sent as raw binary message to the client (used internally for schema request)
       * upstream any other type handling is not defined and will throw scala.MatchError
       */
+
     genericWebSocket(upgrade, stateStoreName, key) {
-      case text: TextMessage => log.info(text.getStrictText)
+      case text: TextMessage =>
+        try {
+          buildSchemaPushMessage(avroSerde.schema(text.getStrictText).get)
+        } catch {
+          case NonFatal(e) => log.warning("Invalid websocket schema type requst", e)
+        }
       case binary: BinaryMessage =>
-        val buf = binary.getStrictData.asByteBuffer
-        buf.get() match {
-          case 0 =>
-            //process avro message request
-            val record: AvroRecord[_] = null
-            //FIXME #24 avroSerde.fromBytes(buf...) this means the client must know the schemas so the websocket will have to send all the schemas on startup
-            val handleAvroClientMessage: PartialFunction[AvroRecord[_], Any] = pfCustomHandle.orElse {
-              case forwardToBackend: AvroRecord[_] => forwardToBackend
+        try {
+          val buf = binary.getStrictData.asByteBuffer
+          buf.get(0) match {
+            case 123 => buildSchemaPushMessage(schemaId = buf.getInt(1))
+            case 0 => try {
+              val record = AvroRecord.read(buf, avroSerde)
+              val handleAvroClientMessage: PartialFunction[Any, Any] = pfCustomHandle.orElse {
+                case forwardToBackend: AvroRecord[_] => forwardToBackend
+              }
+              handleAvroClientMessage(record)
+            } catch {
+              case NonFatal(e) => e.printStackTrace()
             }
-            handleAvroClientMessage(record)
-          case 123 =>
-            //process avro schema request
-            val schemaId = buf.getInt()
-            val schemaBytes = avroSerde.schema(schemaId).get._2.toString(true).getBytes()
-            val echoBytes = new Array[Byte](schemaBytes.length + 5)
-            echoBytes(0) = 123
-            ByteUtils.putIntValue(schemaId, echoBytes, 1)
-            Array.copy(schemaBytes, 0, echoBytes, 5, schemaBytes.length)
-            ByteString(echoBytes) //ByteString is a direct response over the push channel
+          }
+        } catch {
+          case NonFatal(e) => log.warning("Invalid websocket binary avro message", e)
         }
     } {
       case direct: ByteString => BinaryMessage.Strict(direct) //ByteString as the direct response from above
-      case None => BinaryMessage.Strict(ByteString()) //FIXME #24 what should really be sent is a typed empty record
-        //FIXME #24 the above comes back to the issue of representing a zero-value of avro record
+      case None => BinaryMessage.Strict(ByteString()) //TODO what should really be sent is a typed empty record
+      //TODO the above comes back to the issue of representing a zero-value of avro record
       case Some(value: AvroRecord[_]) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
       case value: AvroRecord[_] => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
     }

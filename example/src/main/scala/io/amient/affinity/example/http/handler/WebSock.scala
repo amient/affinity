@@ -25,7 +25,7 @@ import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 import io.amient.affinity.core.actor.WebSocketSupport
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.example.VertexProps
+import io.amient.affinity.example.Edge
 import io.amient.affinity.example.rest.HttpGateway
 
 trait WebSock extends HttpGateway with WebSocketSupport {
@@ -42,7 +42,7 @@ trait WebSock extends HttpGateway with WebSocketSupport {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
           avroWebSocket(upgrade, "graph", vertex) {
-            case x: VertexProps => System.err.println("My custom handler of VertexProps: " + x)
+            case x: Edge => println("My custom handler of Edge: " + x)
           }
         }
       }

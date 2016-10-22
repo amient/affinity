@@ -1,24 +1,38 @@
-window.avro = require('avsc');
-
 //TODO use gradle-node-plugin to generate affinity.js during build
 
+window.avro = require('avsc');
+window.avro.types = new Map();
 window.AvroWebSocket = function (wsAddress, receiver) {
 
     var webSocket;
     var reconnect = 30;
-    var types = new Map();
-    var queue = new Array();
+    var receiveQueue = new Array();
+    var sendQueue = new Array();
+    var schemas = new Map();
 
     function notifyReceiver(view, type) {
         var bytes = new Uint8Array(view.buffer).subarray(5);
         var record = type.fromBuffer(bytes);
         var _name = type._name.split(".");
-        record._name = _name.pop();
-        record._namespace = _name.pop();
+        record._type = type.id
+        record._namespace = type.namespace
         while((n=_name.pop()) != null) {
          record._namespace = n + "." + record._namespace;
         }
         receiver(record);
+    }
+
+    function sendAvroMessage(type, jsonData) {
+        var buf = type.toBuffer(jsonData);
+        var requestBuf = new ArrayBuffer(5 + buf.byteLength);
+        var wv = new DataView(requestBuf);
+        wv.setInt8(0, 0);
+        wv.setInt32(1, type.schemaId, false);
+        var src = new Uint8Array(buf);
+        for (var i = 0; i < src.byteLength; i++) {
+            wv.setInt8(i+5, src[i])
+        }
+        webSocket.send(requestBuf);
     }
 
     function requestSchema(schemaId) {
@@ -37,16 +51,35 @@ window.AvroWebSocket = function (wsAddress, receiver) {
         var schema = String.fromCharCode.apply(null, new Int8Array(event.data).subarray(5));
         console.log(schema);
         var type = avro.parse(schema);
-        types.set(schemaId, type);
+        var _name = type._name.split(".");
+        type.id = _name.pop();
+        type.namespace = _name.pop();
+        type.schemaId = schemaId;
+        schemas.set(schemaId, type);
+        avro.types.set(type._name, type);
+
+        //process pending receive avro data for this schema
         var tmpQueue = new Array();
-        while((recordView=queue.pop()) != null){
+        while((recordView=receiveQueue.pop()) != null){
             if (recordView.getInt32(1, false) == schemaId) {
                 notifyReceiver(recordView, type);
             } else {
                 tmpQueue.push(recordView);
             }
         }
-        queue = tmpQueue;
+        receiveQueue = tmpQueue;
+        //process pending send avro data for this schema
+        tmpQueue2 = new Array();
+        while((sendData=sendQueue.pop()) != null){
+            if (sendData.type == type._name) {
+                sendAvroMessage(type, sendData.data);
+            } else {
+                console.warn(sendData.type);
+                tmpQueue2.push(sendData);
+            }
+        }
+        sendQueue = tmpQueue2;
+
     }
 
     function internalEnsureOpenSocket() {
@@ -77,11 +110,11 @@ window.AvroWebSocket = function (wsAddress, receiver) {
             } else if (view.getInt8(0) == 0) {
                 //process object
                 var schemaId = view.getInt32(1, false);
-                if (!types.has(schemaId)) {
-                    queue.push(view);
+                if (!schemas.has(schemaId)) {
+                    receiveQueue.push(view);
                     requestSchema(schemaId);
                 } else {
-                    notifyReceiver(view, types.get(schemaId));
+                    notifyReceiver(view, schemas.get(schemaId));
                 }
             } else {
                 console.error("Magic byte for avro web socket must be either 0 or 123");
@@ -109,7 +142,16 @@ window.AvroWebSocket = function (wsAddress, receiver) {
                 webSocket.send(data);
             }
         },
-        //TODO send(avro_object, avro_type)
+        send: function(avroType, jsonData) {
+            var type = avro.types.get(avroType);
+            if (type == undefined) {
+                console.log("Requesting schema for "+ avroType);
+                sendQueue.push( { type: avroType, data: jsonData} );
+                webSocket.send(avroType);
+            } else {
+                sendAvroMessage(type, jsonData);
+            }
+        },
         sendBinaryUTF8: function (str) {
             var str = unescape(encodeURIComponent(str));
             var charList = str.split('');

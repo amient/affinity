@@ -33,11 +33,21 @@ trait AvroSchemaProvider {
 
   private val register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
 
-  @volatile private var cache1: immutable.Map[Int, (Type, Schema)] = Map()
+  private var cache1: immutable.Map[Int, (Type, Schema)] = Map()
 
-  @volatile private var cache2: immutable.Map[Schema, Int] = Map()
+  private var cache2: immutable.Map[Schema, Int] = Map()
 
-  @volatile private var cache3 = immutable.Map[Int, Option[(Type, Schema)]]()
+  private var cache3 = immutable.Map[Int, Option[(Type, Schema)]]()
+
+  private var cache4 = immutable.Map[String, Int]()
+
+
+  /**
+    * Get current current schema for the compile time class
+    * @param cls
+    * @return
+    */
+  final def schema(cls: String): Option[Int] = cache4.get(cls)
 
   /**
     * Get schema id which is associated with a concrete schema instance
@@ -84,7 +94,9 @@ trait AvroSchemaProvider {
     * @return unique schema id
     */
   final def register[T: TypeTag](cls: Class[T]): Int = synchronized {
-    register(typeOf[T], cls, AvroRecord.inferSchema(cls))
+    val schemaId = register(typeOf[T], cls, AvroRecord.inferSchema(cls))
+    cache4 += cls.getName -> schemaId
+    schemaId
   }
 
   /**

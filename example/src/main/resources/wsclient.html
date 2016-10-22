@@ -14,10 +14,12 @@
                 console.log("[None]");
                 document.getElementById("messages").innerHTML = null;
             } else {
-                document.getElementById("messages").innerHTML = message._name + "\n" + message;
+                document.getElementById("messages").innerHTML = message._type + "\n" + message;
             }
 
         })
+
+        ws.send('io.amient.example.data.Edge', {"target":4,"timestamp":1476881136895})
 
     </script>
 

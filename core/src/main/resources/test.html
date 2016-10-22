@@ -20,6 +20,11 @@
             }
         })
 
+        function test() {
+            ws.send('io.amient.affinity.example.Edge', {"target":4,"timestamp":1476881136895});
+        }
+
+
     </script>
 
 </head>
@@ -30,6 +35,10 @@
 </div>
 <div>
     <button type="button" onclick="ws.send(document.getElementById('messageinput').value);" >Send</button>
+</div>
+
+<div>
+    <button type="button" onclick="test();" >Test</button>
 </div>
 
 <div id="messages"></div>
