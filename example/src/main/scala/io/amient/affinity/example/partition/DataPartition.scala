@@ -95,12 +95,12 @@ class DataPartition extends Partition {
       * Updated component of the vertex.
       * Responds with the Component data previously associated with the vertex
       */
-    case request@UpdateComponent(cid, updatedComponent) => sender.replyWith(request) {
-      components.put(cid, updatedComponent)
+    case command@UpdateComponent(cid, updated) => sender.replyWith(command) {
+      components.update(cid, updated)
     }
 
-    case request@DeleteComponent(cid) => sender.replyWith(request) {
-      components.remove(cid)
+    case command@DeleteComponent(cid) => sender.replyWith(command) {
+      components.remove(cid, command)
     }
 
     /**
@@ -110,13 +110,11 @@ class DataPartition extends Partition {
       graph(vid)
     }
 
-    case request@UpdateVertexComponent(vid, cid) => sender.replyWith(request) {
-      graph(vid) match {
-        case None => Future.failed(new NoSuchElementException)
-        case Some(props) if (props.component == cid) => Future.successful(cid)
-        case Some(props) => graph.put(vid, props.withComponent(cid)) map {
-          case _ => cid
-        }
+    case command@UpdateVertexComponent(vid, cid) => sender.replyWith(command) {
+      graph.update(vid) {
+        case None => throw new NoSuchElementException
+        case Some(props) if (props.component == cid) => (None, Some(props), cid)
+        case Some(props) => (Some(command), Some(props.withComponent(cid)), props.component)
       }
     }
 
@@ -126,17 +124,15 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
-    case request@ModifyGraph(vertex, edge, GOP.ADD) => sender.replyWith(request) {
-      graph(vertex) match {
-        case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Future.successful(existing)
-        case None => val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
-          graph.put(vertex, inserted) map {
-            case _ => inserted
-          }
+    case command@ModifyGraph(vertex, edge, GOP.ADD) => sender.replyWith(command) {
+      graph.update(vertex) {
+        case Some(existing) if (existing.edges.exists(_.target == edge.target)) =>
+          (None, Some(existing), existing)
+        case None =>
+          val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
+          (Some(inserted), Some(inserted), inserted)
         case Some(existing) => val updated = existing.withEdges(existing.edges + edge)
-          graph.put(vertex, updated) map {
-            case _ => updated
-          }
+          (Some(command), Some(updated), updated)
       }
     }
 
@@ -147,18 +143,14 @@ class DataPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
-    case request@ModifyGraph(vid, edge, GOP.REMOVE) => sender.replyWith(request) {
-      graph(vid) match {
-        case None => Future.failed(new NoSuchElementException)
+    case command@ModifyGraph(vertex, edge, GOP.REMOVE) => sender.replyWith(command) {
+      graph.update(vertex) {
+        case None => throw new NoSuchElementException
+        case Some(existing) if !existing.edges.exists(_.target == edge.target) =>
+          throw new IllegalArgumentException("not connected")
         case Some(existing) =>
-          if (!existing.edges.exists(_.target == edge.target)) {
-            Future.failed(new IllegalArgumentException("not connected"))
-          } else {
-            val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
-            graph.put(vid, updated) map {
-              case _ => updated
-            }
-          }
+          val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
+          (Some(command), Some(updated), updated)
       }
     }
   }

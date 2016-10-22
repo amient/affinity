@@ -83,7 +83,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-      state.put(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+      state.update(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
         (s) => s, (e: Throwable) => {
         numWrites.decrementAndGet()
         e

@@ -37,7 +37,7 @@ import scala.collection.mutable
 
 object Encoder {
 
-  private val mapper = new ObjectMapper()
+  val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
 
   def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {

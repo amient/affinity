@@ -3,4 +3,5 @@
 .gradle
 .DS_Store
 build/
-
+node_modules/
+core/src/main/resources/affinity.js

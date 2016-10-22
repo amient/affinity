@@ -21,31 +21,28 @@ package io.amient.affinity.example.http.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.ws.TextMessage.Strict
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
+import io.amient.affinity.core.actor.WebSocketSupport
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
+import io.amient.affinity.example.VertexProps
 import io.amient.affinity.example.rest.HttpGateway
 
-trait WebSock extends HttpGateway {
+trait WebSock extends HttpGateway with WebSocketSupport {
 
-  val js = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/wsclient.js")).mkString
   val html = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/wsclient.html")).mkString
 
   import context.dispatcher
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case http@HTTP(GET, PATH("wsclient.js"), _, response) => response.success(Encoder.plain(OK, js))
-
     case http@HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>
 
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          keyValueWebSocket(upgrade, "graph", vertex) {
-            case Some(value) => new Strict(Encoder.json(value))
-            case None => new Strict("null")
+          avroWebSocket(upgrade, "graph", vertex) {
+            case x: VertexProps => System.err.println("My custom handler of VertexProps: " + x)
           }
         }
       }

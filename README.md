@@ -86,6 +86,7 @@ The following core features are already in place:
  - On becoming a Standby, the Partition Actor resumes consuming the 
      underlying topic and stops receiving until it again becomes a master.
  - Standby is not a read replica at the moment but it could be an option
+ 
 
 ## Testing the code
 
@@ -94,3 +95,24 @@ The following core features are already in place:
 ## Building the project
         
     ./gradlew build
+
+## JavaScript (affinity.js)
+
+There is affinity_node.js file which contains the source for avro
+web socket implementation. It is based on a node avsc.js library
+which requires browserify tool to generate browser version:
+
+    npm install -g browserify
+
+When working on this script the browser script affinity.js can
+be generated then by:
+
+    browserify core/src/main/resources/affinity_node.js -o core/src/main/resources/affinity.js
+    
+When doing a lot of work on the javascript watchify can be used
+  to automatically generate the new affinity.js when the affinity_node.js
+  is modified:
+
+    npm install -g watchify
+    watchify core/src/main/resources/affinity_node.js -v -o core/src/main/resources/affinity.js -d
+ 

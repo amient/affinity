@@ -23,20 +23,27 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.event.Logging
+import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.ws.{Message, UpgradeToWebSocket}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, UpgradeToWebSocket}
 import akka.pattern.ask
 import akka.routing._
+import akka.serialization.SerializationExtension
 import akka.stream.ActorMaterializer
 import akka.stream.actor.ActorPublisher
 import akka.stream.actor.ActorPublisherMessage.Request
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
+import com.fasterxml.jackson.databind.JsonNode
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
-import io.amient.affinity.core.http.{HttpExchange, HttpInterface}
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.util.ByteUtils
+import org.apache.avro.util.ByteBufferInputStream
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -137,18 +144,95 @@ abstract class Gateway extends Actor {
 
   }
 
-  /*
-   * WebSocket support methods
-   */
+}
 
-  protected def keyValueWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
-                                 (pf: PartialFunction[Any, Message]): Future[HttpResponse] = {
+
+trait WebSocketSupport extends Gateway {
+
+  private val log = Logging.getLogger(context.system, this)
+
+  private val afjs = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/affinity.js")).mkString
+
+  private val serializers = SerializationExtension(context.system).serializerByIdentity
+
+  abstract override def handle: Receive = super.handle orElse {
+    case http@HTTP(GET, PATH("affinity.js"), _, response) => response.success(Encoder.plain(OK, afjs))
+  }
+
+  protected def jsonWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+                             (pfCustomHandle: PartialFunction[JsonNode, Unit]): Future[HttpResponse] = {
+    genericWebSocket(upgrade, stateStoreName, key) {
+      case text: TextMessage => log.info(text.getStrictText)
+      case binary: BinaryMessage =>
+        val buf = binary.getStrictData.asByteBuffer
+        val json = Encoder.mapper.readValue(new ByteBufferInputStream(List(buf).asJava), classOf[JsonNode])
+        pfCustomHandle(json)
+    } {
+      case None => TextMessage.Strict("null")
+      case Some(value) => TextMessage.Strict(Encoder.json(value))
+      case direct: ByteString => BinaryMessage.Strict(direct)
+    }
+  }
+
+  protected def avroWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+                             (pfCustomHandle: PartialFunction[AvroRecord[_], Unit]): Future[HttpResponse] = {
+
+    if (!serializers.contains(101)) throw new IllegalArgumentException("No AvroSerde is registered")
+    val avroSerde = serializers(101).asInstanceOf[AvroSerde]
+
+    /** Avro Web Socket Protocol:
+      *
+      * downstream TextMessage is considered a log event
+      * downstream BinaryMessage starts with a magic byte
+      * 0   Is a binary avro message prefixed with BIG ENDIAN 32INT representing the schemId
+      * 123 Is a schema request - binary buffer contains only BIG ENDIAN 32INT Schema and the client expects json schema to be sent back
+      *       - thre response must also strat with 123 magic byte, followed by 32INT Schema ID and then schema json bytes
+      *
+      * upstream Option[Any] is expected to be an AvroRecord[_] and will be sent as binary message to the client
+      * upstream ByteString will be sent as raw binary message to the client (used internally for schema request)
+      * upstream any other type handling is not defined and will throw scala.MatchError
+      */
+    genericWebSocket(upgrade, stateStoreName, key) {
+      case text: TextMessage => log.info(text.getStrictText)
+      case binary: BinaryMessage =>
+        val buf = binary.getStrictData.asByteBuffer
+        buf.get() match {
+          case 0 =>
+            //process avro message request
+            val record: AvroRecord[_] = null
+            //FIXME #24 avroSerde.fromBytes(buf...) this means the client must know the schemas so the websocket will have to send all the schemas on startup
+            val handleAvroClientMessage: PartialFunction[AvroRecord[_], Any] = pfCustomHandle.orElse {
+              case forwardToBackend: AvroRecord[_] => forwardToBackend
+            }
+            handleAvroClientMessage(record)
+          case 123 =>
+            //process avro schema request
+            val schemaId = buf.getInt()
+            val schemaBytes = avroSerde.schema(schemaId).get._2.toString(true).getBytes()
+            val echoBytes = new Array[Byte](schemaBytes.length + 5)
+            echoBytes(0) = 123
+            ByteUtils.putIntValue(schemaId, echoBytes, 1)
+            Array.copy(schemaBytes, 0, echoBytes, 5, schemaBytes.length)
+            ByteString(echoBytes) //ByteString is a direct response over the push channel
+        }
+    } {
+      case direct: ByteString => BinaryMessage.Strict(direct) //ByteString as the direct response from above
+      case None => BinaryMessage.Strict(ByteString()) //FIXME #24 what should really be sent is a typed empty record
+        //FIXME #24 the above comes back to the issue of representing a zero-value of avro record
+      case Some(value: AvroRecord[_]) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
+      case value: AvroRecord[_] => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
+    }
+  }
+
+  protected def genericWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+                                (pfDown: PartialFunction[Message, Any])
+                                (pfPush: PartialFunction[Any, Message]): Future[HttpResponse] = {
     import context.dispatcher
-    implicit val scheduler = system.scheduler
-    implicit val materializer = ActorMaterializer.create(system)
+    implicit val scheduler = context.system.scheduler
+    implicit val materializer = ActorMaterializer.create(context.system)
     implicit val timeout = Timeout(1 second)
 
-    cluster ? (key, stateStoreName, Partition.INTERNAL_KEY_VALUE_OBSERVER) map {
+    cluster ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
       case keyValueActor: ActorRef =>
 
         /**
@@ -157,12 +241,23 @@ abstract class Gateway extends Actor {
           * Using PoisonPill as termination message in combination with context.watch(source)
           * allows for closing the whole bidi flow in case the client closes the connection.
           */
-        val clientMessageSink = Sink.actorRef[Message](keyValueActor, PoisonPill)
-        //TODO create actorSubscribe which translates the ws messages and passes them on to the keyValueActor
-//        override def receive: Receive = {
-//          //case tm: TextMessage => //TODO look into using websocket client json messages
-//          //case bm: BinaryMessage => //TODO end-to-end avro with js websocket client holding schema registry and using BinaryMessage
-//        }
+        val clientMessageReceiver = context.actorOf(Props(new Actor {
+          private var frontend: Option[ActorRef] = None
+
+          override def postStop(): Unit = {
+            keyValueActor ! PoisonPill
+          }
+
+          override def receive: Receive = {
+            case frontend: ActorRef => this.frontend = Some(frontend)
+            case msg: Message => pfDown(msg) match {
+              case Unit =>
+              case response: ByteString => frontend.foreach(_ ! response)
+              case other: Any => keyValueActor ! other
+            }
+          }
+        }))
+        val downMessageSink = Sink.actorRef[Message](clientMessageReceiver, PoisonPill)
 
         /**
           * Source.actorPublisher doesn't detect connections closed by the server so websockets
@@ -171,21 +266,23 @@ abstract class Gateway extends Actor {
           */
         //TODO akka/akka#21549 - at the moment worked around by never closing idle connections
         //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
-        val serverMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
+        val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           override def preStart(): Unit = {
             context.watch(keyValueActor)
             keyValueActor ! self
+            clientMessageReceiver ! self
           }
 
           override def receive: Receive = {
             case Request(_) =>
             case Terminated(source) => context.stop(self)
-            case msg => sender ! onNext(pf(msg))  //will throw an exception if no messages well demanded
+            case pushMessage => sender ! onNext(pfPush(pushMessage)) //will throw an exception if no messages well demanded
           }
         }))
-        val flow = Flow.fromSinkAndSource(clientMessageSink, serverMessageSource)
+        val flow = Flow.fromSinkAndSource(downMessageSink, pushMessageSource)
         upgrade.handleMessages(flow)
     }
   }
+
 }
