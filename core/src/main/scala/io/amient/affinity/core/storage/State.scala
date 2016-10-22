@@ -89,7 +89,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         Future.Success(None) if the key doesn't exist
     *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
-  def apply(key: Any): Option[V] = {
+  def apply(key: K): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     storage.memstore(k) map[V] {
       case d => valueSerde.fromBinary(d.array) match {
@@ -107,6 +107,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   /**
     * set is a syntactic sugar for update where the value is always overriden
+    *
     * @param key
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
@@ -224,9 +225,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
    * Observable State Support
    */
 
-  private var observables = Map[Any, ObservableState]()
+  private var observables = Map[K, ObservableState]()
 
-  private def push(key: Any, event: Any): Unit = {
+  private def push(key: K, event: Any): Unit = {
     observables.get(key).foreach(_.notifyObservers(event))
   }
 
@@ -238,23 +239,24 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     }
   }
 
-  def addObserver(key: Any, observer: Observer): Observer = {
-    val observable = observables.get(key) match {
-      case Some(observable) => observable
-      case None =>
-        val observable = new ObservableState()
-        observables += key -> observable
-        observable
-    }
-    observable.addObserver(observer)
-    observer.update(observable, apply(key)) // send initial value on subscription
-    observer
+  def addObserver(key: Any, observer: Observer): Observer = key match {
+    case k: K =>
+      val observable = observables.get(k) match {
+        case Some(observable) => observable
+        case None =>
+          val observable = new ObservableState()
+          observables += k -> observable
+          observable
+      }
+      observable.addObserver(observer)
+      observer.update(observable, apply(k)) // send initial value on subscription
+      observer
   }
 
-  def removeObserver(key: Any, observer: Observer): Unit = {
-    observables.get(key).foreach {
+  def removeObserver(key: Any, observer: Observer): Unit = key match {
+    case k: K => observables.get(k).foreach {
       observable => observable.deleteObserver(observer)
-        if (observable.countObservers() == 0) observables -= key
+        if (observable.countObservers() == 0) observables -= k
     }
   }
 
