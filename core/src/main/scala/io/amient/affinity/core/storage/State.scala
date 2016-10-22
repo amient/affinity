@@ -99,7 +99,6 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     }
   }
 
-
   def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
     (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
   }
@@ -109,11 +108,18 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   /**
     * set is a syntactic sugar for update where the value is always overriden
     * @param key
-    * @param value
-    * @return
+    * @param value new value to be associated with the key
+    * @return Future Optional of the value prviously held at the key position
     */
-  def set(key: K, value: V): Future[Option[V]] = update(key) {
-    case prev => (Some(value), Some(value), prev)
+  def update(key: K, value: V): Future[Option[V]] = update(key) {
+    case Some(prev) if (prev == value) => (None, Some(prev), Some(prev))
+    case Some(prev) => (Some(value), Some(value), Some(prev))
+    case None => (Some(value), Some(value), None)
+  }
+
+  def remove(key: K, command: Any): Future[Option[V]] = update(key) {
+    case None => (None, None, None)
+    case Some(component) => (Some(command), None, Some(component))
   }
 
   /**
@@ -138,7 +144,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
               case _ => result
             }
           case None =>
-            remove(key) andThen {
+            delete(key) andThen {
               case _ => push(key, increment)
             } map {
               case _ => result
@@ -183,7 +189,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * @return A a future optional value previously held at the key position
     *         the future option will be equal to None if new a value was inserted
     */
-  private def remove(key: K): Future[Option[V]] = {
+  private def delete(key: K): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     storage.memstore.remove(k) match {
       case None => Future.successful(None)
@@ -218,6 +224,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
    * Observable State Support
    */
 
+  private var observables = Map[Any, ObservableState]()
+
   private def push(key: Any, event: Any): Unit = {
     observables.get(key).foreach(_.notifyObservers(event))
   }
@@ -229,8 +237,6 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       super.notifyObservers(arg)
     }
   }
-
-  private var observables = Map[Any, ObservableState]()
 
   def addObserver(key: Any, observer: Observer): Observer = {
     val observable = observables.get(key) match {

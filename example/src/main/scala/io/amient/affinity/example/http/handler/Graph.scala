@@ -88,43 +88,47 @@ trait Graph extends HttpGateway {
 
   }
 
-  private def connect(v1: Int, v2: Int): Future[Set[Int]] = Transaction(cluster) { transaction =>
-    val ts = System.currentTimeMillis
-    transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
-      case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
-        case props2 => transaction execute collectComponent(v2) flatMap {
-          case mergedComponent =>
-            val newComponentID = mergedComponent.connected.min
-            transaction execute UpdateComponent(newComponentID, mergedComponent)
-            if (props1.component != newComponentID) transaction execute DeleteComponent(props1.component)
-            if (props2.component != newComponentID) transaction execute DeleteComponent(props2.component)
-            Future.sequence(mergedComponent.connected.map { v =>
-              transaction execute UpdateVertexComponent(v, newComponentID)
-            })
+  private def connect(v1: Int, v2: Int): Future[Set[Int]] = {
+    Transaction(cluster) { transaction =>
+      val ts = System.currentTimeMillis
+      transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
+        case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
+          case props2 => transaction execute collectComponent(v2) flatMap {
+            case mergedComponent =>
+              val newComponentID = mergedComponent.connected.min
+              transaction execute UpdateComponent(newComponentID, mergedComponent)
+              if (props1.component != newComponentID) transaction execute DeleteComponent(props1.component)
+              if (props2.component != newComponentID) transaction execute DeleteComponent(props2.component)
+              Future.sequence(mergedComponent.connected.map { v =>
+                transaction execute UpdateVertexComponent(v, newComponentID)
+              })
+          }
         }
       }
     }
   }
 
-  private def disconnect(v1: Int, v2: Int) = Transaction(cluster) { transaction =>
-    val ts = System.currentTimeMillis
-    transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
-      case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
-        case props2 => transaction execute collectComponent(v1) flatMap {
-          case component1 => transaction execute collectComponent(v2) flatMap {
-            case component2 =>
-              val newComponentIDS = List(component1.connected.min, component2.connected.min)
-              transaction execute UpdateComponent(newComponentIDS(0), component1)
-              transaction execute UpdateComponent(newComponentIDS(1), component2)
-              if (!newComponentIDS.contains(props1.component)) transaction execute DeleteComponent(props1.component)
-              if (!newComponentIDS.contains(props2.component)) transaction execute DeleteComponent(props2.component)
-              Future.sequence {
-                component1.connected.map { v =>
-                  transaction execute UpdateVertexComponent(v, newComponentIDS(0))
-                } ++ component2.connected.map { v =>
-                  transaction execute UpdateVertexComponent(v, newComponentIDS(1))
+  private def disconnect(v1: Int, v2: Int) = {
+    Transaction(cluster) { transaction =>
+      val ts = System.currentTimeMillis
+      transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
+        case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
+          case props2 => transaction execute collectComponent(v1) flatMap {
+            case component1 => transaction execute collectComponent(v2) flatMap {
+              case component2 =>
+                val newComponentIDS = List(component1.connected.min, component2.connected.min)
+                transaction execute UpdateComponent(newComponentIDS(0), component1)
+                transaction execute UpdateComponent(newComponentIDS(1), component2)
+                if (!newComponentIDS.contains(props1.component)) transaction execute DeleteComponent(props1.component)
+                if (!newComponentIDS.contains(props2.component)) transaction execute DeleteComponent(props2.component)
+                Future.sequence {
+                  component1.connected.map { v =>
+                    transaction execute UpdateVertexComponent(v, newComponentIDS(0))
+                  } ++ component2.connected.map { v =>
+                    transaction execute UpdateVertexComponent(v, newComponentIDS(1))
+                  }
                 }
-              }
+            }
           }
         }
       }

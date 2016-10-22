@@ -96,18 +96,11 @@ class DataPartition extends Partition {
       * Responds with the Component data previously associated with the vertex
       */
     case command@UpdateComponent(cid, updated) => sender.replyWith(command) {
-      components.update(cid) {
-        case Some(existing) if (existing == updated) => (None, Some(existing), Some(existing))
-        case Some(existing) => (Some(updated), Some(updated), Some(existing))
-        case None => (Some(updated), Some(updated), None)
-      }
+      components.update(cid, updated)
     }
 
     case command@DeleteComponent(cid) => sender.replyWith(command) {
-      components.update(cid) {
-        case None => (None, None, None)
-        case Some(component) => (Some(command), None, Some(component))
-      }
+      components.remove(cid, command)
     }
 
     /**
@@ -121,7 +114,7 @@ class DataPartition extends Partition {
       graph.update(vid) {
         case None => throw new NoSuchElementException
         case Some(props) if (props.component == cid) => (None, Some(props), cid)
-        case Some(props) => (Some(command), Some(props.withComponent(cid)), cid)
+        case Some(props) => (Some(command), Some(props.withComponent(cid)), props.component)
       }
     }
 

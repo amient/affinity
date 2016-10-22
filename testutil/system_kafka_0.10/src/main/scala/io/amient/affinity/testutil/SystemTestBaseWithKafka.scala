@@ -96,7 +96,7 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
       }
 
       case request @ PutValue(key, value) => sender.replyWith(request) {
-        data.set(key, value)
+        data.update(key, value)
       }
     }
   }
