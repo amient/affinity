@@ -107,7 +107,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       val update = MasterStatusUpdate(group, currentMasters, Set())
       //TODO  #12 global config bootstrap timeout
       implicit val timeout = Timeout(30 seconds)
-      watcher.ack[Unit](if (global) update else update.localTo(watcher)) onFailure {
+      watcher ack (if (global) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
           e.printStackTrace()
           system.terminate()
@@ -171,7 +171,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       //TODO  #12 global config bootstrap timeout
       implicit val timeout = Timeout(30 seconds)
       try {
-        watcher ack[Unit] (if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
+        watcher ack (if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
           case e: Throwable => if (!closed.get) {
             e.printStackTrace()
             system.terminate()

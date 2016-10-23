@@ -75,13 +75,13 @@ class Node(config: Config) {
 
   def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack[Unit](CreateRegion(Props(partitionCreator))))
+    startupFutureWithShutdownFuse(controller ack CreateRegion(Props(partitionCreator)))
   }
 
   def startServices(services: Props*): Future[Unit] = {
     require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack(CreateServiceContainer(services)))
+    startupFutureWithShutdownFuse(controller ack CreateServiceContainer(services))
   }
 
   /**
@@ -92,7 +92,7 @@ class Node(config: Config) {
     */
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack[Int](CreateGateway(Props(creator))))
+    startupFutureWithShutdownFuse(controller ack CreateGateway(Props(creator)))
   }
 
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {

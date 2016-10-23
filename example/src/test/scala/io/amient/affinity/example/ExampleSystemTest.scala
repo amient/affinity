@@ -118,6 +118,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
       config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(Seq(0, 1).asJava)),
       new DataPartition)
 
+    Thread.sleep(10000)
     try {
       //(1~>2), (3~>4) ==> component1(1,2), component3(3,4)
       http_get(uri("/vertex/1")).status should be(NotFound)
@@ -144,7 +145,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
       http_get(uri("/component/3")).status should be (NotFound)
       http_get(uri("/component/4")).status should be (NotFound)
 
-      //(4X>3)         ==> component1(1,2,3), component4(4)
+      //(4!>3)         ==> component1(1,2,3), component4(4)
       http_post(uri("/disconnect/4/3")).status should be(SeeOther)
       get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
       get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)

@@ -1,5 +1,3 @@
-//TODO use gradle-node-plugin to generate affinity.js during build
-
 window.avro = require('avsc');
 window.avro.types = new Map();
 window.AvroWebSocket = function (wsAddress, receiver) {

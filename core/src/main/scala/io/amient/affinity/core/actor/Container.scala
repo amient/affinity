@@ -98,8 +98,8 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       //TODO #12 global config bootstrap timeout
       val t = 30 seconds
       implicit val timeout = Timeout(t)
-      val removals = remove.toList.map(ref => ref.ack[Unit](BecomeStandby()))
-      val additions = add.toList.map(ref => ref.ack[Unit](BecomeMaster()))
+      val removals = remove.toList.map(ref => ref.ack(BecomeStandby()))
+      val additions = add.toList.map(ref => ref.ack(BecomeMaster()))
       Future.sequence(removals ++ additions).map(_ => ())
     }
 
