@@ -50,16 +50,17 @@ allprojects {
             }
         }
 
+        test.systemProperties 'property': 'value'
+    }
+
+    plugins.withType(ScalaPlugin).whenPluginAdded {
+
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'
             args = ['-R', 'build/classes/test', '-o']
             classpath = sourceSets.test.runtimeClasspath
         }
         test.dependsOn scalaTest
-        test.systemProperties 'property': 'value'
-    }
-
-    plugins.withType(ScalaPlugin).whenPluginAdded {
 
         dependencies {
             compile 'org.scala-lang:scala-library:' + scalaVersion
