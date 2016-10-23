@@ -34,8 +34,8 @@ import io.amient.affinity.example.rest.HttpGateway
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
-
 
 trait Graph extends HttpGateway {
 

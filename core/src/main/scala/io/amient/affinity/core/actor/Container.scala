@@ -31,6 +31,7 @@ import io.amient.affinity.core.cluster.{Coordinator, Node}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 object Container {
 

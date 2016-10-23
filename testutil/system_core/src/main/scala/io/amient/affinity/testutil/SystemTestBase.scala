@@ -43,6 +43,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 
 object SystemTestBase {
   val akkaPort = new AtomicInteger(15001)

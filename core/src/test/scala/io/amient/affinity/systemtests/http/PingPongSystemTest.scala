@@ -30,6 +30,7 @@ import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
+import scala.language.{existentials, implicitConversions, postfixOps}
 
 class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 

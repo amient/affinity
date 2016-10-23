@@ -28,6 +28,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal

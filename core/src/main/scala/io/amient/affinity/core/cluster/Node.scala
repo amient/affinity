@@ -31,6 +31,8 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
+import scala.language.postfixOps
+import scala.language.implicitConversions
 
 object Node {
   final val CONFIG_AKKA_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"

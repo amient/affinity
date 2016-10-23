@@ -36,6 +36,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
+import scala.language.postfixOps
 
 
 class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka with Matchers {

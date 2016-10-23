@@ -49,6 +49,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
+import scala.language.postfixOps
 
 object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"

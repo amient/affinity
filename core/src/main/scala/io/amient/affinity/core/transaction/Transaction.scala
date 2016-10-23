@@ -27,6 +27,8 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
+import scala.language.implicitConversions
+import scala.language.postfixOps
 
 /**
   *

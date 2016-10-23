@@ -35,6 +35,8 @@ import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBuffer
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.language.reflectiveCalls
+
 
 object KafkaStorage {
   def CONFIG_KAFKA_BOOTSTRAP_SERVERS = "storage.kafka.bootstrap.servers"

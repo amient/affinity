@@ -30,6 +30,7 @@ import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.rest.HttpGateway
 
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 trait Fail extends HttpGateway {
 

@@ -27,6 +27,7 @@ import org.scalatest.Matchers
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 
 class RegionSpec extends ActorUnitTestBase with Matchers {

@@ -32,6 +32,8 @@ import scala.reflect.{ClassTag, classTag}
 import scala.runtime.BoxedUnit
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+import scala.language.postfixOps
+import scala.language.implicitConversions
 
 /**
   * These are utilities for stateless Akka Ack pattern.

@@ -29,6 +29,7 @@ import io.amient.affinity.core.storage.State
 
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
+import scala.language.postfixOps
 
 object Partition {
   final val INTERNAL_CREATE_KEY_VALUE_MEDIATOR = "INTERNAL_CREATE_KEY_VALUE_MEDIATOR"

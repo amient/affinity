@@ -34,6 +34,7 @@ import io.amient.affinity.example.rest.HttpGateway
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
+import scala.language.postfixOps
 
 trait Admin extends HttpGateway {
 

@@ -22,7 +22,7 @@ package io.amient.affinity.core.http
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{ActorRef, ActorSystem, Address}
+import akka.actor.{ActorRef, ActorSystem}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{IncomingConnection, ServerBinding}
@@ -32,6 +32,7 @@ import akka.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
+import scala.language.postfixOps
 
 class HttpInterface(val httpHost: String, httpPort: Int)(implicit system: ActorSystem) {
 
