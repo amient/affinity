@@ -54,6 +54,8 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     }
   })
 
+  gateway.awaitClusterReady()
+
   override def afterAll(): Unit = {
     try {
       gateway.shutdown()

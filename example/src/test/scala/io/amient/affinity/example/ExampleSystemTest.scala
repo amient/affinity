@@ -26,7 +26,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
+import io.amient.affinity.core.cluster.CoordinatorZk
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
@@ -58,11 +58,15 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     with PublicApi
     with Graph)
 
-  import gateway._
+  val region = new TestRegionNode(config, new DataPartition)
 
+  gateway.awaitClusterReady()
+
+  import gateway._
 
   override def afterAll(): Unit = {
     try {
+      region.shutdown()
       gateway.shutdown()
     } finally {
       super.afterAll()
@@ -114,58 +118,43 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
   }
 
   "Graph API" should "should maintatin connected components when adding and removing edges" in {
-    val region = new TestRegionNode(
-      config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(Seq(0, 1).asJava)),
-      new DataPartition)
+    //(1~>2), (3~>4) ==> component1(1,2), component3(3,4)
+    http_get(uri("/vertex/1")).status should be(NotFound)
+    http_get(uri("/vertex/2")).status should be(NotFound)
+    http_post(uri("/connect/1/2")).status should be(SeeOther)
+    http_post(uri("/connect/3/4")).status should be(SeeOther)
+    get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/3"))).get("component").intValue should be(3)
+    get_json(http_get(uri("/vertex/4"))).get("component").intValue should be(3)
+    get_json(http_get(uri("/component/1"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1, 2)) should be(Set())
+    http_get(uri("/component/2")).status should be(NotFound)
+    get_json(http_get(uri("/component/3"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(3, 4)) should be(Set())
+    http_get(uri("/component/4")).status should be(NotFound)
 
-    Thread.sleep(10000)
-    try {
-      //(1~>2), (3~>4) ==> component1(1,2), component3(3,4)
-      http_get(uri("/vertex/1")).status should be(NotFound)
-      http_get(uri("/vertex/2")).status should be(NotFound)
-      http_post(uri("/connect/1/2")).status should be(SeeOther)
-      http_post(uri("/connect/3/4")).status should be(SeeOther)
-      get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/3"))).get("component").intValue should be(3)
-      get_json(http_get(uri("/vertex/4"))).get("component").intValue should be(3)
-      get_json(http_get(uri("/component/1"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1,2)) should be (Set())
-      http_get(uri("/component/2")).status should be (NotFound)
-      get_json(http_get(uri("/component/3"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(3,4)) should be (Set())
-      http_get(uri("/component/4")).status should be (NotFound)
+    //(3~>1)         ==> component1(1,2,3,4)
+    http_post(uri("/connect/3/1")).status should be(SeeOther)
+    get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/3"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/4"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/component/1"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
+    http_get(uri("/component/2")).status should be(NotFound)
+    http_get(uri("/component/3")).status should be(NotFound)
+    http_get(uri("/component/4")).status should be(NotFound)
 
-      //(3~>1)         ==> component1(1,2,3,4)
-      http_post(uri("/connect/3/1")).status should be(SeeOther)
-      get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/3"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/4"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/component/1"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1,2,3,4)) should be (Set())
-      http_get(uri("/component/2")).status should be (NotFound)
-      http_get(uri("/component/3")).status should be (NotFound)
-      http_get(uri("/component/4")).status should be (NotFound)
+    //(4!>3)         ==> component1(1,2,3), component4(4)
+    http_post(uri("/disconnect/4/3")).status should be(SeeOther)
+    get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/3"))).get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/4"))).get("component").intValue should be(4)
+    get_json(http_get(uri("/component/1"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1, 2, 3)) should be(Set())
+    http_get(uri("/component/2")).status should be(NotFound)
+    http_get(uri("/component/3")).status should be(NotFound)
+    get_json(http_get(uri("/component/4"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(4)) should be(Set())
 
-      //(4!>3)         ==> component1(1,2,3), component4(4)
-      http_post(uri("/disconnect/4/3")).status should be(SeeOther)
-      get_json(http_get(uri("/vertex/1"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/2"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/3"))).get("component").intValue should be(1)
-      get_json(http_get(uri("/vertex/4"))).get("component").intValue should be(4)
-      get_json(http_get(uri("/component/1"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1,2,3)) should be (Set())
-      http_get(uri("/component/2")).status should be (NotFound)
-      http_get(uri("/component/3")).status should be (NotFound)
-      get_json(http_get(uri("/component/4"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(4)) should be (Set())
 
-    } finally {
-      region.shutdown()
-    }
   }
-
-
-  //FIXME test consistency of connect/disconnect features under failure/rollback scenarios
-  // have noticed inconsistent state when encountering failures while experimenting with websockets
-
-
-  //TODO time-based DSA implementation and test, i.e. instead of shared salt, there will be a proper private key
 
 }

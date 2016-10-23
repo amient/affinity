@@ -22,9 +22,10 @@ package io.amient.affinity.testutil
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.zip.GZIPInputStream
 
+import akka.actor.{Actor, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpEncodings
@@ -34,6 +35,7 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.actor.Cluster.ClusterAvailability
 import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import org.apache.avro.util.ByteBufferInputStream
@@ -92,19 +94,33 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
-  class TestGatewayNode(config: Config, gateway: => Gateway)
+  class TestGatewayNode(config: Config, gatewayCreator: => Gateway)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
 
     import system.dispatcher
 
     implicit val materializer = ActorMaterializer.create(system)
 
-    val httpPort: Int = Await.result(startGateway(gateway), startupTimeout)
+    val httpPort: Int = Await.result(startGateway(gatewayCreator), startupTimeout)
 
     if (httpPort <= 0) {
       throw new IllegalStateException(s"Gateway node failed to start")
     } else {
       println(s"TestGatewayNode listening on $httpPort")
+    }
+
+    def awaitClusterReady() {
+      val clusterReady = new AtomicBoolean(false)
+      system.eventStream.subscribe(system.actorOf(Props(new Actor {
+        override def receive: Receive = {
+          case ClusterAvailability(false) => {
+            clusterReady.set(true)
+            clusterReady.synchronized(clusterReady.notify)
+          }
+        }
+      })), classOf[ClusterAvailability])
+      clusterReady.synchronized(clusterReady.wait(15000))
+      assert(clusterReady.get)
     }
 
     def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
@@ -151,8 +167,10 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   }
 
   class TestRegionNode(config: Config, partitionCreator: => Partition)
-    extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
-    Await.result(startRegion(partitionCreator), 36 seconds)
+    extends Node(config
+      .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(Seq(0,1).asJava))
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
+    startRegion(partitionCreator)
   }
 
 }

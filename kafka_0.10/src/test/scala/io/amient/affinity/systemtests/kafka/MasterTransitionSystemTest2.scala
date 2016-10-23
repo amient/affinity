@@ -65,6 +65,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
 
   val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
   val region2 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
+  gateway.awaitClusterReady()
 
   override def afterAll(): Unit = {
     try {

@@ -28,7 +28,8 @@ import scala.collection.mutable
 
 object Cluster {
   final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
-  final case class GetRoutee(msg: Any) extends Reply[ActorRefRoutee]
+  final case class CheckClusterAvailability() extends Reply[ClusterAvailability]
+  final case class ClusterAvailability(suspended: Boolean)
 }
 
 class Cluster extends Actor {
@@ -54,6 +55,7 @@ class Cluster extends Actor {
     case AddRoutee(routee: ActorRefRoutee) =>
       val partition = routee.ref.path.name.toInt
       routes.put(partition, routee)
+      routes.size == numPartitions
 
     case RemoveRoutee(routee: ActorRefRoutee) =>
       val partition = routee.ref.path.name.toInt
@@ -61,18 +63,18 @@ class Cluster extends Actor {
         if (removed != routee) routes.put(partition, removed)
       }
 
+    case req@CheckClusterAvailability() => sender.reply(req) {
+      ClusterAvailability(suspended = (routes.size != numPartitions))
+    }
+
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
 
-    case request @ GetRoutee(message) => sender.reply(request) {
-      getRoutee(message)
-    }
     case message => getRoutee(message).send(message, sender)
 
   }
 
   private def getRoutee(message: Any): ActorRefRoutee = {
     val partition = message match {
-      //case (k, v) => partitioner.partition(k, numPartitions)
       case p: Product => partitioner.partition(p.productElement(0), numPartitions)
       case v => partitioner.partition(v, numPartitions)
     }

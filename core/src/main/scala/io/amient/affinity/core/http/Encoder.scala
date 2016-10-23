@@ -40,6 +40,8 @@ object Encoder {
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
 
+  def json(value: Any): String = mapper.writeValueAsString(value)
+
   def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
     h += headers.Date(DateTime.now)
@@ -61,8 +63,6 @@ object Encoder {
       }
     }
   }
-
-  def json(value: Any) = mapper.writeValueAsString(value) // TODO reuse AvroRecord matcher
 
   def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()

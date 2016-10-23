@@ -37,6 +37,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.fasterxml.jackson.databind.JsonNode
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Cluster.{CheckClusterAvailability, ClusterAvailability}
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -74,7 +75,7 @@ abstract class Gateway extends Actor {
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }
 
-  def describeRegions = {
+  def describeRegions: List[String] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
     Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString).toList.sorted
@@ -103,8 +104,8 @@ abstract class Gateway extends Actor {
     case e: NoSuchElementException => HttpResponse(NotFound)
     case e: IllegalArgumentException => HttpResponse(BadRequest)
     case e: UnsupportedOperationException => HttpResponse(NotImplemented)
+    case e: IllegalStateException => HttpResponse(ServiceUnavailable)
     case NonFatal(e) => e.printStackTrace(); HttpResponse(InternalServerError)
-    case e => e.printStackTrace(); HttpResponse(ServiceUnavailable)
   }
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
@@ -117,24 +118,56 @@ abstract class Gateway extends Actor {
     promise.completeWith(delegate map f recover handleException)
   }
 
+  private var handlingSuspended = true
+  private val suspendedQueueMaxSize = 1000
+  //TODO configurable suspended queue max size
+  private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
+
+  final def receive: Receive = manage orElse handle orElse {
+    case exchange: HttpExchange => {
+      //no handler matched the HttpExchange
+      exchange.promise.success(handleException(new NoSuchElementException))
+    }
+  }
+
   def handle: Receive = {
     case null =>
   }
 
-  final def receive: Receive = handle orElse {
+  private def manage: Receive = {
 
-    //no handler matched the HttpExchange
-    case e: HttpExchange => e.promise.success(handleException(new NoSuchElementException))
-
-    case msg@MasterStatusUpdate("regions", add, remove) => sender.reply[Unit](msg) {
+    case msg@MasterStatusUpdate("regions", add, remove) => sender.reply(msg) {
       remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
+      cluster ! CheckClusterAvailability()
     }
 
-    case msg@MasterStatusUpdate("services", add, remove) => sender.reply[Unit](msg) {
+    case msg@MasterStatusUpdate("services", add, remove) => sender.reply(msg) {
       add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
       remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
+      implicit val timeout = Timeout(1 second)
+      cluster ! CheckClusterAvailability()
     }
+
+    case msg@ClusterAvailability(suspended) if (suspended != handlingSuspended) =>
+      handlingSuspended = suspended
+      context.system.eventStream.publish(msg)
+      if (!suspended) {
+        log.info("Handling Resumed")
+        val reprocess = suspendedHttpRequestQueue.toList
+        suspendedHttpRequestQueue.clear
+        if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
+        reprocess.foreach(handle(_))
+      } else {
+        log.warning("Handling Suspended")
+      }
+
+    case exchange: HttpExchange if (handlingSuspended) =>
+      if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
+        suspendedHttpRequestQueue += exchange
+      } else {
+        handleException(new IllegalStateException)
+      }
 
     case request@GracefulShutdown() => sender.reply(request) {
       context.stop(self)
@@ -230,8 +263,7 @@ trait WebSocketSupport extends Gateway {
         }
     } {
       case direct: ByteString => BinaryMessage.Strict(direct) //ByteString as the direct response from above
-      case None => BinaryMessage.Strict(ByteString()) //TODO what should really be sent is a typed empty record
-      //TODO the above comes back to the issue of representing a zero-value of avro record
+      case None => BinaryMessage.Strict(ByteString()) //FIXME what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
       case Some(value: AvroRecord[_]) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
       case value: AvroRecord[_] => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
     }

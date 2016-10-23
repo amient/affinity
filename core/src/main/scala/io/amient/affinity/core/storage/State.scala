@@ -234,7 +234,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   class ObservableState extends Observable {
     override def notifyObservers(arg: scala.Any): Unit = {
-      //TODO with atomic cell versioning can cancel out redundant updates
+      //TODO with atomic cell versioning we could cancel out redundant updates
       setChanged()
       super.notifyObservers(arg)
     }
