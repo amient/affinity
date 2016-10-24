@@ -99,8 +99,12 @@ The following core features are already in place:
 ## JavaScript (affinity.js)
 
 There is affinity_node.js file which contains the source for avro
-web socket implementation. It is based on a node avsc.js library
-which requires browserify tool to generate browser version:
+web socket implementation. It is based on a node avsc.js library:
+
+    npm install avsc
+
+
+To generate final affinity.js for borwsers:
 
     npm install -g browserify
 
