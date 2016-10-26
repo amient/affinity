@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.actor
 
+import java.util
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
@@ -101,7 +102,7 @@ abstract class Gateway extends Actor {
   }
 
   def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: NoSuchElementException => HttpResponse(NotFound)
+    case e: NoSuchElementException => e.printStackTrace(); HttpResponse(NotFound)
     case e: IllegalArgumentException => HttpResponse(BadRequest)
     case e: UnsupportedOperationException => HttpResponse(NotImplemented)
     case e: IllegalStateException => HttpResponse(ServiceUnavailable)
@@ -208,9 +209,20 @@ trait WebSocketSupport extends Gateway {
     }
   }
 
+  protected def avroWebSocket(http: HttpExchange, stateStoreName: String, key: Any)
+                             (pfCustomHandle: PartialFunction[Any, Unit]): Unit = {
+    http.request.header[UpgradeToWebSocket] match {
+      case None => Future.failed(new IllegalArgumentException("WebSocket connection required"))
+      case Some(upgrade) =>
+        import context.dispatcher
+        fulfillAndHandleErrors(http.promise) {
+          avroWebSocket(upgrade, stateStoreName, key)(pfCustomHandle)
+        }
+    }
+  }
+
   protected def avroWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
-
     if (!serializers.contains(101)) throw new IllegalArgumentException("No AvroSerde is registered")
     val avroSerde = serializers(101).asInstanceOf[AvroSerde]
 
@@ -241,7 +253,7 @@ trait WebSocketSupport extends Gateway {
         try {
           buildSchemaPushMessage(avroSerde.schema(text.getStrictText).get)
         } catch {
-          case NonFatal(e) => log.warning("Invalid websocket schema type requst", e)
+          case NonFatal(e) => log.warning("Invalid websocket schema type request: " + text.getStrictText)
         }
       case binary: BinaryMessage =>
         try {
@@ -250,8 +262,8 @@ trait WebSocketSupport extends Gateway {
             case 123 => buildSchemaPushMessage(schemaId = buf.getInt(1))
             case 0 => try {
               val record = AvroRecord.read(buf, avroSerde)
-              val handleAvroClientMessage: PartialFunction[Any, Any] = pfCustomHandle.orElse {
-                case forwardToBackend: AvroRecord[_] => forwardToBackend
+              val handleAvroClientMessage: PartialFunction[Any, Unit] = pfCustomHandle.orElse {
+                case forwardToBackend: AvroRecord[_] => cluster ! forwardToBackend
               }
               handleAvroClientMessage(record)
             } catch {
@@ -319,10 +331,20 @@ trait WebSocketSupport extends Gateway {
             clientMessageReceiver ! self
           }
 
+          private val buffer = new util.LinkedList[Message]()
+
+          //TODO max buffer size
+          private def doPush(messages: Message*) = {
+            messages.foreach(buffer.add)
+            while (isActive && totalDemand > 0 && buffer.size > 0) {
+              sender ! onNext(buffer.pop)
+            }
+          }
+
           override def receive: Receive = {
-            case Request(_) =>
             case Terminated(source) => context.stop(self)
-            case pushMessage => sender ! onNext(pfPush(pushMessage)) //will throw an exception if no messages well demanded
+            case Request(_) => doPush()
+            case pushMessage => doPush(pfPush(pushMessage))
           }
         }))
         val flow = Flow.fromSinkAndSource(downMessageSink, pushMessageSource)

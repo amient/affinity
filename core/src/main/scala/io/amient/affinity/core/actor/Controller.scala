@@ -88,8 +88,8 @@ class Controller extends Actor {
 
 
   override def postStop(): Unit = {
-    regionCoordinator.close()
-    serviceCoordinator.close()
+    if (!regionCoordinator.isClosed) regionCoordinator.close()
+    if (!regionCoordinator.isClosed) serviceCoordinator.close()
     super.postStop()
   }
 

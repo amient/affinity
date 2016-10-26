@@ -20,20 +20,26 @@
 package io.amient.affinity.core
 
 import akka.actor.{ActorPath, ActorSystem}
+import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Coordinator
 
-class TestCoordinator(system: ActorSystem) extends Coordinator(system, "test") {
+class TestCoordinator(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  val services = scala.collection.mutable.Set[String]()
+  val services = scala.collection.mutable.Map[String, String]()
 
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
-    services.add(handle)
+    synchronized {
+      services += handle -> handle
+      if (!closed.get) updateGroup(services.toMap)
+    }
     handle
   }
 
   override def unregister(handle: String): Unit = {
-    services.remove(handle)
+    synchronized {
+      services -= handle
+    }
   }
 
 }

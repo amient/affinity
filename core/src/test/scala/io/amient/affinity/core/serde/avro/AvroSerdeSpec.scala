@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.serde.avro
 
+import io.amient.affinity.core.TestAvroSerde
 import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -41,18 +42,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     * New version 2 of the case class and schema is added at the end of registry
     * the previous V1 schema version now points to the newest case class.
     */
-  val newSerde = new AvroSerde with EmbeddedAvroSchemaProvider {
-    register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
-    register(classOf[Composite])
-    register(classOf[Base])
-    register(classOf[Boolean])
-    register(classOf[Int])
-    register(classOf[Long])
-    register(classOf[Float])
-    register(classOf[Double])
-    register(classOf[String])
-    register(classOf[Null])
-  }
+  val newSerde = new TestAvroSerde
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBinary(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10))

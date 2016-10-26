@@ -21,7 +21,7 @@ package io.amient.affinity.core.cluster
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import akka.actor.{ActorPath, ActorRef, ActorSystem}
+import akka.actor.{ActorNotFound, ActorPath, ActorRef, ActorSystem}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
@@ -68,7 +68,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
 
-  private val closed = new AtomicBoolean(false)
+  protected val closed = new AtomicBoolean(false)
 
   /**
     * wacthers - a list of all actors that will receive AddMaster and RemoveMaster messages
@@ -130,8 +130,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     }
   }
 
+  def isClosed = closed.get
 
-  final protected def updateGroup(newState: Map[String, String]) = {
+  final protected def updateGroup(newState: Map[String, String]): Unit = {
     val t = 6 seconds
     implicit val timeout = new Timeout(t)
     synchronized {
@@ -141,9 +142,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         try {
           handles.put(handle, Await.result(system.actorSelection(actorPath).resolveOne(), t))
         } catch {
-          case NonFatal(e) =>
-            //most likely the actor has gone and there will be another update right away but could be something else
-            if (!closed.get) e.printStackTrace()
+          case e: ActorNotFound => //most likely the actor has gone and there will be another update right away
+          case NonFatal(e) => if (!closed.get) e.printStackTrace()
         }
       }
 
@@ -167,7 +167,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
 
-    watchers.foreach { case (watcher, global) =>
+    if (!closed.get) watchers.foreach { case (watcher, global) =>
       //TODO  #12 global config bootstrap timeout
       implicit val timeout = Timeout(30 seconds)
       try {

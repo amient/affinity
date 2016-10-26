@@ -29,7 +29,6 @@ import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -67,10 +66,12 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
   }
 
   override def postStop(): Unit = {
-    coordinator.unwatch(self)
-    services.foreach { case (ref, handle) =>
-      log.info(s"Unregistering service: handle=${services(ref)}, path=${ref.path}")
-      coordinator.unregister(services(ref))
+    if (!coordinator.isClosed) {
+      coordinator.unwatch(self)
+      services.foreach { case (ref, handle) =>
+        log.info(s"Unregistering service: handle=${services(ref)}, path=${ref.path}")
+        coordinator.unregister(services(ref))
+      }
     }
     super.postStop()
   }
@@ -94,13 +95,12 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
       coordinator.unregister(services(ref))
       services -= ref
 
-    case request @ MasterStatusUpdate(_, add, remove) => sender.replyWith(request) {
+    case request @ MasterStatusUpdate(_, add, remove) => sender.reply(request) {
       //TODO #12 global config bootstrap timeout
       val t = 30 seconds
       implicit val timeout = Timeout(t)
-      val removals = remove.toList.map(ref => ref.ack(BecomeStandby()))
-      val additions = add.toList.map(ref => ref.ack(BecomeMaster()))
-      Future.sequence(removals ++ additions).map(_ => ())
+      val removals = remove.toList.map(ref => ref ! BecomeStandby())
+      val additions = add.toList.map(ref => ref ! BecomeMaster())
     }
 
     case request@GracefulShutdown() => sender.reply(request) {

@@ -48,6 +48,8 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
 
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
 
+  private var currentState = Map[String, String]()
+
   if (!zk.exists(zkRoot)) zk.createPersistent(groupRoot, true)
 
   val initialChildren = zk.subscribeChildChanges(groupRoot, new IZkChildListener() {

@@ -22,7 +22,7 @@ package io.amient.affinity.core.actor
 import akka.actor.{ActorPath, PoisonPill, Props}
 import akka.util.Timeout
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.{ActorUnitTestBase, TestCoordinator}
+import io.amient.affinity.core.{IntegrationTestBase, TestCoordinator}
 import org.scalatest.Matchers
 
 import scala.collection.JavaConverters._
@@ -30,7 +30,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 
-class RegionSpec extends ActorUnitTestBase with Matchers {
+class RegionSpec extends IntegrationTestBase with Matchers {
 
   val testPartition = Props(new Service {
     override def preStart(): Unit = {
@@ -45,7 +45,7 @@ class RegionSpec extends ActorUnitTestBase with Matchers {
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-      val coordinator = new TestCoordinator(system)
+      val coordinator = new TestCoordinator(system, "test", null)
       try {
         val d = 1 second
         implicit val timeout = Timeout(d)
@@ -60,13 +60,13 @@ class RegionSpec extends ActorUnitTestBase with Matchers {
 
         //first stop Partition explicitly - it shouldn't be restarted
         import system.dispatcher
-        system.actorSelection(ActorPath.fromString(coordinator.services.head)).resolveOne() onSuccess {
+        system.actorSelection(ActorPath.fromString(coordinator.services.head._1)).resolveOne() onSuccess {
           case actorRef => system.stop(actorRef)
         }
         awaitCond(coordinator.services.size == 3)
 
         //now simulate error in one of the partitions
-        val partitionToFail = coordinator.services.head
+        val partitionToFail = coordinator.services.head._1
         system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne() onSuccess {
           case actorRef => actorRef ! new IllegalStateException("Exception expected by the Test")
         }

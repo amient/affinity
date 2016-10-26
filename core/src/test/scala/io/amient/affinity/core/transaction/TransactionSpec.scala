@@ -19,10 +19,10 @@
 
 package io.amient.affinity.core.transaction
 
-import io.amient.affinity.core.ActorUnitTestBase
+import io.amient.affinity.core.IntegrationTestBase
 import org.scalatest.Matchers
 
-class TransactionSpec extends ActorUnitTestBase with Matchers{
+class TransactionSpec extends IntegrationTestBase with Matchers{
 
   //TODO #27 test transactional support under failure/rollback scenarios
 

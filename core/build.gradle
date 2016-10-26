@@ -9,7 +9,9 @@ dependencies {
 
     testCompile project(':testutil:system_core')
     testCompile project(':testutil:system_kafka_0.10')
+    testCompile project(':ws-client')
     testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
+
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion

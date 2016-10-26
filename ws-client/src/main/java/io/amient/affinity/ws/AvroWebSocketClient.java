@@ -38,37 +38,37 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 @ClientEndpoint
-public class AvroWebSocketClient {
+final public class AvroWebSocketClient {
 
-    //TODO enforce the entire class is Trhead-Safe (websocket can only communicate one message in each direction)
+    public interface TextMessageHandler {
+        void onMessage(String message);
+    }
+
+    public interface AvroMessageHandler {
+        void onMessage(Object message);
+    }
+
+    //TODO #28 enforce the entire class is Trhead-Safe (websocket can only communicate one message in each direction)
     private Session session;
     private Map<Integer, Schema> schemas = new HashMap<>();
     private Map<String, Integer> types = new HashMap<>();
     private Queue<Map.Entry<Integer, byte[]>> queue = new LinkedList<>();
+    private TextMessageHandler textMessageHandler = null;
+    final private AvroMessageHandler avroMessageHandler;
 
-    static public void main(String[] args) throws InterruptedException, IOException {
-        AvroWebSocketClient socket = new AvroWebSocketClient(URI.create("ws://localhost:8881/vertex?id=1"));
-        Schema schema = socket.getSchema("io.amient.affinity.example.Edge");
-        GenericRecord edge = new GenericData.Record(schema);
-        edge.put("target", 1);
-        edge.put("timestamp", System.currentTimeMillis());
-        socket.send(edge);
-        Thread.sleep(2000);
-        socket.close();
-    }
-
-    public AvroWebSocketClient(URI endpointURI) {
+    public AvroWebSocketClient(URI endpointURI, AvroMessageHandler avroMessageHandler) {
         try {
-            //TODO reuse container for multiple websockets to different entities
+            //TODO #28 reuse container for multiple websockets to different entities
             WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-            container.connectToServer(this, endpointURI);
+            container.connectToServer((AvroWebSocketClient)this, endpointURI);
+            this.avroMessageHandler = avroMessageHandler;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     public void close() throws IOException {
-        session.close();
+        if (session != null) session.close();
     }
 
     @OnOpen
@@ -79,11 +79,15 @@ public class AvroWebSocketClient {
     @OnClose
     public void onClose(Session userSession, CloseReason reason) {
         this.session = null;
-        System.exit(0);
     }
 
     @OnMessage
     public void onMessage(byte[] message) throws IOException {
+        if (message.length == 0) {
+            //FIXME what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
+            avroMessageHandler.onMessage(null);
+            return;
+        }
         ByteBuffer buf = ByteBuffer.wrap(message);
         int magic = buf.get();
         int schemaId = buf.getInt();
@@ -91,7 +95,6 @@ public class AvroWebSocketClient {
             case 0:
                 byte[] bytes = new byte[buf.remaining()];
                 buf.get(bytes);
-                System.err.println("Avro Object of schema " + schemaId + " len " + message.length);
                 if (!schemas.containsKey(schemaId)) {
                     queue.add(new AbstractMap.SimpleEntry(schemaId, bytes));
                     ByteBufferOutputStream req = new ByteBufferOutputStream();
@@ -103,7 +106,7 @@ public class AvroWebSocketClient {
                     }
                 } else {
                     Schema schema = schemas.get(schemaId);
-                    processIcomingBuffer(bytes, schema);
+                    processIncomingBuffer(bytes, schema);
                 }
                 break;
             case 123:
@@ -118,7 +121,7 @@ public class AvroWebSocketClient {
                     while (it.hasNext()) {
                         Map.Entry<Integer, byte[]> next = it.next();
                         if (next.getKey() == schemaId) {
-                            processIcomingBuffer(next.getValue(), schema);
+                            processIncomingBuffer(next.getValue(), schema);
                         }
                     }
                 }
@@ -127,25 +130,23 @@ public class AvroWebSocketClient {
 
     }
 
-    private void processIcomingBuffer(byte[] buf, Schema schema) throws IOException {
+    private void processIncomingBuffer(byte[] buf, Schema schema) throws IOException {
         BinaryDecoder decoder = DecoderFactory.get().binaryDecoder(buf, null);
         GenericDatumReader<Object> reader = new GenericDatumReader<>(schema, schema);
         Object record = reader.read(null, decoder);
-        System.err.println("Received " + schema.getFullName());
-        System.err.println("Record: " + record);
-        //TODO invoke handler
+        avroMessageHandler.onMessage(record);
     }
 
-    public void onMessage(String message) {
-        System.err.println(message);
+    @OnMessage
+    public void onTextMessage(String message) {
+        if (textMessageHandler != null) textMessageHandler.onMessage(message);
     }
 
-
-    public void send(String message) {
+    final public void send(String message) {
         this.session.getAsyncRemote().sendText(message);
     }
 
-    public void send(IndexedRecord record) throws IOException {
+    final public void send(IndexedRecord record) throws IOException {
         try {
             Schema schema = record.getSchema();
             if (!types.containsKey(schema.getFullName())) {
@@ -173,8 +174,9 @@ public class AvroWebSocketClient {
             synchronized (this) {
                 int i = 5;
                 while (session.isOpen() && !types.containsKey(avroType)) {
-                    if (--i == 0) throw new IOException("Failed to fetch schema");
+                    if (--i == 0) throw new IOException("Failed to fetch schema - request time out");
                     wait(1000);
+                    if (session == null)  throw new IOException("Failed to fetch schema - socket closed");
                 }
             }
         }

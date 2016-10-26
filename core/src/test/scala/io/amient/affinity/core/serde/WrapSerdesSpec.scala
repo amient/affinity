@@ -20,11 +20,11 @@
 package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
-import io.amient.affinity.core.ActorUnitTestBase
+import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.serde.primitive.OptionSerde
 import org.scalatest.Matchers
 
-class WrapSerdesSpec extends ActorUnitTestBase with Matchers {
+class WrapSerdesSpec extends IntegrationTestBase with Matchers {
 
 
   val serde = SerializationExtension(system).serializerOf(classOf[OptionSerde].getName).get

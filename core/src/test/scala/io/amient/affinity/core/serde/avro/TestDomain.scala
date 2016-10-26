@@ -28,9 +28,13 @@ object Side extends Enumeration {
   val LEFT, RIGHT = Value
 }
 
-case class ID(val id: Int) extends AvroRecord[ID]
+case class ID(val id: Int) extends AvroRecord[ID] {
+  override def hashCode(): Int = id.hashCode()
+}
 
-case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base]
+case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base] {
+  override def hashCode(): Int = id.hashCode()
+}
 
 case class Composite(
     val items: Seq[Base] = Seq(),
@@ -47,4 +51,5 @@ object AvroUUID {
 
 case class AvroUUID(val data: ByteBuffer) extends AvroRecord[AvroUUID] {
   def uuid: UUID = ByteUtils.uuid(data.array)
+  override def hashCode(): Int = data.hashCode()
 }

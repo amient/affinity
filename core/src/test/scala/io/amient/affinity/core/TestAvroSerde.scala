@@ -19,25 +19,18 @@
 
 package io.amient.affinity.core
 
-import akka.actor.ActorSystem
-import akka.testkit.{ImplicitSender, TestKit}
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.cluster.Node
-import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
+import io.amient.affinity.core.serde.avro._
+import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
 
-import scala.collection.JavaConverters._
-
-class ActorUnitTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
-
-  def this(config: Config) = this(ActorSystem.create("AffinitySpec", config))
-
-  def this() = this(ConfigFactory.defaultApplication()
-    .withValue(Node.CONFIG_AKKA_HOST, ConfigValueFactory.fromAnyRef(null))
-    .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1, 2, 3).asJava))
-  )
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
-
+class TestAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
+  register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
+  register(classOf[Composite])
+  register(classOf[Base])
+  register(classOf[Boolean])
+  register(classOf[Int])
+  register(classOf[Long])
+  register(classOf[Float])
+  register(classOf[Double])
+  register(classOf[String])
+  register(classOf[Null])
 }
