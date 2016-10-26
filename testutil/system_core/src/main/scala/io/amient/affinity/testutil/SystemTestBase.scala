@@ -38,6 +38,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Cluster.ClusterAvailability
 import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
+import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import org.apache.avro.util.ByteBufferInputStream
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -80,6 +81,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     .withValue(Cluster.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2))
     .withValue(Node.CONFIG_AKKA_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
     .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
+    .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
 
   import SystemTestBase._
