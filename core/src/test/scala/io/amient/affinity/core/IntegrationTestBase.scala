@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core
 
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{Actor, ActorSystem, Props}
@@ -29,24 +30,27 @@ import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
 class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem.create("AffinitySpec",ConfigFactory.load("integrationtests")))
+  def this() = this(ActorSystem.create(UUID.randomUUID().toString, ConfigFactory.load("integrationtests")))
+
+  private val clusterReady = new AtomicBoolean(false)
+  system.eventStream.subscribe(system.actorOf(Props(new Actor {
+    override def receive: Receive = {
+      case ClusterAvailability(false) => {
+        clusterReady.set(true)
+        clusterReady.synchronized(clusterReady.notify)
+      }
+    }
+  })), classOf[ClusterAvailability])
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
   }
 
   def awaitClusterReady() {
-    val clusterReady = new AtomicBoolean(false)
-    system.eventStream.subscribe(system.actorOf(Props(new Actor {
-      override def receive: Receive = {
-        case ClusterAvailability(false) => {
-          clusterReady.set(true)
-          clusterReady.synchronized(clusterReady.notify)
-        }
-      }
-    })), classOf[ClusterAvailability])
-    clusterReady.synchronized(clusterReady.wait(15000))
-    assert(clusterReady.get)
+    if (!clusterReady.get) {
+      clusterReady.synchronized(clusterReady.wait(15000))
+      assert(clusterReady.get)
+    }
   }
 
 }

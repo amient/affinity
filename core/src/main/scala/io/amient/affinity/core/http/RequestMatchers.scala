@@ -19,10 +19,8 @@
 
 package io.amient.affinity.core.http
 
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpMethod, HttpResponse}
 import akka.http.scaladsl.model.Uri.{Path, Query}
-import akka.http.scaladsl.model.ws.UpgradeToWebSocket
+import akka.http.scaladsl.model.{HttpMethod, HttpResponse}
 
 import scala.annotation.tailrec
 import scala.concurrent.Promise

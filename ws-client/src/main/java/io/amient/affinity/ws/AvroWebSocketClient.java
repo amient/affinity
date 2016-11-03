@@ -60,7 +60,7 @@ final public class AvroWebSocketClient {
         try {
             //TODO #28 reuse container for multiple websockets to different entities
             WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-            container.connectToServer((AvroWebSocketClient)this, endpointURI);
+            container.connectToServer(this, endpointURI);
             this.avroMessageHandler = avroMessageHandler;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -84,7 +84,7 @@ final public class AvroWebSocketClient {
     @OnMessage
     public void onMessage(byte[] message) throws IOException {
         if (message.length == 0) {
-            //FIXME what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
+            //FIXME #28 what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
             avroMessageHandler.onMessage(null);
             return;
         }

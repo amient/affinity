@@ -60,9 +60,9 @@ final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edg
 
 final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord[Component]
 
-sealed trait AvroInstruction[T, R] extends AvroRecord[T] with Instruction[R] {
-  def reverse(result: R): Option[AvroInstruction[_, _]]
-}
+//sealed trait AvroInstruction[T, R] extends AvroRecord[T] with Instruction[R] {
+//  def reverse(result: R): Option[AvroInstruction[_, _]]
+//}
 
 final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[Option[VertexProps]] {
   override def hashCode(): Int = vertex.hashCode
@@ -72,7 +72,7 @@ final case class GetComponent(cid: Int) extends AvroRecord[GetComponent] with Re
   override def hashCode(): Int = cid.hashCode
 }
 
-final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroInstruction[UpdateVertexComponent, Int] {
+final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord[UpdateVertexComponent] with Instruction[Int] {
   override def hashCode(): Int = vertex.hashCode
 
   override def reverse(result: Int): Option[UpdateVertexComponent] = {
@@ -86,7 +86,7 @@ object GOP extends Enumeration {
   val ADD, REMOVE = Value
 }
 
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroInstruction[ModifyGraph, VertexProps] {
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] with Instruction[VertexProps] {
   override def hashCode(): Int = vertex.hashCode
 
   def reverse(props: VertexProps) = op match {
@@ -96,7 +96,7 @@ final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) e
 }
 
 
-final case class UpdateComponent(cid: Int, component: Component) extends AvroInstruction[UpdateComponent, Option[Component]] {
+final case class UpdateComponent(cid: Int, component: Component) extends AvroRecord[UpdateComponent] with Instruction[Option[Component]] {
   override def hashCode(): Int = cid.hashCode
   override def reverse(c: Option[Component]) = c match {
     case Some(result) if (result == component) => None
@@ -105,7 +105,7 @@ final case class UpdateComponent(cid: Int, component: Component) extends AvroIns
   }
 }
 
-final case class DeleteComponent(cid: Int) extends AvroInstruction[DeleteComponent, Option[Component]] {
+final case class DeleteComponent(cid: Int) extends AvroRecord[DeleteComponent] with Instruction[Option[Component]] {
   override def hashCode(): Int = cid.hashCode
 
   override def reverse(c: Option[Component]) = c match {

@@ -60,7 +60,7 @@ class Transaction(cluster: ActorRef) {
     stack.foreach { case (completed: CompletedInstruction[_]) =>
       completed.reverse.foreach {
         case reversal =>
-//          println("REVERTING " + completed.instr + " WITH " + reversal)
+          //System.err.println("REVERTING " + completed.instr + " WITH " + reversal)
           cluster ! reversal
       }
     }
@@ -71,10 +71,10 @@ class Transaction(cluster: ActorRef) {
     implicit val timeout = Timeout(1 seconds)
     read onComplete {
       case Success(result) =>
-//        println(s"SUCCESS $result")
+        //System.err.println(s"SUCCESS $result")
         promise.success(result)
       case Failure(e) =>
-//        println(s"FAILURE ${e.getMessage}")
+        //System.err.println(s"FAILURE ${e.getMessage}")
         promise.failure(e)
     }
     promise.future
@@ -85,11 +85,11 @@ class Transaction(cluster: ActorRef) {
     implicit val timeout = Timeout(1 seconds)
     cluster ack[T](instr) onComplete {
       case Success(result: T) =>
-//        println(s"SUCCESS $instr")
+        //System.err.println(s"SUCCESS $instr")
         stack = stack :+ CompletedInstruction(instr, result)
         promise.success(result)
       case Failure(e) =>
-//        println(s"FAILURE $instr: $e")
+        //System.err.println(s"FAILURE $instr: $e")
         promise.failure(e)
     }
     promise.future
