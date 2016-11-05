@@ -21,12 +21,13 @@ package io.amient.affinity.core.http
 
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
+import javax.net.ssl.SSLContext
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.Logging
-import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{IncomingConnection, ServerBinding}
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
 
@@ -34,15 +35,18 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
 
-class HttpInterface(val httpHost: String, httpPort: Int)(implicit system: ActorSystem) {
-
-
+class HttpInterface(val httpHost: String, httpPort: Int, ssl: Option[SSLContext])(implicit system: ActorSystem) {
 
   implicit val materializer = ActorMaterializer.create(system)
 
   val log = Logging.getLogger(system, this)
 
-  val incoming: Source[IncomingConnection, Future[ServerBinding]] = Http().bind(httpHost, httpPort)
+  val connectionCtx: ConnectionContext = ssl match {
+    case None => Http().defaultServerHttpContext
+    case Some(sslContext) => ConnectionContext.https(sslContext)
+  }
+
+  val incoming: Source[IncomingConnection, Future[ServerBinding]] = Http().bind(httpHost, httpPort, connectionCtx)
 
   @volatile private var binding: ServerBinding = null
 
@@ -56,7 +60,6 @@ class HttpInterface(val httpHost: String, httpPort: Int)(implicit system: ActorS
     val bindingFuture: Future[Http.ServerBinding] =
       incoming.to(Sink.foreach { connection =>
         connection.handleWithAsyncHandler { request =>
-
           val responsePromise = Promise[HttpResponse]()
 
           gateway ! HttpExchange(request, responsePromise)

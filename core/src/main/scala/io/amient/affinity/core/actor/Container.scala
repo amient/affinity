@@ -68,9 +68,9 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
   override def postStop(): Unit = {
     if (!coordinator.isClosed) {
       coordinator.unwatch(self)
-      services.foreach { case (ref, handle) =>
-        log.info(s"Unregistering service: handle=${services(ref)}, path=${ref.path}")
-        coordinator.unregister(services(ref))
+      services.filter(_._2 != null).foreach { case (ref, handle) =>
+        log.info(s"Unregistering service: handle=${handle}, path=${ref.path}")
+        coordinator.unregister(handle)
       }
     }
     super.postStop()

@@ -27,6 +27,7 @@ import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.testutil.MyTestPartition.{GetValue, PutValue}
@@ -41,11 +42,12 @@ import scala.language.postfixOps
 
 class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val config = configure("systemtests")
+  def config = configure("systemtests")
 
   val gateway = new TestGatewayNode(config, new Gateway {
 
     import context.dispatcher
+
     implicit val scheduler = context.system.scheduler
 
     override def handle: Receive = {
@@ -63,8 +65,12 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
     }
   })
 
-  val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
-  val region2 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
+  val region1 = new Node(config) {
+    startRegion(new MyTestPartition("consistency-test"))
+  }
+  val region2 = new Node(config) {
+    startRegion(new MyTestPartition("consistency-test"))
+  }
   gateway.awaitClusterReady()
 
   override def afterAll(): Unit = {

@@ -24,6 +24,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.actor.{Gateway, Partition}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.testutil.SystemTestBase
@@ -34,7 +35,7 @@ import scala.language.{existentials, implicitConversions, postfixOps}
 
 class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
-  val config = configure("systemtests")
+  val config = configure("pingpong")
 
   val gateway = new TestGatewayNode(config, new Gateway {
     import context.dispatcher
@@ -48,11 +49,15 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     }
   })
 
-  val region = new TestRegionNode(config, new Partition {
-    override def handle: Receive = {
-      case "ping" => sender ! "pong"
+  val region = new Node(config) {
+    startRegion {
+      new Partition {
+        override def handle: Receive = {
+          case "ping" => sender ! "pong"
+        }
+      }
     }
-  })
+  }
 
   gateway.awaitClusterReady()
 

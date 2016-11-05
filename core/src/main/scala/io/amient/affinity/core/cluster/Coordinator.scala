@@ -102,6 +102,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   def watch(watcher: ActorRef, global: Boolean): Unit = {
     synchronized {
       watchers += watcher -> global
+
       //failing this ack means that the watcher would have inconsistent view of the cluster
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
       val update = MasterStatusUpdate(group, currentMasters, Set())

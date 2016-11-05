@@ -42,12 +42,13 @@ import scala.collection.JavaConverters._
 
 class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val config = configure("systemtests")
+  def config = configure("systemtests")
 
   val gateway = new TestGatewayNode(config, new Gateway {
 
     import MyTestPartition._
     import context.dispatcher
+
     implicit val scheduler = context.system.scheduler
 
     override def handle: Receive = {
@@ -70,15 +71,19 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
   import gateway._
 
-  val region1 = new TestRegionNode(config, new MyTestPartition("consistency-test") {
-    override def preStart(): Unit = {
-      super.preStart()
-      if (partition == 0) data.update("B", "initialValueB")
-      else if (partition == 1) data.update("A", "initialValueA")
-    }
-  })
+  val region1 = new Node(config) {
+    startRegion(new MyTestPartition("consistency-test") {
+      override def preStart(): Unit = {
+        super.preStart()
+        if (partition == 0) data.update("B", "initialValueB")
+        else if (partition == 1) data.update("A", "initialValueA")
+      }
+    })
+  }
 
-  val region2 = new TestRegionNode(config, new MyTestPartition("consistency-test"))
+  val region2 = new Node(config) {
+    startRegion(new MyTestPartition("consistency-test"))
+  }
 
   gateway.awaitClusterReady()
 

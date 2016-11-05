@@ -24,11 +24,11 @@ import akka.serialization.SerializationExtension
 import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.util.ZooKeeperClient
-import io.amient.affinity.testutil.SystemTestBase
+import io.amient.affinity.testutil.SystemTestBaseWithZk
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
 
-class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with SystemTestBase {
+class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with SystemTestBaseWithZk {
 
   val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Composite\",\"namespace\":\"io.amient.affinity.core.serde.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Base\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"ID\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"Side\",\"symbols\":[\"LEFT\",\"RIGHT\"]},\"default\":\"LEFT\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"ID\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
   val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Composite\",\"namespace\":\"io.amient.affinity.core.serde.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Base\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"ID\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"Side\",\"symbols\":[\"LEFT\",\"RIGHT\"]},\"default\":\"LEFT\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"ID\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"Base\"},\"default\":[]}]}")

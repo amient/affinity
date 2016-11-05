@@ -19,8 +19,10 @@
 
 package io.amient.affinity.core.actor
 
+import java.security.{KeyStore, SecureRandom}
 import java.util
 import java.util.concurrent.ConcurrentHashMap
+import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.event.Logging
@@ -56,9 +58,16 @@ import scala.language.postfixOps
 object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
   final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
+
+  final val CONFIG_TLS_KEYSTORE_PKCS = "affinity.node.gateway.tls.keystore.standard"
+  final val CONFIG_TLS_KEYSTORE_PASSWORD = "affinity.node.gateway.tls.keystore.password"
+  final val CONFIG_TLS_KEYSTORE_RESOURCE = "affinity.node.gateway.tls.keystore.resource"
+  final val CONFIG_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
 }
 
 abstract class Gateway extends Actor {
+
+  import Gateway._
 
   private val log = Logging.getLogger(context.system, this)
 
@@ -70,8 +79,23 @@ abstract class Gateway extends Actor {
 
   import context.system
 
+  val sslContext = if (!config.hasPath(CONFIG_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
+  sslContext.foreach { context =>
+    log.info("Configuring SSL Context")
+    val password = config.getString(CONFIG_TLS_KEYSTORE_PASSWORD).toCharArray
+    val ks = KeyStore.getInstance(config.getString(CONFIG_TLS_KEYSTORE_PKCS))
+    if (config.hasPath(CONFIG_TLS_KEYSTORE_RESOURCE)) {
+      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_TLS_KEYSTORE_RESOURCE)), password)
+    } else {
+      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_TLS_KEYSTORE_FILE)), password)
+    }
+    val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
+    keyManagerFactory.init(ks, password)
+    context.init(keyManagerFactory.getKeyManagers, null, new SecureRandom)
+  }
+
   private val httpInterface: HttpInterface = new HttpInterface(
-    config.getString(Gateway.CONFIG_HTTP_HOST), config.getInt(Gateway.CONFIG_HTTP_PORT))
+    config.getString(CONFIG_HTTP_HOST), config.getInt(CONFIG_HTTP_PORT), sslContext)
 
 
   def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }

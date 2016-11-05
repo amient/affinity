@@ -21,30 +21,23 @@ package io.amient.affinity.core.transaction
 
 import akka.actor.Props
 import akka.http.scaladsl.model.HttpMethods._
+import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion, GracefulShutdown}
 import io.amient.affinity.core.actor.{Controller, Gateway, Partition}
-import io.amient.affinity.core.http.HttpExchange
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.{IntegrationTestBase, ack}
 import org.scalatest.Matchers
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
 class TransactionSpec extends IntegrationTestBase with Matchers {
 
   import system.dispatcher
-
-  implicit val materializer = ActorMaterializer.create(system)
-
-  implicit val scheduler = system.scheduler
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(10 seconds)
@@ -127,28 +120,20 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
     super.afterAll
   }
 
-  def get(uri: Uri): String = {
-    val promise = Promise[HttpResponse]()
-    system.actorSelection("/user/controller/gateway") ! HttpExchange(HttpRequest(GET, uri), promise)
-    val response = Await.result(promise.future flatMap (_.toStrict(2 second)), 2 seconds)
-    val text = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
-    text
-  }
-
 
   "A Transaction Failure" must {
     "should revert all successful instructions with their inverse" in {
-      get(s"/add/1?items=100") should be("TestValue(List())")
-      get(s"/add/1?items=101,102") should be("TestValue(List(100, 101))")
-      get(s"/get/1") should be("TestValue(List(100, 101, 102))")
+      http_get(s"/add/1?items=100") should be("TestValue(List())")
+      http_get(s"/add/1?items=101,102") should be("TestValue(List(100, 101))")
+      http_get(s"/get/1") should be("TestValue(List(100, 101, 102))")
       //item 106 will simulate an error while 103,104,105 where already successful they should be reverted
-      get(s"/add/1?items=103,104,105,106,107")
-      get(s"/get/1") should be("TestValue(List(100, 101, 102))")
-      get(s"/remove/1?items=101,102")
+      http_get(s"/add/1?items=103,104,105,106,107")
+      http_get(s"/get/1") should be("TestValue(List(100, 101, 102))")
+      http_get(s"/remove/1?items=101,102")
       //item 102 will simulate an error while 101 was already successfully removed so it should be added back by revert
-      get(s"/get/1") should be("TestValue(List(100, 102, 101))")
-      get(s"/remove/1?items=100")
-      get(s"/get/1") should be("TestValue(List(102, 101))")
+      http_get(s"/get/1") should be("TestValue(List(100, 102, 101))")
+      http_get(s"/remove/1?items=100")
+      http_get(s"/get/1") should be("TestValue(List(102, 101))")
     }
   }
 }

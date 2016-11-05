@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.core.http
 
 import java.io.IOException
 import java.net.URI
@@ -29,6 +29,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion, GracefulShutdown}
+import io.amient.affinity.core.actor.{Controller, Gateway, Partition, WebSocketSupport}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.ws.AvroWebSocketClient

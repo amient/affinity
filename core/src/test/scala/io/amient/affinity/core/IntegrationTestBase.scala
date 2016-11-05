@@ -23,14 +23,32 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{Actor, ActorSystem, Props}
+import akka.http.scaladsl.model.HttpMethods._
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.actor.Cluster.ClusterAvailability
+import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
+
+import scala.concurrent.duration._
+
+//import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, Promise}
+
+import scala.language.postfixOps
 
 class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
 
   def this() = this(ActorSystem.create(UUID.randomUUID().toString, ConfigFactory.load("integrationtests")))
+
+  import system.dispatcher
+
+  implicit val materializer = ActorMaterializer.create(system)
+
+  implicit val scheduler = system.scheduler
 
   private val clusterReady = new AtomicBoolean(false)
   system.eventStream.subscribe(system.actorOf(Props(new Actor {
@@ -51,6 +69,13 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
       clusterReady.synchronized(clusterReady.wait(15000))
       assert(clusterReady.get)
     }
+  }
+
+  def http_get(uri: Uri): String = {
+    val promise = Promise[HttpResponse]()
+    system.actorSelection("/user/controller/gateway") ! HttpExchange(HttpRequest(GET, uri), promise)
+    val response = Await.result(promise.future flatMap (_.toStrict(2 second)), 2 seconds)
+    Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
   }
 
 }

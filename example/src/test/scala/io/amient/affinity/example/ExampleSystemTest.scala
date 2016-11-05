@@ -26,9 +26,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.core.cluster.CoordinatorZk
-import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.partition.DataPartition
@@ -44,13 +42,7 @@ import scala.language.postfixOps
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  import KafkaStorage._
-  import State._
-
   val config = configure("example")
-    .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
-    .withValue(s"${CONFIG_STATE_STORE("settings")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
-    .withValue(s"${CONFIG_STATE_STORE("graph")}.$CONFIG_KAFKA_BOOTSTRAP_SERVERS", ConfigValueFactory.fromAnyRef(kafkaBootstrap))
 
   val gateway = new TestGatewayNode(config, new HttpGateway
     with Ping
@@ -58,7 +50,9 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     with PublicApi
     with Graph)
 
-  val region = new TestRegionNode(config, new DataPartition)
+  val region = new Node(config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0,1).asJava))) {
+    startRegion(new DataPartition)
+  }
 
   gateway.awaitClusterReady()
 

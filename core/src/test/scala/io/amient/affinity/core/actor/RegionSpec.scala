@@ -45,7 +45,7 @@ class RegionSpec extends IntegrationTestBase with Matchers {
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-      val coordinator = new TestCoordinator(system, "test", null)
+      val coordinator = new TestCoordinator(system, "coordinator-test-group", null)
       try {
         val d = 1 second
         implicit val timeout = Timeout(d)

@@ -23,9 +23,9 @@ import java.io.File
 import java.util.Properties
 
 import com.typesafe.config.{Config, ConfigValueFactory}
-import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.{Cluster, Partition}
+import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.{Reply, ZooKeeperClient}
 import kafka.cluster.Broker
@@ -34,7 +34,7 @@ import org.apache.kafka.common.protocol.SecurityProtocol
 
 import scala.collection.JavaConverters._
 
-trait SystemTestBaseWithKafka extends SystemTestBase {
+trait SystemTestBaseWithKafka extends SystemTestBaseWithZk {
 
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
   private val kafkaConfig = new KafkaConfig(new Properties {
@@ -56,13 +56,14 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
   val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
   tmpZkClient.close
 
-  override def configure(config: Config): Config = super.configure(config) match {
+  override def configure(config: Config): Config = super.configure(config)
+    .withValue(Cluster.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2)) match {
     case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
     case cfg =>
       cfg.getConfig(State.CONFIG_STATE).entrySet().asScala
         .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
-        .filter { case (p, c) => p.endsWith("storage.class")  && classOf[KafkaStorage].isAssignableFrom(Class.forName(c)) }
-        .map { case (p, c) => (State.CONFIG_STATE + "." + p.split("\\.")(0) , c) }
+        .filter { case (p, c) => p.endsWith("storage.class") && classOf[KafkaStorage].isAssignableFrom(Class.forName(c)) }
+        .map { case (p, c) => (State.CONFIG_STATE + "." + p.split("\\.")(0), c) }
         .foldLeft(cfg) { case (cfg, (p, c)) =>
           cfg.withValue(p + "." + KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS, ConfigValueFactory.fromAnyRef(kafkaBootstrap))
         }
@@ -80,7 +81,6 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
   class MyTestPartition(topic: String) extends Partition {
 
     import MyTestPartition._
-
     import context.dispatcher
 
     private val stateConfig = context.system.settings.config.getConfig(State.CONFIG_STATE_STORE(topic))
@@ -91,11 +91,11 @@ trait SystemTestBaseWithKafka extends SystemTestBase {
     }
 
     override def handle: Receive = {
-      case request @ GetValue(key) => sender.reply(request) {
+      case request@GetValue(key) => sender.reply(request) {
         data(key)
       }
 
-      case request @ PutValue(key, value) => sender.replyWith(request) {
+      case request@PutValue(key, value) => sender.replyWith(request) {
         data.update(key, value)
       }
     }

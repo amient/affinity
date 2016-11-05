@@ -54,44 +54,19 @@ object SystemTestBase {
 
 trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
-  val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
-  println(s"Test dir: $testDir")
-  testDir.mkdirs()
-
-  private def deleteDirectory(path: File) = if (path.exists()) {
-    def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
-    getRecursively(path).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
-  }
-
-  private val embeddedZkPath = new File(testDir, "local-zookeeper")
-  // smaller testDir footprint, default zookeeper file blocks are 65535Kb
-  System.getProperties().setProperty("zookeeper.preAllocSize", "64")
-  private val zookeeper = new ZooKeeperServer(new File(embeddedZkPath, "snapshots"), new File(embeddedZkPath, "logs"), 3000)
-  private val zkFactory = new NIOServerCnxnFactory
-  zkFactory.configure(new InetSocketAddress(0), 10)
-  val zkConnect = "localhost:" + zkFactory.getLocalPort
-  zkFactory.startup(zookeeper)
-
   final def configure(): Config = configure(ConfigFactory.defaultReference())
 
   final def configure(confname: String): Config = configure(ConfigFactory.load(confname)
     .withFallback(ConfigFactory.defaultReference()))
 
   def configure(config: Config): Config = config
-    .withValue(Cluster.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2))
     .withValue(Node.CONFIG_AKKA_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
-    .withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
-    .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnect))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
+    .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
-  import SystemTestBase._
-
-  override def afterAll(): Unit = {
-    try {
-      zkFactory.shutdown()
-    } finally {
-      deleteDirectory(testDir)
-    }
+  def deleteDirectory(path: File) = if (path.exists()) {
+    def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
+    getRecursively(path).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
   }
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
@@ -126,6 +101,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
 
     def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
+    def https_uri(path: String) = Uri(s"https://0.0.0.0:$httpPort$path")
 
     def http(method: HttpMethod, uri: Uri): Future[HttpResponse] = {
       http(HttpRequest(method = method, uri = uri))
@@ -166,13 +142,6 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       decodedResponse.flatMap(_.toStrict(2 seconds))
     }
 
-  }
-
-  class TestRegionNode(config: Config, partitionCreator: => Partition)
-    extends Node(config
-      .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(Seq(0,1).asJava))
-      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort.getAndIncrement()))) {
-    startRegion(partitionCreator)
   }
 
 }
