@@ -31,7 +31,7 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable.Set
 
 
-object DataPartition {
+object GraphPartition {
 
   def main(args: Array[String]): Unit = {
     require(args.length == 2, "Service Node requires 2 argument: <akka-port> <node-partition-list>")
@@ -44,12 +44,12 @@ object DataPartition {
       .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
     new Node(config) {
-      startRegion(new DataPartition)
+      startRegion(new GraphPartition)
     }
   }
 }
 
-class DataPartition extends Partition {
+class GraphPartition extends Partition {
 
   val graph: State[Int, VertexProps] = state("graph")
 

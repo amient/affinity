@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example
 
-import io.amient.affinity.example.partition.DataPartition
+import io.amient.affinity.example.partition.GraphPartition
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.service.ServiceNode
 
@@ -32,10 +32,10 @@ object ExampleApp extends App {
 
 
     // partition masters and standbys
-    DataPartition.main(Seq("2551", "0,1").toArray)
-    DataPartition.main(Seq("2552", "1,2").toArray)
-    DataPartition.main(Seq("2553", "2,3").toArray)
-    DataPartition.main(Seq("2554", "3,0").toArray)
+    GraphPartition.main(Seq("2551", "0,1").toArray)
+    GraphPartition.main(Seq("2552", "1,2").toArray)
+    GraphPartition.main(Seq("2553", "2,3").toArray)
+    GraphPartition.main(Seq("2554", "3,0").toArray)
 
     // gateways
     HttpGateway.main(Seq("8881").toArray)

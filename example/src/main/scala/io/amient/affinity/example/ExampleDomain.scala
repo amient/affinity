@@ -60,10 +60,6 @@ final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edg
 
 final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord[Component]
 
-//sealed trait AvroInstruction[T, R] extends AvroRecord[T] with Instruction[R] {
-//  def reverse(result: R): Option[AvroInstruction[_, _]]
-//}
-
 final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[Option[VertexProps]] {
   override def hashCode(): Int = vertex.hashCode
 }
@@ -78,7 +74,6 @@ final case class UpdateVertexComponent(vertex: Int, component: Int) extends Avro
   override def reverse(result: Int): Option[UpdateVertexComponent] = {
     if (result == component) None else Some(UpdateVertexComponent(vertex, result))
   }
-
 }
 
 object GOP extends Enumeration {
