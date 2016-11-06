@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core
 
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.{Observable, Observer}
 
 import akka.actor.{ActorPath, ActorSystem}
@@ -28,6 +29,9 @@ import io.amient.affinity.core.cluster.Coordinator
 import scala.collection.mutable
 
 object TestCoordinator extends Observable {
+
+  final val CONFIG_TEST_COORDINATOR_ID = "affinity.cluster.coordinator.id"
+  final val AUTO_COORDINATOR_ID = new AtomicInteger(1000000)
 
   private val services = mutable.Map[String, mutable.Map[String, String]]()
 
@@ -59,21 +63,24 @@ class TestCoordinator(system: ActorSystem, group: String, config: Config) extend
 
   TestCoordinator.addObserver(this)
 
-  def services: Map[String, String] = TestCoordinator.get(group)
+  val id = system.settings.config.getInt(TestCoordinator.CONFIG_TEST_COORDINATOR_ID)
+  val space = s"$id:$group"
+
+  def services: Map[String, String] = TestCoordinator.get(space)
 
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
-    TestCoordinator.put(group, handle, handle)
+    TestCoordinator.put(space, handle, handle)
     handle
   }
 
   override def unregister(handle: String): Unit = {
-    TestCoordinator.remove(group, handle)
+    TestCoordinator.remove(space, handle)
   }
 
   override def update(o: Observable, arg: scala.Any): Unit = {
     arg.asInstanceOf[(String, Map[String, String])] match {
-      case (g, services) if (g == group) => {
+      case (s, services) if (s == space) => {
         if (!closed.get) updateGroup(services)
       }
       case _ =>

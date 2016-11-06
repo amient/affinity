@@ -17,6 +17,7 @@ class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegis
 
 class CfRegistryTest extends FlatSpec with SystemTestBaseWithConfluentRegistry {
 
+
   val config = configure {
     ConfigFactory.defaultReference()
       .withValue("akka.actor.serializers.avro", ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))

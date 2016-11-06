@@ -27,7 +27,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Cluster.ClusterAvailability
 import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
@@ -39,7 +39,11 @@ import scala.language.postfixOps
 
 class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem.create("IntegrationTestSystem", ConfigFactory.load("integrationtests")))
+  def this() = this(ActorSystem.create("IntegrationTestSystem",
+    ConfigFactory.load("integrationtests").withValue(
+      TestCoordinator.CONFIG_TEST_COORDINATOR_ID,
+      ConfigValueFactory.fromAnyRef(TestCoordinator.AUTO_COORDINATOR_ID.incrementAndGet()))
+  ))
 
   implicit val materializer = ActorMaterializer.create(system)
 

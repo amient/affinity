@@ -20,32 +20,26 @@
 package io.amient.affinity.testutil
 
 import java.io.File
-import java.net.InetSocketAddress
-import java.nio.file.Files
+import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
-import java.security.cert.{CertificateFactory, X509Certificate}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.zip.GZIPInputStream
-import javax.net.ssl.{SSLContext, SSLParameters, TrustManagerFactory, X509TrustManager}
+import javax.net.ssl.{SSLContext, TrustManagerFactory}
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.{ConnectionContext, Http, HttpsConnectionContext}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpEncodings
+import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import com.typesafe.sslconfig.akka.AkkaSSLConfig
-import com.typesafe.sslconfig.ssl.TrustManagerConfig
 import io.amient.affinity.core.actor.Cluster.ClusterAvailability
-import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
-import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.cluster.Node
 import org.apache.avro.util.ByteBufferInputStream
-import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.collection.JavaConverters._
