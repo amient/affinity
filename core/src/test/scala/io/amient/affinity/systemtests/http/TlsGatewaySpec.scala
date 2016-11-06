@@ -21,7 +21,7 @@ package io.amient.affinity.systemtests.http
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.model.HttpMethods.GET
-import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.util.Timeout
 import io.amient.affinity.core.actor.{Controller, Gateway}
@@ -42,8 +42,7 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
 
   val gateway = new TestGatewayNode(config, new Gateway {
     override def handle: Receive = {
-      case http@HTTP(GET, _, _, response) =>
-        response.success(HttpResponse(OK, entity = "Hello World"))
+      case http@HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
     }
   })
 
@@ -56,8 +55,7 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
   }
 
   "xyz" should "123" in {
-    println(gateway.https_uri("/tls-hello"))
-    println(gateway.http_get(gateway.https_uri("/tls-hello")))
+    gateway.http_get(gateway.https_uri("/tls-hello")).entity should equal(HttpEntity("Hello World"))
   }
 
 }
