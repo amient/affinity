@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core
 
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{Actor, ActorSystem, Props}
@@ -33,18 +32,14 @@ import io.amient.affinity.core.actor.Cluster.ClusterAvailability
 import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
-//import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, Promise}
-
 import scala.language.postfixOps
 
 class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem.create(UUID.randomUUID().toString, ConfigFactory.load("integrationtests")))
-
-  import system.dispatcher
+  def this() = this(ActorSystem.create("IntegrationTestSystem", ConfigFactory.load("integrationtests")))
 
   implicit val materializer = ActorMaterializer.create(system)
 

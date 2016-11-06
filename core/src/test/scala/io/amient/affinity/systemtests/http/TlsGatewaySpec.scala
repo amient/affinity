@@ -43,8 +43,7 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
   val gateway = new TestGatewayNode(config, new Gateway {
     override def handle: Receive = {
       case http@HTTP(GET, _, _, response) =>
-        System.err.println(http)
-        response.success(HttpResponse(OK))
+        response.success(HttpResponse(OK, entity = "Hello World"))
     }
   })
 
@@ -55,12 +54,10 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
       super.afterAll()
     }
   }
-//
-//  "xyz" should "123" in {
-////    println(gateway.https_uri("/tls-hello"))
-////    Thread.sleep(10000)
-////    gateway.http_get(gateway.uri("/normal-http"))
-//    gateway.http_get(gateway.https_uri("/tls-hello"))
-//  }
+
+  "xyz" should "123" in {
+    println(gateway.https_uri("/tls-hello"))
+    println(gateway.http_get(gateway.https_uri("/tls-hello")))
+  }
 
 }

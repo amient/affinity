@@ -22,11 +22,14 @@ package io.amient.affinity.testutil
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
+import java.security.{KeyStore, SecureRandom}
+import java.security.cert.{CertificateFactory, X509Certificate}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.zip.GZIPInputStream
+import javax.net.ssl.{SSLContext, SSLParameters, TrustManagerFactory, X509TrustManager}
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.Http
+import akka.http.scaladsl.{ConnectionContext, Http, HttpsConnectionContext}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpEncodings
 import akka.stream.ActorMaterializer
@@ -35,6 +38,8 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.sslconfig.akka.AkkaSSLConfig
+import com.typesafe.sslconfig.ssl.TrustManagerConfig
 import io.amient.affinity.core.actor.Cluster.ClusterAvailability
 import io.amient.affinity.core.actor.{Cluster, Gateway, Partition}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
@@ -86,6 +91,18 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       println(s"TestGatewayNode listening on $httpPort")
     }
 
+    val testSSLContext = {
+      val certStore = KeyStore.getInstance(KeyStore.getDefaultType)
+      certStore.load(null, null)
+      certStore.setCertificateEntry("ca", CertificateFactory.getInstance("X.509")
+        .generateCertificate(getClass.getClassLoader.getResourceAsStream("keys/localhost.cer")))
+      val certManagerFactory = TrustManagerFactory.getInstance("SunX509")
+      certManagerFactory.init(certStore)
+      val context = SSLContext.getInstance("TLS")
+      context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
+      ConnectionContext.https(context)
+    }
+
     def awaitClusterReady() {
       val clusterReady = new AtomicBoolean(false)
       system.eventStream.subscribe(system.actorOf(Props(new Actor {
@@ -101,7 +118,8 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
 
     def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
-    def https_uri(path: String) = Uri(s"https://0.0.0.0:$httpPort$path")
+
+    def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
 
     def http(method: HttpMethod, uri: Uri): Future[HttpResponse] = {
       http(HttpRequest(method = method, uri = uri))
@@ -116,6 +134,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
 
     val mapper = new ObjectMapper()
+
     def get_json(response: HttpResponse): JsonNode = {
       val json = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
       mapper.readValue(json, classOf[JsonNode])
@@ -127,13 +146,14 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
 
     def http(req: HttpRequest) = {
-      val decodedResponse: Future[HttpResponse] = Http().singleRequest(req) flatMap {
-        response => response.header[headers.`Content-Encoding`] match {
+      val decodedResponse: Future[HttpResponse] = Http().singleRequest(req, testSSLContext) flatMap {
+        response =>
+          response.header[headers.`Content-Encoding`] match {
           case Some(c) if (c.encodings.contains(HttpEncodings.gzip)) =>
             response.entity.dataBytes.map(_.asByteBuffer).runWith(Sink.seq).map {
               byteBufferSequence =>
                 val unzipped = fromInputStream(() => new GZIPInputStream(new ByteBufferInputStream(byteBufferSequence.asJava)))
-                val unzippedEntity =  HttpEntity(response.entity.contentType, unzipped)
+                val unzippedEntity = HttpEntity(response.entity.contentType, unzipped)
                 response.copy(entity = unzippedEntity)
             }
           case _ => Future.successful(response)

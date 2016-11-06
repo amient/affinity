@@ -19,10 +19,11 @@
 
 package io.amient.affinity.core.actor
 
+import java.security.cert.X509Certificate
 import java.security.{KeyStore, SecureRandom}
 import java.util
 import java.util.concurrent.ConcurrentHashMap
-import javax.net.ssl.{KeyManagerFactory, SSLContext}
+import javax.net.ssl.{KeyManagerFactory, SSLContext, X509TrustManager}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.event.Logging

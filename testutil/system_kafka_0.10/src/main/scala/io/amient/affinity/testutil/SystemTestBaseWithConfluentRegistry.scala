@@ -31,7 +31,7 @@ import scala.collection.JavaConverters._
 trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
 
   private val registryConfig: SchemaRegistryConfig = new SchemaRegistryConfig(new java.util.HashMap[Object, Object]() {
-    put("listeners", s"http://0.0.0.0:0")
+    put("listeners", s"http://127.0.0.1:0")
     put("kafkastore.connection.url", zkConnect)
     put("avro.compatibility.level", "full")
     put("kafkastore.topic", "_schemas")
@@ -40,7 +40,8 @@ trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
   private val app = new SchemaRegistryRestApplication(registryConfig)
   private val server = app.createServer
   server.start()
-  val registryUrl = s"http://0.0.0.0:" + server.getConnectors.head.getTransport.asInstanceOf[ServerSocketChannel].socket.getLocalPort
+  val registryUrl = s"http://127.0.0.1:" + server.getConnectors.head.getTransport.asInstanceOf[ServerSocketChannel].socket.getLocalPort
+  println("Confluent schema registry listening at: " + registryUrl)
   val registryClient = new CachedSchemaRegistryClient(registryUrl, 20)
 
   override def configure(config: Config) = super.configure(config)

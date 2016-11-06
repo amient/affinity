@@ -9,7 +9,6 @@ import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
 import org.scalatest.FlatSpec
 
 
-
 class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
   register(classOf[ID])
   register(classOf[Base])
@@ -18,7 +17,8 @@ class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegis
 
 class CfRegistryTest extends FlatSpec with SystemTestBaseWithConfluentRegistry {
 
-  val config = configure { ConfigFactory.defaultReference()
+  val config = configure {
+    ConfigFactory.defaultReference()
       .withValue("akka.actor.serializers.avro", ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))
   }
 
