@@ -28,7 +28,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.util.TimeCryptoProof
-import io.amient.affinity.example.ConfigEntry
+import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.HttpGateway
 
 import scala.concurrent.Future

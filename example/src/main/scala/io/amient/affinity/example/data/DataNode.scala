@@ -17,33 +17,28 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.example.data
 
-import io.amient.affinity.example.data.DataNode
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.cluster.Node
 
-import scala.util.control.NonFatal
-
-object ExampleApp extends App {
-  try {
-    // singleton services
-    ServiceNode.main(Seq("2550").toArray)
+import scala.collection.JavaConverters._
 
 
-    // partition masters and standbys
-    DataNode.main(Seq("2551", "0,1").toArray)
-    DataNode.main(Seq("2552", "1,2").toArray)
-    DataNode.main(Seq("2553", "2,3").toArray)
-    DataNode.main(Seq("2554", "3,0").toArray)
+object DataNode {
 
-    // gateways
-    HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
+  def main(args: Array[String]): Unit = {
+    require(args.length == 2, "Service Node requires 2 argument: <akka-port> <node-partition-list>")
 
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
+    val akkaPort = args(0).toInt
+    val partitionList = args(1).split("\\,").map(_.toInt).toList.asJava
+
+    val config = ConfigFactory.load("example")
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+      .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
+
+    new Node(config) {
+      startRegion(new GraphPartition)
+    }
   }
 }

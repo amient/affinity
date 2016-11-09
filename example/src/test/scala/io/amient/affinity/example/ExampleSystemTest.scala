@@ -32,7 +32,7 @@ import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
-import io.amient.affinity.example.partition.GraphPartition
+import io.amient.affinity.example.data.GraphPartition
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.testutil.SystemTestBaseWithKafka

@@ -17,33 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.example.data
 
-import io.amient.affinity.example.data.DataNode
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
-
-import scala.util.control.NonFatal
-
-object ExampleApp extends App {
-  try {
-    // singleton services
-    ServiceNode.main(Seq("2550").toArray)
+import com.fasterxml.jackson.annotation.JsonIgnore
+import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.util.TimeCryptoProofSHA256
 
 
-    // partition masters and standbys
-    DataNode.main(Seq("2551", "0,1").toArray)
-    DataNode.main(Seq("2552", "1,2").toArray)
-    DataNode.main(Seq("2553", "2,3").toArray)
-    DataNode.main(Seq("2554", "3,0").toArray)
+final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {
+  @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
 
-    // gateways
-    HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
-
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
-  }
+  override def hashCode(): Int = description.hashCode()
 }
+
+

@@ -27,9 +27,10 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, Gateway}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.example.ConfigEntry
+import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.http.handler._
 import io.amient.affinity.example.rest.handler._
+
 import scala.util.control.NonFatal
 
 object HttpGateway {

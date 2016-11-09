@@ -17,33 +17,16 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.model.graph.message
 
-import io.amient.affinity.example.data.DataNode
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
+import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.transaction.Instruction
 
-import scala.util.control.NonFatal
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] with Instruction[VertexProps] {
+  override def hashCode(): Int = vertex.hashCode
 
-object ExampleApp extends App {
-  try {
-    // singleton services
-    ServiceNode.main(Seq("2550").toArray)
-
-
-    // partition masters and standbys
-    DataNode.main(Seq("2551", "0,1").toArray)
-    DataNode.main(Seq("2552", "1,2").toArray)
-    DataNode.main(Seq("2553", "2,3").toArray)
-    DataNode.main(Seq("2554", "3,0").toArray)
-
-    // gateways
-    HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
-
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
+  def reverse(props: VertexProps) = op match {
+    case GOP.ADD => Some(ModifyGraph(vertex, edge, GOP.REMOVE))
+    case GOP.REMOVE => Some(ModifyGraph(vertex, edge, GOP.ADD))
   }
 }

@@ -30,20 +30,17 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.WebSocketSupport
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.transaction.Transaction
-import io.amient.affinity.example._
 import io.amient.affinity.example.rest.HttpGateway
+import io.amient.affinity.model.graph.GraphLogic
+import io.amient.affinity.model.graph.message.{Edge, GetComponent, GetVertexProps}
 
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
-trait Graph extends HttpGateway with WebSocketSupport {
+
+trait Graph extends HttpGateway with WebSocketSupport with GraphLogic {
 
   import context.dispatcher
-
-  implicit val scheduler = context.system.scheduler
 
   val cache = new ConcurrentHashMap[Int, HttpResponse]()
 
@@ -104,74 +101,6 @@ trait Graph extends HttpGateway with WebSocketSupport {
         case _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }
 
-  }
-
-  private def connect(v1: Int, v2: Int): Future[Set[Int]] = {
-    Transaction(cluster) { transaction =>
-      val ts = System.currentTimeMillis
-      transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
-        case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
-          case props2 => transaction execute collectComponent(v2) flatMap {
-            case mergedComponent =>
-              val newComponentID = mergedComponent.connected.min
-              transaction execute UpdateComponent(newComponentID, mergedComponent)
-              if (props1.component != newComponentID) transaction execute DeleteComponent(props1.component)
-              if (props2.component != newComponentID) transaction execute DeleteComponent(props2.component)
-              Future.sequence(mergedComponent.connected.map { v =>
-                transaction execute UpdateVertexComponent(v, newComponentID)
-              })
-          }
-        }
-      }
-    }
-  }
-
-  private def disconnect(v1: Int, v2: Int) = {
-    Transaction(cluster) { transaction =>
-      val ts = System.currentTimeMillis
-      transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
-        case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
-          case props2 => transaction execute collectComponent(v1) flatMap {
-            case component1 => transaction execute collectComponent(v2) flatMap {
-              case component2 =>
-                val newComponentIDS = List(component1.connected.min, component2.connected.min)
-                transaction execute UpdateComponent(newComponentIDS(0), component1)
-                transaction execute UpdateComponent(newComponentIDS(1), component2)
-                if (!newComponentIDS.contains(props1.component)) transaction execute DeleteComponent(props1.component)
-                if (!newComponentIDS.contains(props2.component)) transaction execute DeleteComponent(props2.component)
-                Future.sequence {
-                  component1.connected.map { v =>
-                    transaction execute UpdateVertexComponent(v, newComponentIDS(0))
-                  } ++ component2.connected.map { v =>
-                    transaction execute UpdateVertexComponent(v, newComponentIDS(1))
-                  }
-                }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private def collectComponent(vertex: Int): Future[Component] = {
-    val promise = Promise[Component]()
-    val ts = System.currentTimeMillis
-    implicit val timeout = Timeout(1 seconds)
-    def collect(queue: Set[Int], agg: Set[Int]): Unit = {
-      if (queue.isEmpty) {
-        promise.success(Component(ts, agg))
-      }
-      else cluster ack GetVertexProps(queue.head) map {
-        _ match {
-          case None => throw new NoSuchElementException
-          case Some(VertexProps(_, cid, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)
-        }
-      } recover {
-        case NonFatal(e) => promise.failure(e)
-      }
-    }
-    collect(Set(vertex), Set(vertex))
-    promise.future
   }
 
 }

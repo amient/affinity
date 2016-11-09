@@ -17,33 +17,14 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.example.data
 
-import io.amient.affinity.example.data.DataNode
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
+import akka.actor.ExtendedActorSystem
+import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.model.graph.GraphModel
 
-import scala.util.control.NonFatal
+class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) {
+  register(classOf[ConfigEntry])
+  GraphModel.registerMessages(this)
 
-object ExampleApp extends App {
-  try {
-    // singleton services
-    ServiceNode.main(Seq("2550").toArray)
-
-
-    // partition masters and standbys
-    DataNode.main(Seq("2551", "0,1").toArray)
-    DataNode.main(Seq("2552", "1,2").toArray)
-    DataNode.main(Seq("2553", "2,3").toArray)
-    DataNode.main(Seq("2554", "3,0").toArray)
-
-    // gateways
-    HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
-
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
-  }
 }

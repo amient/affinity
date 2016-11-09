@@ -17,33 +17,11 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
+package io.amient.affinity.model.graph.message
 
-import io.amient.affinity.example.data.DataNode
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
+import io.amient.affinity.core.serde.avro.AvroRecord
 
-import scala.util.control.NonFatal
-
-object ExampleApp extends App {
-  try {
-    // singleton services
-    ServiceNode.main(Seq("2550").toArray)
-
-
-    // partition masters and standbys
-    DataNode.main(Seq("2551", "0,1").toArray)
-    DataNode.main(Seq("2552", "1,2").toArray)
-    DataNode.main(Seq("2553", "2,3").toArray)
-    DataNode.main(Seq("2554", "3,0").toArray)
-
-    // gateways
-    HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
-
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
-  }
+final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord[VertexProps] {
+  def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)
+  def withEdges(newEdges: Set[Edge]) = VertexProps(System.currentTimeMillis, component, newEdges)
 }
