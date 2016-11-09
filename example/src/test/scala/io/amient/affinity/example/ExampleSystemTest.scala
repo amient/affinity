@@ -19,6 +19,9 @@
 
 package io.amient.affinity.example
 
+import java.net.URI
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.http.javadsl.model.headers._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri
@@ -33,6 +36,9 @@ import io.amient.affinity.example.partition.GraphPartition
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
+import io.amient.affinity.ws.AvroWebSocketClient
+import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
+import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -42,7 +48,7 @@ import scala.language.postfixOps
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val config = configure("example")
+  val config = configure("example").withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
 
   val gateway = new TestGatewayNode(config, new HttpGateway
     with Ping
@@ -50,7 +56,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     with PublicApi
     with Graph)
 
-  val region = new Node(config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0,1).asJava))) {
+  val region = new Node(config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1).asJava))) {
     startRegion(new GraphPartition)
   }
 
@@ -111,7 +117,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
 
   }
 
-  "Graph API" should "should maintatin connected components when adding and removing edges" in {
+  "Graph API" should "should maintain connected components when adding and removing edges" in {
     //(1~>2), (3~>4) ==> component1(1,2), component3(3,4)
     http_get(uri("/vertex/1")).status should be(NotFound)
     http_get(uri("/vertex/2")).status should be(NotFound)
@@ -148,7 +154,33 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     http_get(uri("/component/3")).status should be(NotFound)
     get_json(http_get(uri("/component/4"))).get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(4)) should be(Set())
 
+  }
 
+
+  "Graph API" should "stream changes to vertex websocket subscribers" in {
+    val lastMessage = new AtomicReference[GenericRecord](null)
+    lastMessage.synchronized {
+      val ws = new AvroWebSocketClient(URI.create(s"ws://localhost:$httpPort/vertex?id=1000"), new AvroMessageHandler() {
+        override def onMessage(message: scala.Any): Unit = {
+          lastMessage.synchronized {
+            lastMessage.set(message.asInstanceOf[GenericRecord])
+            lastMessage.notify()
+          }
+        }
+      })
+      lastMessage.wait(1000)
+      (lastMessage.get == null) should be(true)
+      http_post(uri("/connect/1000/2000")).status should be(SeeOther)
+      lastMessage.wait(1000)
+      val msg = lastMessage.get
+      (msg != null) should be(true)
+      msg.getSchema.getName should be("VertexProps")
+      msg.get("component") should be (1000)
+      val edges = msg.get("edges").asInstanceOf[GenericData.Array[GenericRecord]]
+      edges.size should be (1)
+      edges.get(0).get("target") should be (2000)
+      ws.close()
+    }
   }
 
 }

@@ -24,8 +24,10 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 import akka.util.Timeout
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.WebSocketSupport
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.transaction.Transaction
@@ -37,14 +39,30 @@ import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait Graph extends HttpGateway {
+trait Graph extends HttpGateway with WebSocketSupport {
 
   import context.dispatcher
+
   implicit val scheduler = context.system.scheduler
 
   val cache = new ConcurrentHashMap[Int, HttpResponse]()
 
+  val html = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/wsclient.html")).mkString
+
   abstract override def handle: Receive = super.handle orElse {
+
+    /**
+      * WebSocket GET /vertex?id=<vid>
+      */
+    case http@HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>
+      http.request.header[UpgradeToWebSocket] match {
+        case None => response.success(Encoder.html(OK, html))
+        case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
+          avroWebSocket(upgrade, "graph", vertex) {
+            case x: Edge => println("My custom handler of Edge: " + x)
+          }
+        }
+      }
 
     /**
       * GET /vertex/<vertex>

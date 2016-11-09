@@ -72,7 +72,6 @@ window.AvroWebSocket = function (wsAddress, receiver) {
             if (sendData.type == type._name) {
                 sendAvroMessage(type, sendData.data);
             } else {
-                console.warn(sendData.type);
                 tmpQueue2.push(sendData);
             }
         }

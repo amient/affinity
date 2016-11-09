@@ -44,7 +44,6 @@ object HttpGateway {
         with Graph
         with Admin
         with PublicApi
-        with WebSock
         with Ping
         with Fail
       )
