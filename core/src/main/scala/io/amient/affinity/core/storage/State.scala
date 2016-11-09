@@ -95,7 +95,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     storage.memstore(k) map[V] {
       case d => valueSerde.fromBinary(d.array) match {
         case value: V => value
-        case _ => throw new UnsupportedOperationException(key.toString)
+        case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
       }
     }
   }

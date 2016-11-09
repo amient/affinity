@@ -61,7 +61,7 @@ class ZkAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   }))
 
   override def getSchema(id: Int): Option[Schema] = try {
-    Some(new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id")))
+    Some(new Schema.Parser().parse(zk.readData[String](s"$zkRoot/${id.toString.reverse.padTo(10, "0").reverse.mkString}")))
   } catch {
     case e: Throwable => e.printStackTrace(); None
   }

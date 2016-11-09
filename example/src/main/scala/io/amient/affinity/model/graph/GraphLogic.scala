@@ -36,6 +36,17 @@ trait GraphLogic extends Gateway {
 
   implicit val scheduler = context.system.scheduler
 
+
+  protected def getVertexProps(vid: Int): Future[Option[VertexProps]] = {
+    implicit val timeout = Timeout(1 seconds)
+    cluster ack GetVertexProps(vid)
+  }
+
+  protected def getGraphComponent(cid: Int): Future[Option[Component]] = {
+    implicit val timeout = Timeout(1 seconds)
+    cluster ack GetComponent(cid)
+  }
+
   protected def connect(v1: Int, v2: Int): Future[Set[Int]] = {
     Transaction(cluster) { transaction =>
       val ts = System.currentTimeMillis
@@ -56,7 +67,7 @@ trait GraphLogic extends Gateway {
     }
   }
 
-  protected def disconnect(v1: Int, v2: Int) = {
+  protected def disconnect(v1: Int, v2: Int): Future[Set[Int]] = {
     Transaction(cluster) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {

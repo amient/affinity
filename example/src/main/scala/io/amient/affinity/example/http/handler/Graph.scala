@@ -25,16 +25,13 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
-import akka.util.Timeout
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.WebSocketSupport
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.model.graph.GraphLogic
-import io.amient.affinity.model.graph.message.{Edge, GetComponent, GetVertexProps}
+import io.amient.affinity.model.graph.message.Edge
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 
@@ -65,8 +62,7 @@ trait Graph extends HttpGateway with WebSocketSupport with GraphLogic {
       * GET /vertex/<vertex>
       */
     case HTTP(GET, PATH("vertex", INT(vid)), query, response) =>
-      implicit val timeout = Timeout(1 seconds)
-      delegateAndHandleErrors(response, cluster ack GetVertexProps(vid)) {
+      delegateAndHandleErrors(response, getVertexProps(vid)) {
         _ match {
           case None => throw new NoSuchElementException
           case Some(vertexProps) => Encoder.json(OK, vertexProps)
@@ -77,8 +73,7 @@ trait Graph extends HttpGateway with WebSocketSupport with GraphLogic {
       * GET /component/<component>
       */
     case HTTP(GET, PATH("component", INT(cid)), query, response) =>
-      implicit val timeout = Timeout(1 seconds)
-      delegateAndHandleErrors(response, cluster ack GetComponent(cid)) {
+      delegateAndHandleErrors(response, getGraphComponent(cid)) {
         _ match {
           case None => throw new NoSuchElementException
           case Some(component) => Encoder.json(OK, component)
