@@ -25,7 +25,7 @@ import java.nio.file.{Files, Paths}
 import com.typesafe.config.Config
 import io.amient.affinity.core.storage.MemStore
 import io.amient.affinity.core.util.ByteUtils
-import org.rocksdb.{Options, RocksDB, RocksDBException}
+import org.rocksdb.{Options, RocksDB, RocksDBException, RocksIterator}
 
 
 object MemStoreRocksDb {
@@ -51,14 +51,16 @@ class MemStoreRocksDb(config: Config, partition: Int) extends MemStore {
   override def apply(key: MK): Option[MV] = get(ByteUtils.bufToArray(key))
 
   override def iterator:Iterator[(MK,MV)] = new Iterator[(MK, MV)] {
-    val rocksIterator = internal.newIterator()
-    rocksIterator.seekToFirst()
-
-    override def hasNext: Boolean = if (rocksIterator.isValid) {
-      rocksIterator.close
-      false
-    } else {
-      true
+    private var rocksIterator: RocksIterator = null
+    override def hasNext: Boolean = {
+      if (rocksIterator == null) {
+        rocksIterator = internal.newIterator()
+        rocksIterator.seekToFirst()
+      } else {
+        rocksIterator.next()
+      }
+      if (!rocksIterator.isValid) rocksIterator.close
+      rocksIterator.isValid
     }
 
     override def next(): (MK, MV) = (ByteBuffer.wrap(rocksIterator.key()), ByteBuffer.wrap(rocksIterator.value()))

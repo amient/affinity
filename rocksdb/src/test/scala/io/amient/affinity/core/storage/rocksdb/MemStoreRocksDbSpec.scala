@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage.rocksdb
 
+import akka.actor.Status
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.actor.Partition
@@ -28,9 +29,10 @@ import io.amient.affinity.testutil.SystemTestBase
 import org.rocksdb.{Options, RocksDB}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.{Failure, Success}
 
 class MemStoreRocksDbSpec extends FlatSpec with Matchers with SystemTestBase {
 
@@ -54,10 +56,15 @@ class MemStoreRocksDbSpec extends FlatSpec with Matchers with SystemTestBase {
             val origin = sender
             val result = value match {
               case None => kvstore.remove(key, cmd)
-              case Some(value: String) => kvstore.update(key, value)
+              case Some(value: String) =>
+                val f = kvstore.update(key, value)
+                if (kvstore.iterator.exists(such => such._1 == key && such._2 == value)) f else
+                  Future.failed(new NoSuchElementException)
+
             }
-            result onSuccess {
-              case prev => origin ! prev
+            result onComplete {
+              case Success(prev) => origin ! prev
+              case Failure(e) => origin ! Status.Failure(e)
             }
         }
       }), 5 seconds)
