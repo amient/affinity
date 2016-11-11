@@ -189,6 +189,7 @@ abstract class Gateway extends Actor {
       }
 
     case exchange: HttpExchange if (handlingSuspended) =>
+      log.warning("Hadnling suspended, enqueuing request: " + exchange.request)
       if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
         suspendedHttpRequestQueue += exchange
       } else {

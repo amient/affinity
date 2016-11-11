@@ -21,8 +21,8 @@ package io.amient.affinity.core.actor
 
 import akka.actor.{ActorPath, PoisonPill, Props}
 import akka.util.Timeout
-import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.{IntegrationTestBase, TestCoordinator}
+import io.amient.affinity.core.cluster.{CoordinatorEmbedded, Node}
+import io.amient.affinity.core.IntegrationTestBase
 import org.scalatest.Matchers
 
 import scala.collection.JavaConverters._
@@ -45,7 +45,7 @@ class RegionSpec extends IntegrationTestBase with Matchers {
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-      val coordinator = new TestCoordinator(system, "coordinator-test-group", null)
+      val coordinator = new CoordinatorEmbedded(system, "coordinator-test-group", null)
       try {
         val d = 1 second
         implicit val timeout = Timeout(d)

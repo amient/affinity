@@ -1,3 +1,4 @@
 include ':core', ':testutil:system_core', ':ws-client',
         ':kafka_0.10', ':testutil:system_kafka_0.10',
-        ':example'
+        ':examples:distributed-graph',
+        ':examples:minimal-setup'

@@ -5,9 +5,8 @@ apply plugin: 'scala'
 apply plugin: 'java'
 
 ext {
-    mainClass = "io.io.amient.affinity.example.ExampleApp"
-    mainScript = "example-graph-api"
-    kafkaMinorVersion = "0.10"
+    mainClass = "io.amient.affinity.example.minimal.MinExampleMain"
+    mainScript = "example"
 }
 
 buildscript {
@@ -29,9 +28,7 @@ build.dependsOn singlejar
 
 dependencies {
     compile project(':core')
-    compile project(':kafka_' + kafkaMinorVersion)
     testCompile project(':ws-client')
-    testCompile project(':testutil:system_kafka_' + kafkaMinorVersion)
 }
 
 

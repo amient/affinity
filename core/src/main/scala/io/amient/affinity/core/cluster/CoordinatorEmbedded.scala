@@ -17,39 +17,38 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.cluster
 
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.{Observable, Observer}
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
-import io.amient.affinity.core.cluster.Coordinator
 
 import scala.collection.mutable
 
-object TestCoordinator extends Observable {
+object CoordinatorEmbedded extends Observable {
 
   final val CONFIG_TEST_COORDINATOR_ID = "affinity.cluster.coordinator.id"
   final val AUTO_COORDINATOR_ID = new AtomicInteger(1000000)
 
   private val services = mutable.Map[String, mutable.Map[String, String]]()
 
-  def get(group: String): Map[String, String] = synchronized {
-    services.get(group) match {
+  def get(space: String): Map[String, String] = synchronized {
+    services.get(space) match {
       case None => Map()
       case Some(g) => g.toMap
     }
   }
 
-  def remove(group: String, handle: String) = update(group) { g =>
+  def remove(space: String, handle: String) = update(space) { g =>
     g -= handle
   }
 
-  def put(group: String, handle: String, handle1: String) = update(group) { g =>
+  def put(space: String, handle: String, handle1: String) = update(space) { g =>
     g += handle -> handle
     setChanged()
-    notifyObservers((group, services(group).toMap))
+    notifyObservers((space, services(space).toMap))
   }
 
   private def update(group: String)(f: mutable.Map[String, String] => Unit) = synchronized {
@@ -57,31 +56,40 @@ object TestCoordinator extends Observable {
     f(services(group))
   }
 
+  override def addObserver(o: Observer): Unit = {
+    super.addObserver(o)
+    services.foreach { case (space, mapping) =>
+      o.update(this, (space, mapping.toMap))
+    }
+  }
+
 }
 
-class TestCoordinator(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
+class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
 
-  TestCoordinator.addObserver(this)
-
-  val id = system.settings.config.getInt(TestCoordinator.CONFIG_TEST_COORDINATOR_ID)
+  val id = system.settings.config.getInt(CoordinatorEmbedded.CONFIG_TEST_COORDINATOR_ID)
   val space = s"$id:$group"
 
-  def services: Map[String, String] = TestCoordinator.get(space)
+  CoordinatorEmbedded.addObserver(this)
+
+  def services: Map[String, String] = CoordinatorEmbedded.get(space)
 
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
-    TestCoordinator.put(space, handle, handle)
+    CoordinatorEmbedded.put(space, handle, handle)
     handle
   }
 
   override def unregister(handle: String): Unit = {
-    TestCoordinator.remove(space, handle)
+    CoordinatorEmbedded.remove(space, handle)
   }
 
   override def update(o: Observable, arg: scala.Any): Unit = {
     arg.asInstanceOf[(String, Map[String, String])] match {
       case (s, services) if (s == space) => {
-        if (!closed.get) updateGroup(services)
+        if (!closed.get) {
+          updateGroup(services)
+        }
       }
       case _ =>
     }

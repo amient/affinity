@@ -29,6 +29,7 @@ import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Cluster.ClusterAvailability
+import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
@@ -41,8 +42,8 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
 
   def this() = this(ActorSystem.create("IntegrationTestSystem",
     ConfigFactory.load("integrationtests").withValue(
-      TestCoordinator.CONFIG_TEST_COORDINATOR_ID,
-      ConfigValueFactory.fromAnyRef(TestCoordinator.AUTO_COORDINATOR_ID.incrementAndGet()))
+      CoordinatorEmbedded.CONFIG_TEST_COORDINATOR_ID,
+      ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AUTO_COORDINATOR_ID.incrementAndGet()))
   ))
 
   implicit val materializer = ActorMaterializer.create(system)
