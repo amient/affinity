@@ -17,27 +17,22 @@
  * limitations under the License.
  */
 
+
 package io.amient.affinity.example.minimal
 
-import com.typesafe.config.ConfigFactory
-import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.util.Reply
 
-import scala.util.control.NonFatal
+class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
+    register(classOf[GetValue])
+    register(classOf[PutValue])
+}
 
-object MinExampleMain extends App {
+case class GetValue(key: String) extends AvroRecord[GetValue] with Reply[Option[String]] {
+  override def hashCode(): Int = key.hashCode()
+}
 
-  try {
-
-    new Node(ConfigFactory.load("minimal-example")) {
-
-      startRegion(new MySimplePartition)
-
-      startGateway(new MySimpleGateway)
-    }
-
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
-  }
+case class PutValue(key: String, value: String) extends AvroRecord[PutValue] with Reply[Option[String]] {
+  override def hashCode(): Int = key.hashCode()
 }

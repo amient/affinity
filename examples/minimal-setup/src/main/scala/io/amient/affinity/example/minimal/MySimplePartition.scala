@@ -19,8 +19,8 @@
 
 package io.amient.affinity.example.minimal
 
-import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Partition
 
 class MySimplePartition extends Partition {
 
