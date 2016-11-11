@@ -29,24 +29,53 @@ import org.rocksdb.{Options, RocksDB, RocksDBException, RocksIterator}
 
 
 object MemStoreRocksDb {
-  def CONFIG_ROCKSDB_DATA_PATH = "memstore.rocksdb.data.path"
+  val CONFIG_ROCKSDB_DATA_PATH = "memstore.rocksdb.data.path"
+
+  private val refs = scala.collection.mutable.Map[String, Long]()
+  private val instances = scala.collection.mutable.Map[String, RocksDB]()
+
+  RocksDB.loadLibrary()
+
+  def createOrGetRocksDbInstanceRef(pathToData: String, rocksOptions: Options): RocksDB = synchronized {
+    if (refs.contains(pathToData) && refs(pathToData) > 0) {
+      refs.put(pathToData, refs(pathToData) + 1)
+      return instances(pathToData)
+    } else {
+      val instance = try {
+        RocksDB.open(rocksOptions, pathToData)
+      } catch {
+        case e:RocksDBException => throw new RuntimeException(e)
+      }
+      instances.put(pathToData, instance)
+      refs.put(pathToData, 1)
+      instance
+    }
+  }
+
+  def releaseRocksDbInstance(pathToData: String): Unit = synchronized {
+    if (refs(pathToData) > 1) {
+      refs.put(pathToData, refs(pathToData) - 1)
+    } else {
+      refs.remove(pathToData)
+      instances(pathToData).close()
+    }
+  }
+
 }
 
 class MemStoreRocksDb(config: Config, partition: Int) extends MemStore {
 
-  private val pathToData = config.getString(MemStoreRocksDb.CONFIG_ROCKSDB_DATA_PATH) + s"/$partition"
+  import MemStoreRocksDb._
+
+  private val pathToData = config.getString(CONFIG_ROCKSDB_DATA_PATH) + s"/$partition"
   private val containerPath = Paths.get(pathToData).getParent.toAbsolutePath
-
-  RocksDB.loadLibrary()
   private val rocksOptions = new Options().setCreateIfMissing(true)
-  private val internal = try {
-    Files.createDirectories(containerPath)
-    RocksDB.open(rocksOptions, pathToData)
-  } catch {
-    case e:RocksDBException => throw new RuntimeException(e)
-  }
 
-  override def close: Unit = internal.close()
+  Files.createDirectories(containerPath)
+
+  private val internal: RocksDB = createOrGetRocksDbInstanceRef(pathToData, rocksOptions)
+
+  override def close: Unit = releaseRocksDbInstance(pathToData)
 
   override def apply(key: MK): Option[MV] = get(ByteUtils.bufToArray(key))
 
