@@ -19,7 +19,72 @@
 
 package io.amient.affinity.core.storage.rocksdb
 
-class MemStoreRocksDbSpec {
+import akka.pattern.ask
+import akka.util.Timeout
+import io.amient.affinity.core.actor.Partition
+import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.serde.primitive.StringSerde
+import io.amient.affinity.testutil.SystemTestBase
+import org.rocksdb.{Options, RocksDB}
+import org.scalatest.{FlatSpec, Matchers}
 
-  //TODO #13 RocksDb Storage integration test
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
+class MemStoreRocksDbSpec extends FlatSpec with Matchers with SystemTestBase {
+
+  val config = configure("rocksdb-test")
+
+  val pathToData = config.getString("affinity.state.test.memstore.rocksdb.data.path")
+
+  "MemStoreRocksDb" should "store all changes in the underlying rocksdb store" in {
+
+    val node = new Node(config) {
+
+      Await.ready(startRegion(new Partition {
+        val kvstore = state[String, String]("test")
+
+        import context.dispatcher
+
+        override def handle: Receive = {
+          case "ping" => sender ! "pong"
+          case key: String => sender ! kvstore(key)
+          case cmd @ (key: String, value) =>
+            val origin = sender
+            val result = value match {
+              case None => kvstore.remove(key, cmd)
+              case Some(value: String) => kvstore.update(key, value)
+            }
+            result onSuccess {
+              case prev => origin ! prev
+            }
+        }
+      }), 5 seconds)
+    }
+
+    try {
+      val x = node.system.actorSelection("/user/controller/region/0")
+      implicit val timeout = Timeout(1 second)
+      Await.result(x ? "ping", timeout.duration) should be("pong")
+      Await.result(x ? ("hello", None), timeout.duration)
+      Await.result(x ? "hello", timeout.duration) should be(None)
+      Await.result(x ? ("hello", Some("world")), timeout.duration) should be(None)
+      Await.result(x ? "hello", timeout.duration) should be(Some("world"))
+      Await.result(x ? ("hello", Some("world2")), timeout.duration) should be(Some("world"))
+    } finally {
+      node.shutdown()
+    }
+
+    val db = RocksDB.open(new Options(), s"$pathToData/0")
+    try {
+      val serde = new StringSerde
+      db.get(serde.toBytes("hello")) should be(serde.toBytes("world2"))
+    } finally {
+      db.close()
+    }
+
+  }
+
+
 }

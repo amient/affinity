@@ -25,6 +25,8 @@ class MemStoreConcurrentMap extends MemStore {
 
   private val internal = new ConcurrentHashMap[MK, MV]()
 
+  override def close(): Unit = internal.clear()
+
   override def apply(key: MK): Option[MV] = internal.get(key) match {
     case null => None
     case value => Some(value)
@@ -49,4 +51,5 @@ class MemStoreConcurrentMap extends MemStore {
     case null => None
     case prev => Some(prev)
   }
+
 }

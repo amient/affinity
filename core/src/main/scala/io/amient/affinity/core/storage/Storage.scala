@@ -25,18 +25,19 @@ import com.typesafe.config.Config
 import scala.reflect.runtime.universe._
 import scala.concurrent.Future
 
-abstract class Storage(val config: Config) {
+abstract class Storage(val config: Config, val partition: Int) {
 
   private val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
   private val memstoreClassSymbol = rootMirror.classSymbol(memstoreClass)
   private val memstoreClassMirror = rootMirror.reflectClass(memstoreClassSymbol)
   private val constructor = memstoreClassSymbol.asClass.primaryConstructor.asMethod
-  //if no-arg constructor present then just do newInstance() otherwise assume there is one-arg constructor that takes Config
   val memstore = if (constructor.paramLists.exists(_.size == 0)) {
+    //if no-arg constructor present then just do newInstance()
     memstoreClass.newInstance()
   } else {
+    //otherwise assume there is two-arg constructor that takes Config and Int partition
     val constructorMirror = memstoreClassMirror.reflectConstructor(constructor)
-    constructorMirror(config).asInstanceOf[MemStore]
+    constructorMirror(config, partition).asInstanceOf[MemStore]
   }
 
   /**
@@ -63,9 +64,22 @@ abstract class Storage(val config: Config) {
   private[affinity] def tail(): Unit
 
   /**
-    * close all resource and background processes
+    * close all resource and background processes used by the memstore and the storage implementation
     */
-  private[affinity] def close(): Unit
+  final private[affinity] def close(): Unit = {
+    try {
+      stop()
+    } finally {
+      memstore.close()
+    }
+  }
+
+  /**
+    * close all resource and background processes used by the the storage implementation
+    */
+  private[affinity] def stop(): Unit = {
+    memstore.close()
+  }
 
   /**
     * @param key   of the pair

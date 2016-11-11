@@ -48,7 +48,7 @@ object KafkaStorage {
   def CONFIG_KAFKA_CONSUMER = s"storage.kafka.consumer"
 }
 
-class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
+class KafkaStorage(config: Config, partition: Int) extends Storage(config, partition) {
 
   import KafkaStorage._
 
@@ -182,8 +182,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config) {
     }
   }
 
-  private[affinity] def close(): Unit = {
-    //stop tailing and shutdown
+  override private[affinity] def stop(): Unit = {
     try {
       consumer.interrupt()
     } finally {

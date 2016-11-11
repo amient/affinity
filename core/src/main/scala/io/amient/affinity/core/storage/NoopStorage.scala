@@ -24,7 +24,7 @@ import com.typesafe.config.Config
 
 import scala.concurrent.Future
 
-class NoopStorage(config: Config) extends Storage(config) {
+class NoopStorage(config: Config, partition:Int) extends Storage(config, partition) {
 
   override def write(key: ByteBuffer, value: ByteBuffer): Future[Unit] = Future.successful(())
 
@@ -34,5 +34,5 @@ class NoopStorage(config: Config) extends Storage(config) {
 
   override private[affinity] def tail(): Unit = ()
 
-  override private[affinity] def close(): Unit = ()
+  override private[affinity] def stop(): Unit = ()
 }

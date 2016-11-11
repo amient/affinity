@@ -9,6 +9,8 @@ ext {
 }
 
 dependencies {
+    testCompile project(':testutil:system_core')
+
     compile project(':core')
     compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
 }

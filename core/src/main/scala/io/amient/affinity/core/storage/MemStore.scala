@@ -55,4 +55,10 @@ trait MemStore {
     */
   protected[storage] def remove(key: MK): Option[MV]
 
+  /**
+    * close() will be called whenever the owning storage is closing
+    * implementation should clean-up any resources here
+    */
+  def close(): Unit
+
 }
