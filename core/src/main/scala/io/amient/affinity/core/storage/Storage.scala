@@ -22,15 +22,22 @@ package io.amient.affinity.core.storage
 import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
-
+import scala.reflect.runtime.universe._
 import scala.concurrent.Future
 
 abstract class Storage(val config: Config) {
 
-  val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
-  //TODO #13 if no-arg constructor then newInstance() otherwse constructorMirror(config)
-  val memstore = memstoreClass.newInstance()
-
+  private val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
+  private val memstoreClassSymbol = rootMirror.classSymbol(memstoreClass)
+  private val memstoreClassMirror = rootMirror.reflectClass(memstoreClassSymbol)
+  private val constructor = memstoreClassSymbol.asClass.primaryConstructor.asMethod
+  //if no-arg constructor present then just do newInstance() otherwise assume there is one-arg constructor that takes Config
+  val memstore = if (constructor.paramLists.exists(_.size == 0)) {
+    memstoreClass.newInstance()
+  } else {
+    val constructorMirror = memstoreClassMirror.reflectConstructor(constructor)
+    constructorMirror(config).asInstanceOf[MemStore]
+  }
 
   /**
     * the contract of this method is that it should start a background process of restoring

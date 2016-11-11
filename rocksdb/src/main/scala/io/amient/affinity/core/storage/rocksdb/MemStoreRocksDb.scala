@@ -20,23 +20,23 @@
 package io.amient.affinity.core.storage.rocksdb
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.storage.MemStore
+import io.amient.affinity.core.storage.{MemStore, MemStoreSimpleMap}
 
 object MemStoreRocksDb {
   //TODO #13 RocksDb config options, esp. data location
 }
 
-class MemStoreRocksDb(config: Config) extends MemStore {
+class MemStoreRocksDb(config: Config) extends MemStoreSimpleMap {
 
   //TODO #13 MemStoreRocksDb implementation
-
-  private val internal = ???
-
-  override def apply(key: MK): Option[MV] = ???
-
-  override def iterator = ???
-
-  override protected[storage] def update(key: MK, value: MV): Option[MV] = ???
-
-  override protected[storage] def remove(key: MK):Option[MV] = ???
+//
+//  private val internal = ???
+//
+//  override def apply(key: MK): Option[MV] = ???
+//
+//  override def iterator = ???
+//
+//  override protected[storage] def update(key: MK, value: MV): Option[MV] = ???
+//
+//  override protected[storage] def remove(key: MK):Option[MV] = ???
 }
