@@ -29,6 +29,7 @@ import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class MySimpleGateway extends Gateway {
 
