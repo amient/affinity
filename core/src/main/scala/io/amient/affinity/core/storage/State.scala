@@ -119,6 +119,12 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     case None => (Some(value), Some(value), None)
   }
 
+  /**
+    * TODO description for remove, especially explain command
+    * @param key
+    * @param command
+    * @return
+    */
   def remove(key: K, command: Any): Future[Option[V]] = update(key) {
     case None => (None, None, None)
     case Some(component) => (Some(command), None, Some(component))
