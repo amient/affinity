@@ -6,7 +6,6 @@ ext {
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
     akkaVersion = '2.4.10'
     zkClientVersion = '0.9'
-    rocksDbVersion = '4.9.0'
     avroVersion = '1.8.1'
     jacksonVersion = '2.7.5'
 }

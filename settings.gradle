@@ -1,4 +1,4 @@
-include ':core', ':testutil:system_core', ':ws-client',
+include ':core', ':testutil:system_core', ':ws-client', ':rocksdb',
         ':kafka_0.10', ':testutil:system_kafka_0.10',
         ':examples:distributed-graph',
         ':examples:minimal-setup'

@@ -28,7 +28,7 @@ build.dependsOn singlejar
 
 dependencies {
     compile project(':core')
-    testCompile project(':ws-client')
+    compile project(':rocksdb')
 }
 
 

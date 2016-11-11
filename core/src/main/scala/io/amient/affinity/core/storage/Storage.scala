@@ -28,6 +28,7 @@ import scala.concurrent.Future
 abstract class Storage(val config: Config) {
 
   val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
+  //TODO #13 if no-arg constructor then newInstance() otherwse constructorMirror(config)
   val memstore = memstoreClass.newInstance()
 
 

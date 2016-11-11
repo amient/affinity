@@ -23,10 +23,15 @@ import java.nio.ByteBuffer
 
 import scala.concurrent.Future
 
+/**
+  * The implementing class must provide either no-arg constructor or a constructor that takes one argument of type Config
+  */
 trait MemStore {
 
   type MK = ByteBuffer
   type MV = ByteBuffer
+
+  def iterator: Iterator[(MK,MV)]
 
   /**
     * @param key ByteBuffer r
@@ -34,8 +39,6 @@ trait MemStore {
     *         None if the key doesn't exist
     */
   def apply(key: MK): Option[MV]
-
-  def iterator: Iterator[(MK,MV)]
 
   /**
     *
