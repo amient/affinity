@@ -19,13 +19,14 @@
 
 package io.amient.affinity.core.http
 
-import java.io.{OutputStream, OutputStreamWriter, Writer}
+import java.io.{ByteArrayOutputStream, OutputStream, OutputStreamWriter, Writer}
 import java.util.zip.GZIPOutputStream
 
 import akka.http.scaladsl.model.headers.HttpEncodings
 import akka.http.scaladsl.model.{HttpEntity, _}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.avro.generic.{GenericDatumWriter, IndexedRecord}
@@ -38,9 +39,17 @@ import scala.collection.mutable
 object Encoder {
 
   val mapper = new ObjectMapper()
+  mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
   mapper.registerModule(DefaultScalaModule)
 
-  def json(value: Any): String = mapper.writeValueAsString(value)
+  def json(value: Any): String = {
+    val out = new ByteArrayOutputStream()
+    val writer = new OutputStreamWriter(out)
+    jsonWrite(value, out, writer)
+    val result = out.toString("UTF-8")
+    writer.close()
+    result
+  }
 
   def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
@@ -51,16 +60,49 @@ object Encoder {
 
   def json(value: Any, gzip: Boolean): MessageEntity = {
     encode(ContentTypes.`application/json`, gzip) { (out, writer) =>
-      value match {
-        case record: IndexedRecord =>
-          val schema = record.getSchema
-          val avroEncoder = EncoderFactory.get().jsonEncoder(schema, out)
-          val datumWriter = new GenericDatumWriter[Any](schema)
-          datumWriter.write(record, avroEncoder)
-          avroEncoder.flush()
-          writer.close()
-        case other => mapper.writeValue(writer, other)
-      }
+      jsonWrite(value, out, writer)
+      writer.close()
+    }
+  }
+
+  private def jsonWrite(value: Any, out: OutputStream, writer: Writer): Unit = {
+    value match {
+      case record: IndexedRecord =>
+        val schema = record.getSchema
+        val avroEncoder = EncoderFactory.get().jsonEncoder(schema, out)
+        val datumWriter = new GenericDatumWriter[Any](schema)
+        datumWriter.write(record, avroEncoder)
+        avroEncoder.flush()
+      case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_,_)]) =>
+        writer.append("{")
+        writer.flush()
+        var first = true
+        i.foreach { case (k,v) =>
+          if (first) first = false else {
+            writer.append(",")
+            writer.flush()
+          }
+          jsonWrite(k, out, writer)
+          writer.append(":")
+          writer.flush()
+          jsonWrite(v, out, writer)
+        }
+        writer.append("}")
+        writer.flush()
+      case i: Iterable[_] =>
+        writer.append("[")
+        writer.flush()
+        var first = true
+        i.foreach { el =>
+          if (first) first = false else {
+            writer.append(",")
+            writer.flush()
+          }
+          jsonWrite(el, out, writer)
+        }
+        writer.append("]")
+        writer.flush()
+      case other => mapper.writeValue(out, other)
     }
   }
 
