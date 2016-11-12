@@ -91,7 +91,7 @@ object Encoder {
         }
         writer.append("}")
         writer.flush()
-      case i: Iterable[_] =>
+      case i: TraversableOnce[_] =>
         writer.append("[")
         writer.flush()
         var first = true
@@ -104,20 +104,27 @@ object Encoder {
         }
         writer.append("]")
         writer.flush()
-      case s: Product with Serializable => mapper.writeValue(out, s)
-      case p: Product =>
-        writer.append("[")
-        writer.flush()
-        var first = true
-        p.productIterator.foreach { el =>
-          if (first) first = false else {
-            writer.append(",")
-            writer.flush()
-          }
-          jsonWrite(el, out, writer)
-        }
-        writer.append("]")
-        writer.flush()
+      case s: (_, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
+      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
       case other => mapper.writeValue(out, other)
     }
   }
