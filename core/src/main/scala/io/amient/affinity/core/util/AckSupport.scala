@@ -100,10 +100,14 @@ final class AckableActorRef(val target: ActorRef) extends AnyVal {
     */
 
   def replyWith[T](request: Reply[T])(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
-    val f: Future[T] = closure
-    f onComplete {
-      case Success(result) => target ! result
-      case Failure(e) => target ! Status.Failure(e)
+    try {
+      val f: Future[T] = closure
+      f onComplete {
+        case Success(result) => target ! result
+        case Failure(e) => target ! Status.Failure(e)
+      }
+    } catch {
+      case NonFatal(e) => target ! Status.Failure(e)
     }
   }
 

@@ -56,6 +56,16 @@ object RequestMatchers {
     }
   }
 
+  object LONG {
+    def unapply(any: Any): Option[Long] = {
+      try {
+        Some(java.lang.Long.parseLong(any.toString))
+      } catch {
+        case e: NumberFormatException => None
+      }
+    }
+  }
+
   object QUERY {
     def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
   }
