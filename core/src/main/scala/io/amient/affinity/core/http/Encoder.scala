@@ -73,7 +73,9 @@ object Encoder {
         val datumWriter = new GenericDatumWriter[Any](schema)
         datumWriter.write(record, avroEncoder)
         avroEncoder.flush()
-      case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_,_)]) =>
+      case None =>  jsonWrite(null, out, writer)
+      case Some(optional) => jsonWrite(optional, out, writer)
+      case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_,_)] && i.head.asInstanceOf[(_,_)]._1.isInstanceOf[String]) =>
         writer.append("{")
         writer.flush()
         var first = true
@@ -94,6 +96,20 @@ object Encoder {
         writer.flush()
         var first = true
         i.foreach { el =>
+          if (first) first = false else {
+            writer.append(",")
+            writer.flush()
+          }
+          jsonWrite(el, out, writer)
+        }
+        writer.append("]")
+        writer.flush()
+      case s: Product with Serializable => mapper.writeValue(out, s)
+      case p: Product =>
+        writer.append("[")
+        writer.flush()
+        var first = true
+        p.productIterator.foreach { el =>
           if (first) first = false else {
             writer.append(",")
             writer.flush()

@@ -27,4 +27,8 @@ class EncoderSpec extends FlatSpec with Matchers {
   "Json Encoder" should "automatically format case classes" in {
     Encoder.json(Test("hello", 123)) should be ("{\"a\":\"hello\",\"b\":123}")
   }
+
+  "Json Encoder" should "automatically format Products" in {
+    Encoder.json(("hello", 123)) should be ("[\"hello\",123]")
+  }
 }
