@@ -50,7 +50,7 @@ object Transaction {
 
 class Transaction(cluster: ActorRef) {
 
-  case class CompletedInstruction[T](instr: Instruction[T], result: T) {
+  case class CompletedInstruction[T](actor: ActorRef, instr: Instruction[T], result: T) {
     def reverse = instr.reverse(result)
   }
 
@@ -61,7 +61,7 @@ class Transaction(cluster: ActorRef) {
       completed.reverse.foreach {
         case reversal =>
           //System.err.println("REVERTING " + completed.instr + " WITH " + reversal)
-          cluster ! reversal
+          completed.actor ! reversal
       }
     }
   }
@@ -81,12 +81,16 @@ class Transaction(cluster: ActorRef) {
   }
 
   def execute[T: ClassTag](instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+    execute(cluster, instr)
+  }
+
+  def execute[T: ClassTag](actor: ActorRef, instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
     implicit val timeout = Timeout(1 seconds)
-    cluster ack[T](instr) onComplete {
+    actor ack[T](instr) onComplete {
       case Success(result: T) =>
         //System.err.println(s"SUCCESS $instr")
-        stack = stack :+ CompletedInstruction(instr, result)
+        stack = stack :+ CompletedInstruction(actor, instr, result)
         promise.success(result)
       case Failure(e) =>
         //System.err.println(s"FAILURE $instr: $e")

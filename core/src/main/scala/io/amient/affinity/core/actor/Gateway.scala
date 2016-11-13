@@ -47,7 +47,7 @@ import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.core.util.{ByteUtils, Reply}
 import org.apache.avro.util.ByteBufferInputStream
 
 import scala.collection.JavaConverters._
@@ -55,6 +55,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.language.postfixOps
+import scala.reflect.ClassTag
 
 object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
@@ -79,6 +80,8 @@ abstract class Gateway extends Actor {
   val cluster = context.actorOf(Props(new Cluster()), name = "cluster")
 
   import context.system
+  import context.dispatcher
+  private implicit val scheduler = context.system.scheduler
 
   val sslContext = if (!config.hasPath(CONFIG_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
@@ -119,12 +122,13 @@ abstract class Gateway extends Actor {
     httpInterface.close()
   }
 
-  def service(actorClass: Class[_ <: Actor]): ActorRef = {
-    services.get(actorClass) match {
-      case null => throw new IllegalStateException(s"Service not available for $actorClass")
+  def service[X <: Actor](implicit tag: ClassTag[X]): ActorRef = {
+    services.get(tag.runtimeClass) match {
+      case null => throw new IllegalStateException(s"Service not available for ${tag.runtimeClass}")
       case instance => instance
     }
   }
+
 
   def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: NoSuchElementException => HttpResponse(NotFound)
@@ -142,6 +146,17 @@ abstract class Gateway extends Actor {
   def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
                              (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
     promise.completeWith(delegate map f recover handleException)
+  }
+
+  def delegateAsJson(response: Promise[HttpResponse], delegate: Reply[_])(implicit timeout: Timeout): Unit = {
+    delegateAsJson(response, cluster, delegate)
+  }
+
+  def delegateAsJson(response: Promise[HttpResponse], target: ActorRef, delegate: Reply[_])
+                    (implicit timeout: Timeout): Unit = {
+    delegateAndHandleErrors(response, target ack delegate) {
+      case any => Encoder.json(OK, any)
+    }
   }
 
   private var handlingSuspended = true
