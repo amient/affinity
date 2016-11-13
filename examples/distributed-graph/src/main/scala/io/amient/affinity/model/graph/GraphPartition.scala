@@ -35,7 +35,7 @@ trait GraphPartition extends Partition {
   import context.dispatcher
 
   abstract override def handle: Receive = super.handle orElse {
-    
+
     /**
       * getting Component object by the Component ID
       */
