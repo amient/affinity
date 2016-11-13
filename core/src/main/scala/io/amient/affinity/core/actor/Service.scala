@@ -66,7 +66,9 @@ trait Service extends Actor {
     }
   }
 
-  def handle: Receive
+  def handle: Receive = {
+    case null =>
+  }
 
 }
 
