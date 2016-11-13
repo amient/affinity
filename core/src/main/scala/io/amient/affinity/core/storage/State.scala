@@ -46,6 +46,7 @@ object State {
 class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, stateConfig: Config)
                                      (implicit val partition: Int) {
 
+
   private val serialization = SerializationExtension(system)
 
   def serde[S: ClassTag]: Serializer = {
@@ -107,7 +108,20 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def size: Long = storage.memstore.iterator.size
 
   /**
-    * set is a syntactic sugar for update where the value is always overriden
+    * insert is a syntactic sugar for update where the value is overriden if it doesn't exist
+    * and the command is the value itself
+    *
+    * @param key
+    * @param value new value to be associated with the key
+    * @return Future Optional of the value previously held at the key position
+    */
+  def insert(key: K, value: V) = update(key) {
+    case Some(existing) => throw new IllegalArgumentException(s"$key already exists in $name")
+    case None => (Some(value), Some(value), value)
+  }
+
+  /**
+    * update is a syntactic sugar for update where the value is always overriden
     *
     * @param key
     * @param value new value to be associated with the key
@@ -120,12 +134,12 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /**
-    * TODO description for remove, especially explain command
+    * remove is a is a syntactic sugar for update where None is used as Value
     * @param key
-    * @param command
+    * @param command is an optional command that can be pushed to key-value observers
     * @return
     */
-  def remove(key: K, command: Any): Future[Option[V]] = update(key) {
+  def remove(key: K, command: Any = null): Future[Option[V]] = update(key) {
     case None => (None, None, None)
     case Some(component) => (Some(command), None, Some(component))
   }

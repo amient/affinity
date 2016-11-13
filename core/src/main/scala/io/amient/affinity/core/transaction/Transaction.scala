@@ -68,7 +68,7 @@ class Transaction(cluster: ActorRef) {
 
   def execute[T: ClassTag](read: Future[T])(implicit context: ExecutionContext): Future[T] = {
     val promise = Promise[T]()
-    implicit val timeout = Timeout(1 seconds)
+    implicit val timeout = Timeout(6 seconds) // FIXME this timeout has to be passed via arg or implicit
     read onComplete {
       case Success(result) =>
         //System.err.println(s"SUCCESS $result")
@@ -86,7 +86,7 @@ class Transaction(cluster: ActorRef) {
 
   def execute[T: ClassTag](actor: ActorRef, instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
-    implicit val timeout = Timeout(1 seconds)
+    implicit val timeout = Timeout(6 seconds) // FIXME this timeout has to be passed via arg or implicit
     actor ack[T](instr) onComplete {
       case Success(result: T) =>
         //System.err.println(s"SUCCESS $instr")
