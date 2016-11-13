@@ -20,7 +20,9 @@
 package io.amient.affinity.example.data
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.model.graph.GraphPartition
 
 import scala.collection.JavaConverters._
 
@@ -38,7 +40,10 @@ object DataNode {
       .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
     new Node(config) {
-      startRegion(new GraphPartition)
+      startRegion(new Partition
+        with GraphPartition
+        with TestPartition
+      )
     }
   }
 }

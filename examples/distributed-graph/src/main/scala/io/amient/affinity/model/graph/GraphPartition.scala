@@ -17,8 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
-
+package io.amient.affinity.model.graph
 
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition
@@ -27,7 +26,7 @@ import io.amient.affinity.model.graph.message._
 
 import scala.collection.immutable.Set
 
-class GraphPartition extends Partition {
+trait GraphPartition extends Partition {
 
   val graph: State[Int, VertexProps] = state("graph")
 
@@ -35,7 +34,7 @@ class GraphPartition extends Partition {
 
   import context.dispatcher
 
-  override def handle: Receive = {
+  abstract override def handle: Receive = super.handle orElse {
 
     /**
       * Simulating Partition Failure - the default supervision should restart this actor

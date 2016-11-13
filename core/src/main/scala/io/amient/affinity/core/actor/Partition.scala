@@ -35,7 +35,7 @@ object Partition {
   final val INTERNAL_CREATE_KEY_VALUE_MEDIATOR = "INTERNAL_CREATE_KEY_VALUE_MEDIATOR"
 }
 
-trait Partition extends Service with ActorState {
+class Partition extends Service with ActorState {
 
   import Partition._
 

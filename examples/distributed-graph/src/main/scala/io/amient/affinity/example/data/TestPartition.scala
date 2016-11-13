@@ -19,12 +19,24 @@
 
 package io.amient.affinity.example.data
 
-import akka.actor.ExtendedActorSystem
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
-import io.amient.affinity.model.graph.GraphData
+import io.amient.affinity.core.actor.Partition
 
-class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) {
-  register(classOf[ConfigEntry])
-  GraphData.registerMessages(this)
+trait TestPartition extends Partition {
 
+  abstract override def handle: Receive = super.handle orElse {
+
+    /**
+      * Simulating Partition Failure - the default supervision should restart this actor
+      * after exeception is thrown
+      */
+    case (p: Int, stateError: IllegalStateException) =>
+      require(p == partition)
+      throw stateError
+
+    /**
+      * Describe partition and its stats
+      */
+    case (p: Int, "down") => context.system.terminate()
+
+  }
 }
