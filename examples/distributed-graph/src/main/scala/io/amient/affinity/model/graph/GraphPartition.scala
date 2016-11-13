@@ -35,31 +35,7 @@ trait GraphPartition extends Partition {
   import context.dispatcher
 
   abstract override def handle: Receive = super.handle orElse {
-
-    /**
-      * Simulating Partition Failure - the default supervision should restart this actor
-      * after exeception is thrown
-      */
-    case (p: Int, stateError: IllegalStateException) =>
-      require(p == partition)
-      throw stateError
-
-    /**
-      * Describe partition and its stats
-      */
-    case (p: Int, "down") => context.system.terminate()
-
-    /**
-      * Describe partition and its stats
-      */
-    case (p: Int, "status") =>
-      require(p == partition)
-      sender ! Map(
-        "partition" -> partition,
-        "graph" -> Map(
-          "size" -> graph.size
-        ))
-
+    
     /**
       * getting Component object by the Component ID
       */

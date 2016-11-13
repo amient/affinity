@@ -29,12 +29,14 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.ConfigValueFactory
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.data.TestPartition
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
+import io.amient.affinity.model.graph.GraphPartition
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.affinity.ws.AvroWebSocketClient
 import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
@@ -57,7 +59,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     with Graph)
 
   val region = new Node(config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1).asJava))) {
-    startRegion(new TestPartition)
+    startRegion(new Partition with GraphPartition)
   }
 
   gateway.awaitClusterReady()

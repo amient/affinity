@@ -42,7 +42,7 @@ object DataNode {
     new Node(config) {
       startRegion(new Partition
         with GraphPartition
-        with TestPartition
+        with DebugPartition
       )
     }
   }

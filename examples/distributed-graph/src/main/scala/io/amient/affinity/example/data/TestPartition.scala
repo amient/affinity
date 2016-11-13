@@ -21,7 +21,7 @@ package io.amient.affinity.example.data
 
 import io.amient.affinity.core.actor.Partition
 
-trait TestPartition extends Partition {
+trait DebugPartition extends Partition {
 
   abstract override def handle: Receive = super.handle orElse {
 
