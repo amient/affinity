@@ -1,4 +1,5 @@
-version = '0.1.0-SNAPSHOT'
+group = 'io.amient.affinity'
+version = '0.2.0-SNAPSHOT'
 
 ext {
     javaVersion = '1.8'
@@ -11,12 +12,15 @@ ext {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.7'
+    gradleVersion = '3.1'
 }
+
+
 
 allprojects {
 
     apply plugin: 'idea'
+    apply plugin: 'maven'
 
     version = rootProject.version
 
@@ -39,7 +43,7 @@ allprojects {
 
         sourceSets {
             main {
-                compileClasspath += [configurations.provided]
+                compileClasspath += configurations.provided
             }
         }
 
