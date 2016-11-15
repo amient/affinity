@@ -20,33 +20,10 @@ task wrapper(type: Wrapper) {
 allprojects {
 
     apply plugin: 'idea'
-    apply plugin: 'maven'
-    apply plugin: 'signing'
 
     version = rootProject.version
 
-    plugins.withType(JavaPlugin).whenPluginAdded {
-
-        sourceCompatibility = rootProject.ext.javaVersion
-
-        repositories {
-            mavenLocal()
-            mavenCentral()
-            maven {
-                url "http://packages.confluent.io/maven/"
-            }
-        }
-
-        configurations {
-            provided
-            testCompile.extendsFrom provided
-        }
-
-        sourceSets {
-            main {
-                compileClasspath += configurations.provided
-            }
-        }
+    plugins.withType(MavenPlugin).whenPluginAdded {
 
         task sourcesJar(type: Jar) {
             classifier = 'sources'
@@ -54,8 +31,8 @@ allprojects {
         }
 
         task javadocJar(type: Jar) {
-           classifier = 'javadoc'
-           from javadoc
+            classifier = 'javadoc'
+            from javadoc
         }
 
         artifacts {
@@ -116,6 +93,30 @@ allprojects {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    plugins.withType(JavaPlugin).whenPluginAdded {
+
+        sourceCompatibility = rootProject.ext.javaVersion
+
+        repositories {
+            mavenLocal()
+            mavenCentral()
+            maven {
+                url "http://packages.confluent.io/maven/"
+            }
+        }
+
+        configurations {
+            provided
+            testCompile.extendsFrom provided
+        }
+
+        sourceSets {
+            main {
+                compileClasspath += configurations.provided
             }
         }
     }

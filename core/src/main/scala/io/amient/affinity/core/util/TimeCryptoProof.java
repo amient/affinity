@@ -31,14 +31,28 @@ public abstract class TimeCryptoProof {
     static private java.util.Random random = new SecureRandom();
     private final byte[] salt;
 
+    /**
+     * convert bytes to hexadecimal representation
+     * @param bytes input bytes
+     * @return result hexadecimal number
+     */
     static public String toHex(byte[] bytes) {
         return DatatypeConverter.printHexBinary(bytes);
     }
 
+    /**
+     * convert hexadecimal representation to bytes
+     * @param hex input
+     * @return byte array
+     */
     static public byte[] fromHex(String hex) {
         return DatatypeConverter.parseHexBinary(hex);
     }
 
+    /**
+     * generate a random secure salt
+     * @return byte array salt
+     */
     static public byte[] generateSalt() {
         byte[] bytes = new byte[16];
         Arrays.fill(bytes, (byte) 0);
@@ -46,22 +60,42 @@ public abstract class TimeCryptoProof {
         return bytes;
     }
 
-    static public long utcInWholeMinutes(int offset) {
+    static private long utcInWholeMinutes(int offset) {
         return ZonedDateTime.now(ZoneOffset.UTC).withNano(0).withSecond(0).toEpochSecond() + offset * 60;
     }
 
+    /**
+     * Construct a Thread-Safe instance of Crypto with a given salt
+     * @param salt byte array salt
+     */
     public TimeCryptoProof(byte[] salt) {
         this.salt = salt;
     }
 
+    /**
+     * Construct a Thread-Safe instance of Crypto with a given salt
+     * @param hexSalt hexadecimal salt
+     */
     public TimeCryptoProof(String hexSalt) {
         this.salt = fromHex(hexSalt);
     }
 
+    /**
+     * Sign a given input argument
+     * @param arg input string to sign
+     * @return signature string
+     * @throws Exception if anything goes wrong
+     */
     final public String sign(String arg) throws Exception {
         return toHex(sign(arg.getBytes("UTF-8")));
     }
 
+    /**
+     * Sign a given input argument
+     * @param arg byte array input
+     * @return byte array signature
+     * @throws Exception if anything goes wrong
+     */
     final public byte[] sign(byte[] arg) throws Exception {
         return sign(arg, utcInWholeMinutes(0));
     }

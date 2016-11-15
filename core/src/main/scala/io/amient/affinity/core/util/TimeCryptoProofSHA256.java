@@ -27,10 +27,18 @@ import java.time.ZonedDateTime;
 
 public class TimeCryptoProofSHA256 extends TimeCryptoProof {
 
+    /**
+     * Construct a Thread-Safe instance of Crypto with a given salt
+     * @param salt byte array to be used as salt for encoding and decoding all inputs
+     */
     public TimeCryptoProofSHA256(byte[] salt) {
         super(salt);
     }
 
+    /**
+     * Construct a Thread-Safe instance of Crypto with a given salt
+     * @param hexSalt hexadecimal representation of the salt to be used for encoding and decoding all inputs
+     */
     public TimeCryptoProofSHA256(String hexSalt) {
         super(hexSalt);
     }
@@ -42,7 +50,12 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
     }
 
     /**
-     * Example standalone hash function
+     * Example standalone hash function for AES-256 salted crypto function
+     * @param arg input string to hash
+     * @param hexSalt hexadecimal representation of the salt
+     * @param shift timeshift in minutes with respect to current UTC time
+     * @return result time-based hash
+     * @throws Exception if anything goes wrong
      */
     public String timeBasedHash(String arg, String hexSalt, int shift) throws Exception {
         byte[] salt = DatatypeConverter.parseHexBinary(hexSalt);

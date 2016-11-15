@@ -3,6 +3,9 @@ version = parent.version
 
 apply plugin: 'scala'
 apply plugin: 'java'
+apply plugin: 'signing'
+apply plugin: 'maven'
+
 
 ext {
     kafkaVersion = '0.10.0.1'
