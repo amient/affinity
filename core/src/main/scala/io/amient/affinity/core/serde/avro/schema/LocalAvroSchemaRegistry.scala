@@ -45,9 +45,6 @@ class LocalAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde wit
         val schema = new Schema.Parser().parse(file.toFile)
         val cls = Class.forName(schema.getFullName)
         internal.put(id, (cls, schema))
-        System.err.println(id)
-        System.err.println(cls)
-        System.err.println(schema)
         super.visitFile(file, attrs)
       }
     })
