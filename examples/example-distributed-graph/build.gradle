@@ -31,7 +31,7 @@ dependencies {
     compile project(':core')
     compile project(':kafka_' + kafkaMinorVersion)
     testCompile project(':ws-client')
-    testCompile project(':testutil:system_kafka_' + kafkaMinorVersion)
+    testCompile project(':testutil:testing_kafka_' + kafkaMinorVersion)
 }
 
 

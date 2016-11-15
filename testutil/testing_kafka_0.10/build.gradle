@@ -12,7 +12,7 @@ ext {
 
 dependencies {
     compile project(':core')
-    compile project(':testutil:system_core')
+    compile project(':testutil:testing_core')
     compile project(':kafka_' + kafkaMinorVersion)
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
