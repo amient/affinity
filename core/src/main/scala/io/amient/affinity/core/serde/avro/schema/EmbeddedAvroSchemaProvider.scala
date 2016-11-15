@@ -27,7 +27,7 @@ import scala.collection.JavaConverters._
 
 trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
 
-  private val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
+  protected val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
 
   override def getSchema(id: Int): Option[Schema] = {
     internal.getOrDefault(id,null) match {
