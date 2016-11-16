@@ -248,7 +248,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   private var observables = Map[K, ObservableState]()
 
-  private def push(key: K, event: Any): Unit = {
+  def push(key: K, event: Any): Unit = {
     observables.get(key).foreach(_.notifyObservers(event))
   }
 

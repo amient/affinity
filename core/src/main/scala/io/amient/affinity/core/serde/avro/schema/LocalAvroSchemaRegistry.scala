@@ -43,8 +43,14 @@ class LocalAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde wit
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         val id = file.getFileName.toString.split("\\.")(0).toInt
         val schema = new Schema.Parser().parse(file.toFile)
-        val cls = Class.forName(schema.getFullName)
-        internal.put(id, (cls, schema))
+        try {
+          val cls = Class.forName(schema.getFullName)
+          internal.put(id, (cls, schema))
+        } catch {
+          case removed: ClassNotFoundException =>
+            internal.put(id, (null, schema))
+            system.log.warning(s"schema $id for ${schema.getFullName} no longer has a compile time class associated")
+        }
         super.visitFile(file, attrs)
       }
     })
@@ -57,7 +63,6 @@ class LocalAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde wit
       val schemaPath = dataPath.resolve(s"$id.avsc")
       Files.createFile(schemaPath)
       Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
-      System.err.println("NEW " + schemaPath)
     }
     id
   }
