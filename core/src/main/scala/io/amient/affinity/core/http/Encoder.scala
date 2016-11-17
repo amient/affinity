@@ -66,67 +66,79 @@ object Encoder {
   }
 
   private def jsonWrite(value: Any, out: OutputStream, writer: Writer): Unit = {
-    value match {
-      case record: IndexedRecord =>
-        val schema = record.getSchema
-        val avroEncoder = EncoderFactory.get().jsonEncoder(schema, out)
-        val datumWriter = new GenericDatumWriter[Any](schema)
-        datumWriter.write(record, avroEncoder)
-        avroEncoder.flush()
-      case None =>  jsonWrite(null, out, writer)
-      case Some(optional) => jsonWrite(optional, out, writer)
-      case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_,_)] && i.head.asInstanceOf[(_,_)]._1.isInstanceOf[String]) =>
-        writer.append("{")
-        writer.flush()
-        var first = true
-        i.foreach { case (k,v) =>
-          if (first) first = false else {
-            writer.append(",")
-            writer.flush()
-          }
-          jsonWrite(k, out, writer)
-          writer.append(":")
+
+    def jsonWriteRecursive(value: Any, out: OutputStream, writer: Writer): Unit = {
+      value match {
+        case record: IndexedRecord =>
+          val schema = record.getSchema
+          val avroEncoder = EncoderFactory.get().jsonEncoder(schema, out, false)
+          val datumWriter = new GenericDatumWriter[Any](schema)
+          writer.append("{\"type\":\"" + schema.getFullName+ "\",\"data\":")
+          writer.flush
+          datumWriter.write(record, avroEncoder)
+          avroEncoder.flush()
+          writer.append("}")
+          writer.flush
+
+        case None => jsonWriteRecursive(null, out, writer)
+        case Some(optional) => jsonWriteRecursive(optional, out, writer)
+        case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_, _)] && i.head.asInstanceOf[(_, _)]._1.isInstanceOf[String]) =>
+          writer.append("{")
           writer.flush()
-          jsonWrite(v, out, writer)
-        }
-        writer.append("}")
-        writer.flush()
-      case i: TraversableOnce[_] =>
-        writer.append("[")
-        writer.flush()
-        var first = true
-        i.foreach { el =>
-          if (first) first = false else {
-            writer.append(",")
+          var first = true
+          i.foreach { case (k, v) =>
+            if (first) first = false
+            else {
+              writer.append(",")
+              writer.flush()
+            }
+            jsonWriteRecursive(k, out, writer)
+            writer.append(":")
             writer.flush()
+            jsonWriteRecursive(v, out, writer)
           }
-          jsonWrite(el, out, writer)
-        }
-        writer.append("]")
-        writer.flush()
-      case s: (_, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWrite(s.productIterator, out, writer)
-      case other => mapper.writeValue(out, other)
+          writer.append("}")
+          writer.flush()
+        case i: TraversableOnce[_] =>
+          writer.append("[")
+          writer.flush()
+          var first = true
+          i.foreach { el =>
+            if (first) first = false
+            else {
+              writer.append(",")
+              writer.flush()
+            }
+            jsonWriteRecursive(el, out, writer)
+          }
+          writer.append("]")
+          writer.flush()
+        case s: (_, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
+        case other => mapper.writeValue(out, other)
+      }
     }
+
+    jsonWriteRecursive(value, out, writer)
   }
 
   def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {

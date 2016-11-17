@@ -247,6 +247,7 @@ trait WebSocketSupport extends Gateway {
       case None => TextMessage.Strict("null")
       case Some(value) => TextMessage.Strict(Encoder.json(value))
       case direct: ByteString => BinaryMessage.Strict(direct)
+      case other => TextMessage.Strict(Encoder.json(other))
     }
   }
 
