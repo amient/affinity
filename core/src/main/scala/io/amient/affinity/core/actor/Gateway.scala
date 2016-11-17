@@ -148,14 +148,27 @@ abstract class Gateway extends Actor {
     promise.completeWith(delegate map f recover handleException)
   }
 
-  def delegateAsJson(response: Promise[HttpResponse], delegate: Reply[_])(implicit timeout: Timeout): Unit = {
-    delegateAsJson(response, cluster, delegate)
+  def delegateAsJson(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
+    delegateAndHandleErrors(response, delegate) {
+      case any => Encoder.json(OK, any)
+    }
   }
 
-  def delegateAsJson(response: Promise[HttpResponse], target: ActorRef, delegate: Reply[_])
-                    (implicit timeout: Timeout): Unit = {
-    delegateAndHandleErrors(response, target ack delegate) {
-      case any => Encoder.json(OK, any)
+  def delegateAsJson(response: Promise[HttpResponse], data: Any): Unit = {
+    response.success(try {
+      data match {
+        case None => HttpResponse(NotFound)
+        case Some(value) => Encoder.json(OK, value)
+        case other => Encoder.json(OK, other)
+      }
+    } catch {
+      case NonFatal(e) => handleException(e)
+    })
+  }
+
+  def delegateAsAccepted(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
+    delegateAndHandleErrors(response, delegate) {
+      case _ => HttpResponse(Accepted)
     }
   }
 
