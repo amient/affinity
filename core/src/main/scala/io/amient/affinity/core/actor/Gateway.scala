@@ -131,9 +131,9 @@ abstract class Gateway extends Actor {
 
 
   def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: NoSuchElementException => HttpResponse(NotFound)
-    case e: IllegalArgumentException => HttpResponse(BadRequest)
-    case e: UnsupportedOperationException => HttpResponse(NotImplemented)
+    case e: NoSuchElementException => HttpResponse(NotFound, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: IllegalArgumentException => HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: UnsupportedOperationException => HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: IllegalStateException => HttpResponse(ServiceUnavailable)
     case NonFatal(e) => e.printStackTrace(); HttpResponse(InternalServerError)
   }
