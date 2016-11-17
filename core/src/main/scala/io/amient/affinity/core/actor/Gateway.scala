@@ -148,13 +148,15 @@ abstract class Gateway extends Actor {
     promise.completeWith(delegate map f recover handleException)
   }
 
-  def delegateAsJson(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
+  def handleAsJsonWith(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
     delegateAndHandleErrors(response, delegate) {
+      case None => HttpResponse(NotFound)
+      case Some(value) => Encoder.json(OK, value)
       case any => Encoder.json(OK, any)
     }
   }
 
-  def delegateAsJson(response: Promise[HttpResponse], data: Any): Unit = {
+  def handleAsJson(response: Promise[HttpResponse], data: Any): Unit = {
     response.success(try {
       data match {
         case None => HttpResponse(NotFound)
@@ -166,8 +168,9 @@ abstract class Gateway extends Actor {
     })
   }
 
-  def delegateAsAccepted(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
+  def acceptWith(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
     delegateAndHandleErrors(response, delegate) {
+      case None => HttpResponse(NotFound)
       case _ => HttpResponse(Accepted)
     }
   }
