@@ -68,8 +68,6 @@ class Partition extends Service with ActorState {
 
   override def postStop(): Unit = {
     super.postStop()
-    log.info(s"Closing all state in partition $partition")
-    closeState()
   }
 
   override protected def manage: Receive = super.manage orElse {

@@ -38,6 +38,11 @@ trait ActorState extends Actor {
 
   import State._
 
+  abstract override def postStop(): Unit = {
+    super.postStop()
+    closeState()
+  }
+
   def state[K: ClassTag, V: ClassTag](name: String, partition: Int): State[K, V] = {
     implicit val p = partition
     state(name)
@@ -64,6 +69,12 @@ trait ActorState extends Actor {
 
   def tailState(): Unit = storageRegistry.asScala.foreach(_.storage.tail())
 
-  def closeState(): Unit = storageRegistry.asScala.foreach(_.storage.close())
+  def closeState(): Unit = {
+    storageRegistry.asScala.foreach { store =>
+      log.info(s"Closing state store " + store.name + "/" + store.partition)
+      store.storage.close()
+    }
+    storageRegistry.clear()
+  }
 
 }

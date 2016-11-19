@@ -111,7 +111,6 @@ public class MemStoreMapDb implements JavaMemStore {
 
     @Override
     public void close() {
-        //FIXME - this is very fregile: Header checksum broken. Store was not closed correctly and might be corrupted.
         releaseDbInstance(pathToData);
     }
 }
