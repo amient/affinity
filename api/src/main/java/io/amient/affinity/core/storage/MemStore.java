@@ -34,21 +34,21 @@ public interface MemStore {
     Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
     /**
-     * @param key ByteBuffer r
+     * @param key ByteBuffer representation of the key
      * @return Some(MV) if key exists
      * None if the key doesn't exist
      */
     Optional<ByteBuffer> apply(ByteBuffer key);
 
     /**
-     * @param key
-     * @param value
+     * @param key ByteBuffer representation
+     * @param value ByteBuffer which will be associated with the given key
      * @return optional value held at the key position before the update
      */
     Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value);
 
     /**
-     * @param key
+     * @param key ByteBuffer representation whose value will be removed
      * @return optional value held at the key position before the update, None if the key doesn't exist
      */
     Optional<ByteBuffer> remove(ByteBuffer key);
