@@ -6,6 +6,8 @@ apply plugin: 'java'
 apply plugin: 'signing'
 apply plugin: 'maven'
 
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'kafka_0.10-scala_' + baseScalaVersion
+install.repositories.mavenInstaller.pom.artifactId = 'kafka_0.10-scala_' + baseScalaVersion
 
 ext {
     kafkaVersion = '0.10.0.1'
