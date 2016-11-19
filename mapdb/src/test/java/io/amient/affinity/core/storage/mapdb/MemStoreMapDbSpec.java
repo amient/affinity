@@ -35,7 +35,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class MemStoreMemDbSpec {
+public class MemStoreMapDbSpec {
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
@@ -44,10 +44,10 @@ public class MemStoreMemDbSpec {
     public void testMemStoreMapDb() throws IOException {
         String tmp = folder.newFolder().toString();
         Config config = ConfigFactory.empty()
-                .withValue(MemStoreMemDb.CONFIG_MAPDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp))
-                .withValue(MemStoreMemDb.CONFIG_MAPDB_MMAP_ENABLED, ConfigValueFactory.fromAnyRef(false));
+                .withValue(MemStoreMapDb.CONFIG_MAPDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp))
+                .withValue(MemStoreMapDb.CONFIG_MAPDB_MMAP_ENABLED, ConfigValueFactory.fromAnyRef(false));
 
-        JavaMemStore instance = new MemStoreMemDb(config, 0);
+        JavaMemStore instance = new MemStoreMapDb(config, 0);
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

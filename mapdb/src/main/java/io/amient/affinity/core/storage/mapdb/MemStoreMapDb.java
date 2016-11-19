@@ -34,7 +34,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 
-public class MemStoreMemDb implements JavaMemStore {
+public class MemStoreMapDb implements JavaMemStore {
 
     public static final String CONFIG_MAPDB_DATA_PATH = "memstore.mapdb.data.path";
     public static final String CONFIG_MAPDB_MMAP_ENABLED = "memstore.mapdb.mmap.enabled";
@@ -75,10 +75,10 @@ public class MemStoreMemDb implements JavaMemStore {
     private final Path containerPath;
     private final ConcurrentMap<byte[], byte[]> internal;
 
-    public MemStoreMemDb(Config config, int partition) throws IOException {
+    public MemStoreMapDb(Config config, int partition) throws IOException {
         pathToData = config.getString(CONFIG_MAPDB_DATA_PATH) + "/" + partition + "/";
         containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
-        Boolean mmapEnabled = config.getBoolean(CONFIG_MAPDB_MMAP_ENABLED);
+        Boolean mmapEnabled = config.hasPath(CONFIG_MAPDB_MMAP_ENABLED) && config.getBoolean(CONFIG_MAPDB_MMAP_ENABLED);
         Files.createDirectories(containerPath);
         this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled);
     }
@@ -111,6 +111,7 @@ public class MemStoreMemDb implements JavaMemStore {
 
     @Override
     public void close() {
+        //FIXME - this is very fregile: Header checksum broken. Store was not closed correctly and might be corrupted.
         releaseDbInstance(pathToData);
     }
 }
