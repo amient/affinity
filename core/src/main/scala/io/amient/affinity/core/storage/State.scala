@@ -20,7 +20,8 @@
 package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
-import java.util.{Observable, Observer}
+import java.util.Map.Entry
+import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
 import akka.serialization.{SerializationExtension, Serializer}
@@ -32,6 +33,7 @@ import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal
+import scala.collection.JavaConverters._
 
 object State {
   val CONFIG_STATE = "affinity.state"
@@ -83,6 +85,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   import system.dispatcher
 
+  def option[T](opt: Optional[T]) = if (opt.isPresent) Some(opt.get()) else None
+
   /**
     * Retrieve a value from the store asynchronously
     *
@@ -93,7 +97,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     */
   def apply(key: K): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    storage.memstore(k) map[V] {
+    option(storage.memstore(k)) map[V] {
       case d => valueSerde.fromBinary(d.array) match {
         case value: V => value
         case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
@@ -101,11 +105,22 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     }
   }
 
-  def iterator: Iterator[(K, V)] = storage.memstore.iterator.map { case (mk, mv) =>
-    (keySerde.fromBinary(mk.array()).asInstanceOf[K], valueSerde.fromBinary(mv.array).asInstanceOf[V])
+  def iterator: Iterator[(K, V)] = {
+    storage.memstore.iterator.asScala.map { case entry =>
+      (keySerde.fromBinary(entry.getKey.array()).asInstanceOf[K],
+        valueSerde.fromBinary(entry.getValue.array).asInstanceOf[V])
+    }
   }
 
-  def size: Long = storage.memstore.iterator.size
+  def size: Long = {
+    val it = storage.memstore.iterator
+    var count = 0
+    while(it.hasNext) {
+      count += 1
+      it.next()
+    }
+    count
+  }
 
   /**
     * insert is a syntactic sugar for update where the value is overriden if it doesn't exist
@@ -193,7 +208,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   private def put(key: K, value: V): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBinary(value.asInstanceOf[AnyRef]))
-    storage.memstore.update(k, write) match {
+    option(storage.memstore.update(k, write)) match {
       case Some(prev) if (prev == write) => Future.successful(Some(value))
       case differentOrNone =>
         writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))
@@ -213,7 +228,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     */
   private def delete(key: K): Future[Option[V]] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    storage.memstore.remove(k) match {
+    option(storage.memstore.remove(k)) match {
       case None => Future.successful(None)
       case some =>
         writeWithMemstoreRollback(k, some, storage.write(k, null))

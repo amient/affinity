@@ -27,17 +27,17 @@ import scala.concurrent.Future
 
 abstract class Storage(val config: Config, val partition: Int) {
 
-  private val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[MemStore])
+  private val memstoreClass = Class.forName(config.getString(State.CONFIG_MEMSTORE_CLASS)).asSubclass(classOf[JavaMemStore])
   private val memstoreClassSymbol = rootMirror.classSymbol(memstoreClass)
   private val memstoreClassMirror = rootMirror.reflectClass(memstoreClassSymbol)
   private val constructor = memstoreClassSymbol.asClass.primaryConstructor.asMethod
-  val memstore = if (constructor.paramLists.exists(_.size == 0)) {
+  val memstore: JavaMemStore = if (constructor.paramLists.exists(_.size == 0)) {
     //if no-arg constructor present then just do newInstance()
     memstoreClass.newInstance()
   } else {
     //otherwise assume there is two-arg constructor that takes Config and Int partition
     val constructorMirror = memstoreClassMirror.reflectConstructor(constructor)
-    constructorMirror(config, partition).asInstanceOf[MemStore]
+    constructorMirror(config, partition).asInstanceOf[JavaMemStore]
   }
 
   /**

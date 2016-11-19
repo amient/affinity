@@ -25,7 +25,7 @@ allprojects {
 
     version = rootProject.version
 
-    //TODO create scala cross-compiled artifacts with scala_x.xx classifier for core, kafka_0.10, rocksdb, testutil
+    //TODO create scala cross-compiled artifacts with scala_x.xx classifier for core, kafka_0.10, testutil
     //FIXME maven pluging is trying to authenticate with osshr during normal build which fails on standard dev machine
 //    plugins.withType(MavenPlugin).whenPluginAdded {
 //
@@ -122,6 +122,10 @@ allprojects {
             main {
                 compileClasspath += configurations.provided
             }
+        }
+
+        dependencies {
+            testCompile group: 'junit', name: 'junit', version: junitVersion
         }
     }
 

@@ -35,7 +35,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 
-public class MemStoreRocksDbNEW implements JavaMemStore {
+public class MemStoreRocksDb implements JavaMemStore {
 
 
     public static final String CONFIG_ROCKSDB_DATA_PATH = "memstore.rocksdb.data.path";
@@ -74,7 +74,7 @@ public class MemStoreRocksDbNEW implements JavaMemStore {
     private final Path containerPath;
     private final RocksDB internal;
 
-    public MemStoreRocksDbNEW(Config config, int partition) throws IOException {
+    public MemStoreRocksDb(Config config, int partition) throws IOException {
         pathToData = config.getString(CONFIG_ROCKSDB_DATA_PATH) + "/" + partition + "/";
         containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
         Files.createDirectories(containerPath);
@@ -86,21 +86,25 @@ public class MemStoreRocksDbNEW implements JavaMemStore {
     public Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
         return new java.util.Iterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
             private RocksIterator rocksIterator = null;
-
+            private boolean checked = false;
             @Override
             public boolean hasNext() {
+                checked = true;
                 if (rocksIterator == null) {
                     rocksIterator = internal.newIterator();
                     rocksIterator.seekToFirst();
                 } else {
                     rocksIterator.next();
                 }
-                if (!rocksIterator.isValid()) rocksIterator.close();
                 return rocksIterator.isValid();
             }
 
             @Override
             public Map.Entry<ByteBuffer, ByteBuffer> next() {
+                if (!checked) {
+                    if (!hasNext()) throw new NoSuchElementException("End of iterator");
+                }
+                checked = false;
                 return new AbstractMap.SimpleEntry<ByteBuffer, ByteBuffer>(
                         ByteBuffer.wrap(rocksIterator.key()), ByteBuffer.wrap(rocksIterator.value())
                 );

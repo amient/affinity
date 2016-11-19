@@ -13,7 +13,6 @@ ext {
 dependencies {
     compile project(':api')
     compile group: 'org.mapdb', name: 'mapdb', version: mapDbVersion
-    testCompile group: 'junit', name: 'junit', version: junitVersion
 }
 
 

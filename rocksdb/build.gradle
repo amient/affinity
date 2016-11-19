@@ -1,7 +1,7 @@
 group = parent.group
 version = parent.version
 
-apply plugin: 'scala'
+//apply plugin: 'scala'
 apply plugin: 'java'
 apply plugin: 'signing'
 apply plugin: 'maven'
@@ -11,9 +11,7 @@ ext {
 }
 
 dependencies {
-    testCompile project(':testutil:testing_core')
-
-    compile project(':core')
+    compile project(':api')
     compile group: 'org.rocksdb', name: 'rocksdbjni', version: rocksDbVersion
 }
 
