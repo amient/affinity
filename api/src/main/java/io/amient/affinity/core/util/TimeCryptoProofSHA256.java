@@ -25,7 +25,6 @@ import java.security.MessageDigest;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 
-//TODO #33 move this class to the java api
 public class TimeCryptoProofSHA256 extends TimeCryptoProof {
 
     /**

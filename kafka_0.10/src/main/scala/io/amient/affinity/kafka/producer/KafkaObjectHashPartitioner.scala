@@ -23,7 +23,6 @@ import io.amient.affinity.core.util.ObjectHashPartitioner
 import org.apache.kafka.clients.producer.Partitioner
 import org.apache.kafka.common.Cluster
 
-//TODO #33 port this class to to java8
 class KafkaObjectHashPartitioner extends ObjectHashPartitioner with Partitioner {
   override def configure(configs: java.util.Map[String, _]): Unit = ()
 

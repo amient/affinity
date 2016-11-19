@@ -25,7 +25,7 @@ import java.util.Map.Entry
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
-class MemStoreConcurrentMap extends JavaMemStore {
+class MemStoreConcurrentMap extends MemStore {
 
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 

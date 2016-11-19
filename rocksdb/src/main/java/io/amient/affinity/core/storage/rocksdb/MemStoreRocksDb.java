@@ -20,7 +20,7 @@
 package io.amient.affinity.core.storage.rocksdb;
 
 import com.typesafe.config.Config;
-import io.amient.affinity.core.storage.JavaMemStore;
+import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -35,7 +35,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 
-public class MemStoreRocksDb implements JavaMemStore {
+public class MemStoreRocksDb implements MemStore {
 
 
     public static final String CONFIG_ROCKSDB_DATA_PATH = "memstore.rocksdb.data.path";

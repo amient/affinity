@@ -26,7 +26,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.storage.JavaStorage
+import io.amient.affinity.core.storage.Storage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -37,7 +37,6 @@ import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
 
 
-//TODO #33 port this class to to java8
 object KafkaStorage {
   def CONFIG_KAFKA_BOOTSTRAP_SERVERS = "storage.kafka.bootstrap.servers"
 
@@ -48,8 +47,7 @@ object KafkaStorage {
   def CONFIG_KAFKA_CONSUMER = s"storage.kafka.consumer"
 }
 
-//TODO #33 port this class to to java8
-class KafkaStorage(config: Config, partition: Int) extends JavaStorage(config, partition) {
+class KafkaStorage(config: Config, partition: Int) extends Storage(config, partition) {
 
   import KafkaStorage._
 

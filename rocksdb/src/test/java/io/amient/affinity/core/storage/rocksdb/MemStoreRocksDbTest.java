@@ -21,7 +21,7 @@ package io.amient.affinity.core.storage.rocksdb;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
-import io.amient.affinity.core.storage.JavaMemStore;
+import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -46,7 +46,7 @@ public class MemStoreRocksDbTest {
         Config config = ConfigFactory.empty()
                 .withValue(MemStoreRocksDb.CONFIG_ROCKSDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp));
 
-        JavaMemStore instance = new MemStoreRocksDb(config, 0);
+        MemStore instance = new MemStoreRocksDb(config, 0);
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

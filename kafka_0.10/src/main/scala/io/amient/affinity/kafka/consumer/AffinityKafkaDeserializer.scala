@@ -37,7 +37,7 @@ object AffinityKafkaAvroDeserializer {
     }
   }
 }
-//TODO #33 port this class to to java8
+
 class TypedKafkaAvroDeserializer[T: TypeTag](props: Map[String, Any], isKey: Boolean) extends Deserializer[T] {
 
   val internal = new KafkaAvroDeserializer()

@@ -74,13 +74,13 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   val valueSerde = serde[V]
   val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
-  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[JavaStorage])
+  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
   private val storageClassSymbol = rootMirror.classSymbol(storageClass)
   private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage = constructorMirror(config, partition).asInstanceOf[JavaStorage]
+  val storage = constructorMirror(config, partition).asInstanceOf[Storage]
 
   import system.dispatcher
 

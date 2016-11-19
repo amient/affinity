@@ -24,7 +24,7 @@ import java.util
 import java.util.Map.Entry
 import java.util.Optional
 
-class MemStoreSimpleMap extends JavaMemStore {
+class MemStoreSimpleMap extends MemStore {
 
   private val internal = new util.HashMap[ByteBuffer, ByteBuffer]()
 

@@ -23,7 +23,7 @@ import java.util.concurrent.{CompletableFuture, Future}
 
 import com.typesafe.config.Config
 
-class NoopStorage(config: Config, partition:Int) extends JavaStorage(config, partition) {
+class NoopStorage(config: Config, partition:Int) extends Storage(config, partition) {
 
   override def init(): Unit = ()
 

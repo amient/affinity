@@ -29,7 +29,7 @@ import java.util.Optional;
  *  Config config
  *  int partition
  */
-public interface JavaMemStore {
+public interface MemStore {
 
     Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 

@@ -21,7 +21,7 @@ package io.amient.affinity.core.storage.mapdb;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
-import io.amient.affinity.core.storage.JavaMemStore;
+import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -47,7 +47,7 @@ public class MemStoreMapDbSpec {
                 .withValue(MemStoreMapDb.CONFIG_MAPDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp))
                 .withValue(MemStoreMapDb.CONFIG_MAPDB_MMAP_ENABLED, ConfigValueFactory.fromAnyRef(false));
 
-        JavaMemStore instance = new MemStoreMapDb(config, 0);
+        MemStore instance = new MemStoreMapDb(config, 0);
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

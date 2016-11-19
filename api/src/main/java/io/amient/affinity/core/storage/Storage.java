@@ -26,22 +26,22 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
-public abstract class JavaStorage {
+public abstract class Storage {
 
     final public static String CONFIG_MEMSTORE_CLASS = "memstore.class";
 
-    final public JavaMemStore memstore;
+    final public MemStore memstore;
 
-    public JavaStorage(Config config, int partition)
+    public Storage(Config config, int partition)
             throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
-        Class<? extends JavaMemStore> memstoreClass
-                = Class.forName(config.getString(CONFIG_MEMSTORE_CLASS)).asSubclass(JavaMemStore.class);
-        JavaMemStore tmp;
+        Class<? extends MemStore> memstoreClass
+                = Class.forName(config.getString(CONFIG_MEMSTORE_CLASS)).asSubclass(MemStore.class);
+        MemStore tmp;
         try {
-            Constructor<? extends JavaMemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
+            Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
             tmp = memstoreConstructor.newInstance(config, partition);
         } catch (NoSuchMethodException e) {
-            Constructor<? extends JavaMemStore> memstoreConstructor = memstoreClass.getConstructor();
+            Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor();
             tmp = memstoreConstructor.newInstance();
         }
         memstore = tmp;

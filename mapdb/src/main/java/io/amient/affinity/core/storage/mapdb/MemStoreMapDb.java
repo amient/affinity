@@ -20,7 +20,7 @@
 package io.amient.affinity.core.storage.mapdb;
 
 import com.typesafe.config.Config;
-import io.amient.affinity.core.storage.JavaMemStore;
+import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -34,7 +34,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 
-public class MemStoreMapDb implements JavaMemStore {
+public class MemStoreMapDb implements MemStore {
 
     public static final String CONFIG_MAPDB_DATA_PATH = "memstore.mapdb.data.path";
     public static final String CONFIG_MAPDB_MMAP_ENABLED = "memstore.mapdb.mmap.enabled";
