@@ -19,37 +19,31 @@
 
 package io.amient.affinity.core.storage
 
+import java.nio.ByteBuffer
+import java.util
+import java.util.Map.Entry
+import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
-class MemStoreConcurrentMap extends MemStore {
+class MemStoreConcurrentMap extends JavaMemStore {
 
-  private val internal = new ConcurrentHashMap[MK, MV]()
+  private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 
   override def close(): Unit = internal.clear()
 
-  override def apply(key: MK): Option[MV] = internal.get(key) match {
-    case null => None
-    case value => Some(value)
+  override def iterator(): util.Iterator[Entry[ByteBuffer, ByteBuffer]] = {
+    internal.entrySet().iterator()
   }
 
-  override def iterator = new Iterator[(MK, MV)] {
-    val it = internal.entrySet().iterator()
-
-    override def hasNext: Boolean = it.hasNext
-
-    override def next(): (MK, MV) = it.next match {
-      case entry => (entry.getKey, entry.getValue)
-    }
+  override def apply(key: ByteBuffer): Optional[ByteBuffer] = {
+    Optional.ofNullable(internal.get(key))
   }
 
-  override protected[storage] def update(key: MK, value: MV): Option[MV] = internal.put(key, value) match {
-    case null => None
-    case prev => Some(prev)
+  override def update(key: ByteBuffer, value: ByteBuffer): Optional[ByteBuffer] = {
+    Optional.ofNullable(internal.put(key, value))
   }
 
-  override protected[storage] def remove(key: MK): Option[MV] = internal.remove(key) match {
-    case null => None
-    case prev => Some(prev)
+  override def remove(key: ByteBuffer): Optional[ByteBuffer] = {
+    Optional.ofNullable(internal.remove(key))
   }
-
 }

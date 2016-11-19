@@ -19,17 +19,32 @@
 
 package io.amient.affinity.core.storage
 
-class MemStoreSimpleMap extends MemStore {
+import java.nio.ByteBuffer
+import java.util
+import java.util.Map.Entry
+import java.util.Optional
 
-  private val internal = scala.collection.mutable.Map[MK, MV]()
+class MemStoreSimpleMap extends JavaMemStore {
 
-  override def apply(key: MK): Option[MV] = internal.get(key)
+  private val internal = new util.HashMap[ByteBuffer, ByteBuffer]()
 
-  override def iterator = internal.iterator
+  override def iterator(): util.Iterator[Entry[ByteBuffer, ByteBuffer]] = {
+    internal.entrySet().iterator()
+  }
 
-  override protected[storage] def update(key: MK, value: MV): Option[MV] = internal.put(key, value)
+  override def apply(key: ByteBuffer): Optional[ByteBuffer] = {
+    Optional.ofNullable(internal.get(key))
+  }
 
-  override protected[storage] def remove(key: MK):Option[MV] = internal.remove(key)
+  override def update(key: ByteBuffer, value: ByteBuffer): Optional[ByteBuffer] = {
+    Optional.ofNullable(internal.put(key, value))
+  }
 
-  override def close(): Unit = internal.clear()
+  override def remove(key: ByteBuffer): Optional[ByteBuffer] = {
+    Optional.ofNullable(internal.remove(key))
+  }
+
+  override def close(): Unit = {
+    internal.clear()
+  }
 }

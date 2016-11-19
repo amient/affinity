@@ -24,6 +24,7 @@ import java.nio.ByteBuffer
 /**
   * The implementing class must provide either no-arg constructor or a constructor that takes one argument of type Config
   */
+@deprecated
 trait MemStore {
 
   type MK = ByteBuffer

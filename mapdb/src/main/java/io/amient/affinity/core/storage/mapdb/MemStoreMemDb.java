@@ -67,6 +67,7 @@ public class MemStoreMemDb implements JavaMemStore {
         } else {
             refs.remove(pathToData);
             instances.get(pathToData).close();
+            maps.remove(pathToData);
         }
     }
 
