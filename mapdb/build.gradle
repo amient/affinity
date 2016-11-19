@@ -1,0 +1,20 @@
+group = parent.group
+version = parent.version
+
+//apply plugin: 'scala'
+apply plugin: 'java'
+apply plugin: 'signing'
+apply plugin: 'maven'
+
+ext {
+    mapDbVersion = '3.0.2'
+}
+
+dependencies {
+    compile project(':api')
+    compile group: 'org.mapdb', name: 'mapdb', version: mapDbVersion
+    testCompile group: 'junit', name: 'junit', version: junitVersion
+}
+
+
+

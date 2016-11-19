@@ -3,8 +3,10 @@ version = '0.2.0-SNAPSHOT'
 
 ext {
     javaVersion = '1.8'
+    junitVersion = '4.12'
     scalaVersion = '2.11.7'
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
+    typesafeConfigVersion = '1.3.0'
     akkaVersion = '2.4.10'
     zkClientVersion = '0.9'
     avroVersion = '1.8.1'
@@ -23,79 +25,81 @@ allprojects {
 
     version = rootProject.version
 
-    plugins.withType(MavenPlugin).whenPluginAdded {
-
-        task sourcesJar(type: Jar) {
-            classifier = 'sources'
-            from sourceSets.main.allSource
-        }
-
-        task javadocJar(type: Jar) {
-            classifier = 'javadoc'
-            from javadoc
-        }
-
-        artifacts {
-            archives javadocJar, sourcesJar
-        }
-
-        signing {
-            sign configurations.archives
-        }
-
-        idea {
-            module {
-                scopes.PROVIDED.plus += [configurations.provided]
-            }
-        }
-
-        test.systemProperties 'property': 'value'
-
-        uploadArchives {
-            repositories {
-                mavenDeployer {
-                    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-
-                    repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                        authentication(userName: ossrhUsername, password: ossrhPassword)
-                    }
-
-                    snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                        authentication(userName: ossrhUsername, password: ossrhPassword)
-                    }
-
-                    pom.project {
-                        name 'Affinity Library'
-                        packaging 'jar'
-                        // optionally artifactId can be defined here
-                        description 'Library for building fast, scalable, fault-tolerant Data APIs based on Akka, ZooKeeper and Kafka.'
-                        url 'https://github.com/amient/affinity'
-
-                        scm {
-                            connection 'scm:git:https://github.com/amient/affinity.git'
-                            developerConnection 'scm:git:https://github.com/amient/affinity.git'
-                            url 'https://github.com/amient/affinity.git'
-                        }
-
-                        licenses {
-                            license {
-                                name 'The Apache License, Version 2.0'
-                                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                            }
-                        }
-
-                        developers {
-                            developer {
-                                id 'michal.haris'
-                                name 'Michal Haris'
-                                email 'mharis@amient.io'
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //TODO create scala cross-compiled artifacts with scala_x.xx classifier for core, kafka_0.10, rocksdb, testutil
+    //FIXME maven pluging is trying to authenticate with osshr during normal build which fails on standard dev machine
+//    plugins.withType(MavenPlugin).whenPluginAdded {
+//
+//        task sourcesJar(type: Jar) {
+//            classifier = 'sources'
+//            from sourceSets.main.allSource
+//        }
+//
+//        task javadocJar(type: Jar) {
+//            classifier = 'javadoc'
+//            from javadoc
+//        }
+//
+//        artifacts {
+//            archives javadocJar, sourcesJar
+//        }
+//
+//        signing {
+//            sign configurations.archives
+//        }
+//
+//        idea {
+//            module {
+//                scopes.PROVIDED.plus += [configurations.provided]
+//            }
+//        }
+//
+//        test.systemProperties 'property': 'value'
+//
+//        uploadArchives {
+//            repositories {
+//                mavenDeployer {
+//                    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+//
+//                    repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+//                        authentication(userName: ossrhUsername, password: ossrhPassword)
+//                    }
+//
+//                    snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+//                        authentication(userName: ossrhUsername, password: ossrhPassword)
+//                    }
+//
+//                    pom.project {
+//                        name 'Affinity Library'
+//                        packaging 'jar'
+//                        // optionally artifactId can be defined here
+//                        description 'Library for building fast, scalable, fault-tolerant Data APIs based on Akka, ZooKeeper and Kafka.'
+//                        url 'https://github.com/amient/affinity'
+//
+//                        scm {
+//                            connection 'scm:git:https://github.com/amient/affinity.git'
+//                            developerConnection 'scm:git:https://github.com/amient/affinity.git'
+//                            url 'https://github.com/amient/affinity.git'
+//                        }
+//
+//                        licenses {
+//                            license {
+//                                name 'The Apache License, Version 2.0'
+//                                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                            }
+//                        }
+//
+//                        developers {
+//                            developer {
+//                                id 'michal.haris'
+//                                name 'Michal Haris'
+//                                email 'mharis@amient.io'
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     plugins.withType(JavaPlugin).whenPluginAdded {
 

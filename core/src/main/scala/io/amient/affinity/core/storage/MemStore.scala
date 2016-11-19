@@ -21,8 +21,6 @@ package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
 
-import scala.concurrent.Future
-
 /**
   * The implementing class must provide either no-arg constructor or a constructor that takes one argument of type Config
   */

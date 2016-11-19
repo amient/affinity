@@ -14,6 +14,7 @@ dependencies {
     testCompile project(':testutil:testing_kafka_0.10')
     testCompile project(':ws-client')
 
+    compile project(':api')
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion

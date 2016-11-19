@@ -36,3 +36,14 @@ dependencies {
 
 
 
+//FIXME is there a way to usie CreateStartScripts with OneJar
+//task createStartScripts(type: CreateStartScripts) {
+//    outputDir = file("build/scripts")
+//    mainClassName = mainClass
+//    applicationName = mainScript
+//    classpath = singlejar.outputs.files
+//}
+//
+//build.dependsOn createStartScripts
+//libsDirName = 'lib'
+//

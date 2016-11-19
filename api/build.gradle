@@ -1,0 +1,14 @@
+group = parent.group
+version = parent.version
+
+apply plugin: 'java'
+apply plugin: 'signing'
+apply plugin: 'maven'
+
+
+dependencies {
+    compile group: 'com.typesafe', name: 'config', version: typesafeConfigVersion
+}
+
+
+

@@ -96,7 +96,7 @@ final public class AvroWebSocketClient {
                 byte[] bytes = new byte[buf.remaining()];
                 buf.get(bytes);
                 if (!schemas.containsKey(schemaId)) {
-                    queue.add(new AbstractMap.SimpleEntry(schemaId, bytes));
+                    queue.add(new AbstractMap.SimpleEntry<Integer, byte[]>(schemaId, bytes));
                     ByteBufferOutputStream req = new ByteBufferOutputStream();
                     DataOutputStream reqData = new DataOutputStream(req);
                     reqData.write(123);
