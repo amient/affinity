@@ -17,16 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.util
+package io.amient.affinity.core.util;
 
-//TODO #33 port this class to java api
-class ObjectHashPartitioner {
+public class ObjectHashPartitioner {
 
-  def partition(key: Any, numPartitions: Int): Int = {
-    (math.abs(key.hashCode()) match {
-      case Int.MinValue => 0
-      case a => a
-    }) % numPartitions
+  public int partition(Object key, int numPartitions) {
+    int absHashCode = Math.abs(key.hashCode());
+    if (absHashCode == Integer.MIN_VALUE) {
+      return 0 % numPartitions;
+    } else {
+      return absHashCode % numPartitions;
+    }
   }
 
 }
