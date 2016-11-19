@@ -19,11 +19,10 @@
 
 package io.amient.affinity.core.actor
 
-import java.security.cert.X509Certificate
 import java.security.{KeyStore, SecureRandom}
 import java.util
 import java.util.concurrent.ConcurrentHashMap
-import javax.net.ssl.{KeyManagerFactory, SSLContext, X509TrustManager}
+import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.event.Logging
@@ -47,15 +46,15 @@ import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.util.{ByteUtils, Reply}
+import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.util.ByteBufferInputStream
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
 import scala.language.postfixOps
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 object Gateway {
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
@@ -79,8 +78,8 @@ abstract class Gateway extends Actor {
 
   val cluster = context.actorOf(Props(new Cluster()), name = "cluster")
 
-  import context.system
-  import context.dispatcher
+  import context.{dispatcher, system}
+
   private implicit val scheduler = context.system.scheduler
 
   val sslContext = if (!config.hasPath(CONFIG_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
@@ -148,28 +147,31 @@ abstract class Gateway extends Actor {
     promise.completeWith(delegate map f recover handleException)
   }
 
-  def handleAsJsonWith(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
-    delegateAndHandleErrors(response, delegate) {
-      case None => HttpResponse(NotFound)
-      case Some(value) => Encoder.json(OK, value)
-      case any => Encoder.json(OK, any)
+  def handleAsJson(response: Promise[HttpResponse], data: Any): Unit = {
+    data match {
+      case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
+        case None => HttpResponse(NotFound)
+        case Some(value) => Encoder.json(OK, value)
+        case any => Encoder.json(OK, any)
+      }
+      case other => response.success(try {
+        data match {
+          case None => HttpResponse(NotFound)
+          case Some(value) => Encoder.json(OK, value)
+          case other => Encoder.json(OK, other)
+        }
+      } catch {
+        case NonFatal(e) => handleException(e)
+      })
     }
   }
 
-  def handleAsJson(response: Promise[HttpResponse], data: Any): Unit = {
-    response.success(try {
-      data match {
+  def accept(response: Promise[HttpResponse], data: Any): Unit = {
+    data match {
+      case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
         case None => HttpResponse(NotFound)
-        case Some(value) => Encoder.json(OK, value)
-        case other => Encoder.json(OK, other)
+        case _ => HttpResponse(Accepted)
       }
-    } catch {
-      case NonFatal(e) => handleException(e)
-    })
-  }
-
-  def acceptWith(response: Promise[HttpResponse], delegate: Future[Any]): Unit = {
-    delegateAndHandleErrors(response, delegate) {
       case None => HttpResponse(NotFound)
       case _ => HttpResponse(Accepted)
     }
