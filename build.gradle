@@ -42,6 +42,14 @@ allprojects {
             testCompile.extendsFrom provided
         }
 
+        idea {
+            module {
+                scopes.PROVIDED.plus += [configurations.provided]
+            }
+        }
+
+        test.systemProperties 'property': 'value'
+
         sourceSets {
             main {
                 compileClasspath += configurations.provided
