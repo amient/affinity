@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.util
 
+//TODO #33 port this class to java api
 class ObjectHashPartitioner {
 
   def partition(key: Any, numPartitions: Int): Int = {

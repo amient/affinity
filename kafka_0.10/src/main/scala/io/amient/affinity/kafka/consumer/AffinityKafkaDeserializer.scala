@@ -27,7 +27,6 @@ import org.apache.kafka.common.serialization.Deserializer
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
-
 object AffinityKafkaAvroDeserializer {
   def create[T: TypeTag](props: Map[String, Any], isKey: Boolean): Deserializer[T] = {
     if (props.contains("schema.registry.url")) {
@@ -38,6 +37,7 @@ object AffinityKafkaAvroDeserializer {
     }
   }
 }
+//TODO #33 port this class to to java8
 class TypedKafkaAvroDeserializer[T: TypeTag](props: Map[String, Any], isKey: Boolean) extends Deserializer[T] {
 
   val internal = new KafkaAvroDeserializer()

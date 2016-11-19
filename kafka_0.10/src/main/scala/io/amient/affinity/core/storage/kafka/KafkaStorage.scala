@@ -22,10 +22,11 @@ package io.amient.affinity.core.storage.kafka
 import java.nio.ByteBuffer
 import java.util
 import java.util.Properties
+import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.storage.Storage
+import io.amient.affinity.core.storage.JavaStorage
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -33,11 +34,10 @@ import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBufferSerializer}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.language.reflectiveCalls
 
 
+//TODO #33 port this class to to java8
 object KafkaStorage {
   def CONFIG_KAFKA_BOOTSTRAP_SERVERS = "storage.kafka.bootstrap.servers"
 
@@ -48,7 +48,8 @@ object KafkaStorage {
   def CONFIG_KAFKA_CONSUMER = s"storage.kafka.consumer"
 }
 
-class KafkaStorage(config: Config, partition: Int) extends Storage(config, partition) {
+//TODO #33 port this class to to java8
+class KafkaStorage(config: Config, partition: Int) extends JavaStorage(config, partition) {
 
   import KafkaStorage._
 
@@ -182,7 +183,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     }
   }
 
-  override private[affinity] def stop(): Unit = {
+  override protected def stop(): Unit = {
     try {
       consumer.interrupt()
     } finally {
@@ -191,9 +192,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
   }
 
   def write(key: ByteBuffer, value: ByteBuffer): Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, key, value)) match {
-      case jfuture => Future(jfuture.get)
-    }
+    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
   }
 
 }

@@ -20,20 +20,19 @@
 package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
-import java.util.Map.Entry
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
 import akka.serialization.{SerializationExtension, Serializer}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal
-import scala.collection.JavaConverters._
 
 object State {
   val CONFIG_STATE = "affinity.state"
@@ -75,13 +74,13 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   val valueSerde = serde[V]
   val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
-  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
+  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[JavaStorage])
   private val storageClassSymbol = rootMirror.classSymbol(storageClass)
   private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage = constructorMirror(config, partition).asInstanceOf[Storage]
+  val storage = constructorMirror(config, partition).asInstanceOf[JavaStorage]
 
   import system.dispatcher
 
@@ -211,7 +210,10 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     option(storage.memstore.update(k, write)) match {
       case Some(prev) if (prev == write) => Future.successful(Some(value))
       case differentOrNone =>
-        writeWithMemstoreRollback(k, differentOrNone, storage.write(k, write))
+        val javaToScalaFuture = storage.write(k, write) match {
+          case jfuture => Future(jfuture.get)
+        }
+        writeWithMemstoreRollback(k, differentOrNone, javaToScalaFuture)
     }
   }
 
@@ -231,7 +233,10 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     option(storage.memstore.remove(k)) match {
       case None => Future.successful(None)
       case some =>
-        writeWithMemstoreRollback(k, some, storage.write(k, null))
+        val javaToScalaFuture = storage.write(k, null) match {
+          case jfuture => Future(jfuture.get)
+        }
+        writeWithMemstoreRollback(k, some, javaToScalaFuture)
     }
   }
 

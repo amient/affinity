@@ -24,6 +24,7 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
+//TODO #33 port this class to to java8
 class AffinityKafkaProducer[K: TypeTag, V: TypeTag](props: Map[String, Any]) extends KafkaProducer[K,V](
   (props ++ Map("partitioner.class" -> classOf[KafkaObjectHashPartitioner].getName))
     .mapValues(_.toString.asInstanceOf[AnyRef]).asJava,

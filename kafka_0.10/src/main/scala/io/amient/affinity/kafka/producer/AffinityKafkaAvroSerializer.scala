@@ -36,6 +36,7 @@ object AffinityKafkaAvroSerializer {
   }
 }
 
+//TODO #33 port this class to to java8
 class TypedKafkaAvroSerializer[T: TypeTag](props: Map[String, Any], isKey: Boolean) extends Serializer[T] {
 
   val newSubject = rootMirror.runtimeClass(typeOf[T]).getName

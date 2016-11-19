@@ -24,6 +24,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
+//TODO #33 port this class to to java8
 class AffinityKafkaConsumer[K: TypeTag, V: TypeTag](props: Map[String, Any]) extends KafkaConsumer[K, V](
   props.mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
   AffinityKafkaAvroDeserializer.create[K](props, true),
