@@ -20,11 +20,11 @@
 package io.amient.affinity.example.service
 
 import akka.actor.Status
-import io.amient.affinity.core.actor.Service
+import io.amient.affinity.core.actor.Partition
 
 import scala.io.StdIn
 
-class UserInputMediator extends Service {
+class UserInputMediator extends Partition {
 
   override def handle: Receive = {
     case greeting: String =>

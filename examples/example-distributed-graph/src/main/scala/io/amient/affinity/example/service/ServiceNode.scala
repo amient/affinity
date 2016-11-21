@@ -23,6 +23,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.cluster.Node
 
 import scala.util.control.NonFatal
+import scala.collection.JavaConverters._
 
 object ServiceNode extends App {
 
@@ -31,13 +32,13 @@ object ServiceNode extends App {
 
     val akkaPort = args(0).toInt
 
-    val config = ConfigFactory.load("example").withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
+    val config = ConfigFactory.load("example")
+      .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0).asJava))
+      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
 
     new Node(config) {
 
-      startServices{
-        new UserInputMediator
-      }
+      startContainer("user-mediator", new UserInputMediator)
 
     }
 

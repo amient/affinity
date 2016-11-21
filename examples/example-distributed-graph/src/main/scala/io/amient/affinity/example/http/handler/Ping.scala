@@ -47,7 +47,7 @@ trait Ping extends HttpGateway {
       */
     case HTTP(PUT, PATH("ping"), query, response) =>
       implicit val timeout = Timeout(1 minute)
-      service[UserInputMediator] ? "hello" onSuccess {
+      service("user-mediator") ? "hello" onSuccess {
         case userInput: String => response.success(Encoder.json(OK, Map("userInput" -> userInput)))
       }
   }

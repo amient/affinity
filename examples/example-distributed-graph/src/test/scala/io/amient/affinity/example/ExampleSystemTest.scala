@@ -58,7 +58,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     with Graph)
 
   val region = new Node(config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1).asJava))) {
-    startRegion(new Partition with GraphPartition)
+    startContainer("graph", new Partition with GraphPartition)
   }
 
   gateway.awaitClusterReady()

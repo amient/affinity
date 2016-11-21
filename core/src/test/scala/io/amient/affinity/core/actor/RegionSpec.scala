@@ -32,7 +32,7 @@ import scala.language.postfixOps
 
 class RegionSpec extends IntegrationTestBase with Matchers {
 
-  val testPartition = Props(new Service {
+  val testPartition = Props(new Partition {
     override def preStart(): Unit = {
       Thread.sleep(100)
       super.preStart()

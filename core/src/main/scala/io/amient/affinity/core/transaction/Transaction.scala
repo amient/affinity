@@ -39,8 +39,8 @@ import scala.language.postfixOps
 
 object Transaction {
 
-  def apply[T](cluster: ActorRef)(t: (Transaction) => Future[T])(implicit context: ExecutionContext) = {
-    val transaction = new Transaction(cluster)
+  def apply[T](default: ActorRef)(t: (Transaction) => Future[T])(implicit context: ExecutionContext) = {
+    val transaction = new Transaction(default)
     val result = t(transaction)
     result transform((result: T) => result, (e: Throwable) => {
       transaction.rollback; e
@@ -48,7 +48,7 @@ object Transaction {
   }
 }
 
-class Transaction(cluster: ActorRef) {
+class Transaction(default: ActorRef) {
 
   case class CompletedInstruction[T](actor: ActorRef, instr: Instruction[T], result: T) {
     def reverse = instr.reverse(result)
@@ -81,7 +81,7 @@ class Transaction(cluster: ActorRef) {
   }
 
   def execute[T: ClassTag](instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
-    execute(cluster, instr)
+    execute(default, instr)
   }
 
   def execute[T: ClassTag](actor: ActorRef, instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {

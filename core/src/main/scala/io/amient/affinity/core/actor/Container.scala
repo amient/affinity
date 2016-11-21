@@ -25,7 +25,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.actor.Controller.{ContainerOnline, GracefulShutdown}
-import io.amient.affinity.core.actor.Service.{BecomeMaster, BecomeStandby}
+import io.amient.affinity.core.actor.Partition.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 

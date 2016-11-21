@@ -54,7 +54,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
-        delegateAndHandleErrors(response, cluster ack GetValue(key)) {
+        delegateAndHandleErrors(response, service("keyspace1") ack GetValue(key)) {
           _ match {
             case None => HttpResponse(NotFound)
             case Some(value) => Encoder.json(OK, value, gzip = false)
@@ -63,7 +63,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
       case HTTP(POST, PATH(key, value), _, response) =>
         implicit val timeout = Timeout(1500 milliseconds)
-        delegateAndHandleErrors(response, cluster ack PutValue(key, value)) {
+        delegateAndHandleErrors(response, service("keyspace1") ack PutValue(key, value)) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }
@@ -72,7 +72,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
   import gateway._
 
   val region1 = new Node(config) {
-    startRegion(new MyTestPartition("consistency-test") {
+    startContainer("keyspace1", new MyTestPartition("consistency-test") {
       override def preStart(): Unit = {
         super.preStart()
         if (partition == 0) data.update("B", "initialValueB")
@@ -82,7 +82,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
   }
 
   val region2 = new Node(config) {
-    startRegion(new MyTestPartition("consistency-test"))
+    startContainer("keyspace1", new MyTestPartition("consistency-test"))
   }
 
   gateway.awaitClusterReady()

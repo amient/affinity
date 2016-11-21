@@ -53,7 +53,7 @@ trait Fail extends HttpGateway {
       */
     case HTTP(POST, PATH("down", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = cluster ! (partition, "down")
+      val task = service("graph") ! (partition, "down")
       Thread.sleep(1000)
       response.success(HttpResponse(MovedPermanently, headers = List(headers.Location(Uri("/")))))
 
@@ -62,7 +62,7 @@ trait Fail extends HttpGateway {
       */
     case HTTP(POST, PATH("fail", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = cluster ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
+      val task = service("graph") ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
       delegateAndHandleErrors(response, task) {
         case any => HttpResponse(status = StatusCodes.Accepted)
       }
@@ -72,7 +72,7 @@ trait Fail extends HttpGateway {
       */
     case HTTP(POST, PATH("bug", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = cluster ? (partition, "message-that-can't-be-handled")
+      val task = service("graph") ? (partition, "message-that-can't-be-handled")
       delegateAndHandleErrors(response, task) {
         case any => Encoder.json(OK, any)
       }

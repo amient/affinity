@@ -40,7 +40,7 @@ object DataNode {
       .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
 
     new Node(config) {
-      startRegion(new Partition
+      startContainer("graph", new Partition
         with GraphPartition
         with DebugPartition
       )

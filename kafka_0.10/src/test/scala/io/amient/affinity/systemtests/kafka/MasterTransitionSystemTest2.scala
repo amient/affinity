@@ -53,23 +53,23 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
-        delegateAndHandleErrors(response, cluster ack GetValue(key)) {
+        delegateAndHandleErrors(response, service("keyspace1") ack GetValue(key)) {
           case value => Encoder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
         implicit val timeout = Timeout(1500 milliseconds)
-        delegateAndHandleErrors(response, cluster ack PutValue(key, value)) {
+        delegateAndHandleErrors(response, service("keyspace1") ack PutValue(key, value)) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }
   })
 
   val region1 = new Node(config) {
-    startRegion(new MyTestPartition("consistency-test"))
+    startContainer("keyspace1", new MyTestPartition("consistency-test"))
   }
   val region2 = new Node(config) {
-    startRegion(new MyTestPartition("consistency-test"))
+    startContainer("keyspace1", new MyTestPartition("consistency-test"))
   }
   gateway.awaitClusterReady()
 

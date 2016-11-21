@@ -40,8 +40,8 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.fasterxml.jackson.databind.JsonNode
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Cluster.{CheckClusterAvailability, ClusterAvailability}
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
+import io.amient.affinity.core.actor.Keyspace.{CheckClusterAvailability, ClusterAvailability}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
@@ -53,7 +53,6 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.postfixOps
-import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
 object Gateway {
@@ -74,9 +73,7 @@ abstract class Gateway extends Actor {
 
   private val config = context.system.settings.config
 
-  private val services = new ConcurrentHashMap[Class[_ <: Actor], ActorRef]
-
-  val cluster = context.actorOf(Props(new Cluster()), name = "cluster")
+  private val services = new ConcurrentHashMap[String, (ActorRef, Boolean)]()
 
   import context.{dispatcher, system}
 
@@ -101,18 +98,23 @@ abstract class Gateway extends Actor {
     config.getString(CONFIG_HTTP_HOST), config.getInt(CONFIG_HTTP_PORT), sslContext)
 
 
-  def describeServices = services.asScala.map { case (k, v) => (k.toString, v.path.toString) }
+  def describeServices = services.asScala.map { case (group, (actorRef, suspended)) => (group, actorRef.path.toString) }
 
   def describeRegions: List[String] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
-    Await.result(cluster ? GetRoutees, t).asInstanceOf[Routees].routees.map(_.toString).toList.sorted
+    val routeeSets = Future.sequence {
+      services.asScala.map { case (group, (actorRef, suspended)) =>
+        actorRef ? GetRoutees map (_.asInstanceOf[Routees])
+      }
+    }
+    Await.result(routeeSets, t).map(_.routees).flatten.map(_.toString).toList.sorted
   }
 
   override def preStart(): Unit = {
     log.info("starting gateway")
     httpInterface.bind(self)
-    context.watch(cluster)
+    //    context.watch(cluster)
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
   }
 
@@ -121,12 +123,19 @@ abstract class Gateway extends Actor {
     httpInterface.close()
   }
 
-  def service[X <: Actor](implicit tag: ClassTag[X]): ActorRef = {
-    services.get(tag.runtimeClass) match {
-      case null => throw new IllegalStateException(s"Service not available for ${tag.runtimeClass}")
-      case instance => instance
+  def service(group: String): ActorRef = {
+    services.get(group) match {
+      case null => throw new IllegalStateException(s"Service not available for group $group")
+      case (actorRef, suspended) => actorRef
     }
   }
+
+  //  def service[X <: Actor](implicit tag: ClassTag[X]): ActorRef = {
+  //    services.get(tag.runtimeClass) match {
+  //      case null => throw new IllegalStateException(s"Service not available for ${tag.runtimeClass}")
+  //      case instance => instance
+  //    }
+  //  }
 
 
   def handleException: PartialFunction[Throwable, HttpResponse] = {
@@ -195,30 +204,50 @@ abstract class Gateway extends Actor {
 
   private def manage: Receive = {
 
-    case msg@MasterStatusUpdate("regions", add, remove) => sender.reply(msg) {
-      remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
-      add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
-      cluster ! CheckClusterAvailability()
+    //    case msg@MasterStatusUpdate("regions", add, remove) => sender.reply(msg) {
+    //      remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
+    //      add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
+    //      cluster ! CheckClusterAvailability()
+    //    }
+    //
+    //    case msg@MasterStatusUpdate("services", add, remove) => sender.reply(msg) {
+    //      add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
+    //      remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
+    //      implicit val timeout = Timeout(1 second)
+    //      cluster ! CheckClusterAvailability()
+    //    }
+
+    case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
+      if (!services.containsKey(group)) {
+        val service = context.actorOf(Props(new Keyspace()), name = group)
+        services.put(group, (service, true))
+        context.watch(service)
+      }
+      val service = services.get(group)._1
+      remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))
+      add.foreach(ref => service ! AddRoutee(ActorRefRoutee(ref)))
+      service ! CheckClusterAvailability(group)
     }
 
-    case msg@MasterStatusUpdate("services", add, remove) => sender.reply(msg) {
-      add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
-      remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
-      implicit val timeout = Timeout(1 second)
-      cluster ! CheckClusterAvailability()
-    }
 
-    case msg@ClusterAvailability(suspended) if (suspended != handlingSuspended) =>
-      handlingSuspended = suspended
-      context.system.eventStream.publish(msg)
-      if (!suspended) {
-        log.info("Handling Resumed")
-        val reprocess = suspendedHttpRequestQueue.toList
-        suspendedHttpRequestQueue.clear
-        if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
-        reprocess.foreach(handle(_))
-      } else {
-        log.warning("Handling Suspended")
+    case msg@ClusterAvailability(group, suspended) =>
+      val (actorRef, currentlySuspended) = services.get(group)
+      if (currentlySuspended != suspended) {
+        services.put(group, (actorRef, suspended))
+        val gatewayShouldBeSuspended = services.asScala.exists(_._2._2)
+        if (gatewayShouldBeSuspended != handlingSuspended) {
+          handlingSuspended = suspended
+          context.system.eventStream.publish(msg)
+          if (!suspended) {
+            log.info("Handling Resumed")
+            val reprocess = suspendedHttpRequestQueue.toList
+            suspendedHttpRequestQueue.clear
+            if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
+            reprocess.foreach(handle(_))
+          } else {
+            log.warning("Handling Suspended")
+          }
+        }
       }
 
     case exchange: HttpExchange if (handlingSuspended) =>
@@ -253,9 +282,9 @@ trait WebSocketSupport extends Gateway {
     case http@HTTP(GET, PATH("affinity.js"), _, response) => response.success(Encoder.plain(OK, afjs))
   }
 
-  protected def jsonWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+  protected def jsonWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[JsonNode, Unit]): Future[HttpResponse] = {
-    genericWebSocket(upgrade, stateStoreName, key) {
+    genericWebSocket(upgrade, keyspace, stateStoreName, key) {
       case text: TextMessage => log.info(text.getStrictText)
       case binary: BinaryMessage =>
         val buf = binary.getStrictData.asByteBuffer
@@ -269,19 +298,19 @@ trait WebSocketSupport extends Gateway {
     }
   }
 
-  protected def avroWebSocket(http: HttpExchange, stateStoreName: String, key: Any)
+  protected def avroWebSocket(http: HttpExchange, keyspace: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[Any, Unit]): Unit = {
     http.request.header[UpgradeToWebSocket] match {
       case None => Future.failed(new IllegalArgumentException("WebSocket connection required"))
       case Some(upgrade) =>
         import context.dispatcher
         fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, stateStoreName, key)(pfCustomHandle)
+          avroWebSocket(upgrade, keyspace, stateStoreName, key)(pfCustomHandle)
         }
     }
   }
 
-  protected def avroWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+  protected def avroWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
     if (!serializers.contains(101)) throw new IllegalArgumentException("No AvroSerde is registered")
     val avroSerde = serializers(101).asInstanceOf[AvroSerde]
@@ -308,7 +337,7 @@ trait WebSocketSupport extends Gateway {
       * upstream any other type handling is not defined and will throw scala.MatchError
       */
 
-    genericWebSocket(upgrade, stateStoreName, key) {
+    genericWebSocket(upgrade, keyspace, stateStoreName, key) {
       case text: TextMessage =>
         try {
           buildSchemaPushMessage(avroSerde.schema(text.getStrictText).get)
@@ -323,7 +352,7 @@ trait WebSocketSupport extends Gateway {
             case 0 => try {
               val record = AvroRecord.read(buf, avroSerde)
               val handleAvroClientMessage: PartialFunction[Any, Unit] = pfCustomHandle.orElse {
-                case forwardToBackend: AvroRecord[_] => cluster ! forwardToBackend
+                case forwardToBackend: AvroRecord[_] => keyspace ! forwardToBackend
               }
               handleAvroClientMessage(record)
             } catch {
@@ -341,7 +370,7 @@ trait WebSocketSupport extends Gateway {
     }
   }
 
-  protected def genericWebSocket(upgrade: UpgradeToWebSocket, stateStoreName: String, key: Any)
+  protected def genericWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
                                 (pfDown: PartialFunction[Message, Any])
                                 (pfPush: PartialFunction[Any, Message]): Future[HttpResponse] = {
     import context.dispatcher
@@ -349,7 +378,7 @@ trait WebSocketSupport extends Gateway {
     implicit val materializer = ActorMaterializer.create(context.system)
     implicit val timeout = Timeout(1 second)
 
-    cluster ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
+    keyspace ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
       case keyValueActor: ActorRef =>
 
         /**

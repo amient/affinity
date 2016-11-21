@@ -25,17 +25,23 @@ import akka.actor.{Actor, ActorRef, Props, Status}
 import akka.event.Logging
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
 import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
-import scala.util.control.NonFatal
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
 object Partition {
   final val INTERNAL_CREATE_KEY_VALUE_MEDIATOR = "INTERNAL_CREATE_KEY_VALUE_MEDIATOR"
+  case class BecomeStandby() extends Reply[Unit]
+
+  case class BecomeMaster() extends Reply[Unit]
 }
 
-class Partition extends Service with ActorState {
+class Partition extends Actor with ActorState {
 
   import Partition._
 
@@ -51,7 +57,7 @@ class Partition extends Service with ActorState {
     * of being the Master for the related physical partition. The signalling message
     * may be resent as part of ack contract so this method must be idempotent.
     */
-  override protected def onBecomeMaster: Unit = {
+  protected def onBecomeMaster: Unit = {
     bootState()
     log.info(s"Became master for partition $partition")
   }
@@ -61,16 +67,38 @@ class Partition extends Service with ActorState {
     * and keep listening to the changes in the related physical partition.
     * The signalling message may be resent as part of ack contract so this method must be idempotent.
     */
-  override protected def onBecomeStandby: Unit = {
+  protected def onBecomeStandby: Unit = {
     tailState()
     log.info(s"Became standby for partition $partition")
   }
 
+  override def preStart(): Unit = {
+    log.info("Starting partition: " + self.path.name)
+    context.parent ! ServiceOnline(self)
+    super.preStart()
+  }
+
   override def postStop(): Unit = {
+    log.info("Stopping partition: " + self.path.name)
+    context.parent ! ServiceOffline(self)
     super.postStop()
   }
 
-  override protected def manage: Receive = super.manage orElse {
+  final override def receive: Receive = manage orElse handle
+
+  def handle: Receive = {
+    case null =>
+  }
+
+  protected def manage: Receive = {
+
+    case msg@BecomeMaster() => sender.reply(msg) {
+      onBecomeMaster
+    }
+    case msg@BecomeStandby() => sender.reply(msg) {
+      onBecomeStandby
+    }
+
     case (key: Any, INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName: String) => try {
       val state = getStateStore(stateStoreName)
       sender ! context.actorOf(Props(new KeyValueMediator(state, key)))

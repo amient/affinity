@@ -38,25 +38,25 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
   val config = configure("pingpong")
 
   val gateway = new TestGatewayNode(config, new Gateway {
+
     import context.dispatcher
+
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
-        delegateAndHandleErrors(response, cluster ? "ping") {
+        delegateAndHandleErrors(response, service("region") ? "ping") {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
     }
   })
 
   val region = new Node(config) {
-    startRegion {
-      new Partition {
-        override def handle: Receive = {
-          case "ping" => sender ! "pong"
-        }
+    startContainer("region", new Partition {
+      override def handle: Receive = {
+        case "ping" => sender ! "pong"
       }
-    }
+    })
   }
 
   gateway.awaitClusterReady()

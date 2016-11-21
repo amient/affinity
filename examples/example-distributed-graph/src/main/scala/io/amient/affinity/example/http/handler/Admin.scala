@@ -70,7 +70,7 @@ trait Admin extends HttpGateway {
 
     case http@HTTP(GET, PATH("status", INT(p)), _, response) => AUTH_ADMIN(http) { (user: String) =>
       implicit val timeout = Timeout(1 second)
-      cluster ? (p.toInt, "status") map {
+      service("graph") ? (p.toInt, "status") map {
         case any => Encoder.json(OK, any)
       }
     }

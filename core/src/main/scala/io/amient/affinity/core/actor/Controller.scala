@@ -34,13 +34,11 @@ import scala.language.postfixOps
 
 object Controller {
 
-  final case class CreateRegion(partitionProps: Props) extends Reply[Unit]
+  final case class CreateContainer(group: String, partitionProps: Props) extends Reply[Unit]
 
   final case class ContainerOnline(group: String)
 
   final case class CreateGateway(handlerProps: Props) extends Reply[Int]
-
-  final case class CreateServiceContainer(services: Seq[Props]) extends Reply[Unit]
 
   final case class GatewayCreated(httpPort: Int)
 
@@ -58,38 +56,12 @@ class Controller extends Actor {
 
   val system = context.system
 
-  val regionCoordinator = try {
-    Coordinator.create(system, "regions")
-  } catch {
-    case e: Throwable =>
-      import scala.concurrent.ExecutionContext.Implicits.global
-      system.terminate() onComplete { _ =>
-        e.printStackTrace()
-        System.exit(10)
-      }
-      throw e
-  }
-
-  val serviceCoordinator = try {
-    Coordinator.create(system, "services")
-  } catch {
-    case e: Throwable =>
-      import scala.concurrent.ExecutionContext.Implicits.global
-      system.terminate() onComplete { _ =>
-        e.printStackTrace()
-        System.exit(11)
-      }
-      throw e
-  }
-
   private var gatewayPromise: Promise[Int] = null
-  private var regionPromise: Promise[Unit] = null
-  private var servicesPromise: Promise[Unit] = null
 
+  private val containers = scala.collection.mutable.Map[String, (Coordinator, Promise[Unit])]()
 
   override def postStop(): Unit = {
-    if (!regionCoordinator.isClosed) regionCoordinator.close()
-    if (!regionCoordinator.isClosed) serviceCoordinator.close()
+    containers.foreach { case (group, (coordinator, _)) => coordinator.close() }
     super.postStop()
   }
 
@@ -99,47 +71,29 @@ class Controller extends Actor {
 
   override def receive: Receive = {
 
-    case request@CreateServiceContainer(services) =>
+    case request@CreateContainer(group, partitionProps) => sender.replyWith(request) {
       try {
-        context.actorOf(Props(new Container(serviceCoordinator, "services") {
-          services.foreach { serviceProps =>
-            context.actorOf(serviceProps, serviceProps.actorClass().getName)
-          }
-        }), name = "services")
-        servicesPromise = Promise[Unit]()
-        sender.replyWith(request) {
-          servicesPromise.future
-        }
-      } catch {
-        case e: InvalidActorNameException => sender.replyWith(request) {
-          servicesPromise.future
-        }
-      }
-
-    case msg@Terminated(child) if (child.path.name == "services") =>
-      if (!servicesPromise.isCompleted) servicesPromise.failure(new AkkaException("Services Container initialisation failed"))
-
-    case ContainerOnline("services") => if (!servicesPromise.isCompleted) servicesPromise.success(())
-
-    case request@CreateRegion(partitionProps) => sender.replyWith(request) {
-      try {
-        context.actorOf(Props(new Container(regionCoordinator, "region") {
+        System.err.println(s"Creating service container for $group")
+        val coordinator =  Coordinator.create(system, group)
+        context.actorOf(Props(new Container(coordinator, group) {
           val partitions = config.getIntList(Node.CONFIG_PARTITION_LIST).asScala
           for (partition <- partitions) {
             context.actorOf(partitionProps, name = partition.toString)
           }
-        }), name = "region")
-        regionPromise = Promise[Unit]()
-        regionPromise.future
+        }), name = s"$group")
+        val promise = Promise[Unit]()
+        containers.put(group, (coordinator, promise))
+        promise.future
       } catch {
-        case e: InvalidActorNameException => regionPromise.future
+        case e: InvalidActorNameException => containers(group)._2.future
       }
     }
 
-    case msg@Terminated(child) if (child.path.name == "region") =>
-      if (!regionPromise.isCompleted) regionPromise.failure(new AkkaException("Region initialisation failed"))
+    case msg@Terminated(child) if (containers.contains(child.path.name)) =>
+      val (_, promise) = containers(child.path.name)
+      if (!promise.isCompleted) promise.failure(new AkkaException("Container initialisation failed"))
 
-    case ContainerOnline("region") => if (!regionPromise.isCompleted) regionPromise.success(())
+    case ContainerOnline(group) => if (!containers(group)._2.isCompleted) containers(group)._2.success(())
 
     case request@CreateGateway(gatewayProps) => try {
       context.watch(context.actorOf(gatewayProps, name = "gateway"))
@@ -154,13 +108,11 @@ class Controller extends Actor {
     }
 
     case msg@Terminated(child) if (child.path.name == "gateway") =>
-      regionCoordinator.unwatch(child)
-      serviceCoordinator.unwatch(child)
+      containers.foreach { case (_, (coordinator, _)) => coordinator.unwatch(child) }
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
     case GatewayCreated(httpPort) =>
-      regionCoordinator.watch(sender, global = true)
-      serviceCoordinator.watch(sender, global = true)
+      containers.foreach { case (_, (coordinator, _)) => coordinator.watch(sender, global = true) }
       if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
 
     case request@GracefulShutdown() => sender.replyWith(request) {

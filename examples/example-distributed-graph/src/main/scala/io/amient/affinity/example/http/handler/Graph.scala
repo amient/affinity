@@ -52,7 +52,7 @@ trait Graph extends HttpGateway with WebSocketSupport with GraphLogic {
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, "graph", vertex) {
+          avroWebSocket(upgrade, service("graph"), "graph", vertex) {
             case x: Edge => println("My custom handler of Edge: " + x)
           }
         }

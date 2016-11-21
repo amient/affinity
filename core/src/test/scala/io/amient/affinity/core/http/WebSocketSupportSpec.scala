@@ -28,7 +28,7 @@ import akka.http.scaladsl.model.HttpMethods.GET
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.IntegrationTestBase
-import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion, GracefulShutdown}
+import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.{Controller, Gateway, Partition, WebSocketSupport}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.serde.avro._
@@ -48,7 +48,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(10 seconds)
 
-  controller ? CreateRegion(Props(new Partition() {
+  controller ? CreateContainer("region", Props(new Partition() {
     val data = state[Int, Base]("test")
 
     override def handle: Receive = {
@@ -59,7 +59,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   val httpPort = Await.result(controller ? CreateGateway(Props(new Gateway() with WebSocketSupport {
     override def handle: Receive = {
       case http@HTTP(GET, PATH("test"), _, response) =>
-        avroWebSocket(http, "test", 1) {
+        avroWebSocket(http, service("region"),  "test", 1) {
           case c: Composite => System.err.println("WS Server custom avro message " + c)
         }
     }

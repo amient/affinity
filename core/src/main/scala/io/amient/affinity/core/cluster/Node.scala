@@ -69,19 +69,13 @@ class Node(config: Config) {
   import system.dispatcher
   implicit val scheduler = system.scheduler
 
-  implicit def serviceCreatorToProps[T <: Service](creator: => T)(implicit tag: ClassTag[T]): Props = {
+  implicit def partitionCreatorToProps[T <: Partition](creator: => T)(implicit tag: ClassTag[T]): Props = {
     Props(creator)
   }
 
-  def startRegion[T <: Partition](partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
+  def startContainer[T <: Partition](group: String, partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack CreateRegion(Props(partitionCreator)))
-  }
-
-  def startServices(services: Props*): Future[Unit] = {
-    require(services.forall(props => classOf[Service].isAssignableFrom(props.actorClass)))
-    implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack CreateServiceContainer(services))
+    startupFutureWithShutdownFuse(controller ack CreateContainer(group, Props(partitionCreator)))
   }
 
   /**

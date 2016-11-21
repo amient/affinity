@@ -39,16 +39,16 @@ trait GraphLogic extends Gateway {
 
   protected def getVertexProps(vid: Int): Future[Option[VertexProps]] = {
     implicit val timeout = Timeout(1 seconds)
-    cluster ack GetVertexProps(vid)
+    service("graph") ack GetVertexProps(vid)
   }
 
   protected def getGraphComponent(cid: Int): Future[Option[Component]] = {
     implicit val timeout = Timeout(1 seconds)
-    cluster ack GetComponent(cid)
+    service("graph") ack GetComponent(cid)
   }
 
   protected def connect(v1: Int, v2: Int): Future[Set[Int]] = {
-    Transaction(cluster) { transaction =>
+    Transaction(service("graph")) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
         case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
@@ -68,7 +68,7 @@ trait GraphLogic extends Gateway {
   }
 
   protected def disconnect(v1: Int, v2: Int): Future[Set[Int]] = {
-    Transaction(cluster) { transaction =>
+    Transaction(service("graph")) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
         case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
@@ -102,7 +102,7 @@ trait GraphLogic extends Gateway {
       if (queue.isEmpty) {
         promise.success(Component(ts, agg))
       }
-      else cluster ack GetVertexProps(queue.head) map {
+      else service("graph") ack GetVertexProps(queue.head) map {
         _ match {
           case None => throw new NoSuchElementException
           case Some(VertexProps(_, cid, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)

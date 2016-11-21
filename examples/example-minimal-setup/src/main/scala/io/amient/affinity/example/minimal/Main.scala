@@ -30,7 +30,7 @@ object Main extends App {
 
     new Node(ConfigFactory.load("minimal-example")) {
 
-      startRegion(new MySimplePartition)
+      startContainer("simple-keyspace", new MySimplePartition)
 
       startGateway(new MySimpleGateway)
     }

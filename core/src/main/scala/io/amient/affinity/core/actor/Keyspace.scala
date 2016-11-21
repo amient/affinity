@@ -26,15 +26,15 @@ import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
 
 import scala.collection.mutable
 
-object Cluster {
+object Keyspace {
   final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
-  final case class CheckClusterAvailability() extends Reply[ClusterAvailability]
-  final case class ClusterAvailability(suspended: Boolean)
+  final case class CheckClusterAvailability(group: String) extends Reply[ClusterAvailability]
+  final case class ClusterAvailability(group: String, suspended: Boolean)
 }
 
-class Cluster extends Actor {
+class Keyspace extends Actor {
 
-  import Cluster._
+  import Keyspace._
 
   private val config = context.system.settings.config
 
@@ -63,8 +63,8 @@ class Cluster extends Actor {
         if (removed != routee) routes.put(partition, removed)
       }
 
-    case req@CheckClusterAvailability() => sender.reply(req) {
-      ClusterAvailability(suspended = (routes.size != numPartitions))
+    case req@CheckClusterAvailability(group) => sender.reply(req) {
+      ClusterAvailability(group, suspended = (routes.size != numPartitions))
     }
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)

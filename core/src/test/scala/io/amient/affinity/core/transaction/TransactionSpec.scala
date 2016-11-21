@@ -25,7 +25,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateRegion, GracefulShutdown}
+import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateContainer, GracefulShutdown}
 import io.amient.affinity.core.actor.{Controller, Gateway, Partition}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.{IntegrationTestBase, ack}
@@ -42,7 +42,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(10 seconds)
 
-  controller ? CreateRegion(Props(new Partition() {
+  controller ? CreateContainer("region", Props(new Partition() {
     val data = state[TestKey, TestValue]("test")
 
     override def handle: Receive = {
@@ -76,12 +76,12 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
   val httpPort = Await.result(controller ? CreateGateway(Props(new Gateway() {
     override def handle: Receive = {
       case http@HTTP(GET, PATH("get", INT(id)), _, response) =>
-        delegateAndHandleErrors(response, cluster ack TestKey(id)) {
+        delegateAndHandleErrors(response, service("region") ack TestKey(id)) {
           case Some(value) => HttpResponse(OK, entity = value.toString)
           case None => HttpResponse(NotFound)
         }
       case http@HTTP(GET, PATH("add", INT(id)), QUERY(("items", items)), response) =>
-        val t = Transaction(cluster) { transaction =>
+        val t = Transaction(service("region")) { transaction =>
           def recAddItem(itemsToAdd: List[Int]): Future[TestValue] = {
             transaction execute AddItem(TestKey(id), itemsToAdd.head) flatMap {
               case v: TestValue => if (itemsToAdd.tail.isEmpty) Future.successful(v) else recAddItem(itemsToAdd.tail)
@@ -95,7 +95,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
         }
 
       case http@HTTP(GET, PATH("remove", INT(id)), QUERY(("items", items)), response) =>
-        val t = Transaction(cluster) { transaction =>
+        val t = Transaction(service("region")) { transaction =>
           def recAddItem(itemsToRemove: List[Int]): Future[TestValue] = {
             transaction execute RemoveItem(TestKey(id), itemsToRemove.head) flatMap {
               case v: TestValue => if (itemsToRemove.tail.isEmpty) Future.successful(v) else recAddItem(itemsToRemove.tail)
