@@ -66,12 +66,12 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka 
   })
 
   val region1 = new Node(config) {
-    startContainer("keyspace1", new MyTestPartition("consistency-test"))
+    startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
   }
   val region2 = new Node(config) {
-    startContainer("keyspace1", new MyTestPartition("consistency-test"))
+    startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
   }
-  gateway.awaitClusterReady()
+  gateway.awaitServiceReady("keyspace1")
 
   override def afterAll(): Unit = {
     try {

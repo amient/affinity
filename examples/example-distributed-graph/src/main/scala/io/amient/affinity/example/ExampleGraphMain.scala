@@ -19,27 +19,16 @@
 
 package io.amient.affinity.example
 
-import io.amient.affinity.example.data.DataNode
-import io.amient.affinity.example.rest.HttpGateway
-import io.amient.affinity.example.service.ServiceNode
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.core.cluster.Node
 
 import scala.util.control.NonFatal
 
 object ExampleGraphMain extends App {
   try {
-    // singleton services
-    ServiceNode.main(Seq("2550").toArray)
 
-
-    // partition masters and standbys
-    DataNode.main(Seq("2551", "0,1").toArray)
-    DataNode.main(Seq("2552", "1,2").toArray)
-    DataNode.main(Seq("2553", "2,3").toArray)
-    DataNode.main(Seq("2554", "3,0").toArray)
-
-    // gateways
-    HttpGateway.main(Seq("8881").toArray)
-    HttpGateway.main(Seq("8882").toArray)
+    val logicalConfig = ConfigFactory.load("example")
+    new Node(ConfigFactory.load("example-node1").withFallback(logicalConfig)).start()
 
   } catch {
     case NonFatal(e) =>

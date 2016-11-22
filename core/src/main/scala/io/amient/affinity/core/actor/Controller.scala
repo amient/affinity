@@ -24,17 +24,15 @@ import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.cluster.{Coordinator, Node}
 import io.amient.affinity.core.util.Reply
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 
 object Controller {
 
-  final case class CreateContainer(group: String, partitionProps: Props) extends Reply[Unit]
+  final case class CreateContainer(group: String, partitions: List[Int], partitionProps: Props) extends Reply[Unit]
 
   final case class ContainerOnline(group: String)
 
@@ -58,10 +56,9 @@ class Controller extends Actor {
 
   private var gatewayPromise: Promise[Int] = null
 
-  private val containers = scala.collection.mutable.Map[String, (Coordinator, Promise[Unit])]()
+  private val containers = scala.collection.mutable.Map[String, Promise[Unit]]()
 
   override def postStop(): Unit = {
-    containers.foreach { case (group, (coordinator, _)) => coordinator.close() }
     super.postStop()
   }
 
@@ -71,29 +68,30 @@ class Controller extends Actor {
 
   override def receive: Receive = {
 
-    case request@CreateContainer(group, partitionProps) => sender.replyWith(request) {
+    case request@CreateContainer(group, partitions, partitionProps) => sender.replyWith(request) {
       try {
-        System.err.println(s"Creating service container for $group")
-        val coordinator =  Coordinator.create(system, group)
-        context.actorOf(Props(new Container(coordinator, group) {
-          val partitions = config.getIntList(Node.CONFIG_PARTITION_LIST).asScala
+        log.info(s"Creating Container for $group with partitions $partitions")
+        context.actorOf(Props(new Container(group) {
           for (partition <- partitions) {
             context.actorOf(partitionProps, name = partition.toString)
           }
-        }), name = s"$group")
+        }), name = group)
         val promise = Promise[Unit]()
-        containers.put(group, (coordinator, promise))
+        containers.put(group, promise)
         promise.future
       } catch {
-        case e: InvalidActorNameException => containers(group)._2.future
+        case e: InvalidActorNameException => containers(group).future
       }
     }
 
     case msg@Terminated(child) if (containers.contains(child.path.name)) =>
-      val (_, promise) = containers(child.path.name)
+      val promise = containers(child.path.name)
       if (!promise.isCompleted) promise.failure(new AkkaException("Container initialisation failed"))
 
-    case ContainerOnline(group) => if (!containers(group)._2.isCompleted) containers(group)._2.success(())
+    case ContainerOnline(group) => containers(group) match {
+      case promise => if (!promise.isCompleted) containers(group).success(())
+    }
+
 
     case request@CreateGateway(gatewayProps) => try {
       context.watch(context.actorOf(gatewayProps, name = "gateway"))
@@ -108,12 +106,9 @@ class Controller extends Actor {
     }
 
     case msg@Terminated(child) if (child.path.name == "gateway") =>
-      containers.foreach { case (_, (coordinator, _)) => coordinator.unwatch(child) }
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
-    case GatewayCreated(httpPort) =>
-      containers.foreach { case (_, (coordinator, _)) => coordinator.watch(sender, global = true) }
-      if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
+    case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
 
     case request@GracefulShutdown() => sender.replyWith(request) {
       implicit val timeout = Timeout(500 milliseconds)

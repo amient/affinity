@@ -21,7 +21,7 @@ package io.amient.affinity.core.actor
 
 import java.security.{KeyStore, SecureRandom}
 import java.util
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
@@ -41,7 +41,8 @@ import akka.util.{ByteString, Timeout}
 import com.fasterxml.jackson.databind.JsonNode
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.Keyspace.{CheckClusterAvailability, ClusterAvailability}
+import io.amient.affinity.core.actor.Service.{CheckClusterAvailability, ClusterAvailability}
+import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
@@ -56,6 +57,11 @@ import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object Gateway {
+  final val CONFIG_SERVICES = "affinity.service"
+
+  final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
+
+  final val CONFIG_GATEWAY_CLASS = "affinity.node.gateway.class"
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
   final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
 
@@ -73,7 +79,19 @@ abstract class Gateway extends Actor {
 
   private val config = context.system.settings.config
 
-  private val services = new ConcurrentHashMap[String, (ActorRef, Boolean)]()
+  private val services: Map[String, (Coordinator, ActorRef, AtomicBoolean)] =
+    config.getObject(CONFIG_SERVICES).asScala.map(_._1).map { group =>
+      val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
+      log.info(s"Expecting group $group of ${serviceConfig.getString(Service.CONFIG_NUM_PARTITIONS)} partitions")
+      val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
+      val coordinator = Coordinator.create(context.system, group)
+      context.watch(service)
+      group -> (coordinator, service, new AtomicBoolean(true))
+    }.toMap
+  private var handlingSuspended = services.exists(_._2._3.get)
+  private val suspendedQueueMaxSize = 1000
+  //TODO configurable suspended queue max size
+  private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
 
   import context.{dispatcher, system}
 
@@ -98,13 +116,13 @@ abstract class Gateway extends Actor {
     config.getString(CONFIG_HTTP_HOST), config.getInt(CONFIG_HTTP_PORT), sslContext)
 
 
-  def describeServices = services.asScala.map { case (group, (actorRef, suspended)) => (group, actorRef.path.toString) }
+  def describeServices = services.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
 
   def describeRegions: List[String] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
     val routeeSets = Future.sequence {
-      services.asScala.map { case (group, (actorRef, suspended)) =>
+      services.map { case (group, (_, actorRef, _)) =>
         actorRef ? GetRoutees map (_.asInstanceOf[Routees])
       }
     }
@@ -114,24 +132,25 @@ abstract class Gateway extends Actor {
   override def preStart(): Unit = {
     log.info("starting gateway")
     httpInterface.bind(self)
-    //    context.watch(cluster)
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
+    services.values.foreach(_._1.watch(self, global = true))
   }
 
   override def postStop(): Unit = {
     log.info("stopping gateway")
     httpInterface.close()
+    services.values.foreach(_._1.unwatch(self))
   }
 
   def service(group: String): ActorRef = {
-    services.get(group) match {
-      case null => throw new IllegalStateException(s"Service not available for group $group")
-      case (actorRef, suspended) => actorRef
+    services(group) match {
+      case (_, null, _) => throw new IllegalStateException(s"Service not available for group $group")
+      case (_, actorRef, _) => actorRef
     }
   }
 
   //  def service[X <: Actor](implicit tag: ClassTag[X]): ActorRef = {
-  //    services.get(tag.runtimeClass) match {
+  //    services(tag.runtimeClass) match {
   //      case null => throw new IllegalStateException(s"Service not available for ${tag.runtimeClass}")
   //      case instance => instance
   //    }
@@ -186,11 +205,6 @@ abstract class Gateway extends Actor {
     }
   }
 
-  private var handlingSuspended = true
-  private val suspendedQueueMaxSize = 1000
-  //TODO configurable suspended queue max size
-  private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
-
   final def receive: Receive = manage orElse handle orElse {
     case exchange: HttpExchange => {
       //no handler matched the HttpExchange
@@ -204,26 +218,8 @@ abstract class Gateway extends Actor {
 
   private def manage: Receive = {
 
-    //    case msg@MasterStatusUpdate("regions", add, remove) => sender.reply(msg) {
-    //      remove.foreach(ref => cluster ! RemoveRoutee(ActorRefRoutee(ref)))
-    //      add.foreach(ref => cluster ! AddRoutee(ActorRefRoutee(ref)))
-    //      cluster ! CheckClusterAvailability()
-    //    }
-    //
-    //    case msg@MasterStatusUpdate("services", add, remove) => sender.reply(msg) {
-    //      add.foreach(ref => services.put(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
-    //      remove.foreach(ref => services.remove(Class.forName(ref.path.name).asSubclass(classOf[Actor]), ref))
-    //      implicit val timeout = Timeout(1 second)
-    //      cluster ! CheckClusterAvailability()
-    //    }
-
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
-      if (!services.containsKey(group)) {
-        val service = context.actorOf(Props(new Keyspace()), name = group)
-        services.put(group, (service, true))
-        context.watch(service)
-      }
-      val service = services.get(group)._1
+      val service = services(group)._2
       remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => service ! AddRoutee(ActorRefRoutee(ref)))
       service ! CheckClusterAvailability(group)
@@ -231,10 +227,10 @@ abstract class Gateway extends Actor {
 
 
     case msg@ClusterAvailability(group, suspended) =>
-      val (actorRef, currentlySuspended) = services.get(group)
-      if (currentlySuspended != suspended) {
-        services.put(group, (actorRef, suspended))
-        val gatewayShouldBeSuspended = services.asScala.exists(_._2._2)
+      val (_, actorRef, currentlySuspended) = services(group)
+      if (currentlySuspended.get != suspended) {
+        services(group)._3.set(suspended)
+        val gatewayShouldBeSuspended = services.exists(_._2._3.get)
         if (gatewayShouldBeSuspended != handlingSuspended) {
           handlingSuspended = suspended
           context.system.eventStream.publish(msg)

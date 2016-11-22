@@ -19,31 +19,11 @@
 
 package io.amient.affinity.example.data
 
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.model.graph.GraphPartition
 
-import scala.collection.JavaConverters._
 
+class DataPartition extends Partition
+  with GraphPartition
+  with DebugPartition
 
-object DataNode {
-
-  def main(args: Array[String]): Unit = {
-    require(args.length == 2, "Service Node requires 2 argument: <akka-port> <node-partition-list>")
-
-    val akkaPort = args(0).toInt
-    val partitionList = args(1).split("\\,").map(_.toInt).toList.asJava
-
-    val config = ConfigFactory.load("example")
-      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(akkaPort))
-      .withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(partitionList))
-
-    new Node(config) {
-      startContainer("graph", new Partition
-        with GraphPartition
-        with DebugPartition
-      )
-    }
-  }
-}

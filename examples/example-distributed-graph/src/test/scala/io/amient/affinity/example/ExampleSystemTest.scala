@@ -28,7 +28,7 @@ import akka.http.scaladsl.model.Uri
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.JsonNode
-import com.typesafe.config.ConfigValueFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
@@ -49,26 +49,34 @@ import scala.language.postfixOps
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
-  val config = configure("example").withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
+  val config = ConfigFactory.load("example")
+    .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(2))
+    .withValue("akka.logLevel", ConfigValueFactory.fromAnyRef("ERROR"))
 
-  val gateway = new TestGatewayNode(config, new HttpGateway
+
+  val gatewayNode = new TestGatewayNode(configure(config), new HttpGateway
     with Ping
     with Admin
     with PublicApi
     with Graph)
 
-  val region = new Node(config.withValue(Node.CONFIG_PARTITION_LIST, ConfigValueFactory.fromIterable(List(0, 1).asJava))) {
-    startContainer("graph", new Partition with GraphPartition)
+  val regionNode = new Node(configure(config)) {
+    startContainer("graph", List(0, 1))
   }
 
-  gateway.awaitClusterReady()
+  val serviceNode = new Node(configure(config)) {
+    startContainer("user-mediator", List(0))
+  }
 
-  import gateway._
+  gatewayNode.awaitServiceReady("graph")
+
+  import gatewayNode._
 
   override def afterAll(): Unit = {
     try {
-      region.shutdown()
-      gateway.shutdown()
+      regionNode.shutdown()
+      serviceNode.shutdown()
+      gatewayNode.shutdown()
     } finally {
       super.afterAll()
     }
@@ -93,7 +101,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     val publicKey = "pkey1"
     val createApiKey = http_post(uri(s"/settings/add?key=$publicKey"), "", List(Authorization.basic("admin", "1234")))
     createApiKey.status should be(OK)
-    implicit val materializer = ActorMaterializer.create(gateway.system)
+    implicit val materializer = ActorMaterializer.create(gatewayNode.system)
     val salt = get_json(createApiKey).textValue
     val crypto = new TimeCryptoProofSHA256(salt)
 

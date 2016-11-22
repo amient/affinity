@@ -48,7 +48,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(10 seconds)
 
-  controller ? CreateContainer("region", Props(new Partition() {
+  controller ? CreateContainer("region", List(0,1,2,3), Props(new Partition() {
     val data = state[Int, Base]("test")
 
     override def handle: Receive = {
@@ -67,7 +67,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     case port: Int => port
   }, timeout.duration)
 
-  awaitClusterReady()
+  awaitServiceReady("region")
 
   override def afterAll: Unit = {
     controller ! GracefulShutdown()

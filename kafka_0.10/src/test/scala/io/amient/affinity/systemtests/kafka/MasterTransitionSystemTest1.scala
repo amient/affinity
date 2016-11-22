@@ -72,7 +72,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
   import gateway._
 
   val region1 = new Node(config) {
-    startContainer("keyspace1", new MyTestPartition("consistency-test") {
+    startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test") {
       override def preStart(): Unit = {
         super.preStart()
         if (partition == 0) data.update("B", "initialValueB")
@@ -82,10 +82,10 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
   }
 
   val region2 = new Node(config) {
-    startContainer("keyspace1", new MyTestPartition("consistency-test"))
+    startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
   }
 
-  gateway.awaitClusterReady()
+  gateway.awaitServiceReady("keyspace1")
 
   override def afterAll(): Unit = {
     try {

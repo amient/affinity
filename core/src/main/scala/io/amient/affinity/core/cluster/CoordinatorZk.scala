@@ -30,10 +30,10 @@ import org.apache.zookeeper.CreateMode
 import scala.collection.JavaConverters._
 
 object CoordinatorZk {
-  final val CONFIG_ZOOKEEPER_ROOT = "affinity.cluster.coordinator.zookeeper.root"
-  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.cluster.coordinator.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.connect.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.cluster.coordinator.zookeeper.timeout.session.ms"
+  final val CONFIG_ZOOKEEPER_ROOT = "affinity.coordinator.zookeeper.root"
+  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.coordinator.zookeeper.connect"
+  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.coordinator.zookeeper.timeout.connect.ms"
+  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.coordinator.zookeeper.timeout.session.ms"
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {

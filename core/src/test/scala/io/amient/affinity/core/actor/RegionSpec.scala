@@ -45,13 +45,13 @@ class RegionSpec extends IntegrationTestBase with Matchers {
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-      val coordinator = new CoordinatorEmbedded(system, "coordinator-test-group", null)
+      val coordinator = new CoordinatorEmbedded(system, "region", null)
       try {
         val d = 1 second
         implicit val timeout = Timeout(d)
 
-        val region = system.actorOf(Props(new Container(coordinator, "region") {
-          val partitions = system.settings.config.getIntList(Node.CONFIG_PARTITION_LIST).asScala
+        val region = system.actorOf(Props(new Container("region") {
+          val partitions = List(0,1,2,3)
           for (partition <- partitions) {
             context.actorOf(testPartition, name = partition.toString)
           }

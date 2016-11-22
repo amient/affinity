@@ -41,17 +41,17 @@ object HttpGateway {
     val config = ConfigFactory.load("example").withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
 
     new Node(config) {
-      startGateway(new HttpGateway
-        with Graph
-        with Admin
-        with PublicApi
-        with Ping
-        with Fail
-      )
+      startGateway(new ExampleGateway)
     }
   }
-
 }
+
+class ExampleGateway extends HttpGateway
+  with Graph
+  with Admin
+  with PublicApi
+  with Ping
+  with Fail
 
 class HttpGateway extends Gateway with ActorState {
 

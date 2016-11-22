@@ -22,7 +22,7 @@ package io.amient.affinity.core.cluster
 
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigList}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
@@ -33,24 +33,26 @@ import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 import scala.language.postfixOps
 import scala.language.implicitConversions
+import scala.collection.JavaConverters._
 
 object Node {
-  final val CONFIG_AKKA_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"
-  final val CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS = "affinity.node.shutdown.timeout.ms"
-  final val CONFIG_AKKA_SYSTEM_NAME = "affinity.node.name"
+
+  final val CONFIG_NODE_CONTAINERS = "affinity.node.container"
+  final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
+  final val CONFIG_NODE_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"
+  final val CONFIG_NODE_SHUTDOWN_TIMEOUT_MS = "affinity.node.shutdown.timeout.ms"
+  final val CONFIG_NODE_SYSTEM_NAME = "affinity.node.name"
   final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.hostname"
   final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
-
-  final val CONFIG_PARTITION_LIST = "affinity.node.region.partitions"
 }
 
 class Node(config: Config) {
 
   import Node._
 
-  private val actorSystemName = config.getString(CONFIG_AKKA_SYSTEM_NAME)
-  val startupTimeout = config.getInt(CONFIG_AKKA_STARTUP_TIMEOUT_MS) milliseconds
-  val shutdownTimeout = config.getInt(CONFIG_AKKA_SHUTDOWN_TIMEOUT_MS) milliseconds
+  private val actorSystemName = config.getString(CONFIG_NODE_SYSTEM_NAME)
+  val startupTimeout = config.getInt(CONFIG_NODE_STARTUP_TIMEOUT_MS) milliseconds
+  val shutdownTimeout = config.getInt(CONFIG_NODE_SHUTDOWN_TIMEOUT_MS) milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
@@ -67,15 +69,37 @@ class Node(config: Config) {
   }
 
   import system.dispatcher
+
   implicit val scheduler = system.scheduler
 
   implicit def partitionCreatorToProps[T <: Partition](creator: => T)(implicit tag: ClassTag[T]): Props = {
     Props(creator)
   }
 
-  def startContainer[T <: Partition](group: String, partitionCreator: => T)(implicit tag: ClassTag[T]): Future[Unit] = {
+  def start() = {
+    if (config.hasPath(CONFIG_NODE_CONTAINERS)) {
+      config.getObject(CONFIG_NODE_CONTAINERS).asScala.foreach { case (group, value) =>
+        val partitions = value.asInstanceOf[ConfigList].asScala.map(_.unwrapped().asInstanceOf[Int]).toList
+        startContainer(group, partitions)
+      }
+    }
+    if (config.hasPath(Gateway.CONFIG_GATEWAY_CLASS)) {
+      val cls = Class.forName(config.getString(Gateway.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[Gateway])
+      startGateway(cls.newInstance())
+    }
+  }
+
+  def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack CreateContainer(group, Props(partitionCreator)))
+    val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
+    val serviceClass = Class.forName(serviceConfig.getString(Service.CONFIG_SERVICE_CLASS)).asSubclass(classOf[Partition])
+    startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
+  }
+
+  def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
+                                    (implicit tag: ClassTag[T]): Future[Unit] = {
+    implicit val timeout = Timeout(startupTimeout)
+    startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(partitionCreator)))
   }
 
   /**

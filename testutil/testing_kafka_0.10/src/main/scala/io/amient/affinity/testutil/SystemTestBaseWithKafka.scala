@@ -24,7 +24,7 @@ import java.util.Properties
 
 import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{Keyspace, Partition}
+import io.amient.affinity.core.actor.{Service, Partition}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.{Reply, ZooKeeperClient}
@@ -57,7 +57,7 @@ trait SystemTestBaseWithKafka extends SystemTestBaseWithZk {
   tmpZkClient.close
 
   override def configure(config: Config): Config = super.configure(config)
-    .withValue(Keyspace.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2)) match {
+    .withValue(Service.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2)) match {
     case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
     case cfg =>
       cfg.getConfig(State.CONFIG_STATE).entrySet().asScala

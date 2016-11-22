@@ -36,7 +36,7 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Keyspace.ClusterAvailability
+import io.amient.affinity.core.actor.Service.ClusterAvailability
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.cluster.Node
 import org.apache.avro.util.ByteBufferInputStream
@@ -59,7 +59,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     .withFallback(ConfigFactory.defaultReference()))
 
   def configure(config: Config): Config = config
-    .withValue(Node.CONFIG_AKKA_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
+    .withValue(Node.CONFIG_NODE_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
     .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
     .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
@@ -97,11 +97,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       ConnectionContext.https(context)
     }
 
-    def awaitClusterReady() {
+    def awaitServiceReady(group: String) {
       val clusterReady = new AtomicBoolean(false)
       system.eventStream.subscribe(system.actorOf(Props(new Actor {
         override def receive: Receive = {
-          case ClusterAvailability(_, false) => {
+          case ClusterAvailability(g, false) if (g == group) => {
             clusterReady.set(true)
             clusterReady.synchronized(clusterReady.notify)
           }

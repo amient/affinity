@@ -52,14 +52,14 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
   })
 
   val region = new Node(config) {
-    startContainer("region", new Partition {
+    startContainer("region", List(0,1), new Partition {
       override def handle: Receive = {
         case "ping" => sender ! "pong"
       }
     })
   }
 
-  gateway.awaitClusterReady()
+  gateway.awaitServiceReady("region")
 
   override def afterAll(): Unit = {
     try {

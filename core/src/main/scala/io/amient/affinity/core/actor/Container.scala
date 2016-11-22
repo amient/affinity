@@ -40,7 +40,7 @@ object Container {
 
 }
 
-class Container(coordinator: Coordinator, group: String) extends Actor {
+class Container(group: String) extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
@@ -57,6 +57,7 @@ class Container(coordinator: Coordinator, group: String) extends Actor {
   /**
     * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
     */
+  private val coordinator = Coordinator.create(context.system, group)
   coordinator.watch(self, global = false)
 
   override def preStart(): Unit = {

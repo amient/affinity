@@ -28,12 +28,7 @@ object Main extends App {
 
   try {
 
-    new Node(ConfigFactory.load("minimal-example")) {
-
-      startContainer("simple-keyspace", new MySimplePartition)
-
-      startGateway(new MySimpleGateway)
-    }
+    new Node(ConfigFactory.load("minimal-example")).start()
 
   } catch {
     case NonFatal(e) =>

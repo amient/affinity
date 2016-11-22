@@ -54,7 +54,7 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
     }
   }
 
-  "xyz" should "123" in {
+  "HTTPS Requests" should "be handled correctly as TLS" in {
     gateway.http_get(gateway.https_uri("/tls-hello")).entity should equal(HttpEntity("Hello World"))
   }
 

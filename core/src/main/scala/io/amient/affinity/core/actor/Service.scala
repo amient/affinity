@@ -21,22 +21,22 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.routing._
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
 
 import scala.collection.mutable
 
-object Keyspace {
-  final val CONFIG_NUM_PARTITIONS = "affinity.cluster.num.partitions"
+object Service {
+  final val CONFIG_SERVICE_CLASS = s"class"
+  final val CONFIG_NUM_PARTITIONS = s"num.partitions"
   final case class CheckClusterAvailability(group: String) extends Reply[ClusterAvailability]
   final case class ClusterAvailability(group: String, suspended: Boolean)
 }
 
-class Keyspace extends Actor {
+class Service(config: Config) extends Actor {
 
-  import Keyspace._
-
-  private val config = context.system.settings.config
+  import Service._
 
   private val numPartitions = config.getInt(CONFIG_NUM_PARTITIONS)
 

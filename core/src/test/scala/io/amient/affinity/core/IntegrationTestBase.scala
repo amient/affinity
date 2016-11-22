@@ -28,7 +28,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Keyspace.ClusterAvailability
+import io.amient.affinity.core.actor.Service.ClusterAvailability
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
@@ -50,12 +50,14 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
 
   implicit val scheduler = system.scheduler
 
-  private val clusterReady = new AtomicBoolean(false)
+  private val servicesReady = scala.collection.mutable.Set[String]()
   system.eventStream.subscribe(system.actorOf(Props(new Actor {
     override def receive: Receive = {
-      case ClusterAvailability(_, false) => {
-        clusterReady.set(true)
-        clusterReady.synchronized(clusterReady.notify)
+      case ClusterAvailability(g, false) => {
+        servicesReady.synchronized {
+          servicesReady.add(g)
+          servicesReady.notify
+        }
       }
     }
   })), classOf[ClusterAvailability])
@@ -64,10 +66,13 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
     TestKit.shutdownActorSystem(system)
   }
 
-  def awaitClusterReady() {
-    if (!clusterReady.get) {
-      clusterReady.synchronized(clusterReady.wait(15000))
-      assert(clusterReady.get)
+  def awaitServiceReady(group: String) {
+    val t = System.currentTimeMillis()
+    servicesReady.synchronized {
+      while (!servicesReady.contains(group)) {
+        servicesReady.wait(5000)
+        if (System.currentTimeMillis() - t > 15000) assert(servicesReady.contains(group))
+      }
     }
   }
 

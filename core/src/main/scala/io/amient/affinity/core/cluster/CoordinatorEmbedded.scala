@@ -29,7 +29,7 @@ import scala.collection.mutable
 
 object CoordinatorEmbedded extends Observable {
 
-  final val CONFIG_TEST_COORDINATOR_ID = "affinity.cluster.coordinator.id"
+  final val CONFIG_TEST_COORDINATOR_ID = "affinity.coordinator.id"
   final val AUTO_COORDINATOR_ID = new AtomicInteger(1000000)
 
   private val services = mutable.Map[String, mutable.Map[String, String]]()
