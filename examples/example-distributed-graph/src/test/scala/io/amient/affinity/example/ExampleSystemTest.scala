@@ -29,13 +29,11 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
-import io.amient.affinity.model.graph.GraphPartition
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.affinity.ws.AvroWebSocketClient
 import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
@@ -51,7 +49,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
 
   val config = ConfigFactory.load("example")
     .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(2))
-    .withValue("akka.logLevel", ConfigValueFactory.fromAnyRef("ERROR"))
+    .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
 
 
   val gatewayNode = new TestGatewayNode(configure(config), new HttpGateway

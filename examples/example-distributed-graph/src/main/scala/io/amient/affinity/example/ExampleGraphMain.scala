@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions, ConfigResolveOptions}
 import io.amient.affinity.core.cluster.Node
 
 import scala.util.control.NonFatal
@@ -27,8 +27,15 @@ import scala.util.control.NonFatal
 object ExampleGraphMain extends App {
   try {
 
-    val logicalConfig = ConfigFactory.load("example")
-    new Node(ConfigFactory.load("example-node1").withFallback(logicalConfig)).start()
+
+    val config = ConfigFactory.load("example")
+    val node1config = ConfigFactory.parseResources("example-node1.conf").withFallback(config)
+    assert(node1config.getString("akka.loglevel") == "INFO")
+    assert(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
+    assert(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
+
+    new Node(node1config).start()
+    new Node(ConfigFactory.parseResources("example-node2.conf").withFallback(config)).start()
 
   } catch {
     case NonFatal(e) =>
