@@ -92,12 +92,13 @@ class Partition extends Actor with ActorState {
 
   protected def manage: Receive = {
 
-    case msg@BecomeMaster() => sender.reply(msg) {
+    case msg@BecomeMaster() =>
+      sender.reply(msg) {}
       onBecomeMaster
-    }
-    case msg@BecomeStandby() => sender.reply(msg) {
+
+    case msg@BecomeStandby() =>
+      sender.reply(msg) {}
       onBecomeStandby
-    }
 
     case (key: Any, INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName: String) => try {
       val state = getStateStore(stateStoreName)
