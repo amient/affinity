@@ -97,9 +97,9 @@ class Container(group: String) extends Actor {
       services -= ref
 
     case request @ MasterStatusUpdate(_, add, remove) => sender.reply(request) {
-      implicit val timeout = Timeout(15 seconds)
-      val removals = remove.toList.map(ref => ref ack BecomeStandby())
-      val additions = add.toList.map(ref => ref ack BecomeMaster())
+      implicit val timeout = Timeout(5 seconds)
+      remove.toList.map(ref => ref ack BecomeStandby())
+      add.toList.map(ref => ref ack BecomeMaster())
     }
 
     case request@GracefulShutdown() => sender.reply(request) {

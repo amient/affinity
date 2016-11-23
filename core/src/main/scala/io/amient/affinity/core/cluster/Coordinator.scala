@@ -106,8 +106,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       //failing this ack means that the watcher would have inconsistent view of the cluster
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
       val update = MasterStatusUpdate(group, currentMasters, Set())
-      //TODO  #12 global config bootstrap timeout
-      implicit val timeout = Timeout(30 seconds)
+      implicit val timeout = Timeout(5 seconds)
       watcher ack (if (global) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
           e.printStackTrace()
@@ -169,8 +168,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
 
     if (!closed.get) watchers.foreach { case (watcher, global) =>
-      //TODO  #12 global config bootstrap timeout
-      implicit val timeout = Timeout(30 seconds)
+      implicit val timeout = Timeout(15 seconds)
       try {
         watcher ack (if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
           case e: Throwable => if (!closed.get) {

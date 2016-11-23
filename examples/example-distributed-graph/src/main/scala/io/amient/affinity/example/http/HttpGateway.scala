@@ -38,7 +38,7 @@ object HttpGateway {
   def main(args: Array[String]): Unit = {
     require(args.length == 1, "Gateway Node requires 1 argument: <http-port>")
     val httpPort = args(0).toInt
-    val config = ConfigFactory.load("example").withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
+    val config = ConfigFactory.load("example").withValue(Gateway.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
 
     new Node(config) {
       startGateway(new ExampleGateway)

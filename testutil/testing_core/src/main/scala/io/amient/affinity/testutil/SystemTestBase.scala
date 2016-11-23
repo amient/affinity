@@ -60,7 +60,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def configure(config: Config): Config = config
     .withValue(Node.CONFIG_NODE_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
-    .withValue(Gateway.CONFIG_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
+    .withValue(Gateway.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
     .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
   def deleteDirectory(path: File) = if (path.exists()) {

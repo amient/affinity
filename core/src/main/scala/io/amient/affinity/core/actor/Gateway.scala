@@ -58,18 +58,18 @@ import scala.util.control.NonFatal
 
 object Gateway {
   final val CONFIG_SERVICES = "affinity.service"
-
   final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
 
   final val CONFIG_GATEWAY_CLASS = "affinity.node.gateway.class"
   final val CONFIG_GATEWAY_SUSPEND_QUEUE_MAX_SIZE = "affinity.node.gateway.suspend.queue.max.size"
-  final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
-  final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
+  final val CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE = "affinity.node.gateway.max.websocket.queue.size"
+  final val CONFIG_GATEWAY_HTTP_HOST = "affinity.node.gateway.http.host"
+  final val CONFIG_GATEWAY_HTTP_PORT = "affinity.node.gateway.http.port"
 
-  final val CONFIG_TLS_KEYSTORE_PKCS = "affinity.node.gateway.tls.keystore.standard"
-  final val CONFIG_TLS_KEYSTORE_PASSWORD = "affinity.node.gateway.tls.keystore.password"
-  final val CONFIG_TLS_KEYSTORE_RESOURCE = "affinity.node.gateway.tls.keystore.resource"
-  final val CONFIG_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
+  final val CONFIG_GATEWAY_TLS_KEYSTORE_PKCS = "affinity.node.gateway.tls.keystore.standard"
+  final val CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD = "affinity.node.gateway.tls.keystore.password"
+  final val CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE = "affinity.node.gateway.tls.keystore.resource"
+  final val CONFIG_GATEWAY_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
 }
 
 abstract class Gateway extends Actor {
@@ -97,15 +97,15 @@ abstract class Gateway extends Actor {
 
   private implicit val scheduler = context.system.scheduler
 
-  val sslContext = if (!config.hasPath(CONFIG_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
+  val sslContext = if (!config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
     log.info("Configuring SSL Context")
-    val password = config.getString(CONFIG_TLS_KEYSTORE_PASSWORD).toCharArray
-    val ks = KeyStore.getInstance(config.getString(CONFIG_TLS_KEYSTORE_PKCS))
-    if (config.hasPath(CONFIG_TLS_KEYSTORE_RESOURCE)) {
-      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_TLS_KEYSTORE_RESOURCE)), password)
+    val password = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD).toCharArray
+    val ks = KeyStore.getInstance(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PKCS))
+    if (config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)) {
+      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)), password)
     } else {
-      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_TLS_KEYSTORE_FILE)), password)
+      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE)), password)
     }
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
     keyManagerFactory.init(ks, password)
@@ -113,7 +113,7 @@ abstract class Gateway extends Actor {
   }
 
   private val httpInterface: HttpInterface = new HttpInterface(
-    config.getString(CONFIG_HTTP_HOST), config.getInt(CONFIG_HTTP_PORT), sslContext)
+    config.getString(CONFIG_GATEWAY_HTTP_HOST), config.getInt(CONFIG_GATEWAY_HTTP_PORT), sslContext)
 
 
   def describeServices = services.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
@@ -406,9 +406,11 @@ trait WebSocketSupport extends Gateway {
           * connections which are closed akka-server-side due to being idle leave zombie
           * flows materialized.
           */
-        //TODO akka/akka#21549 - at the moment worked around by never closing idle connections
+        //akka/akka#21549 - at the moment worked around by never closing idle connections
         //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
         val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
+
+          final val maxBufferSize = context.system.settings.config.getInt(Gateway.CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE)
 
           override def preStart(): Unit = {
             context.watch(keyValueActor)
@@ -418,8 +420,10 @@ trait WebSocketSupport extends Gateway {
 
           private val buffer = new util.LinkedList[Message]()
 
-          //TODO max buffer size
           private def doPush(messages: Message*) = {
+            while (buffer.size + messages.size > maxBufferSize ) {
+              buffer.pop()
+            }
             messages.foreach(buffer.add)
             while (isActive && totalDemand > 0 && buffer.size > 0) {
               sender ! onNext(buffer.pop)
