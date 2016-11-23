@@ -62,6 +62,7 @@ object Gateway {
   final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
 
   final val CONFIG_GATEWAY_CLASS = "affinity.node.gateway.class"
+  final val CONFIG_GATEWAY_SUSPEND_QUEUE_MAX_SIZE = "affinity.node.gateway.suspend.queue.max.size"
   final val CONFIG_HTTP_HOST = "affinity.node.gateway.http.host"
   final val CONFIG_HTTP_PORT = "affinity.node.gateway.http.port"
 
@@ -89,8 +90,7 @@ abstract class Gateway extends Actor {
       group -> (coordinator, service, new AtomicBoolean(true))
     }.toMap
   private var handlingSuspended = services.exists(_._2._3.get)
-  private val suspendedQueueMaxSize = 1000
-  //TODO configurable suspended queue max size
+  private val suspendedQueueMaxSize = config.getInt(CONFIG_GATEWAY_SUSPEND_QUEUE_MAX_SIZE)
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
 
   import context.{dispatcher, system}

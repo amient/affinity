@@ -12,7 +12,6 @@ import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
   * @param config
   * @param partition
   */
-//TODO port this class to to java8
 class FailingKafkaStorage(config: Config, partition: Int) extends KafkaStorage(config, partition) {
 
   val executor = Executors.newFixedThreadPool(1)
