@@ -48,6 +48,7 @@ trait GraphLogic extends Gateway {
   }
 
   protected def connect(v1: Int, v2: Int): Future[Set[Int]] = {
+    implicit val timeout = Timeout(5 seconds)
     Transaction(service("graph")) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
@@ -68,6 +69,7 @@ trait GraphLogic extends Gateway {
   }
 
   protected def disconnect(v1: Int, v2: Int): Future[Set[Int]] = {
+    implicit val timeout = Timeout(5 seconds)
     Transaction(service("graph")) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {

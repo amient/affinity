@@ -19,16 +19,17 @@
 
 package io.amient.affinity.core.transaction
 
+import java.util.concurrent.TimeoutException
+
 import akka.actor.{ActorRef, Scheduler}
+import akka.pattern.after
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
-import scala.concurrent.duration._
-import scala.language.implicitConversions
-import scala.language.postfixOps
 
 /**
   *
@@ -66,10 +67,13 @@ class Transaction(default: ActorRef) {
     }
   }
 
-  def execute[T: ClassTag](read: Future[T])(implicit context: ExecutionContext): Future[T] = {
+  def execute[T: ClassTag](read: Future[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
-    implicit val timeout = Timeout(6 seconds) // FIXME this timeout has to be passed via arg or implicit
-    read onComplete {
+
+    lazy val t = after(timeout.duration, scheduler) (Future.failed(
+      new TimeoutException(s"Execution timed out after ${timeout.duration}")))
+
+    Future firstCompletedOf Seq(read, t) onComplete {
       case Success(result) =>
         //System.err.println(s"SUCCESS $result")
         promise.success(result)
@@ -80,13 +84,12 @@ class Transaction(default: ActorRef) {
     promise.future
   }
 
-  def execute[T: ClassTag](instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+  def execute[T: ClassTag](instr: Instruction[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     execute(default, instr)
   }
 
-  def execute[T: ClassTag](actor: ActorRef, instr: Instruction[T])(implicit context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+  def execute[T: ClassTag](actor: ActorRef, instr: Instruction[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
-    implicit val timeout = Timeout(6 seconds) // FIXME this timeout has to be passed via arg or implicit
     actor ack[T](instr) onComplete {
       case Success(result: T) =>
         //System.err.println(s"SUCCESS $instr")
