@@ -53,7 +53,7 @@ trait GraphLogic extends Gateway {
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
         case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
-          case props2 => transaction execute collectComponent(v2) flatMap {
+          case props2 => transaction apply collectComponent(v2) flatMap {
             case mergedComponent =>
               val newComponentID = mergedComponent.connected.min
               transaction execute UpdateComponent(newComponentID, mergedComponent)
@@ -74,8 +74,8 @@ trait GraphLogic extends Gateway {
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
         case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
-          case props2 => transaction execute collectComponent(v1) flatMap {
-            case component1 => transaction execute collectComponent(v2) flatMap {
+          case props2 => transaction apply collectComponent(v1) flatMap {
+            case component1 => transaction apply collectComponent(v2) flatMap {
               case component2 =>
                 val newComponentIDS = List(component1.connected.min, component2.connected.min)
                 transaction execute UpdateComponent(newComponentIDS(0), component1)

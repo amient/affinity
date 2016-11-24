@@ -25,6 +25,7 @@ import akka.actor.{ActorRef, Scheduler}
 import akka.pattern.after
 import akka.util.Timeout
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
@@ -67,13 +68,13 @@ class Transaction(default: ActorRef) {
     }
   }
 
-  def execute[T: ClassTag](read: Future[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+  def apply[T: ClassTag](f: Future[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
 
     lazy val t = after(timeout.duration, scheduler) (Future.failed(
-      new TimeoutException(s"Execution timed out after ${timeout.duration}")))
+      new TimeoutException(s"Transaction future timed out after ${timeout.duration}")))
 
-    Future firstCompletedOf Seq(read, t) onComplete {
+    Future firstCompletedOf Seq(f, t) onComplete {
       case Success(result) =>
         //System.err.println(s"SUCCESS $result")
         promise.success(result)
@@ -84,16 +85,29 @@ class Transaction(default: ActorRef) {
     promise.future
   }
 
-  def execute[T: ClassTag](instr: Instruction[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
-    execute(default, instr)
+  def apply[T: ClassTag](actor: ActorRef, query: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+    val promise = Promise[T]()
+    actor ack query onComplete {
+      case Success(result) =>
+        //System.err.println(s"SUCCESS $result")
+        promise.success(result)
+      case Failure(e) =>
+        //System.err.println(s"FAILURE ${e.getMessage}")
+        promise.failure(e)
+    }
+    promise.future
   }
 
-  def execute[T: ClassTag](actor: ActorRef, instr: Instruction[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+  def execute[T: ClassTag](cmd: Instruction[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+    execute(default, cmd)
+  }
+
+  def execute[T: ClassTag](actor: ActorRef, cmd: Instruction[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
-    actor ack[T](instr) onComplete {
+    actor ack[T](cmd) onComplete {
       case Success(result: T) =>
         //System.err.println(s"SUCCESS $instr")
-        stack = stack :+ CompletedInstruction(actor, instr, result)
+        stack = stack :+ CompletedInstruction(actor, cmd, result)
         promise.success(result)
       case Failure(e) =>
         //System.err.println(s"FAILURE $instr: $e")
