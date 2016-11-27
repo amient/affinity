@@ -130,7 +130,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * @return Future Optional of the value previously held at the key position
     */
   def insert(key: K, value: V) = update(key) {
-    case Some(existing) => throw new IllegalArgumentException(s"$key already exists in $name")
+    case Some(existing) => throw new IllegalArgumentException(s"$key already exists in state store `$name`")
     case None => (Some(value), Some(value), value)
   }
 

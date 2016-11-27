@@ -85,9 +85,13 @@ class Transaction(default: ActorRef) {
     promise.future
   }
 
-  def apply[T: ClassTag](actor: ActorRef, query: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+  def query[T: ClassTag](q: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
+    query(default, q)
+  }
+
+  def query[T: ClassTag](actor: ActorRef, q: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
-    actor ack query onComplete {
+    actor ack q onComplete {
       case Success(result) =>
         //System.err.println(s"SUCCESS $result")
         promise.success(result)
