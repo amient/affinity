@@ -404,11 +404,12 @@ trait WebSocketSupport extends Gateway {
         /**
           * Source.actorPublisher doesn't detect connections closed by the server so websockets
           * connections which are closed akka-server-side due to being idle leave zombie
-          * flows materialized.
+          * flows materialized - akka/akka#21549
+          * At the moment worked around by never closing idle connection
+          * (in core/refernce.conf akka.http.server.idle-timeout = infinite)
           */
-        //akka/akka#21549 - at the moment worked around by never closing idle connections
-        //  (in core/refernce.conf akka.http.server.idle-timeout = infinite)
-        val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
+          //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
+          val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           final val maxBufferSize = context.system.settings.config.getInt(Gateway.CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE)
 
