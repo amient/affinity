@@ -58,6 +58,7 @@ import scala.util.control.NonFatal
 
 object Gateway {
   final val CONFIG_SERVICES = "affinity.service"
+
   final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
 
   final val CONFIG_GATEWAY_CLASS = "affinity.node.gateway.class"
@@ -133,7 +134,9 @@ abstract class Gateway extends Actor {
     log.info("starting gateway")
     httpInterface.bind(self)
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
-    services.values.foreach(_._1.watch(self, global = true))
+    services.values.foreach { case (coordinator, _, _) =>
+      coordinator.watch(self, global = true)
+    }
   }
 
   override def postStop(): Unit = {
@@ -175,14 +178,15 @@ abstract class Gateway extends Actor {
     promise.completeWith(delegate map f recover handleException)
   }
 
-  def handleAsJson(response: Promise[HttpResponse], data: Any): Unit = {
+  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any): Unit = try {
+    val data = dataGenerator
     data match {
       case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
         case None => HttpResponse(NotFound)
         case Some(value) => Encoder.json(OK, value)
         case any => Encoder.json(OK, any)
       }
-      case other => response.success(try {
+      case _ => response.success(try {
         data match {
           case None => HttpResponse(NotFound)
           case Some(value) => Encoder.json(OK, value)
@@ -192,9 +196,12 @@ abstract class Gateway extends Actor {
         case NonFatal(e) => handleException(e)
       })
     }
+  } catch {
+    case e: Throwable => response.success(handleException(e))
   }
 
-  def accept(response: Promise[HttpResponse], data: Any): Unit = {
+  def accept(response: Promise[HttpResponse], dataGenerator: => Any): Unit = try {
+    val data = dataGenerator
     data match {
       case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
         case None => HttpResponse(NotFound)
@@ -203,6 +210,8 @@ abstract class Gateway extends Actor {
       case None => HttpResponse(NotFound)
       case _ => HttpResponse(Accepted)
     }
+  } catch {
+    case e: Throwable => response.success(handleException(e))
   }
 
   final def receive: Receive = manage orElse handle orElse {
@@ -227,15 +236,15 @@ abstract class Gateway extends Actor {
 
 
     case msg@ClusterAvailability(group, suspended) =>
-      val (_, actorRef, currentlySuspended) = services(group)
+      val (_, _, currentlySuspended) = services(group)
       if (currentlySuspended.get != suspended) {
         services(group)._3.set(suspended)
         val gatewayShouldBeSuspended = services.exists(_._2._3.get)
         if (gatewayShouldBeSuspended != handlingSuspended) {
           handlingSuspended = suspended
-          context.system.eventStream.publish(msg)
           if (!suspended) {
             log.info("Handling Resumed")
+            context.system.eventStream.publish(msg)
             val reprocess = suspendedHttpRequestQueue.toList
             suspendedHttpRequestQueue.clear
             if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
@@ -247,7 +256,7 @@ abstract class Gateway extends Actor {
       }
 
     case exchange: HttpExchange if (handlingSuspended) =>
-      log.warning("Hadnling suspended, enqueuing request: " + exchange.request)
+      log.warning("Handling suspended, enqueuing request: " + exchange.request)
       if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
         suspendedHttpRequestQueue += exchange
       } else {
@@ -408,8 +417,8 @@ trait WebSocketSupport extends Gateway {
           * At the moment worked around by never closing idle connection
           * (in core/refernce.conf akka.http.server.idle-timeout = infinite)
           */
-          //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
-          val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
+        //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
+        val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
           final val maxBufferSize = context.system.settings.config.getInt(Gateway.CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE)
 
@@ -422,7 +431,7 @@ trait WebSocketSupport extends Gateway {
           private val buffer = new util.LinkedList[Message]()
 
           private def doPush(messages: Message*) = {
-            while (buffer.size + messages.size > maxBufferSize ) {
+            while (buffer.size + messages.size > maxBufferSize) {
               buffer.pop()
             }
             messages.foreach(buffer.add)

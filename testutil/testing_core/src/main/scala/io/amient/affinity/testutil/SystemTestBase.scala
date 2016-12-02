@@ -97,16 +97,17 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       ConnectionContext.https(context)
     }
 
-    def awaitServiceReady(group: String) {
+    def awaitClusterReady(startUpSequence: => Unit): Unit = {
       val clusterReady = new AtomicBoolean(false)
       system.eventStream.subscribe(system.actorOf(Props(new Actor {
         override def receive: Receive = {
-          case ClusterAvailability(g, false) if (g == group) => {
+          case ClusterAvailability(_, false) => {
             clusterReady.set(true)
             clusterReady.synchronized(clusterReady.notify)
           }
         }
       })), classOf[ClusterAvailability])
+      startUpSequence
       clusterReady.synchronized(clusterReady.wait(15000))
       assert(clusterReady.get)
     }

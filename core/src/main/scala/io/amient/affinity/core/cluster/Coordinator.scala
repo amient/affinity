@@ -76,7 +76,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * watcher is interested for changes at the global/cluster level, `false` means that the
     * watcher is only intereseted in changes in the local system.
     */
-  private val watchers = scala.collection.mutable.Map[ActorRef, Boolean]()
+  protected val watchers = scala.collection.mutable.Map[ActorRef, Boolean]()
 
   /**
     * @param actorPath of the actor that needs to managed as part of coordinated group
@@ -151,9 +151,10 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
       val add = currentMasters.filter(!prevMasters.contains(_))
       val remove = prevMasters.filter(!currentMasters.contains(_))
-      val update = MasterStatusUpdate(group, add, remove)
-
-      notifyWatchers(update)
+      if (!add.isEmpty || !remove.isEmpty) {
+        val update = MasterStatusUpdate(group, add, remove)
+        notifyWatchers(update)
+      }
     }
 
   }
@@ -166,7 +167,6 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
 
   private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
-
     if (!closed.get) watchers.foreach { case (watcher, global) =>
       implicit val timeout = Timeout(15 seconds)
       try {

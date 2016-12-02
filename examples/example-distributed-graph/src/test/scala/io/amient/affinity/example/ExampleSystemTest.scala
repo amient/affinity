@@ -52,28 +52,24 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
 
 
+  val dataNode = new Node(configure(config))
   val gatewayNode = new TestGatewayNode(configure(config), new HttpGateway
     with Ping
     with Admin
     with PublicApi
-    with Graph)
-
-  val regionNode = new Node(configure(config)) {
-    startContainer("graph", List(0, 1))
+    with Graph) {
+    awaitClusterReady {
+      dataNode.startContainer("graph", List(0, 1))
+      dataNode.startContainer("user-mediator", List(0))
+    }
   }
 
-  val serviceNode = new Node(configure(config)) {
-    startContainer("user-mediator", List(0))
-  }
-
-  gatewayNode.awaitServiceReady("graph")
 
   import gatewayNode._
 
   override def afterAll(): Unit = {
     try {
-      regionNode.shutdown()
-      serviceNode.shutdown()
+      dataNode.shutdown()
       gatewayNode.shutdown()
     } finally {
       super.afterAll()
@@ -182,10 +178,10 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
       val msg = lastMessage.get
       (msg != null) should be(true)
       msg.getSchema.getName should be("VertexProps")
-      msg.get("component") should be (1000)
+      msg.get("component") should be(1000)
       val edges = msg.get("edges").asInstanceOf[GenericData.Array[GenericRecord]]
-      edges.size should be (1)
-      edges.get(0).get("target") should be (2000)
+      edges.size should be(1)
+      edges.get(0).get("target") should be(2000)
       ws.close()
     }
   }
