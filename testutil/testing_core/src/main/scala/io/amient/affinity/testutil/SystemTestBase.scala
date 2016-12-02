@@ -135,6 +135,9 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       mapper.readValue(json, classOf[JsonNode])
     }
 
+    def get_text(response: HttpResponse): String = {
+      Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
+    }
 
     def http_post(uri: Uri, entity: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
       Await.result(http(HttpRequest(method = HttpMethods.POST, uri = uri, headers = headers)), 2 seconds)
