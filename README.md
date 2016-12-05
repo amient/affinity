@@ -46,10 +46,16 @@ but the design is expecting this to come in future).
 
 # Development 
 
-The codebase is split into core which is the general purpose library 
-for this architecture and an example application which uses the core 
-library. 
+The codebase is split into several modules:
 
+ - `core` is the main scala library with js-avro extension (Scala)
+ - `examples/..` contain example applications of the core library (Scala)
+ - `testutil/..` system test utilities (see examples for usage) (Scala)
+ - `kafka_0.10` module with kafka storage and confluent schema provider (Scala)
+ - `mapdb` module with MapDb implementation of the MemStore (Java)
+ - `rocksdb` module with RocksDb implementation of the MemStore (Java)
+ - `ws-client/` custom web socket with avro support written (Java)
+ 
 The following core features are already in place:
 
  - HTTP Interface is completely async done with Akka Http. 
