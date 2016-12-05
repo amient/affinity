@@ -1,9 +1,10 @@
 # Design Goals 
 
- - library for building stateful, scalable REST APIs
- - can be attached to stream-processing systems 
+ - library for building stateful, scalable Data APIs on top of streaming foundation
+ - can be attached to stream-processing pipelines based around kafka and participate
+   either as a producer/source or consumer/materializer of state 
  - fault-tolerance build on top of a distributed-log
- - horizontally scalable
+ - horizontally scalable and fully asynchronous
  - zero-downtime possible
  
 # Architecture
