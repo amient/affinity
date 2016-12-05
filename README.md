@@ -14,9 +14,10 @@
  ![Cluster Architecture](doc/affinity.png)
 
  - akka for asynchronous communication 
- - akka http as the main interface
- - zookeeper for distributed coordiation
- - kafka as a fault-tolerant change log
+ - akka http as the main interface with websocket layer
+ - zookeeper for distributed coordination (other coordinators pluggable)
+ - RocksDb, MemDb, ConcurrentMap and other MemStore implementations
+ - kafka as a fault-tolerant change log storage
 
 ## State Management
 
@@ -57,19 +58,24 @@ The following core features are already in place:
  - Handlers translate requests into Akka Messages - they can either ? Ask
     and get response which they turn into HTTP Response or just ! Tell
     and respond with No Content or Accepted, etc.
+ - WebSockets can be attached to Key-Value entities which then receive 
+    automatically all changes to that entity as well as any other 
+    user-defined events 
  - Akka Cluster that comes with Akka is not used, instead a custom
-    cluster management is implemented 
- - Each Gateway Actor System has a Cluster Actor in its hierarchy which 
-    implements standard Akka Router interface with custom routing logic.
-    This routing logic is meant to mimic whatever partitioning strategy
-    is used in the underlying kafka storage.
- - Cluster is therefore a dynamic Akka Router which maintains a copy of the 
-    active Partition Actors, kept up to date by a pluggable Coordinator 
-    (ZkCoordinator by default)
- - Each Handler has access to the Cluster Actor by extending the Gateway
-    as mentioned above. Any task that needs to be handled by a partition
-    is given to the Cluster Actor. This may be a simple forward or 
+    cluster management is implemented using a third-party coordinator
+ - Each Gateway Actor System maintains a list of Service Actors 
+    in its hierarchy which implement the the routing logic. This routing 
+    logic mimics the partitioning strategy used in the underlying storage.
+ - Each Service is therefore a dynamic Akka Router which maintains a copy 
+    of the active Partition Actors, kept up to date by a pluggable 
+    Coordinator (ZooKeeper and Embedded embedded implementations provided)
+ - Each Handler has access to all Service Actors by extending the Gateway
+    as mentioned above. Any task that needs to be handled by a partitioned
+    logic is passed to the Service Actor. This may be a simple forward or 
     it can be an orchestrated sequence of Asks and Tells.
+ - Gateways are hence the orchestration layer and Services are individual
+    microservices or keyspaces whose logic is completely constrained to
+    the partition scope.
  - Cluster Actor routes all request to Partition Actors which implement
     the logic over the data partition and respond to the sender which
     will ultimately be the calling Handler but sometimes the caller 
@@ -86,6 +92,17 @@ The following core features are already in place:
  - On becoming a Standby, the Partition Actor resumes consuming the 
      underlying topic and stops receiving until it again becomes a master.
  - Standby is not a read replica at the moment but it could be an option
+ - custom Akka ack implementation which is strongly typed
+ - Lightweight Transactions can be wrapped around orchestrated logic
+    which use reversible Instructions to rollback failed operations    
+ - Support for different Avro schema providers which are implementations of 
+    a generalised concept similar to Confluent Schema Registry (for which
+    an implementation is provided) - this allows to use embedded schema 
+    provider for development and testing while in production can be 
+    deployed with full distributed schema registry. These avro registries
+     are implemented with standard Akka Serialisation and are at the same
+     time compatible with Confluent Schema Registry which means the same
+     serialization is used for Akka transport, MemStores and Storage.
  
 
 ## Testing the code
