@@ -1,0 +1,13 @@
+version: '2'
+services:
+  kafka:
+    build:
+      context: ./src/test/docker/kafka
+      args:
+        num_partitions: 4
+    image: kafka
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+      - "19092:19092"
+

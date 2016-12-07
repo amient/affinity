@@ -22,8 +22,14 @@ semantics or other strong guarantees, the problem can be delegated to
 
 ## Running the ExampleApp
 
-First you'll need Zookeeper and Kafka running locally. Then
-you'll need to create compacted kafka topics, 
+First you'll need Zookeeper and Kafka running locally for which there is a
+docker compose file.
+    
+    cd ./examples/example-distributed-graph
+    docker-compose up
+ 
+
+Then you'll need to create compacted kafka topics, 
 e.g. from the Kafka home dir:
  
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --create \
