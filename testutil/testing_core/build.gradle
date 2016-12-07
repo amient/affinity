@@ -1,5 +1,5 @@
-group = parent.group
-version = parent.version
+group = rootProject.group
+version = rootProject.version
 
 apply plugin: 'scala'
 apply plugin: 'java'

@@ -1,9 +1,6 @@
 #FROM openjdk:alpine
 FROM anapsix/alpine-java
 
-ARG num_partitions
-ENV kafka_num_partitions=$num_partitions
-
 RUN mkdir -p /var/zookeeper/data
 RUN mkdir -p /var/log/zookeeper
 RUN mkdir -p /etc/zookeeper
