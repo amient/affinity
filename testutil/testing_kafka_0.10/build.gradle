@@ -12,14 +12,14 @@ install.repositories.mavenInstaller.pom.artifactId = 'testing_kafka_0.10-scala_'
 
 ext {
     kafkaMinorVersion = '0.10'
-    kafkaVersion = project(':kafka_' + kafkaMinorVersion).ext.kafkaVersion
-    confluentVersion = project(':kafka_' + kafkaMinorVersion).ext.confluentVersion
+    kafkaVersion = project(':kafka:kafka_' + kafkaMinorVersion).ext.kafkaVersion
+    confluentVersion = project(':kafka:kafka_' + kafkaMinorVersion).ext.confluentVersion
 }
 
 dependencies {
     compile project(':core')
     compile project(':testutil:testing_core')
-    compile project(':kafka_' + kafkaMinorVersion)
+    compile project(':kafka:kafka_' + kafkaMinorVersion)
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
