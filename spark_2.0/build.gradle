@@ -20,7 +20,7 @@ dependencies {
     provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
     provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
     provided 'org.scala-lang:scala-library:' + scalaVersion
-    compile group: 'com.twitter', name: 'parquet-avro', version: avroVersion
+    compile group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
     compile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
 }
 
