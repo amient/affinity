@@ -71,7 +71,6 @@ allprojects {
         test.dependsOn scalaTest
 
         dependencies {
-            compile 'org.scala-lang:scala-library:' + scalaVersion
             testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
             testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
         }
