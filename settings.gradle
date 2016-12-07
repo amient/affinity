@@ -1,5 +1,5 @@
 include ':api', ':core', ':rocksdb', ':mapdb', ':ws-client', ':testutil:testing_core',
         ':kafka:kafka_0.10', ':testutil:testing_kafka_0.10',
-        ':spark_2.0',
+        ':spark:spark_2.0',
         ':examples:example-distributed-graph',
         ':examples:example-minimal-setup'

@@ -52,11 +52,12 @@ The codebase is split into several modules:
  - `api` is the internal programming api and utiliities for writing memstore and storage plugins (Java)
  - `core` is the main scala library with js-avro extension (Scala)
  - `examples/..` contain example applications of the core library (Scala)
- - `testutil/..` system test utilities (see examples for usage) (Scala)
- - `kafka_0.10` module with kafka storage and confluent schema provider (Scala)
+ - `testutil/testing_core` system test utilities (see examples for usage) (Scala)
+ - `testutil/testing_kafka_0.10` system test utilities with embedded kafka and registry
+ - `kafka` module with kafka storage and confluent schema provider (Scala)
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
- - `ws-client/` custom web socket with avro support written (Java)
+ - `ws-client` custom web socket with avro support written (Java)
  - `spark` module exposes underlying kafka storage as CompactedKafkaRDD with all the serialization support
  
 The following core features are already in place:

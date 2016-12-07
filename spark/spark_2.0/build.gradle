@@ -16,9 +16,10 @@ install.repositories.mavenInstaller.pom.artifactId = 'spark_2.0-scala_' + baseSc
 //version = parent.version  + "-kafka_" + rootProject.ext.kafkaVersion + "-scala_" + rootProject.ext.baseScalaVersion
 
 dependencies {
+    compile project(':api')
     compile project(':core')
-    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
-    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
+    provided group: 'org.apache.io.amient.affinity.spark', name: 'io.amient.affinity.spark-core_' + baseScalaVersion, version: sparkVersion
+    provided group: 'org.apache.io.amient.affinity.spark', name: 'io.amient.affinity.spark-sql_' + baseScalaVersion, version: sparkVersion
     provided 'org.scala-lang:scala-library:' + scalaVersion
     compile group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
     compile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
