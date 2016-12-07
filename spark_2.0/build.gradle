@@ -1,0 +1,46 @@
+group = rootProject.group
+version = rootProject.version
+
+apply plugin: 'java'
+apply plugin: 'scala'
+apply plugin: 'signing'
+apply plugin: 'maven'
+
+ext {
+    sparkVersion = '2.0.2'
+}
+
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
+install.repositories.mavenInstaller.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
+
+//version = parent.version  + "-kafka_" + rootProject.ext.kafkaVersion + "-scala_" + rootProject.ext.baseScalaVersion
+
+dependencies {
+    compile project(':core')
+    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
+    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
+    provided 'org.scala-lang:scala-library:' + scalaVersion
+    compile group: 'com.twitter', name: 'parquet-avro', version: avroVersion
+    compile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
+}
+
+jar {
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+//import org.apache.tools.ant.filters.ReplaceTokens
+
+//task startScripts(type: Copy) {
+//    from new File("$projectDir/src/main/scripts")
+//    into new File("$projectDir/build/bin")
+//    filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: rootProject.ext.getProperties())
+//    include('*.*')
+//    include('*')
+//    fileMode 0777
+//}
+//
+//build.dependsOn startScripts
+
+
