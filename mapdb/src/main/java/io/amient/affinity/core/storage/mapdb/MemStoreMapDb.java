@@ -49,9 +49,8 @@ public class MemStoreMapDb implements MemStore {
             refs.put(pathToData, refs.get(pathToData) + 1);
             return maps.get(pathToData);
         } else {
-            DB instance = mmap
-                    ? DBMaker.fileDB(pathToData).fileMmapEnable().make()
-                    : DBMaker.fileDB(pathToData).make();
+            DBMaker.Maker dbMaker = DBMaker.fileDB(pathToData).checksumHeaderBypass();
+            DB instance = mmap ? dbMaker.fileMmapEnable().make() : dbMaker.make();
             ConcurrentMap<byte[], byte[]> map = instance.hashMap("map", Serializer.BYTE_ARRAY, Serializer.BYTE_ARRAY)
                     .createOrOpen();
             instances.put(pathToData, instance);
