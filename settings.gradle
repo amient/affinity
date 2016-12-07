@@ -1,4 +1,4 @@
 include ':api', ':core', ':rocksdb', ':mapdb', ':ws-client', ':testutil:testing_core',
-        ':kafka_0.10', ':testutil:testing_kafka_0.10',
+        ':kafka:kafka_0.10', ':testutil:testing_kafka_0.10',
         ':examples:example-distributed-graph',
         ':examples:example-minimal-setup'
