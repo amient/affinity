@@ -19,8 +19,7 @@
 
 package io.amient.util.spark
 
-import java.io.IOException
-import java.util.Optional
+import java.lang.Long
 
 import io.amient.affinity.kafka._
 import io.amient.affinity.spark.KafkaSplit
@@ -29,29 +28,10 @@ import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
-class KafkaRDD(sc: SparkContext, client: KafkaClient, val topic: String,
-               val extraParallelism: Int = 1,
-               val sinceTimeMs: Long = KafkaClient.EARLIEST_TIME,
-               val selectPartition: Int = -1
-              )
+class KafkaRDD(sc: SparkContext, client: KafkaClient, val extraParallelism: Int = 1, val selectPartition: Int = -1)
   extends RDD[(ByteKey, PayloadAndOffset)](sc, Nil) {
-
-  implicit def OptionalKafkaBroker(opt: Optional[KafkaBroker]): Option[KafkaBroker] = {
-    if (opt.isPresent) Some(opt.get()) else None
-  }
-
-  private def retry[E](e: => E): E = {
-    def sleep() = Thread.sleep(client.refreshLeaderBackoffMs())
-
-    def attempt(e: => E, nr: Int = 1): E = if (nr < client.refreshLeaderMaxRetries()) {
-      try (e) catch {
-        case _: IOException => sleep(); attempt(e, nr + 1)
-      }
-    } else e
-
-    attempt(e)
-  }
 
   def compact(rdd: KafkaRDD): RDD[(ByteKey, PayloadAndOffset)] = mapPartitions { rawMessages =>
     val compactor = (m1: PayloadAndOffset, m2: PayloadAndOffset) => if (m1.offset > m2.offset) m1 else m2
@@ -60,26 +40,22 @@ class KafkaRDD(sc: SparkContext, client: KafkaClient, val topic: String,
     spillMap.iterator
   }
 
-  protected def getPartitions: Array[Partition] = retry {
+  protected def getPartitions: Array[Partition] = {
 
-    //TODO use all ISRs not just leaders
-    val leaders = client.getLeaders(topic)
+    val startOffsets = client.topicOffsets(KafkaClient.EARLIEST_TIME).asScala
+    val stopOffsets = client.topicOffsets(KafkaClient.LATEST_TIME).asScala
 
-    val startOffsets = client.topicOffsets(topic, sinceTimeMs, leaders).asScala
-    val stopOffsets = client.topicOffsets(topic, KafkaClient.LATEST_TIME, leaders).asScala
-
-    val offsets = startOffsets.map {
+    val offsets: mutable.Map[Integer, (Long, Long)] = startOffsets.map {
       case (partition, startOffset) => (partition, (startOffset, stopOffsets(partition)))
     }
     var index = -1
-    leaders.asScala.flatMap { case (partition, leader) =>
+    offsets.flatMap { case (partition, (startOffset, stopOffset)) =>
       if (selectPartition >= 0 && selectPartition != partition) {
         Seq()
       } else {
-        val (startOffset, stopOffset) = offsets(partition)
         if (extraParallelism < 2) {
           index += 1
-          Seq(new KafkaSplit(id, index, partition, startOffset, stopOffset, leader))
+          Seq(new KafkaSplit(id, index, partition, startOffset, stopOffset))
         } else {
           val range = (stopOffset - startOffset)
           val interval = math.ceil(range.toDouble / extraParallelism).toLong
@@ -87,7 +63,7 @@ class KafkaRDD(sc: SparkContext, client: KafkaClient, val topic: String,
             val startMarker = interval * i + startOffset
             val endMarker = math.min(startMarker + interval, stopOffset)
             index += 1
-            val split = new KafkaSplit(id, index, partition, startMarker, endMarker, leader)
+            val split = new KafkaSplit(id, index, partition, startMarker, endMarker)
             split
           }
         }
@@ -95,32 +71,55 @@ class KafkaRDD(sc: SparkContext, client: KafkaClient, val topic: String,
     }.toArray
   }
 
-  protected def compute(split: Partition, context: TaskContext): Iterator[(ByteKey, PayloadAndOffset)] = {
+  override def compute(split: Partition, context: TaskContext): Iterator[(ByteKey, PayloadAndOffset)] = {
     val kafkaSplit = split.asInstanceOf[KafkaSplit]
     val partition = kafkaSplit.partition
-    val tap = new KafkaTopicAndPartition(topic, partition)
     val startOffset = kafkaSplit.startOffset
     val stopOffset = kafkaSplit.stopOffset
-
-    def sleep() = Thread.sleep(client.refreshLeaderBackoffMs())
-
-    try {
-      // every task reads from a single broker
-      // on the first attempt we use the lead broker determined in the driver, on next attempts we ask for the lead broker ourselves
-      val broker = (if (context.attemptNumber == 0) kafkaSplit.leader else None)
-        .orElse(client.getLeaders(topic).get(partition))
-        .getOrElse(throw new RuntimeException(s"no leader for partition ${partition}"))
-
-      val fetcher = client.connect(broker, tap)
-      context.addTaskCompletionListener(_ => fetcher.close())
-
-      fetcher.iterator(startOffset, stopOffset).asScala.map { keyPayloadAndOffset =>
-        (keyPayloadAndOffset.key, keyPayloadAndOffset.payloadAndOffset)
-      }
-
-    } catch {
-      case e: Exception => sleep(); throw e
-      case e: IOException => sleep(); throw e
+    val iterator = client.iterator(partition, startOffset, stopOffset)
+    context.addTaskCompletionListener(_ => client.close())
+    iterator.asScala.map { keyPayloadAndOffset =>
+      (keyPayloadAndOffset.key, keyPayloadAndOffset.payloadAndOffset)
     }
   }
 }
+
+//object KafkaRDD {
+//
+//  /** Write contents of this RDD to Kafka messages by creating a Producer per partition. */
+//  def produceToKafka(kafkaConfig: KafkaConfig, topic: String, rdd: RDD[(Array[Byte], Array[Byte])]) {
+//
+//    val produced = rdd.context.accumulator(0L, "Produced Messages")
+//
+//    def write(context: TaskContext, iter: Iterator[(Array[Byte], Array[Byte])]) {
+//      val config = new ProducerConfig(new Properties() {
+//        put("metadata.broker.list", kafkaConfig.brokers)
+//        put("compression.codec", "snappy")
+//        put("linger.ms", "200")
+//        put("batch.size", "10000")
+//        put("acks", "0")
+//      })
+//
+//      val producer = new Producer[Array[Byte], Array[Byte]](config)
+//
+//      try {
+//        var messages = 0L
+//        iter.foreach { case (key, msg) => {
+//          if (context.isInterrupted) sys.error("interrupted")
+//          producer.send(new KeyedMessage(topic, key, msg))
+//          messages += 1
+//        }
+//        }
+//        produced += messages
+//      } finally {
+//        producer.close()
+//      }
+//    }
+//
+//    println(s"Producing into topic `${topic}` at ${kafkaConfig.brokers} ...")
+//    rdd.context.runJob(rdd, write _)
+//    println(s"Produced ${produced.value} messages into topic `${topic}` at ${kafkaConfig.brokers}.")
+//  }
+//
+//}
+

@@ -19,7 +19,6 @@
 
 package io.amient.affinity.spark
 
-import io.amient.affinity.kafka.KafkaBroker
 import org.apache.spark.Partition
 
 /**
@@ -32,11 +31,11 @@ import org.apache.spark.Partition
   * @param partition   - kafka partition number
   * @param startOffset - offset range start - inclusive
   * @param stopOffset  - offset range end - exclusive
-  * @param leader      - host:port of the leader broker for this partition
   */
-class KafkaSplit(rddId: Int, override val index: Int,
-                 val partition: Int, val startOffset: Long, val stopOffset: Long,
-                 val leader: Option[KafkaBroker]) extends Partition {
+class KafkaSplit(rddId: Int,
+                 override val index: Int,
+                 val partition: Int,
+                 val startOffset: Long, val stopOffset: Long) extends Partition {
   override def hashCode: Int = 41 * 41 * (41 + rddId) + (41 * index)
 
   override def toString = s"KafkaSplit(index=$index, partition=$partition [$startOffset:$stopOffset], rddId=$rddId)"

@@ -21,48 +21,51 @@ package io.amient.affinity.kafka
 
 import java.lang.Long
 import java.util
-import java.util.{Optional, Properties}
+import java.util.Properties
 
-import org.apache.kafka.clients.consumer.KafkaConsumer
+import io.amient.affinity.core.util.ByteUtils
+import org.apache.kafka.clients.consumer.{ConsumerRecord, ConsumerRecords, KafkaConsumer}
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.BrokerNotAvailableException
+import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class KafkaClientImpl(@transient props: Properties, val topic: String) extends KafkaClient {
+class KafkaClientImpl(val topic: String, @transient props: Properties) extends KafkaClient {
 
   val config = new Properties() with Serializable {
+    put("value.deserializer", classOf[ByteArrayDeserializer].getName)
+    put("key.deserializer", classOf[ByteArrayDeserializer].getName)
+    put("enable.auto.commit", "false")
     putAll(props)
   }
 
   //  val clientId = config.getProperty("client.id", "")
-  val brokers = config.getProperty("metadata.broker.list", "localhost:9092")
+  val brokers = config.getProperty("bootstrap.servers", "localhost:9092")
   val brokerList = brokers.split(",").toList
   //  val socketTimeoutMs = config.getProperty("socket.timeout.ms", "30000").toInt
   //  val socketReceiveBufferBytes = config.getProperty("socket.receive.buffer.bytes", "65536")
   //  val fetchMessageMaxBytes = config.getProperty("fetch.message.max.bytes", "1048576")
 
-  implicit def OptionalKafkaBroker(opt: Option[KafkaBroker]): Optional[KafkaBroker] = {
-    if (opt.isDefined) Optional.of(opt.get) else Optional.empty()
+
+  override def topicOffsets(time: Long): util.Map[Integer, Long] = {
+    metadata((consumer) => {
+      val tp = consumer.partitionsFor(topic).asScala.map(info => new TopicPartition(topic, info.partition())).asJava
+      consumer.assign(tp)
+      if (time == KafkaClient.EARLIEST_TIME) {
+        consumer.seekToBeginning(tp)
+      } else if (time == KafkaClient.LATEST_TIME) {
+        consumer.seekToEnd(tp)
+      } else {
+        throw new IllegalArgumentException(s"Invalid offset limit, expecting either ${KafkaClient.EARLIEST_TIME} or ${KafkaClient.LATEST_TIME}")
+      }
+
+      tp.asScala.map {
+        t => new Integer(t.partition()) -> new Long(consumer.position(t))
+      }.toMap.asJava
+    })
   }
-
-  override def refreshLeaderBackoffMs(): Int = config.getProperty("refresh.leader.backoff.ms", "1000").toInt
-
-  override def refreshLeaderMaxRetries(): Int = config.getProperty("refresh.leader.max.retries", "10").toInt
-
-  override def getLeaders(): util.Map[Integer, Optional[KafkaBroker]] = metadata((consumer) => {
-    consumer.partitionsFor(topic).asScala.map { partitionInfo =>
-      val leader = partitionInfo.leader()
-      val broker: Optional[KafkaBroker] = if (leader == null) None else Some(new KafkaBroker(leader.id()))
-      (new Integer(partitionInfo.partition()), broker)
-    }.toMap.asJava
-  })
-
-  override def topicOffsets(time: Long, leaders: util.Map[Integer, Optional[KafkaBroker]]): util.Map[Integer, Long] = {
-    ???
-  }
-
-  override def connect(broker: KafkaBroker, tap: KafkaTopicAndPartition): KafkaFetcher = ???
 
   private def metadata[E](e: (KafkaConsumer[Array[Byte], Array[Byte]]) => E): E = {
     val it = Random.shuffle(brokerList).iterator.flatMap { broker =>
@@ -85,6 +88,51 @@ class KafkaClientImpl(@transient props: Properties, val topic: String) extends K
       }
     }
     if (it.hasNext) it.next else throw new BrokerNotAvailableException("operation failed for all brokers")
+  }
+
+  override def close(): Unit = ??? //TODO close all iterators that are still open
+
+  override def iterator(partition: Int, startOffset: Long, stopOffset: Long): util.Iterator[KeyPayloadAndOffset] = {
+
+    val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](config)
+    val tp = new TopicPartition(topic, partition)
+    consumer.assign(List(tp).asJava)
+
+    new util.Iterator[KeyPayloadAndOffset] {
+      private var record: ConsumerRecord[Array[Byte], Array[Byte]] = null
+      private var offset = startOffset
+      private var setIter: util.Iterator[ConsumerRecord[Array[Byte], Array[Byte]]] = null
+
+      seek
+
+      override def hasNext: Boolean = record != null
+
+      override def next(): KeyPayloadAndOffset = {
+        if (record == null) {
+          throw new NoSuchElementException
+        } else {
+          val k = new ByteKey(record.key)
+          val v = new PayloadAndOffset(record.offset, record.value)
+          seek
+          new KeyPayloadAndOffset(k, v)
+        }
+      }
+
+      private def seek {
+        while (offset < stopOffset) {
+          consumer.seek(tp, offset)
+          if (setIter == null || !setIter.hasNext) setIter = consumer.poll(1000).iterator() //TODO configurable timeout
+          val u: ConsumerRecord[Array[Byte], Array[Byte]] = setIter.next()
+          record = setIter.next()
+          offset = record.offset + 1L
+          if (record.value != null && record.offset >= startOffset) {
+            return
+          }
+        }
+        record = null
+      }
+
+    }
   }
 
 }
