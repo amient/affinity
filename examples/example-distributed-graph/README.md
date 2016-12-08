@@ -38,7 +38,7 @@ e.g. from the Kafka home dir:
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --create \
         --topic components --partitions 4 --replication-factor 1 --config cleanup.policy=compact
 
-    ./bin/kafka-topics.sh --zookeeper localhost:2181 --create \ 
+    ./bin/kafka-topics.sh --zookeeper localhost:2181 --create \
         --topic settings --partitions 1 --replication-factor 1 --config cleanup.policy=compact
         
 The graph topic will hold the the main domain data for the app and the
