@@ -5,6 +5,7 @@ apply plugin: 'java'
 apply plugin: 'scala'
 apply plugin: 'signing'
 apply plugin: 'maven'
+apply plugin: 'gradle-one-jar'
 
 ext {
     sparkVersion = '2.0.2'
@@ -14,23 +15,21 @@ ext {
 install.repositories.mavenInstaller.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
 
 dependencies {
-    compile 'org.scala-lang:scala-library:' + scalaVersion
-//    compile project(':api')
-//    compile project(':core')
-//    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
-//    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
-//    compile group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
-//    compile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion //, classifier: 'hadoop2'
-//    testCompile project(":testutil:testing_core")
-//    testCompile project(':testutil:testing_core')
+    provided 'org.scala-lang:scala-library:' + scalaVersion
+    compile project(':api')
+    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
+    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
+    provided group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
+    provided group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
     testCompile project(':testutil:testing_kafka_0.10')
 }
 
-//jar {
-//    from {
-//        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
-//    }
-//}
+
+task singlejar(type: OneJar) {
+    mainClass = 'io.amient.affinity.spark.Shell'
+}
+
+build.dependsOn singlejar
 
 //import org.apache.tools.ant.filters.ReplaceTokens
 
@@ -44,5 +43,6 @@ dependencies {
 //}
 //
 //build.dependsOn startScripts
+
 
 

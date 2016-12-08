@@ -32,7 +32,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class KafkaClientImpl(val topic: String, @transient props: Properties) extends KafkaClient {
+class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient {
 
   val config = new Properties() with Serializable {
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)

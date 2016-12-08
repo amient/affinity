@@ -3,22 +3,13 @@ version = rootProject.version
 
 apply plugin: 'scala'
 apply plugin: 'java'
+apply plugin: 'gradle-one-jar'
 
 ext {
     mainClass = "io.amient.affinity.example.ExampleGraphMain"
     mainScript = "example-graph-api"
     kafkaMinorVersion = "0.10"
 }
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.github.rholder:gradle-one-jar:1.0.4'
-    }
-}
-apply plugin: 'gradle-one-jar'
 
 task singlejar(type: OneJar) {
     mainClass = project.ext.mainClass

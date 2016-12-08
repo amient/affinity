@@ -24,7 +24,16 @@ allprojects {
     apply plugin: 'idea'
 
     version = rootProject.version
-    
+
+    buildscript {
+        repositories {
+            mavenCentral()
+        }
+        dependencies {
+            classpath 'com.github.rholder:gradle-one-jar:1.0.4'
+        }
+    }
+
     plugins.withType(JavaPlugin).whenPluginAdded {
 
         sourceCompatibility = rootProject.ext.javaVersion
@@ -42,6 +51,12 @@ allprojects {
             testCompile.extendsFrom provided
         }
 
+        sourceSets {
+            main.compileClasspath += configurations.provided
+            test.compileClasspath += configurations.provided
+            test.runtimeClasspath += configurations.provided
+        }
+
         idea {
             module {
                 scopes.PROVIDED.plus += [configurations.provided]
@@ -49,12 +64,6 @@ allprojects {
         }
 
         test.systemProperties 'property': 'value'
-
-        sourceSets {
-            main {
-                compileClasspath += configurations.provided
-            }
-        }
 
         dependencies {
             testCompile group: 'junit', name: 'junit', version: junitVersion
