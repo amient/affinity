@@ -21,7 +21,6 @@ package io.amient.affinity.kafka;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,21 +29,23 @@ public interface KafkaClient extends Serializable {
     public static long EARLIEST_TIME = -2L;
 
 
-    int refreshLeaderBackoffMs(); //"refresh.leader.backoff.ms", 1000
-    int refreshLeaderMaxRetries(); //"refresh.leader.max.retries", 10
-//    val brokers = props.getString("metadata.broker.list", "localhost:9092")
-//    val brokerList = brokers.split(",").toList
-//    int socketTimeoutMs(); //"socket.timeout.ms", 30 * 1000
-//    int socketReceiveBufferBytes(); //"socket.receive.buffer.bytes", 64 * 1024
-//    int fetchMessageMaxBytes(); //"fetch.message.max.bytes", 1 * 1024 * 1024
-//    String clientId(); //"client.id", ""
+    int refreshLeaderBackoffMs();
+    int refreshLeaderMaxRetries();
 
 
-    Map<Integer, Optional<KafkaBroker>> getLeaders(String topic);
+    Map<Integer, Optional<KafkaBroker>> getLeaders() throws IOException;
+//        case e: LeaderNotAvailableException => throw new IOException(e)
+//        case e: NotLeaderForPartitionException => throw new IOException(e)
+//        case e: ConnectException => throw new IOException(e)
 
-    Map<Integer, Long> topicOffsets(String topic, Long time, Map<Integer, Optional<KafkaBroker>> leaders);
+
+    Map<Integer, Long> topicOffsets(Long time, Map<Integer, Optional<KafkaBroker>> leaders);
 
     KafkaFetcher connect(KafkaBroker broker, KafkaTopicAndPartition tap) throws IOException;
+//      case e: LeaderNotAvailableException => throw new IOException(e)
+//      case e: NotLeaderForPartitionException => throw new IOException(e)
+//      case e: ConnectException => throw new IOException(e)
+
 
 }
 

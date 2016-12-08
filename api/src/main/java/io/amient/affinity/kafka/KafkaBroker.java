@@ -20,4 +20,10 @@
 package io.amient.affinity.kafka;
 
 public class KafkaBroker {
+
+    public final int id;
+
+    public KafkaBroker(int id) {
+        this.id = id;
+    }
 }
