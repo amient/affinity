@@ -14,14 +14,16 @@ ext {
 install.repositories.mavenInstaller.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
 
 dependencies {
-    compile project(':api')
-    compile project(':core')
-    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
-    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
-    provided 'org.scala-lang:scala-library:' + scalaVersion
+    compile 'org.scala-lang:scala-library:' + scalaVersion
+//    compile project(':api')
+//    compile project(':core')
+//    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
+//    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
 //    compile group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
 //    compile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion //, classifier: 'hadoop2'
-    testCompile project(":testutil:testing_kafka_0.10")
+//    testCompile project(":testutil:testing_core")
+//    testCompile project(':testutil:testing_core')
+    testCompile project(':testutil:testing_kafka_0.10')
 }
 
 //jar {

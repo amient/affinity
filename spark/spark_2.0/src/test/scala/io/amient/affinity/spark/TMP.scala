@@ -2,6 +2,10 @@ package io.amient.affinity.spark
 
 import java.util.Properties
 
+import io.amient.affinity.kafka.{KafkaClient, KafkaClientImpl}
+
+import scala.collection.JavaConverters._
+
 object TMP extends App {
 
   val impl = new KafkaClientImpl("graph", new Properties() {
