@@ -22,8 +22,6 @@ package io.amient.affinity.core.serde.avro.schema
 import java.util
 
 import akka.actor.ExtendedActorSystem
-import io.amient.affinity.core.cluster.CoordinatorZk
-import io.amient.affinity.core.cluster.CoordinatorZk._
 import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
