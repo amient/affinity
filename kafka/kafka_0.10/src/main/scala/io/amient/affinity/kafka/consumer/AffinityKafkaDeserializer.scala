@@ -38,6 +38,14 @@ object AffinityKafkaAvroDeserializer {
   }
 }
 
+/**
+  * This is an extension to Confluent's KafkaAvroDeserializer which combines the generic
+  * avro recrods with scala AvroRecord types.
+  *
+  * @param props
+  * @param isKey
+  * @tparam T
+  */
 class TypedKafkaAvroDeserializer[T: TypeTag](props: Map[String, Any], isKey: Boolean) extends Deserializer[T] {
 
   val internal = new KafkaAvroDeserializer()

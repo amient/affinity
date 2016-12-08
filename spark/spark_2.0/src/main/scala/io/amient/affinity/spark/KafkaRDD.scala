@@ -33,7 +33,7 @@ import scala.collection.mutable
 class KafkaRDD(sc: SparkContext, client: KafkaClient, val extraParallelism: Int = 1, val selectPartition: Int = -1)
   extends RDD[(ByteKey, PayloadAndOffset)](sc, Nil) {
 
-  def compact(rdd: KafkaRDD): RDD[(ByteKey, PayloadAndOffset)] = mapPartitions { rawMessages =>
+  def compacted: RDD[(ByteKey, PayloadAndOffset)] = mapPartitions { rawMessages =>
     val compactor = (m1: PayloadAndOffset, m2: PayloadAndOffset) => if (m1.offset > m2.offset) m1 else m2
     val spillMap = new ExternalAppendOnlyMap[ByteKey, PayloadAndOffset, PayloadAndOffset]((v) => v, compactor, compactor)
     spillMap.insertAll(rawMessages)

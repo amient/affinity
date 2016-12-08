@@ -9,6 +9,8 @@ ext {
     mainClass = "io.amient.affinity.example.ExampleGraphMain"
     mainScript = "example-graph-api"
     kafkaMinorVersion = "0.10"
+    sparkVersion = '2.0.2'
+    baseSparkVersion = sparkVersion.split("\\.\\d+\$")[0]
 }
 
 task singlejar(type: OneJar) {
@@ -23,6 +25,9 @@ dependencies {
     compile project(':kafka:kafka_' + kafkaMinorVersion)
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':ws-client')
+    testCompile project(':spark:spark_' + baseSparkVersion)
+    testCompile group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
+    testCompile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
     testCompile project(':testutil:testing_kafka_' + kafkaMinorVersion)
 }
 

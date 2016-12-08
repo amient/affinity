@@ -90,11 +90,23 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
     if (it.hasNext) it.next else throw new BrokerNotAvailableException("operation failed for all brokers")
   }
 
-  override def close(): Unit = ??? //TODO close all iterators that are still open
+  private val consumers = scala.collection.mutable.ListBuffer[KafkaConsumer[_, _]]()
+
+  override def close(): Unit = {
+    consumers.foreach { consumer =>
+      try {
+        consumer.close()
+      } catch {
+        case e: Exception => e.printStackTrace()
+      }
+    }
+  }
 
   override def iterator(partition: Int, startOffset: Long, stopOffset: Long): util.Iterator[KeyPayloadAndOffset] = {
 
     val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](config)
+    consumers += consumer
+
     val tp = new TopicPartition(topic, partition)
     consumer.assign(List(tp).asJava)
 
@@ -122,11 +134,12 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
         while (offset < stopOffset) {
           consumer.seek(tp, offset)
           if (setIter == null || !setIter.hasNext) setIter = consumer.poll(1000).iterator() //TODO configurable timeout
-          val u: ConsumerRecord[Array[Byte], Array[Byte]] = setIter.next()
-          record = setIter.next()
-          offset = record.offset + 1L
-          if (record.value != null && record.offset >= startOffset) {
-            return
+          if (setIter.hasNext) {
+            record = setIter.next()
+            offset = record.offset + 1L
+            if (record.value != null && record.offset >= startOffset) {
+              return
+            }
           }
         }
         record = null
