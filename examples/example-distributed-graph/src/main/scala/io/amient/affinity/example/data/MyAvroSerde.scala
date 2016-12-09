@@ -20,11 +20,13 @@
 package io.amient.affinity.example.data
 
 import akka.actor.ExtendedActorSystem
+import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.model.graph.GraphData
 
-class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) {
+class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) with MyProjectAvroSerde
+
+trait MyProjectAvroSerde extends AvroSerde {
   register(classOf[ConfigEntry])
   GraphData.registerMessages(this)
-
 }
