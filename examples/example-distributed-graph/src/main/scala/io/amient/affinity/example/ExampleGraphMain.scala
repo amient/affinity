@@ -25,8 +25,8 @@ import io.amient.affinity.core.cluster.Node
 import scala.util.control.NonFatal
 
 object ExampleGraphMain extends App {
-  try {
 
+  try {
 
     val config = ConfigFactory.load("example")
     val node1config = ConfigFactory.parseResources("example-node1.conf").withFallback(config)
@@ -42,4 +42,5 @@ object ExampleGraphMain extends App {
       e.printStackTrace()
       System.exit(1)
   }
+
 }

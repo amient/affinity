@@ -40,6 +40,7 @@ import scala.language.postfixOps
 
 class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRegistry with Matchers {
 
+  override def numPartitions = 2
 
   val config = configure {
     ConfigFactory.load("systemtests")

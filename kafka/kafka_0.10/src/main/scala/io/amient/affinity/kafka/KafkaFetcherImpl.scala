@@ -23,8 +23,7 @@ import java.lang.Long
 import java.util
 import java.util.Properties
 
-import io.amient.affinity.core.util.ByteUtils
-import org.apache.kafka.clients.consumer.{ConsumerRecord, ConsumerRecords, KafkaConsumer}
+import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -32,7 +31,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient {
+class KafkaFetcherImpl(val topic: String, props: Properties) extends KafkaFetcher {
 
   val config = new Properties() with Serializable {
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)
@@ -41,9 +40,9 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
     putAll(props)
   }
 
-  //  val clientId = config.getProperty("client.id", "")
   val brokers = config.getProperty("bootstrap.servers", "localhost:9092")
   val brokerList = brokers.split(",").toList
+  //  val clientId = config.getProperty("client.id", "")
   //  val socketTimeoutMs = config.getProperty("socket.timeout.ms", "30000").toInt
   //  val socketReceiveBufferBytes = config.getProperty("socket.receive.buffer.bytes", "65536")
   //  val fetchMessageMaxBytes = config.getProperty("fetch.message.max.bytes", "1048576")
@@ -53,12 +52,12 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
     metadata((consumer) => {
       val tp = consumer.partitionsFor(topic).asScala.map(info => new TopicPartition(topic, info.partition())).asJava
       consumer.assign(tp)
-      if (time == KafkaClient.EARLIEST_TIME) {
+      if (time == KafkaFetcher.EARLIEST_TIME) {
         consumer.seekToBeginning(tp)
-      } else if (time == KafkaClient.LATEST_TIME) {
+      } else if (time == KafkaFetcher.LATEST_TIME) {
         consumer.seekToEnd(tp)
       } else {
-        throw new IllegalArgumentException(s"Invalid offset limit, expecting either ${KafkaClient.EARLIEST_TIME} or ${KafkaClient.LATEST_TIME}")
+        throw new IllegalArgumentException(s"Invalid offset limit, expecting either ${KafkaFetcher.EARLIEST_TIME} or ${KafkaFetcher.LATEST_TIME}")
       }
 
       tp.asScala.map {

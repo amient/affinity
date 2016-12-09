@@ -21,6 +21,7 @@ package io.amient.util.spark
 
 import java.lang.Long
 
+import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.kafka._
 import io.amient.affinity.spark.KafkaSplit
 import org.apache.spark.rdd.RDD
@@ -29,8 +30,9 @@ import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
-class KafkaRDD(sc: SparkContext, client: KafkaClient, val extraParallelism: Int = 1, val selectPartition: Int = -1)
+class KafkaRDD(sc: SparkContext, client: KafkaFetcher, val extraParallelism: Int = 1, val selectPartition: Int = -1)
   extends RDD[(ByteKey, PayloadAndOffset)](sc, Nil) {
 
   def compacted: RDD[(ByteKey, PayloadAndOffset)] = mapPartitions { rawMessages =>
@@ -40,10 +42,22 @@ class KafkaRDD(sc: SparkContext, client: KafkaClient, val extraParallelism: Int 
     spillMap.iterator
   }
 
+  def compact[K: ClassTag, V: ClassTag](keySerde: => AbstractSerde[_ >: K], valueSerde: => AbstractSerde[_ >: V]): RDD[(K, V)] = {
+    compacted.mapPartitions { part =>
+      val keySerdeInstance = keySerde
+      val valueSerdeInstance = valueSerde
+      part.map { case (k, v) =>
+        (keySerdeInstance.fromBytes(k.bytes), valueSerdeInstance.fromBytes(v.bytes))
+      }.collect {
+        case (k: K, v: V) => (k, v)
+      }
+    }
+  }
+
   protected def getPartitions: Array[Partition] = {
 
-    val startOffsets = client.topicOffsets(KafkaClient.EARLIEST_TIME).asScala
-    val stopOffsets = client.topicOffsets(KafkaClient.LATEST_TIME).asScala
+    val startOffsets = client.topicOffsets(KafkaFetcher.EARLIEST_TIME).asScala
+    val stopOffsets = client.topicOffsets(KafkaFetcher.LATEST_TIME).asScala
 
     val offsets: mutable.Map[Integer, (Long, Long)] = startOffsets.map {
       case (partition, startOffset) => (partition, (startOffset, stopOffsets(partition)))

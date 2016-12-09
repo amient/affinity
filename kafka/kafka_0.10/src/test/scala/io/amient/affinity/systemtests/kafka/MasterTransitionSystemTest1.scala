@@ -42,6 +42,8 @@ import scala.collection.JavaConverters._
 
 class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
+  override def numPartitions = 2
+
   def config = configure("systemtests")
 
   val gateway = new TestGatewayNode(config, new Gateway {

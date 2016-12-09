@@ -4,5 +4,6 @@
 .data
 .DS_Store
 build/
+out/
 node_modules/
 core/src/main/resources/affinity.js

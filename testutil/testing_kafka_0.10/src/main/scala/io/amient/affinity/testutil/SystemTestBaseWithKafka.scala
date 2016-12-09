@@ -36,6 +36,8 @@ import scala.collection.JavaConverters._
 
 trait SystemTestBaseWithKafka extends SystemTestBaseWithZk {
 
+  def numPartitions: Int
+
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
   private val kafkaConfig = new KafkaConfig(new Properties {
     {
@@ -43,7 +45,7 @@ trait SystemTestBaseWithKafka extends SystemTestBaseWithZk {
       put("host.name", "localhost")
       put("port", "0")
       put("log.dir", embeddedKafkaPath.toString)
-      put("num.partitions", "2")
+      put("num.partitions", numPartitions.toString)
       put("auto.create.topics.enable", "true")
       put("zookeeper.connect", zkConnect)
     }

@@ -17,17 +17,12 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.primitive
+package io.amient.affinity.core.serde;
 
-import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.util.ByteUtils
+public interface AbstractSerde<T> {
 
-class IntSerde extends Serde[Int] {
+    T fromBytes(byte[] bytes);
 
-  override def identifier: Int = 20
-
-  override def fromBytes(bytes: Array[Byte]): Int = ByteUtils.asIntValue(bytes)
-
-  override def toBytes(obj: Int): Array[Byte] = ByteUtils.putIntValue(obj, new Array[Byte](4),0)
+    byte[] toBytes(T obj);
 
 }

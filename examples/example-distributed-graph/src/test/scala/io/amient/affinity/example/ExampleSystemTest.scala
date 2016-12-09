@@ -47,8 +47,10 @@ import scala.language.postfixOps
 
 class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
+  override def numPartitions = 2
+
   val config = ConfigFactory.load("example")
-    .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(2))
+    .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
 
 

@@ -24,9 +24,10 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.Map;
 
-public interface KafkaClient extends Serializable, Closeable {
-    public static long LATEST_TIME = -1L;
-    public static long EARLIEST_TIME = -2L;
+public interface KafkaFetcher extends Serializable, Closeable {
+
+    long LATEST_TIME = -1L;
+    long EARLIEST_TIME = -2L;
 
     Map<Integer, Long> topicOffsets(Long time);
 

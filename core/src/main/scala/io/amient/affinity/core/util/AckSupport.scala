@@ -85,8 +85,8 @@ final class AckableActorRef(val target: ActorRef) extends AnyVal {
         case cause: IllegalArgumentException => promise.failure(cause)
         case cause: NoSuchElementException => promise.failure(cause)
         case cause if (retry == 0) => promise.failure(cause)
-        case cause: TimeoutException => attempt(retry - 1)
-        case cause => attempt(retry - 1, timeout.duration)
+        case _: TimeoutException => attempt(retry - 1)
+        case _ => attempt(retry - 1, timeout.duration)
       }
     }
     attempt(maxRetries)

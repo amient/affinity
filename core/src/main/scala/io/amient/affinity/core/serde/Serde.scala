@@ -22,17 +22,17 @@ package io.amient.affinity.core.serde
 
 import akka.serialization.JSerializer
 
-trait Serde extends JSerializer  {
+trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
-  def fromBytes(bytes: Array[Byte]): Any
+  def fromBytes(bytes: Array[Byte]): T
 
-  def toBytes(obj: Any): Array[Byte]
+  def toBytes(obj: T): Array[Byte]
 
   //////////////////////////////////////////////////////////////////////////
 
   override def includeManifest: Boolean = false
 
-  override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj)
+  override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj.asInstanceOf[T])
 
   override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes) match {
     case null => null

@@ -42,6 +42,8 @@ import scala.language.postfixOps
 
 class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
+  override def numPartitions = 2
+
   def config = configure("systemtests")
 
   val gateway = new TestGatewayNode(config, new Gateway {

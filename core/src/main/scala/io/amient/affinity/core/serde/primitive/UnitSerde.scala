@@ -21,10 +21,10 @@ package io.amient.affinity.core.serde.primitive
 
 import io.amient.affinity.core.serde.Serde
 
-class UnitSerde extends Serde {
-  override def fromBytes(bytes: Array[Byte]): Any = ()
+class UnitSerde extends Serde[Unit] {
+  override def fromBytes(bytes: Array[Byte]): Unit = ()
 
-  override def toBytes(obj: Any): Array[Byte] = Array()
+  override def toBytes(obj: Unit): Array[Byte] = Array()
 
   override def identifier: Int = 30
 }

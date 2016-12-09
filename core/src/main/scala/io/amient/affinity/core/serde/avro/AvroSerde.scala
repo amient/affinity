@@ -26,7 +26,7 @@ import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 
-trait AvroSerde extends Serde with AvroSchemaProvider {
+trait AvroSerde extends Serde[Any] with AvroSchemaProvider {
 
   override def identifier: Int = 101
 

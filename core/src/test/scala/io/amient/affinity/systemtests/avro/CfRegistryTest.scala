@@ -17,6 +17,7 @@ class MyConfluentRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegis
 
 class CfRegistryTest extends FlatSpec with SystemTestBaseWithConfluentRegistry {
 
+  override def numPartitions = 2
 
   val config = configure {
     ConfigFactory.defaultReference()

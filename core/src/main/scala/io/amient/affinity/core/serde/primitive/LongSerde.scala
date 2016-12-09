@@ -22,12 +22,12 @@ package io.amient.affinity.core.serde.primitive
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.util.ByteUtils
 
-class IntSerde extends Serde[Int] {
+class LongSerde extends Serde[Long] {
 
   override def identifier: Int = 20
 
-  override def fromBytes(bytes: Array[Byte]): Int = ByteUtils.asIntValue(bytes)
+  override def fromBytes(bytes: Array[Byte]): Long = ByteUtils.asLongValue(bytes)
 
-  override def toBytes(obj: Int): Array[Byte] = ByteUtils.putIntValue(obj, new Array[Byte](4),0)
+  override def toBytes(obj: Long): Array[Byte] = ByteUtils.putLongValue(obj, new Array[Byte](8),0)
 
 }
