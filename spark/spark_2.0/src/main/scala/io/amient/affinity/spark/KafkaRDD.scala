@@ -98,6 +98,7 @@ class KafkaRDD(sc: SparkContext, client: KafkaFetcher, val extraParallelism: Int
   }
 }
 
+//TODO #36 api/kafka/KafkaWriter - also consider masters need to also tail their underlying partitions
 //object KafkaRDD {
 //
 //  /** Write contents of this RDD to Kafka messages by creating a Producer per partition. */
