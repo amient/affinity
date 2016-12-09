@@ -136,7 +136,7 @@ class KafkaFetcherImpl(val topic: String, props: Properties) extends KafkaFetche
           if (setIter.hasNext) {
             record = setIter.next()
             offset = record.offset + 1L
-            if (record.value != null && record.offset >= startOffset) {
+            if (record.offset >= startOffset) {
               return
             }
           }

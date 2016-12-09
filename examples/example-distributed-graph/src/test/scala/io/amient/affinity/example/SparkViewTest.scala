@@ -31,11 +31,12 @@ import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.KafkaFetcherImpl
-import io.amient.affinity.model.graph.message.VertexProps
+import io.amient.affinity.model.graph.message.{Component, VertexProps}
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.util.spark.KafkaRDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
+import org.junit.internal.runners.statements.ExpectException
 import org.scalatest.{FlatSpec, Matchers}
 
 class MySparkAvroSerde(zk: String, to1: Int, to2: Int)
@@ -66,6 +67,7 @@ class ExampleGraphAnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKa
 
   http_post(uri("/connect/1/2")).status should be(SeeOther)
   http_post(uri("/connect/3/4")).status should be(SeeOther)
+  http_post(uri("/connect/2/3")).status should be(SeeOther)
 
   override def afterAll(): Unit = {
     try {
@@ -77,6 +79,7 @@ class ExampleGraphAnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKa
   }
 
   "Spark Module" should "be able to see avro-serialised state in kafka" in {
+
     val _kafkaBootstrap = kafkaBootstrap
     val _zkConnect = zkConnect
     val conf = new SparkConf()
@@ -86,23 +89,35 @@ class ExampleGraphAnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKa
 
     val sc = new SparkContext(conf)
 
-    val fetcher = new KafkaFetcherImpl(topic = "graph", new Properties() {
+    val graphFetcher = new KafkaFetcherImpl(topic = "graph", new Properties() {
       put("bootstrap.servers", _kafkaBootstrap)
     })
 
-    val rdd = new KafkaRDD(sc, fetcher)
+    val graphRdd = new KafkaRDD(sc, graphFetcher)
       .compact[Int, VertexProps](new IntSerde, new MySparkAvroSerde(_zkConnect, 6000, 6000))
       .repartition(1)
       .sortByKey()
 
-    val result = rdd.collect().toList
-    true should be(result match {
+    graphRdd.collect().toList match {
       case (1, VertexProps(_, 1, _)) ::
         (2, VertexProps(_, 1, _)) ::
-        (3, VertexProps(_, 3, _)) ::
-        (4, VertexProps(_, 3, _)) :: Nil => true
-      case _ => false
+        (3, VertexProps(_, 1, _)) ::
+        (4, VertexProps(_, 1, _)) :: Nil =>
+      case _ => throw new AssertionError("Graph should contain 4 vertices")
+    }
+
+    val componentFetcher = new KafkaFetcherImpl(topic = "components", new Properties() {
+      put("bootstrap.servers", _kafkaBootstrap)
     })
+
+    val componentRdd = new KafkaRDD(sc, componentFetcher)
+      .compact[Int, Component](new IntSerde, new MySparkAvroSerde(_zkConnect, 6000, 6000))
+      .repartition(1)
+
+    componentRdd.collect.toList match {
+      case (1, Component(_, _)) :: Nil =>
+      case _ => throw new AssertionError("Graph should contain 1 component")
+    }
 
   }
 
