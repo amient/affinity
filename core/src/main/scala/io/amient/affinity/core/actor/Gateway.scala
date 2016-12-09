@@ -296,27 +296,28 @@ trait WebSocketSupport extends Gateway {
         val json = Encoder.mapper.readValue(new ByteBufferInputStream(List(buf).asJava), classOf[JsonNode])
         pfCustomHandle(json)
     } {
-      case None => TextMessage.Strict("null")
+      case None => TextMessage.Strict("null") //FIXME none type representation
       case Some(value) => TextMessage.Strict(Encoder.json(value))
       case direct: ByteString => BinaryMessage.Strict(direct)
       case other => TextMessage.Strict(Encoder.json(other))
     }
   }
 
-  protected def avroWebSocket(http: HttpExchange, keyspace: ActorRef, stateStoreName: String, key: Any)
+  protected def avroWebSocket(http: HttpExchange, service: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[Any, Unit]): Unit = {
     http.request.header[UpgradeToWebSocket] match {
       case None => Future.failed(new IllegalArgumentException("WebSocket connection required"))
       case Some(upgrade) =>
         import context.dispatcher
         fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, keyspace, stateStoreName, key)(pfCustomHandle)
+          avroWebSocket(upgrade, service, stateStoreName, key)(pfCustomHandle)
         }
     }
   }
 
-  protected def avroWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
+  protected def avroWebSocket(upgrade: UpgradeToWebSocket, service: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
+    //FIXME hardcoded avro serde identifier
     if (!serializers.contains(101)) throw new IllegalArgumentException("No AvroSerde is registered")
     val avroSerde = serializers(101).asInstanceOf[AvroSerde]
 
@@ -342,7 +343,7 @@ trait WebSocketSupport extends Gateway {
       * upstream any other type handling is not defined and will throw scala.MatchError
       */
 
-    genericWebSocket(upgrade, keyspace, stateStoreName, key) {
+    genericWebSocket(upgrade, service, stateStoreName, key) {
       case text: TextMessage =>
         try {
           buildSchemaPushMessage(avroSerde.schema(text.getStrictText).get)
@@ -357,7 +358,7 @@ trait WebSocketSupport extends Gateway {
             case 0 => try {
               val record = AvroRecord.read(buf, avroSerde)
               val handleAvroClientMessage: PartialFunction[Any, Unit] = pfCustomHandle.orElse {
-                case forwardToBackend: AvroRecord[_] => keyspace ! forwardToBackend
+                case forwardToBackend: AvroRecord[_] => service ! forwardToBackend
               }
               handleAvroClientMessage(record)
             } catch {
@@ -375,7 +376,7 @@ trait WebSocketSupport extends Gateway {
     }
   }
 
-  protected def genericWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
+  protected def genericWebSocket(upgrade: UpgradeToWebSocket, service: ActorRef, stateStoreName: String, key: Any)
                                 (pfDown: PartialFunction[Message, Any])
                                 (pfPush: PartialFunction[Any, Message]): Future[HttpResponse] = {
     import context.dispatcher
@@ -383,7 +384,7 @@ trait WebSocketSupport extends Gateway {
     implicit val materializer = ActorMaterializer.create(context.system)
     implicit val timeout = Timeout(1 second)
 
-    keyspace ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
+    service ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
       case keyValueActor: ActorRef =>
 
         /**

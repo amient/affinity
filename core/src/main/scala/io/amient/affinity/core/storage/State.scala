@@ -65,14 +65,14 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   import State._
 
-  val config = stateConfig.withFallback(ConfigFactory.empty()
+  private val config = stateConfig.withFallback(ConfigFactory.empty()
     .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
   )
 
-  val keySerde = serde[K]
-  val valueSerde = serde[V]
-  val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
+  private val keySerde = serde[K]
+  private val valueSerde = serde[V]
+  private val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
   private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
   private val storageClassSymbol = rootMirror.classSymbol(storageClass)
@@ -80,24 +80,24 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage = constructorMirror(config, partition).asInstanceOf[Storage]
+  val storage: Storage = constructorMirror(config, partition).asInstanceOf[Storage]
 
   import system.dispatcher
 
-  def option[T](opt: Optional[T]) = if (opt.isPresent) Some(opt.get()) else None
+  def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
   /**
     * Retrieve a value from the store asynchronously
     *
-    * @param key
+    * @param key to retrieve value of
     * @return Future.Success(Some(V)) if the key exists and the value could be retrieved and deserialized
     *         Future.Success(None) if the key doesn't exist
     *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
   def apply(key: K): Option[V] = {
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    option(storage.memstore(k)) map[V] {
-      case d => valueSerde.fromBinary(d.array) match {
+    option(storage.memstore(k)) map[V] { (cell: ByteBuffer) =>
+      valueSerde.fromBinary(cell.array) match {
         case value: V => value
         case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
       }
@@ -105,7 +105,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   def iterator: Iterator[(K, V)] = {
-    storage.memstore.iterator.asScala.map { case entry =>
+    storage.memstore.iterator.asScala.map { entry =>
       (keySerde.fromBinary(entry.getKey.array()).asInstanceOf[K],
         valueSerde.fromBinary(entry.getValue.array).asInstanceOf[V])
     }
@@ -114,7 +114,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def size: Long = {
     val it = storage.memstore.iterator
     var count = 0
-    while(it.hasNext) {
+    while (it.hasNext) {
       count += 1
       it.next()
     }
@@ -125,35 +125,36 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * insert is a syntactic sugar for update where the value is overriden if it doesn't exist
     * and the command is the value itself
     *
-    * @param key
+    * @param key to insert
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
-  def insert(key: K, value: V) = update(key) {
-    case Some(existing) => throw new IllegalArgumentException(s"$key already exists in state store `$name`")
+  def insert(key: K, value: V): Future[V] = update(key) {
+    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store `$name`")
     case None => (Some(value), Some(value), value)
   }
 
   /**
     * update is a syntactic sugar for update where the value is always overriden
     *
-    * @param key
+    * @param key to update
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
   def update(key: K, value: V): Future[Option[V]] = update(key) {
-    case Some(prev) if (prev == value) => (None, Some(prev), Some(prev))
+    case Some(prev) if prev == value => (None, Some(prev), Some(prev))
     case Some(prev) => (Some(value), Some(value), Some(prev))
     case None => (Some(value), Some(value), None)
   }
 
   /**
     * remove is a is a syntactic sugar for update where None is used as Value
-    * @param key
-    * @param command is an optional command that can be pushed to key-value observers
-    * @return
+    *
+    * @param key to remove
+    * @param command is the message that will be pushed to key-value observers
+    * @return Future Optional of the value previously held at the key position
     */
-  def remove(key: K, command: Any = null): Future[Option[V]] = update(key) {
+  def remove(key: K, command: Any): Future[Option[V]] = update(key) {
     case None => (None, None, None)
     case Some(component) => (Some(command), None, Some(component))
   }
@@ -171,20 +172,16 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       pf(apply(key)) match {
-        case (None, unchanged, result) => Future.successful(result)
+        case (None, _, result) => Future.successful(result)
         case (Some(increment), changed, result) => changed match {
           case Some(updatedValue) =>
             put(key, updatedValue) andThen {
               case _ => push(key, increment)
-            } map {
-              case _ => result
-            }
+            } map (_ => result)
           case None =>
             delete(key) andThen {
               case _ => push(key, increment)
-            } map {
-              case _ => result
-            }
+            } map (_ => result)
         }
       }
     } catch {
@@ -199,8 +196,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * the previous value is rolled back in the memstore and the failure is propagated into
     * the result future.
     *
-    * @param key
-    * @param value
+    * @param key to replace
+    * @param value new value for the key
     * @return A a future optional value previously held at the key position
     *         the future option will be equal to None if new a value was inserted
     */
@@ -208,7 +205,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
     val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBinary(value.asInstanceOf[AnyRef]))
     option(storage.memstore.update(k, write)) match {
-      case Some(prev) if (prev == write) => Future.successful(Some(value))
+      case Some(prev) if prev == write => Future.successful(Some(value))
       case differentOrNone =>
         val javaToScalaFuture = storage.write(k, write) match {
           case jfuture => Future(jfuture.get)
@@ -224,7 +221,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * the previous value is rolled back in the memstore and the failure is propagated into
     * the result future.
     *
-    * @param key
+    * @param key to delete
     * @return A a future optional value previously held at the key position
     *         the future option will be equal to None if new a value was inserted
     */
@@ -233,6 +230,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     option(storage.memstore.remove(k)) match {
       case None => Future.successful(None)
       case some =>
+        //FIXME writing null should be avoided in favour of storage.delete(k)
         val javaToScalaFuture = storage.write(k, null) match {
           case jfuture => Future(jfuture.get)
         }
@@ -250,6 +248,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     */
   private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
     def commit(success: Any) = prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V])
+
     def revert(failure: Throwable) = {
       //write to storage failed - reverting the memstore modification
       //TODO use cell versioning or timestamp to cancel revert if another write succeeded after the one being reverted
@@ -259,6 +258,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       }
       failure
     }
+
     write transform(commit, revert)
   }
 
@@ -283,11 +283,11 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def addObserver(key: Any, observer: Observer): Observer = key match {
     case k: K =>
       val observable = observables.get(k) match {
-        case Some(observable) => observable
+        case Some(o) => o
         case None =>
-          val observable = new ObservableState()
-          observables += k -> observable
-          observable
+          val o: ObservableState = new ObservableState()
+          observables += k -> o
+          o
       }
       observable.addObserver(observer)
       observer.update(observable, apply(k)) // send initial value on subscription
@@ -296,7 +296,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   def removeObserver(key: Any, observer: Observer): Unit = key match {
     case k: K => observables.get(k).foreach {
-      observable => observable.deleteObserver(observer)
+      observable =>
+        observable.deleteObserver(observer)
         if (observable.countObservers() == 0) observables -= k
     }
   }
