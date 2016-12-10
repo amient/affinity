@@ -166,6 +166,7 @@ class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Match
     val lastMessage = new AtomicReference[GenericRecord](null)
     lastMessage.synchronized {
       val ws = new AvroWebSocketClient(URI.create(s"ws://localhost:$httpPort/vertex?id=1000"), new AvroMessageHandler() {
+        override def onError(e: Throwable): Unit = e.printStackTrace()
         override def onMessage(message: scala.Any): Unit = {
           lastMessage.synchronized {
             lastMessage.set(message.asInstanceOf[GenericRecord])

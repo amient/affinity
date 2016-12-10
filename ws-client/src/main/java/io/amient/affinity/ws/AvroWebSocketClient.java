@@ -42,10 +42,12 @@ final public class AvroWebSocketClient {
 
     public interface TextMessageHandler {
         void onMessage(String message);
+        void onError(Throwable e);
     }
 
     public interface AvroMessageHandler {
         void onMessage(Object message);
+        void onError(Throwable e);
     }
 
     //TODO #28 enforce the entire class is Trhead-Safe (websocket can only communicate one message in each direction)
@@ -76,9 +78,20 @@ final public class AvroWebSocketClient {
         this.session = session;
     }
 
+    @OnError
+    public void onError(Session session, Throwable e) {
+        if (textMessageHandler != null) textMessageHandler.onError(e);
+        if (avroMessageHandler != null) avroMessageHandler.onError(e);
+    }
+
     @OnClose
     public void onClose(Session userSession, CloseReason reason) {
         this.session = null;
+    }
+
+    @OnMessage
+    public void onTextMessage(String message) {
+        if (textMessageHandler != null) textMessageHandler.onMessage(message);
     }
 
     @OnMessage
@@ -137,10 +150,6 @@ final public class AvroWebSocketClient {
         avroMessageHandler.onMessage(record);
     }
 
-    @OnMessage
-    public void onTextMessage(String message) {
-        if (textMessageHandler != null) textMessageHandler.onMessage(message);
-    }
 
     final public void send(String message) {
         this.session.getAsyncRemote().sendText(message);

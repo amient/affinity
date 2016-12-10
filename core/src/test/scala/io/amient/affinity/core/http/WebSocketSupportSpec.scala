@@ -81,6 +81,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       (try {
         val ws = new AvroWebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
           override def onMessage(message: scala.Any): Unit = ()
+          override def onError(e: Throwable): Unit = ()
         })
         try {
           ws.getSchema("io.amient.affinity.core.serde.avro.WrongClass")
@@ -96,12 +97,14 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     "retrieve valid schema for known type and send a receive objects according to that schama" in {
       val lastMessage = new AtomicReference[Any](null)
       val ws = new AvroWebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
+        override def onError(e: Throwable): Unit = e.printStackTrace()
         override def onMessage(message: scala.Any): Unit = {
           lastMessage.synchronized {
             lastMessage.set(message)
             lastMessage.notify()
           }
         }
+
       })
       try {
         val schema = ws.getSchema("io.amient.affinity.core.serde.avro.Base")
