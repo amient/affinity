@@ -49,7 +49,7 @@ class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
           }
         }), "subscriber1"), false)
       }
-
+      coordinator1.close()
 
       val coordinator2 = Coordinator.create(system, "group1")
       val update2 = new AtomicReference[String]("")
@@ -63,6 +63,7 @@ class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
         update2.get should be("group1, 1, 0")
         update1.get should be("group1, 1, 0")
       }
+      coordinator2.close()
 
 
     } finally {
