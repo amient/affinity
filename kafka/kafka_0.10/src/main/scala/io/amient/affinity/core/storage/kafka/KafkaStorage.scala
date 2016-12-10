@@ -193,4 +193,8 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
   }
 
+  def delete(key: ByteBuffer): Future[RecordMetadata] = {
+    write(key, null)
+  }
+
 }

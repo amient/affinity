@@ -36,7 +36,6 @@ import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.util.spark.KafkaRDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
-import org.junit.internal.runners.statements.ExpectException
 import org.scalatest.{FlatSpec, Matchers}
 
 class MySparkAvroSerde(zk: String, to1: Int, to2: Int)

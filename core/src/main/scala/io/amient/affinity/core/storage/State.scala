@@ -230,9 +230,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     option(storage.memstore.remove(k)) match {
       case None => Future.successful(None)
       case some =>
-        //FIXME writing null should be avoided in favour of storage.delete(k)
-        val javaToScalaFuture = storage.write(k, null) match {
-          case jfuture => Future(jfuture.get)
+        val javaToScalaFuture = storage.delete(k) match {
+          case jFuture => Future(jFuture.get)
         }
         writeWithMemstoreRollback(k, some, javaToScalaFuture)
     }

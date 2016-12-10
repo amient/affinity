@@ -122,10 +122,10 @@ class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
   }
 
   override def receive: Receive = {
-    case frontend: ActorRef => creatKeyValueObserver(key, frontend)
+    case frontend: ActorRef => createKeyValueObserver(key, frontend)
   }
 
-  def creatKeyValueObserver(key: Any, frontend: ActorRef): Unit = {
+  def createKeyValueObserver(key: Any, frontend: ActorRef): Unit = {
     observer = Some(state.addObserver(key, new Observer() {
       override def update(o: Observable, arg: scala.Any): Unit = {
         val t = 1 seconds

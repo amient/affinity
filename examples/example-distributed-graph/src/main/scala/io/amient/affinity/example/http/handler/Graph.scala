@@ -70,6 +70,19 @@ trait Graph extends HttpGateway with WebSocketSupport with GraphLogic {
       }
 
     /**
+      * WebSocket GET /component?id=<vid>
+      */
+    case http@HTTP(GET, PATH("component"), QUERY(("id", INT(cid))), response) =>
+      http.request.header[UpgradeToWebSocket] match {
+        case None => response.success(Encoder.html(OK, html))
+        case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
+          avroWebSocket(upgrade, service("graph"), "components", cid) {
+            case _ =>
+          }
+        }
+      }
+
+    /**
       * GET /component/<component>
       */
     case HTTP(GET, PATH("component", INT(cid)), query, response) =>

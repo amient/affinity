@@ -93,4 +93,6 @@ public abstract class Storage {
      */
     abstract public Future<?> write(ByteBuffer key, ByteBuffer value);
 
+    abstract public Future<?> delete(ByteBuffer key);
+
 }
