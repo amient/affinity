@@ -19,7 +19,9 @@
 
 package io.amient.affinity.core.serde;
 
-public interface AbstractSerde<T> {
+import java.io.Closeable;
+
+public interface AbstractSerde<T> extends Closeable {
 
     T fromBytes(byte[] bytes);
 

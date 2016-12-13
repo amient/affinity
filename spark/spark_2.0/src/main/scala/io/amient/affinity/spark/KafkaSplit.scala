@@ -26,17 +26,12 @@ import org.apache.spark.Partition
   * can be further sub-divided multiple times to get extra parallelism. Hence the number of splits if defined by
   * number of kafka partition times the extraParallelism factor.
   *
-  * @param rddId
-  * @param index       ∈ { i | 0 ≤ i < numPartitions * extraParallelism }
-  * @param partition   - kafka partition number
-  * @param startOffset - offset range start - inclusive
-  * @param stopOffset  - offset range end - exclusive
+  * @param rddId       owner RDD
+  * @param index       spark index for the partition
+  * @param partition   kafka index for the partition
   */
-class KafkaSplit(rddId: Int,
-                 override val index: Int,
-                 val partition: Int,
-                 val startOffset: Long, val stopOffset: Long) extends Partition {
+class KafkaSplit(rddId: Int, override val index: Int, val partition: Int) extends Partition {
   override def hashCode: Int = 41 * 41 * (41 + rddId) + (41 * index)
 
-  override def toString = s"KafkaSplit(index=$index, partition=$partition [$startOffset:$stopOffset], rddId=$rddId)"
+  override def toString = s"KafkaSplit(index=$index, partition=$partition, rddId=$rddId)"
 }

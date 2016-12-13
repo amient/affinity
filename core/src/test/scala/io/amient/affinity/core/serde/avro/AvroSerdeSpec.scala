@@ -36,6 +36,8 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
     register(classOf[_V1_Composite], AvroRecord.inferSchema(classOf[Composite]))
     register(classOf[Base])
+
+    override def close(): Unit = ()
   }
 
   /**

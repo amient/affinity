@@ -28,6 +28,8 @@ import org.apache.avro.generic.IndexedRecord
 
 trait AvroSerde extends Serde[Any] with AvroSchemaProvider {
 
+  override def close(): Unit = ()
+
   override def identifier: Int = 101
 
   /**

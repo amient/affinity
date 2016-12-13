@@ -56,6 +56,8 @@ class LocalAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde wit
     })
   }
 
+  override def close(): Unit = ()
+
   override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
     val isNew = internal.asScala.filter(_._2 == (cls, schema)).isEmpty
     val id = super.registerSchema(cls, schema)

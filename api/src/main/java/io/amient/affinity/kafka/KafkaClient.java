@@ -22,15 +22,20 @@ package io.amient.affinity.kafka;
 import java.io.Closeable;
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
-public interface KafkaFetcher extends Serializable, Closeable {
+public interface KafkaClient extends Serializable {
 
-    long LATEST_TIME = -1L;
-    long EARLIEST_TIME = -2L;
+    List<Integer> getPartitions();
 
-    Map<Integer, Long> topicOffsets(Long time);
+    Map<Long, Long> getOffsets(int partition);
 
     Iterator<KeyPayloadAndOffset> iterator(int partition, Long startOffset, Long stopOffset);
+
+    void publish(Iterator<KeyPayloadAndOffset> iter, Function<Long, Boolean> checker);
+
+    void release(Iterator<KeyPayloadAndOffset> iter);
 
 }

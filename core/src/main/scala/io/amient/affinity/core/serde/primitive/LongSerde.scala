@@ -30,4 +30,6 @@ class LongSerde extends Serde[Long] {
 
   override def toBytes(obj: Long): Array[Byte] = ByteUtils.putLongValue(obj, new Array[Byte](8),0)
 
+  override def close(): Unit = ()
+
 }

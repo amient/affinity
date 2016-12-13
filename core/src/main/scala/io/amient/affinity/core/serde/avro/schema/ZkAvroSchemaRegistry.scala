@@ -38,7 +38,7 @@ object ZkAvroSchemaRegistry {
   final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.zookeeper-schema-registry.zookeeper.timeout.session.ms"
 }
 
-class ZkAvroSchemaRegistry(zkConnect:String, zkConnectTimeout: Int, zkSessionTimeout: Int)
+class ZkAvroSchemaRegistry(zkConnect: String, zkConnectTimeout: Int, zkSessionTimeout: Int)
   extends AvroSerde with AvroSchemaProvider {
 
   def this(system: ExtendedActorSystem) = this(
@@ -58,6 +58,10 @@ class ZkAvroSchemaRegistry(zkConnect:String, zkConnectTimeout: Int, zkSessionTim
       updateInternal(children)
     }
   }))
+
+  override def close(): Unit = {
+    zk.close()
+  }
 
   override private[schema] def getSchema(id: Int): Option[Schema] = try {
     Some(new Schema.Parser().parse(zk.readData[String](s"$zkRoot/${id.toString.reverse.padTo(10, "0").reverse.mkString}")))

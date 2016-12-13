@@ -36,4 +36,6 @@ class TestAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
   register(classOf[Null])
   register(classOf[TestKey])
   register(classOf[TestValue])
+
+  override def close(): Unit = ()
 }

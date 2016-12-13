@@ -30,4 +30,6 @@ class IntSerde extends Serde[Int] {
 
   override def toBytes(obj: Int): Array[Byte] = ByteUtils.putIntValue(obj, new Array[Byte](4),0)
 
+  override def close(): Unit = ()
+
 }

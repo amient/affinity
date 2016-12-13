@@ -275,7 +275,8 @@ abstract class AvroRecord[X: TypeTag] extends SpecificRecord with java.io.Serial
     s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
 
   @transient private val declaredFields = getClass.getDeclaredFields
-  @transient private val fields = params.zipWithIndex.map { case (param, pos) => {
+  //TODO verify that when fields are not transient the java and kryo serialization is not excessive
+  private val fields = params.zipWithIndex.map { case (param, pos) => {
     val field = declaredFields(pos)
     require(param.getType == field.getType,
       s"field `${field.getType}` at position $pos doesn't match expected `$param`")

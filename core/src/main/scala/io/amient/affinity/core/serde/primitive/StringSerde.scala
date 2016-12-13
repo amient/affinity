@@ -32,4 +32,6 @@ class StringSerde extends Serde[String] {
   }
 
   override def identifier: Int = 21
+
+  override def close(): Unit = ()
 }

@@ -47,6 +47,8 @@ class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   val config = system.settings.config
   val client = new ConfluentSchemaRegistryClient(Uri(config.getString(CONFIG_CF_REGISTRY_URL_BASE)))
 
+  override def close(): Unit = ()
+
   override private[schema] def getSchema(id: Int): Option[Schema] = try {
     Some(client.getSchema(id))
   } catch {
