@@ -32,10 +32,10 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable
 
 object ZkAvroSchemaRegistry {
-  final val CONFIG_ZOOKEEPER_ROOT = "affinity.zookeeper-schema-registry.zookeeper.root"
-  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.zookeeper-schema-registry.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.zookeeper-schema-registry.zookeeper.timeout.connect.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.zookeeper-schema-registry.zookeeper.timeout.session.ms"
+  final val CONFIG_ZOOKEEPER_ROOT = "affinity.avro.zookeeper-schema-registry.zookeeper.root"
+  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.avro.zookeeper-schema-registry.zookeeper.connect"
+  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.avro.zookeeper-schema-registry.zookeeper.timeout.connect.ms"
+  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.avro.zookeeper-schema-registry.zookeeper.timeout.session.ms"
 }
 
 class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {

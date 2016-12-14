@@ -29,7 +29,7 @@ import org.apache.avro.Schema
 import scala.collection.JavaConverters._
 
 object LocalAvroSchemaRegistry {
-  final val CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH = "affinity.local-schema-registry.data.path"
+  final val CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH = "affinity.avro.local-schema-registry.data.path"
 }
 
 class LocalAvroSchemaRegistry(config: Config) extends AvroSerde with EmbeddedAvroSchemaProvider {

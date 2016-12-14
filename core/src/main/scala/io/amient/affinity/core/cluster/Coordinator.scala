@@ -135,7 +135,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   final protected def updateGroup(newState: Map[String, String]): Unit = {
     val t = 6 seconds
     implicit val timeout = new Timeout(t)
-    synchronized {
+    if (!closed.get) synchronized {
       val prevMasters: Set[ActorRef] = getCurrentMasters
       handles.clear()
       newState.foreach { case (handle, actorPath) =>

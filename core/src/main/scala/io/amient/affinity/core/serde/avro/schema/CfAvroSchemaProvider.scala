@@ -33,7 +33,7 @@ import org.apache.avro.Schema
 import scala.collection.JavaConverters._
 
 object CfAvroSchemaProvider {
-  final val CONFIG_CF_REGISTRY_URL_BASE = "affinity.confluent-schema-registry.url.base"
+  final val CONFIG_CF_REGISTRY_URL_BASE = "affinity.avro.confluent-schema-registry.url.base"
 }
 /**
   * Confluent Schema Registry provider and serde
