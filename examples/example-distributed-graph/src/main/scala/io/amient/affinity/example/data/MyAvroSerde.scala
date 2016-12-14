@@ -26,6 +26,8 @@ import io.amient.affinity.model.graph.GraphData
 
 class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) with MyProjectAvroSerde
 
+class MySparkAvroSerde(zk: String, to1: Int, to2: Int) extends ZkAvroSchemaRegistry(zk, to1, to2) with MyProjectAvroSerde
+
 trait MyProjectAvroSerde extends AvroSerde {
   register(classOf[ConfigEntry])
   GraphData.registerMessages(this)

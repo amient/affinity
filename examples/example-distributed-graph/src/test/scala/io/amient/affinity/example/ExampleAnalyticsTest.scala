@@ -24,9 +24,8 @@ import java.util.Properties
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.serde.primitive.IntSerde
-import io.amient.affinity.example.data.MyProjectAvroSerde
+import io.amient.affinity.example.data.MySparkAvroSerde
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
@@ -39,11 +38,7 @@ import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
-class MySparkAvroSerde(zk: String, to1: Int, to2: Int)
-  extends ZkAvroSchemaRegistry(zk, to1, to2) with MyProjectAvroSerde
-
-
-class ExampleGraphAnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class ExampleAnalyticsTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
   override def numPartitions = 4
 

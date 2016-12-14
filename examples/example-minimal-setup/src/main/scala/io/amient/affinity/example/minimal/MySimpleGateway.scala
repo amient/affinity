@@ -43,13 +43,13 @@ class MySimpleGateway extends Gateway {
 
     case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong"))
 
-    case HTTP(GET, PATH("get", key), _, response) =>
+    case HTTP(GET, PATH("store", key), _, response) =>
       delegateAndHandleErrors(response, service("simple-keyspace") ack GetValue(key)) {
         case None => HttpResponse(NotFound)
         case Some(value: String) => HttpResponse(OK, entity = value)
       }
 
-    case HTTP(GET, PATH("put", key), QUERY(("value", value)), response) =>
+    case HTTP(PUT, PATH("store", key), QUERY(("value", value)), response) =>
       delegateAndHandleErrors(response, service("simple-keyspace") ack PutValue(key, value)) {
         case None => HttpResponse(Accepted)
         case Some(prevValue: String) => HttpResponse(OK, entity = prevValue)
