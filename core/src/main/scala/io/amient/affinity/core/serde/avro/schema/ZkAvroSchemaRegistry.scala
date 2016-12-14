@@ -21,7 +21,7 @@ package io.amient.affinity.core.serde.avro.schema
 
 import java.util
 
-import akka.actor.ExtendedActorSystem
+import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
@@ -38,14 +38,11 @@ object ZkAvroSchemaRegistry {
   final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.zookeeper-schema-registry.zookeeper.timeout.session.ms"
 }
 
-class ZkAvroSchemaRegistry(zkConnect: String, zkConnectTimeout: Int, zkSessionTimeout: Int)
-  extends AvroSerde with AvroSchemaProvider {
+class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
 
-  def this(system: ExtendedActorSystem) = this(
-    system.settings.config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT),
-    system.settings.config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS),
-    system.settings.config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
-  )
+  val zkConnect = config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT)
+  val zkSessionTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
+  val zkConnectTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
 
   private val zkRoot = "/schema-registry"
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)

@@ -23,16 +23,16 @@ package io.amient.affinity.core.serde.avro.schema
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
-import akka.actor.ExtendedActorSystem
+//FIXME de-couple from akka http model by using standard java URL
 import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroSerde
 import org.apache.avro.Schema
 
 import scala.collection.JavaConverters._
 
-object CfAvroSchemaRegistry {
+object CfAvroSchemaProvider {
   final val CONFIG_CF_REGISTRY_URL_BASE = "affinity.confluent-schema-registry.url.base"
 }
 /**
@@ -41,10 +41,9 @@ object CfAvroSchemaRegistry {
   * Instead a fully-qualified name of the class is the subject.
   */
 
-class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with AvroSchemaProvider {
+class CfAvroSchemaProvider(config: Config) extends AvroSerde with AvroSchemaProvider {
 
-  import CfAvroSchemaRegistry._
-  val config = system.settings.config
+  import CfAvroSchemaProvider._
   val client = new ConfluentSchemaRegistryClient(Uri(config.getString(CONFIG_CF_REGISTRY_URL_BASE)))
 
   override def close(): Unit = ()
@@ -68,9 +67,6 @@ class CfAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with A
   }
 
   class ConfluentSchemaRegistryClient(baseUrl: Uri) {
-    implicit val system = CfAvroSchemaRegistry.this.system
-
-    implicit val materializer = ActorMaterializer.create(system)
 
     private val mapper = new ObjectMapper
 

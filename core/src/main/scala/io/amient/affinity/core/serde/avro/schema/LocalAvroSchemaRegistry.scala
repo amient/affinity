@@ -19,10 +19,10 @@
 
 package io.amient.affinity.core.serde.avro.schema
 
-import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file._
+import java.nio.file.attribute.BasicFileAttributes
 
-import akka.actor.ExtendedActorSystem
+import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroSerde
 import org.apache.avro.Schema
 
@@ -32,11 +32,11 @@ object LocalAvroSchemaRegistry {
   final val CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH = "affinity.local-schema-registry.data.path"
 }
 
-class LocalAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde with EmbeddedAvroSchemaProvider {
+class LocalAvroSchemaRegistry(config: Config) extends AvroSerde with EmbeddedAvroSchemaProvider {
 
   import LocalAvroSchemaRegistry._
 
-  val dataPath = Paths.get(system.settings.config.getString(CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH))
+  val dataPath = Paths.get(config.getString(CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH))
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
   else {
     Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
@@ -44,12 +44,11 @@ class LocalAvroSchemaRegistry(system: ExtendedActorSystem) extends AvroSerde wit
         val id = file.getFileName.toString.split("\\.")(0).toInt
         val schema = new Schema.Parser().parse(file.toFile)
         try {
-          val cls = Class.forName(schema.getFullName)
-          internal.put(id, (cls, schema))
+          internal.put(id, (Class.forName(schema.getFullName), schema))
         } catch {
-          case removed: ClassNotFoundException =>
+          case _: ClassNotFoundException =>
+            //s"schema $id for ${schema.getFullName} no longer has a compile time class associated"
             internal.put(id, (null, schema))
-            system.log.warning(s"schema $id for ${schema.getFullName} no longer has a compile time class associated")
         }
         super.visitFile(file, attrs)
       }

@@ -22,7 +22,7 @@ package io.amient.affinity.testutil
 import java.nio.channels.ServerSocketChannel
 
 import com.typesafe.config.{Config, ConfigValueFactory}
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaProvider
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.confluent.kafka.schemaregistry.rest.{SchemaRegistryConfig, SchemaRegistryRestApplication}
 
@@ -45,7 +45,7 @@ trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
   val registryClient = new CachedSchemaRegistryClient(registryUrl, 20)
 
   override def configure(config: Config) = super.configure(config)
-    .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
+    .withValue(CfAvroSchemaProvider.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
     .withValue("akka.actor.serialization-bindings", ConfigValueFactory.fromMap(Map(
       "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro",
       "java.lang.String" -> "avro",

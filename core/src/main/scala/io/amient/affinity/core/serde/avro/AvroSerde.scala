@@ -21,16 +21,31 @@ package io.amient.affinity.core.serde.avro
 
 import java.nio.ByteBuffer
 
-import io.amient.affinity.core.serde.Serde
+import com.typesafe.config.Config
+import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 
-trait AvroSerde extends Serde[Any] with AvroSchemaProvider {
+object AvroSerde {
+  final val CONFIG_PROVIDER_CLASS = "affinity.avro.schema.provider.class"
+  def create(config: Config): AvroSerde = {
+    val providerClass: Class[_ <: AvroSerde] = if (!config.hasPath(CONFIG_PROVIDER_CLASS)) null else {
+      val providerClassName = config.getString(CONFIG_PROVIDER_CLASS)
+      Class.forName(providerClassName).asSubclass(classOf[AvroSerde])
+    }
+
+    if (providerClass == null) null else try {
+      providerClass.getConstructor(classOf[Config]).newInstance(config)
+    } catch {
+      case _: NoSuchMethodException => providerClass.newInstance()
+    }
+  }
+}
+
+trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
 
   override def close(): Unit = ()
-
-  override def identifier: Int = 101
 
   /**
     * Deserialize bytes to a concrete instance

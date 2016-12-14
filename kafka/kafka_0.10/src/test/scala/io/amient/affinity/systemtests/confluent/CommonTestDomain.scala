@@ -21,9 +21,9 @@ package io.amient.affinity.systemtests.confluent
 
 import java.nio.ByteBuffer
 
-import akka.actor.ExtendedActorSystem
+import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaProvider
 import io.amient.affinity.core.util.ByteUtils
 
 object UUID {
@@ -44,7 +44,7 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
   override def hashCode(): Int = key.hashCode()
 }
 
-class TestAvroRegistry(system: ExtendedActorSystem) extends CfAvroSchemaRegistry(system) {
+class TestAvroRegistry(config: Config) extends CfAvroSchemaProvider(config) {
   register(classOf[Int])
   register(classOf[String])
   register(classOf[KEY])

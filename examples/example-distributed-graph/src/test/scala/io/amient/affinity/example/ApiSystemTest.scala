@@ -45,7 +45,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ExampleSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
   override def numPartitions = 2
 

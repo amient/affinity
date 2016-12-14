@@ -19,16 +19,11 @@
 
 package io.amient.affinity.example.data
 
-import akka.actor.ExtendedActorSystem
-import io.amient.affinity.core.serde.avro.AvroSerde
+import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.model.graph.GraphData
 
-class MyAvroSerde(system: ExtendedActorSystem) extends ZkAvroSchemaRegistry(system) with MyProjectAvroSerde
-
-class MySparkAvroSerde(zk: String, to1: Int, to2: Int) extends ZkAvroSchemaRegistry(zk, to1, to2) with MyProjectAvroSerde
-
-trait MyProjectAvroSerde extends AvroSerde {
+class MyAvroSerde(config: Config) extends ZkAvroSchemaRegistry(config) {
   register(classOf[ConfigEntry])
   GraphData.registerMessages(this)
 }

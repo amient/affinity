@@ -39,6 +39,7 @@ import akka.stream.actor.ActorPublisherMessage.Request
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.fasterxml.jackson.databind.JsonNode
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.actor.Service.{CheckClusterAvailability, ClusterAvailability}
@@ -46,7 +47,7 @@ import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde, AvroSerdeProxy}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.util.ByteBufferInputStream
 
@@ -79,7 +80,7 @@ abstract class Gateway extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val config = context.system.settings.config
+  protected val config: Config = context.system.settings.config
 
   private val services: Map[String, (Coordinator, ActorRef, AtomicBoolean)] =
     config.getObject(CONFIG_SERVICES).asScala.map(_._1).map { group =>
@@ -283,6 +284,8 @@ trait WebSocketSupport extends Gateway {
 
   private val serializers = SerializationExtension(context.system).serializerByIdentity
 
+  private val avroSerde = AvroSerde.create(config)
+
   abstract override def handle: Receive = super.handle orElse {
     case http@HTTP(GET, PATH("affinity.js"), _, response) => response.success(Encoder.plain(OK, afjs))
   }
@@ -317,9 +320,6 @@ trait WebSocketSupport extends Gateway {
 
   protected def avroWebSocket(upgrade: UpgradeToWebSocket, service: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
-    //FIXME hardcoded avro serde identifier
-    if (!serializers.contains(101)) throw new IllegalArgumentException("No AvroSerde is registered")
-    val avroSerde = serializers(101).asInstanceOf[AvroSerde]
 
     def buildSchemaPushMessage(schemaId: Int): ByteString = {
       val schemaBytes = avroSerde.schema(schemaId).get._2.toString(true).getBytes()

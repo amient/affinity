@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.kafka.consumer.AffinityKafkaConsumer
@@ -44,7 +44,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
 
   val config = configure {
     ConfigFactory.load("systemtests")
-      .withValue("akka.actor.serializers.avro", ConfigValueFactory.fromAnyRef(classOf[TestAvroRegistry].getName))
+      .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
+        ConfigValueFactory.fromAnyRef(classOf[TestAvroRegistry].getName))
   }
 
   val system = ActorSystem.create("ConfluentEcoSystem", config)

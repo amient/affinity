@@ -24,12 +24,6 @@ import akka.serialization.JSerializer
 
 trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
-  def fromBytes(bytes: Array[Byte]): T
-
-  def toBytes(obj: T): Array[Byte]
-
-  //////////////////////////////////////////////////////////////////////////
-
   override def includeManifest: Boolean = false
 
   override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj.asInstanceOf[T])

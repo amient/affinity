@@ -47,14 +47,14 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
   val newSerde = new TestAvroSerde
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
-    val oldValue = oldSerde.toBinary(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10))
-    val renderedValue = newSerde.fromBinary(oldValue)
+    val oldValue = oldSerde.toBytes(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10))
+    val renderedValue = newSerde.fromBytes(oldValue)
     renderedValue should be(Composite(Seq(Base(ID(1), Side.LEFT)), Map()))
   }
 
   "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
-    val newValue = newSerde.toBinary(Composite(Seq(Base(ID(1), Side.LEFT)), Map("1" -> Base(ID(1), Side.LEFT))))
-    val downgradedValue = oldSerde.fromBinary(newValue)
+    val newValue = newSerde.toBytes(Composite(Seq(Base(ID(1), Side.LEFT)), Map("1" -> Base(ID(1), Side.LEFT))))
+    val downgradedValue = oldSerde.fromBytes(newValue)
     downgradedValue should be(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 0))
   }
 

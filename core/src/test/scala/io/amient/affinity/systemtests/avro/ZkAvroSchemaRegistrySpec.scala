@@ -20,7 +20,6 @@
 package io.amient.affinity.systemtests.avro
 
 import akka.actor.ActorSystem
-import akka.serialization.SerializationExtension
 import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.util.ZooKeeperClient
@@ -36,7 +35,7 @@ class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with SystemTestBas
   println("ZkAvroSchemaRegistrySpec zk " + zkConnect)
   val client = new ZooKeeperClient(zkConnect)
   val system = ActorSystem.create("TestActorSystem", configure())
-  val serde = new ZkAvroSchemaRegistry(SerializationExtension(system).system)
+  val serde = new ZkAvroSchemaRegistry(system.settings.config)
   serde.register(classOf[ID])
   serde.register(classOf[Base])
   val backwardSchemaId = serde.register(classOf[Composite], v1schema)
@@ -46,14 +45,14 @@ class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with SystemTestBas
   "ZkAvroRegistry" should "work in a backward-compatibility scenario" in {
     val oldValue = _V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10)
     val oldBytes = AvroRecord.write(oldValue, v1schema, backwardSchemaId)
-    val upgraded = serde.fromBinary(oldBytes)
+    val upgraded = serde.fromBytes(oldBytes)
     upgraded should be(Composite(Seq(Base(ID(1), Side.LEFT)), Map()))
   }
 
   "ZkAvroRegistry" should "work in a forward-compatibility scenario" in {
     val forwardValue = _V3_Composite(Seq(Base(ID(1), Side.LEFT)), Map("X" -> Base(ID(1), Side.LEFT)))
     val forwardBytes = AvroRecord.write(forwardValue, v3schema, forwardSchemaId)
-    val downgraded = serde.fromBinary(forwardBytes)
+    val downgraded = serde.fromBytes(forwardBytes)
     downgraded should be(Composite(Seq(Base(ID(1), Side.LEFT)), Map("X" -> Base(ID(1), Side.LEFT)), Set()))
   }
 

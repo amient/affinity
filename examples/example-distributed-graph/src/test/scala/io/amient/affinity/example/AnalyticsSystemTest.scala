@@ -22,10 +22,10 @@ package io.amient.affinity.spark
 import java.util.Properties
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.primitive.IntSerde
-import io.amient.affinity.example.data.MySparkAvroSerde
+import io.amient.affinity.example.data.MyAvroSerde
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.HttpGateway
 import io.amient.affinity.example.rest.handler.Ping
@@ -38,11 +38,11 @@ import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
-class ExampleAnalyticsTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
   override def numPartitions = 4
 
-  val config = ConfigFactory.load("example")
+  val config: Config = ConfigFactory.load("example")
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
 
 
@@ -78,26 +78,23 @@ class ExampleAnalyticsTest extends FlatSpec with SystemTestBaseWithKafka with Ma
     get_json(http_get(uri("/vertex/1"))).get("data").get("component").intValue should be(1)
     get_json(http_get(uri("/vertex/4"))).get("data").get("component").intValue should be(1)
 
-
-    val _kafkaBootstrap = kafkaBootstrap
-    val _zkConnect = zkConnect
-    val conf = new SparkConf()
+    val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")
       .setAppName("Affinity_Spark_2.0")
-      .set("spark.serializer", classOf[KryoSerializer].getName)
+      .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val sc = new SparkContext(conf)
+    val serializedConfig = sc.broadcast(config)
 
     val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
-      put("bootstrap.servers", _kafkaBootstrap)
+      put("bootstrap.servers", kafkaBootstrap)
     })
 
     val componentClient = new KafkaClientImpl(topic = "components", new Properties() {
-      put("bootstrap.servers", _kafkaBootstrap)
+      put("bootstrap.servers", kafkaBootstrap)
     })
 
     val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
-      new IntSerde, new MySparkAvroSerde(_zkConnect, 6000, 6000), compacted = true)
+      new IntSerde, new MyAvroSerde(serializedConfig.value), compacted = true)
       .repartition(1)
       .sortByKey()
 
@@ -110,7 +107,7 @@ class ExampleAnalyticsTest extends FlatSpec with SystemTestBaseWithKafka with Ma
     }
 
     val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
-      new IntSerde, new MySparkAvroSerde(_zkConnect, 6000, 6000), compacted = true)
+      new IntSerde, new MyAvroSerde(serializedConfig.value), compacted = true)
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>

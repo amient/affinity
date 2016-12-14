@@ -20,28 +20,9 @@
 
 package io.amient.affinity.example.minimal
 
-import akka.actor.ExtendedActorSystem
-import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.Reply
-
-class AvroSerdeForAkka(system: ExtendedActorSystem) extends Serde[Any]  {
-
-  val cls = system.settings.config.getString("affinity.avro.register.class")
-  //FIXME generalise avro serde constructors to Config
-  val internal: AvroSerde = Class.forName(cls).newInstance().asInstanceOf[AvroSerde]
-
-  //TODO finalize override def identifier: Int = 101
-
-  override def fromBytes(bytes: Array[Byte]): Any = internal.fromBytes(bytes)
-
-  override def toBytes(obj: Any): Array[Byte] = internal.toBytes(obj)
-
-  override def close(): Unit = internal.close()
-
-  override def identifier: Int = internal.identifier
-}
 
 class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
     register(classOf[GetValue])
