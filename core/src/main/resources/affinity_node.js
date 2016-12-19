@@ -80,6 +80,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
     }
 
     function internalEnsureOpenSocket() {
+        console.log("internalEnsureOpenSocket for " + webSocket)
         if(webSocket !== undefined && webSocket.readyState !== WebSocket.CLOSED){
            return;
         }
@@ -116,9 +117,11 @@ window.AvroWebSocket = function (wsAddress, receiver) {
             } else {
                 console.error("Magic byte for avro web socket must be either 0 or 123");
             }
+            //console.log(event)
         };
 
         webSocket.onclose = function(event){
+            //console.log("webSocket.onclose event.code=" + event.code);
             if (event.code != 1000) {
                 console.log("WebSocket connection interrupted, reconnecting in " + reconnect +" seconds.. " + wsAddress);
                 setTimeout(internalEnsureOpenSocket, reconnect * 1000);
@@ -134,7 +137,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
             try {
                 webSocket.send(data);
             } catch(err) {
-                webSocket.close();
+                //webSocket.close();
                 internalEnsureOpenSocket();
                 webSocket.send(data);
             }

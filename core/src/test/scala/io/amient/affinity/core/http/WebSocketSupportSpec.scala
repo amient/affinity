@@ -60,7 +60,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     override def handle: Receive = {
       case http@HTTP(GET, PATH("test"), _, response) =>
         avroWebSocket(http, service("region"),  "test", 1) {
-          case c: Composite => System.err.println("WS Server custom avro message " + c)
+          case null =>
         }
     }
   })) map {

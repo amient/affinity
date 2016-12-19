@@ -8,17 +8,17 @@
     <script type="text/javascript" src="affinity.js"></script>
     <script type="text/javascript">
 
-        var ws = AvroWebSocket("ws://localhost:8881/vertex?id=1", function(message) {
-            var messages = document.getElementById("messages");
-            messages.innerHTML = message + "<br/>" + messages.innerHTML;
-            if (message == null) {
+        var ws = AvroWebSocket("ws://localhost:8881/vertex?id=1", function(msg) {
+            console.log(msg);
+            messages.innerHTML = msg + "<br/>" + messages.innerHTML;
+            if (msg == null) {
                 console.log("[doesn't exist]");
             } else {
-                console.log(message._name);
-                console.log(message._namespace);
-                console.log(message.ts);
+                console.log(msg._type);
+                console.log(msg._namespace);
+                console.log(msg.ts);
             }
-        })
+        });
 
         function test() {
             ws.send('io.amient.affinity.model.graph.message.Edge', {"target":4,"timestamp":1476881136895});

@@ -134,6 +134,7 @@ abstract class Gateway extends Actor {
   override def preStart(): Unit = {
     log.info("starting gateway")
     httpInterface.bind(self)
+    //FIXME This probably causes the following akka warning: Message [java.lang.Integer] from Actor[akka://VPCAPI/deadLetters] to..
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
     services.values.foreach { case (coordinator, _, _) =>
       coordinator.watch(self, global = true)
@@ -397,6 +398,7 @@ trait WebSocketSupport extends Gateway {
           private var frontend: Option[ActorRef] = None
 
           override def postStop(): Unit = {
+            log.info("WebSocket Sink Closing")
             keyValueActor ! PoisonPill
           }
 
@@ -416,7 +418,7 @@ trait WebSocketSupport extends Gateway {
           * connections which are closed akka-server-side due to being idle leave zombie
           * flows materialized - akka/akka#21549
           * At the moment worked around by never closing idle connection
-          * (in core/refernce.conf akka.http.server.idle-timeout = infinite)
+          * (in core/reference.conf akka.http.server.idle-timeout = infinite)
           */
         //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
         val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
@@ -429,6 +431,10 @@ trait WebSocketSupport extends Gateway {
             clientMessageReceiver ! self
           }
 
+          override def postStop(): Unit = {
+            log.info("WebSocket Source Closing")
+          }
+
           private val buffer = new util.LinkedList[Message]()
 
           private def doPush(messages: Message*) = {
@@ -437,14 +443,17 @@ trait WebSocketSupport extends Gateway {
             }
             messages.foreach(buffer.add)
             while (isActive && totalDemand > 0 && buffer.size > 0) {
-              sender ! onNext(buffer.pop)
+              onNext(buffer.pop)
             }
           }
 
           override def receive: Receive = {
             case Terminated(source) => context.stop(self)
             case Request(_) => doPush()
-            case pushMessage => doPush(pfPush(pushMessage))
+            case pushMessage =>
+              doPush(pfPush(pushMessage))
+              //the keyvaluemediator which sent this message must be acked with a unit
+              sender ! ()
           }
         }))
         val flow = Flow.fromSinkAndSource(downMessageSink, pushMessageSource)

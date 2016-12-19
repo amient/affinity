@@ -130,8 +130,12 @@ class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
       override def update(o: Observable, arg: scala.Any): Unit = {
         val t = 1 seconds
         implicit val timeout = Timeout(t)
+        //here is the ack the requires the actorPublisher at the gateway side to ack the receipt
+        //TODO write a system test that verifies that websocket actor publisher sends a unit ack
         (frontend ? arg) recover {
-          case any => context.stop(self)
+          case any =>
+            //in case of any error the mediator will be stopped and also any front end that watches it
+            context.stop(self)
         }
       }
     }))
