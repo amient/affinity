@@ -45,12 +45,12 @@ trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
   val registryClient = new CachedSchemaRegistryClient(registryUrl, 20)
 
   override def configure(config: Config) = super.configure(config)
-    .withValue(CfAvroSchemaProvider.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
-    .withValue("akka.actor.serialization-bindings", ConfigValueFactory.fromMap(Map(
-      "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro",
-      "java.lang.String" -> "avro",
-      "java.lang.Integer" -> "avro"
-    ).asJava))
+      .withValue(CfAvroSchemaProvider.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
+      .withValue("akka.actor.serialization-bindings", ConfigValueFactory.fromMap(Map(
+        "io.amient.affinity.core.serde.avro.AvroRecord" -> "avro",
+        "java.lang.String" -> "avro",
+        "java.lang.Integer" -> "avro"
+      ).asJava))
 
   override def afterAll() {
     server.stop()

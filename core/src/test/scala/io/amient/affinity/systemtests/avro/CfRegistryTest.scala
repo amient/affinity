@@ -17,13 +17,12 @@ class MyConfluentRegistry(config: Config) extends CfAvroSchemaProvider(config) {
 
 class CfRegistryTest extends FlatSpec with SystemTestBaseWithConfluentRegistry {
 
-  override def numPartitions = 2
+  val config = configure(ConfigFactory.defaultReference)
+    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))
 
-  val config = configure {
-    ConfigFactory.defaultReference()
-      .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
-        ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))
-  }
+  assert(config.getString(CfAvroSchemaProvider.CONFIG_CF_REGISTRY_URL_BASE) == registryUrl)
+
+  override def numPartitions = 2
 
   "Confluent Schema Registry Provider" should "be available via akka SerializationExtension" in {
     val system = ActorSystem.create("CfTest", config)
