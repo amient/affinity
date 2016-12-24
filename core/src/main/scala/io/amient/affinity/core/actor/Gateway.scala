@@ -453,7 +453,7 @@ trait WebSocketSupport extends Gateway {
             case pushMessage =>
               doPush(pfPush(pushMessage))
               //the keyvaluemediator which sent this message must be acked with a unit
-              sender ! ()
+              sender ! true
           }
         }))
         val flow = Flow.fromSinkAndSource(downMessageSink, pushMessageSource)

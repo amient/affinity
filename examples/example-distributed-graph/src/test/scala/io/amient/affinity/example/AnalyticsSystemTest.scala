@@ -83,7 +83,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val serializedConfig = sc.broadcast(config)
+    val serializedConfig = sc.broadcast(configure(config))
 
     val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
       put("bootstrap.servers", kafkaBootstrap)
