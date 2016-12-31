@@ -21,11 +21,10 @@ package io.amient.affinity.core.actor
 
 import akka.actor.{ActorPath, PoisonPill, Props}
 import akka.util.Timeout
-import io.amient.affinity.core.cluster.{CoordinatorEmbedded, Node}
 import io.amient.affinity.core.IntegrationTestBase
+import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import org.scalatest.Matchers
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 

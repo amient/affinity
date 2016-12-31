@@ -142,7 +142,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         try {
           handles.put(handle, Await.result(system.actorSelection(actorPath).resolveOne(), t))
         } catch {
-          case e: ActorNotFound => //most likely the actor has gone and there will be another update right away
+          case _: ActorNotFound => //most likely the actor has gone and there will be another update right away
+          case _: IllegalStateException => //closed
           case NonFatal(e) => if (!closed.get) e.printStackTrace()
         }
       }
