@@ -15,7 +15,7 @@ final class AvroSerdeProxy(system: ExtendedActorSystem) extends Serde[Any] {
 
   override def close(): Unit = if (internal != null) internal.close()
 
-  override def identifier: Int = 101
+  override def identifier: Int = 200
 
 }
 

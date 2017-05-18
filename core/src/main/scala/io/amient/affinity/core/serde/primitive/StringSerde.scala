@@ -31,7 +31,7 @@ class StringSerde extends Serde[String] {
     obj.getBytes("UTF-8")
   }
 
-  override def identifier: Int = 21
+  override def identifier: Int = 103
 
   override def close(): Unit = ()
 }

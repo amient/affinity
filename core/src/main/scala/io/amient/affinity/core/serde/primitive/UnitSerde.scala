@@ -26,7 +26,7 @@ class UnitSerde extends Serde[Unit] {
 
   override def toBytes(obj: Unit): Array[Byte] = Array()
 
-  override def identifier: Int = 30
+  override def identifier: Int = 100
 
   override def close(): Unit = ()
 }

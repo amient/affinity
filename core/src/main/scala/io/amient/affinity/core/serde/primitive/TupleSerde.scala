@@ -25,7 +25,7 @@ import io.amient.affinity.core.util.ByteUtils
 
 class TupleSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) {
 
-  override def identifier: Int = 31
+  override def identifier: Int = 132
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
     case p: Product =>

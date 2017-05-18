@@ -29,7 +29,8 @@ abstract class AbstractWrapSerde(val system: ExtendedActorSystem) extends JSeria
     val serializerIdentifier = ByteUtils.asIntValue(bytes)
     val data = new Array[Byte](bytes.length - 4)
     Array.copy(bytes, 4, data, 0, bytes.length - 4)
-    SerializationExtension(system).serializerByIdentity(serializerIdentifier).fromBinary(data)
+    val wrappedSerde = SerializationExtension(system).serializerByIdentity(serializerIdentifier)
+    wrappedSerde.fromBinary(data)
   }
 
   def toBinaryWrapped(wrapped: AnyRef, offset: Int = 0): Array[Byte] = {

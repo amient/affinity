@@ -27,7 +27,7 @@ class OptionSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system)
     if (bytes.length == 0) None else Some(fromBinaryWrapped(bytes))
   }
 
-  override def identifier: Int = 29
+  override def identifier: Int = 131
 
   override def toBinary(o: AnyRef): Array[Byte] = o match {
     case None => Array[Byte]()

@@ -24,7 +24,7 @@ import io.amient.affinity.core.util.ByteUtils
 
 class IntSerde extends Serde[Int] {
 
-  override def identifier: Int = 20
+  override def identifier: Int = 101
 
   override def fromBytes(bytes: Array[Byte]): Int = ByteUtils.asIntValue(bytes)
 

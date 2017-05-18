@@ -21,7 +21,7 @@ package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
 import io.amient.affinity.core.IntegrationTestBase
-import io.amient.affinity.core.serde.primitive.OptionSerde
+import io.amient.affinity.core.serde.primitive.{OptionSerde, StringSerde}
 import org.scalatest.Matchers
 
 class WrapSerdesSpec extends IntegrationTestBase with Matchers {
@@ -36,18 +36,23 @@ class WrapSerdesSpec extends IntegrationTestBase with Matchers {
       serde.fromBinary(bytes) should be(None)
     }
     "work with with wrapped string" in {
+        val stringSerde = SerializationExtension(system).serializerOf(classOf[StringSerde].getName).get
+        val string = stringSerde.toBinary("XYZ")
+        string.mkString(".") should equal("88.89.90")
+        stringSerde.fromBinary(string) should be("XYZ")
+
         val bytes = serde.toBinary(Some("XYZ"))
-        bytes.mkString(".") should equal("0.0.0.21.88.89.90")
+        bytes.mkString(".") should equal("0.0.0.103.88.89.90")
         serde.fromBinary(bytes) should be(Some("XYZ"))
     }
     "work with wrapped unit" in {
       val bytes = serde.toBinary(Some(()))
-      bytes.mkString(".") should equal("0.0.0.30")
+      bytes.mkString(".") should equal("0.0.0.100")
       serde.fromBinary(bytes) should be(Some(()))
     }
     "work with wrapped tuple" in {
       val bytes = serde.toBinary(Some(("XYZ", 10)))
-      bytes.mkString(".") should equal("0.0.0.31.0.0.0.2.0.0.0.7.0.0.0.21.88.89.90.0.0.0.8.0.0.0.20.0.0.0.10")
+      bytes.mkString(".") should equal("0.0.0.-124.0.0.0.2.0.0.0.7.0.0.0.103.88.89.90.0.0.0.8.0.0.0.101.0.0.0.10")
       serde.fromBinary(bytes) should be(Some(("XYZ", 10)))
     }
   }
