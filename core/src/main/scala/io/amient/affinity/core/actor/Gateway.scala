@@ -165,8 +165,9 @@ abstract class Gateway extends Actor {
   def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: NoSuchElementException => HttpResponse(NotFound, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: IllegalArgumentException => HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: scala.NotImplementedError => HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: UnsupportedOperationException => HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: IllegalStateException => HttpResponse(ServiceUnavailable)
+    case _: IllegalStateException => HttpResponse(ServiceUnavailable)
     case NonFatal(e) => e.printStackTrace(); HttpResponse(InternalServerError)
   }
 

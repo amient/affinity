@@ -81,7 +81,22 @@ public abstract class TimeCryptoProof {
     }
 
     /**
-     * Sign a given input argument
+     * Generate deterministic salted hash
+     * @param arg String input
+     * @return String output hash
+     * @throws Exception
+     */
+    final public String hash(String arg) throws Exception {
+        byte[] input = arg.getBytes("UTF-8");
+        ByteBuffer in = ByteBuffer.allocate(salt.length + input.length);
+        in.put(salt);
+        in.put(input);
+        in.flip();
+        return toHex(encode(in.array()));
+    }
+
+    /**
+     * Sign a given input argument with time-based salted hash
      * @param arg input string to sign
      * @return signature string
      * @throws Exception if anything goes wrong
@@ -91,7 +106,7 @@ public abstract class TimeCryptoProof {
     }
 
     /**
-     * Sign a given input argument
+     * Sign a given input argument with time-based salted hash
      * @param arg byte array input
      * @return byte array signature
      * @throws Exception if anything goes wrong
@@ -106,7 +121,7 @@ public abstract class TimeCryptoProof {
         in.putLong(utc);
         in.put(arg);
         in.flip();
-        return hash(in.array());
+        return encode(in.array());
     }
 
 
@@ -120,7 +135,7 @@ public abstract class TimeCryptoProof {
                 || (Arrays.equals(sign(arg, utcInWholeMinutes(+1)), signature));
     }
 
-    abstract protected byte[] hash(byte[] input) throws Exception;
+    abstract protected byte[] encode(byte[] input) throws Exception;
 
 
 }

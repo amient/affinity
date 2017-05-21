@@ -41,7 +41,7 @@ import scala.util.{Failure, Success}
 
 object Transaction {
 
-  def apply[T](default: ActorRef)(t: (Transaction) => Future[T])(implicit context: ExecutionContext) = {
+  def apply[T](default: ActorRef)(t: (Transaction) => Future[T])(implicit context: ExecutionContext): Future[T] = {
     val transaction = new Transaction(default)
     val result = t(transaction)
     result transform((result: T) => result, (e: Throwable) => {

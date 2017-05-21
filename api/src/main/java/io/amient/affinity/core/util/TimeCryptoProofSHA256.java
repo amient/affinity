@@ -44,17 +44,17 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
     }
 
     @Override
-    protected byte[] hash(byte[] input) throws Exception {
+    protected byte[] encode(byte[] input) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         return digest.digest(input);
     }
 
     /**
-     * Example standalone hash function for AES-256 salted crypto function
-     * @param arg input string to hash
+     * Example standalone encode function for AES-256 salted crypto function
+     * @param arg input string to encode
      * @param hexSalt hexadecimal representation of the salt
      * @param shift timeshift in minutes with respect to current UTC time
-     * @return result time-based hash
+     * @return result time-based encode
      * @throws Exception if anything goes wrong
      */
     public String timeBasedHash(String arg, String hexSalt, int shift) throws Exception {
