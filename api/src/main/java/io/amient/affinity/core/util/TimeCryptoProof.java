@@ -84,7 +84,7 @@ public abstract class TimeCryptoProof {
      * Generate deterministic salted hash
      * @param arg String input
      * @return String output hash
-     * @throws Exception
+     * @throws Exception if anything goes wrong
      */
     final public String hash(String arg) throws Exception {
         byte[] input = arg.getBytes("UTF-8");
