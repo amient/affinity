@@ -28,7 +28,7 @@ dependencies {
     testCompile project(':spark:spark_' + baseSparkVersion)
     testCompile group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
     testCompile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
-    testCompile project(':testutil:testing_kafka_' + kafkaMinorVersion)
+    testCompile project(':testutil:testing-kafka_' + kafkaMinorVersion)
 }
 
 

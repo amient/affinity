@@ -21,7 +21,7 @@ dependencies {
     provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
     provided group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
     provided group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
-    testCompile project(':testutil:testing_kafka_0.10')
+    testCompile project(':testutil:testing-kafka_0.10')
 }
 
 

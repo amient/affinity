@@ -7,7 +7,7 @@ apply plugin: 'signing'
 apply plugin: 'maven'
 
 //uploadArchives.repositories.mavenDeployer.pom.artifactId = 'testing_core-scala_' + baseScalaVersion
-install.repositories.mavenInstaller.pom.artifactId = 'testing_core-scala_' + baseScalaVersion
+install.repositories.mavenInstaller.pom.artifactId = 'testing-core-scala_' + baseScalaVersion
 
 dependencies {
     compile project(':core')
