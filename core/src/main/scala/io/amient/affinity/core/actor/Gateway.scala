@@ -106,9 +106,13 @@ abstract class Gateway extends Actor {
     val password = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD).toCharArray
     val ks = KeyStore.getInstance(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PKCS))
     val is = if (config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)) {
-      getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE))
+      val keystoreResource = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)
+      log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
+      getClass.getClassLoader.getResourceAsStream(keystoreResource)
     } else {
-      new FileInputStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE))
+      val keystoreFileName = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE)
+      log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
+      new FileInputStream(keystoreFileName)
     }
     try {
       ks.load(is, password)
