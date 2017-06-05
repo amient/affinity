@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.actor
 
+import java.io.FileInputStream
 import java.security.{KeyStore, SecureRandom}
 import java.util
 import java.util.concurrent.atomic.AtomicBoolean
@@ -104,11 +105,15 @@ abstract class Gateway extends Actor {
     log.info("Configuring SSL Context")
     val password = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD).toCharArray
     val ks = KeyStore.getInstance(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PKCS))
-    if (config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)) {
-      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)), password)
+    val is = if (config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)) {
+      getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE))
     } else {
-      //FIXME load file not resource!!!!
-      ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE)), password)
+      new FileInputStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE))
+    }
+    try {
+      ks.load(is, password)
+    } finally {
+      is.close()
     }
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
     keyManagerFactory.init(ks, password)
