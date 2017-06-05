@@ -29,6 +29,7 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
 
     /**
      * Construct a Thread-Safe instance of Crypto with a given salt
+     *
      * @param salt byte array to be used as salt for encoding and decoding all inputs
      */
     public TimeCryptoProofSHA256(byte[] salt) {
@@ -37,6 +38,7 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
 
     /**
      * Construct a Thread-Safe instance of Crypto with a given salt
+     *
      * @param hexSalt hexadecimal representation of the salt to be used for encoding and decoding all inputs
      */
     public TimeCryptoProofSHA256(String hexSalt) {
@@ -51,9 +53,10 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
 
     /**
      * Example standalone encode function for AES-256 salted crypto function
-     * @param arg input string to encode
+     *
+     * @param arg     input string to encode
      * @param hexSalt hexadecimal representation of the salt
-     * @param shift timeshift in minutes with respect to current UTC time
+     * @param shift   timeshift in minutes with respect to current UTC time
      * @return result time-based encode
      * @throws Exception if anything goes wrong
      */
@@ -72,5 +75,24 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
         String hexHash = DatatypeConverter.printHexBinary(hash);
         return hexHash;
     }
+
+    /*
+     * Example PHP equivalent of the timebased hash:
+     *
+        <?php
+        function timeBasedHash ($arg, $hexSalt) {
+                $salt = hex2bin($hexSalt);
+                $utcWholeMinute = mktime(date("H"), date("i"), 0);
+                $utc = pack("V", 0) . pack("N", $utcWholeMinute);
+                $input = $salt . $utc . $arg ;
+                return strtoupper(hash('sha256', $input));
+        }
+
+        function signURL($apiKey, $apiSalt, $url) {
+                $path = parse_url($url, PHP_URL_PATH);
+                return $url . "&signature=" . urlencode($apiKey . ":" . timeBasedHash($path, $apiSalt));
+        }
+     *
+     */
 
 }

@@ -107,6 +107,7 @@ abstract class Gateway extends Actor {
     if (config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)) {
       ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)), password)
     } else {
+      //FIXME load file not resource!!!!
       ks.load(getClass.getClassLoader.getResourceAsStream(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE)), password)
     }
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")

@@ -133,7 +133,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   def isClosed = closed.get
 
   final protected def updateGroup(newState: Map[String, String]): Unit = {
-    val t = 6 seconds
+    val t = 20 seconds
     implicit val timeout = new Timeout(t)
     if (!closed.get) synchronized {
       val prevMasters: Set[ActorRef] = getCurrentMasters

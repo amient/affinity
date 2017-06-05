@@ -44,7 +44,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
   val zkSessionTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
   val zkConnectTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
 
-  private val zkRoot = "/schema-registry"
+  private val zkRoot = config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_ROOT)
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
 
   @volatile private var internal = immutable.Map[String, List[(Int, Schema)]]()
