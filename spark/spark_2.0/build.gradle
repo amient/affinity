@@ -5,6 +5,7 @@ apply plugin: 'java'
 apply plugin: 'scala'
 apply plugin: 'signing'
 apply plugin: 'maven'
+apply plugin: 'maven-publish'
 apply plugin: 'gradle-one-jar'
 
 ext {
@@ -13,6 +14,15 @@ ext {
 
 //uploadArchives.repositories.mavenDeployer.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
 install.repositories.mavenInstaller.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId 'spark_2.0-scala_' + baseScalaVersion
+            from components.java
+        }
+    }
+}
 
 dependencies {
     provided 'org.scala-lang:scala-library:' + scalaVersion

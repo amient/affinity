@@ -5,9 +5,18 @@ version = parent.version
 apply plugin: 'java'
 apply plugin: 'signing'
 apply plugin: 'maven'
+apply plugin: 'maven-publish'
 
 ext {
     rocksDbVersion = '4.9.0'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
 }
 
 dependencies {
