@@ -19,8 +19,6 @@
 
 package io.amient.affinity.core
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}

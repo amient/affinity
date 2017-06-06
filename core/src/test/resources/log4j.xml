@@ -5,15 +5,19 @@
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d %-5p  [%c{1}] %m %n" />
         </layout>
+
     </appender>
 
-    <logger name="io.amient" additivity="false">
-        <level value="WARN" />
-        <appender-ref ref="consoleAppender"/>
+    <logger name="org.I0Itec.zkclient" additivity="false">
+        <level value="ERROR"/>
+    </logger>
+
+    <logger name="org.apache.zookeeper" additivity="false">
+        <level value="ERROR" />
     </logger>
 
     <root>
-        <priority value ="ERROR" />
+        <priority value ="WARN" />
         <appender-ref ref="consoleAppender"/>
     </root>
 
