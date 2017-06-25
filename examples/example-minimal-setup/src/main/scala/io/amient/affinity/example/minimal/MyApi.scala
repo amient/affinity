@@ -17,18 +17,29 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.actor
+package io.amient.affinity.example.minimal
 
-import akka.actor.Actor
+import akka.util.Timeout
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.GatewayApi
 
-trait Gateway extends Actor {
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
-  override final def receive = manage orElse handle orElse unhandled
+trait MyApi extends GatewayApi {
 
-  def manage: Receive = PartialFunction.empty
+  import context.dispatcher
 
-  def handle: Receive = PartialFunction.empty
+  implicit val scheduler = context.system.scheduler
 
-  def unhandled: Receive = PartialFunction.empty
+  def getData(key: String): Future[Option[String]] = {
+    implicit val timeout = Timeout(1 second)
+    service("simple-keyspace") ack GetValue(key)
+  }
 
+  def putData(key: String, value: String): Future[Option[String]] = {
+    implicit val timeout = Timeout(1 second)
+    service("simple-keyspace") ack PutValue(key, value)
+  }
 }

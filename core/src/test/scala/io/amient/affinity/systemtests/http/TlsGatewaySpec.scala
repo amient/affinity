@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.HttpMethods.GET
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.util.Timeout
-import io.amient.affinity.core.actor.{Controller, Gateway}
+import io.amient.affinity.core.actor.{Controller, GatewayHttp, GatewayApi}
 import io.amient.affinity.core.http.RequestMatchers.HTTP
 import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
@@ -40,7 +40,7 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(10 seconds)
 
-  val gateway = new TestGatewayNode(config, new Gateway {
+  val gateway = new TestGatewayNode(config, new GatewayHttp {
     override def handle: Receive = {
       case http@HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
     }

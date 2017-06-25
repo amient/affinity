@@ -36,6 +36,8 @@ object Controller {
 
   final case class ContainerOnline(group: String)
 
+  final case class ServicesStarted()
+
   final case class CreateGateway(handlerProps: Props) extends Reply[Int]
 
   final case class GatewayCreated(httpPort: Int)
@@ -92,6 +94,8 @@ class Controller extends Actor {
       case promise => if (!promise.isCompleted) containers(group).success(())
     }
 
+    case ServicesStarted() =>
+      log.info("Services online")
 
     case request@CreateGateway(gatewayProps) => try {
       context.watch(context.actorOf(gatewayProps, name = "gateway"))
@@ -108,7 +112,10 @@ class Controller extends Actor {
     case msg@Terminated(child) if (child.path.name == "gateway") =>
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
-    case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
+    case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) {
+      log.info("Gateway online")
+      gatewayPromise.success(httpPort)
+    }
 
     case request@GracefulShutdown() => sender.replyWith(request) {
       implicit val timeout = Timeout(500 milliseconds)

@@ -27,12 +27,12 @@ import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.example.rest.HttpGateway
+import io.amient.affinity.example.rest.ExampleGateway
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-trait Fail extends HttpGateway {
+trait Fail extends ExampleGateway {
 
   import context.dispatcher
 

@@ -21,7 +21,7 @@ package io.amient.affinity.model.graph
 
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.actor.GatewayApi
 import io.amient.affinity.core.transaction.Transaction
 import io.amient.affinity.model.graph.message._
 
@@ -30,7 +30,7 @@ import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 import scala.language.postfixOps
 
-trait GraphLogic extends Gateway {
+trait GraphLogic extends GatewayApi {
 
   import context.dispatcher
 

@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.StatusCodes.{NotFound, OK}
 import akka.util.Timeout
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.actor.{GatewayHttp, GatewayApi}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.testutil.{MyTestPartition, SystemTestBaseWithZk}
@@ -21,8 +21,9 @@ class ZkCoordinatorTest extends FlatSpec with SystemTestBaseWithZk with Matchers
   def config = configure("distributedit")
 
   val system = ActorSystem.create("test", config)
-  val gatewayNode = new TestGatewayNode(config, new Gateway {
+  val gatewayNode = new TestGatewayNode(config, new GatewayHttp with GatewayApi {
 
+    //FIXME
 //    import MyTestPartition._
 //    import context.dispatcher
 //

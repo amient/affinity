@@ -30,8 +30,9 @@ import scala.collection.mutable
 object Service {
   final val CONFIG_SERVICE_CLASS = s"class"
   final val CONFIG_NUM_PARTITIONS = s"num.partitions"
-  final case class CheckClusterAvailability(group: String) extends Reply[ClusterAvailability]
-  final case class ClusterAvailability(group: String, suspended: Boolean)
+  final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
+  final case class ServiceAvailability(group: String, suspended: Boolean)
+  final case class ClusterStatus(suspended: Boolean)
 }
 
 class Service(config: Config) extends Actor {
@@ -63,8 +64,8 @@ class Service(config: Config) extends Actor {
         if (removed != routee) routes.put(partition, removed)
       }
 
-    case req@CheckClusterAvailability(group) => sender.reply(req) {
-      ClusterAvailability(group, suspended = (routes.size != numPartitions))
+    case req@CheckServiceAvailability(group) => sender.reply(req) {
+      ServiceAvailability(group, suspended = (routes.size != numPartitions))
     }
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)

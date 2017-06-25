@@ -29,7 +29,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.actor.{Controller, Gateway, Partition, WebSocketSupport}
+import io.amient.affinity.core.actor._
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.ws.AvroWebSocketClient
@@ -56,7 +56,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     }
   }))
 
-  val httpPort = Await.result(controller ? CreateGateway(Props(new Gateway() with WebSocketSupport {
+  val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with GatewayApi with WebSocketSupport {
     override def handle: Receive = {
       case http@HTTP(GET, PATH("test"), _, response) =>
         avroWebSocket(http, service("region"),  "test", 1) {

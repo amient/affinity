@@ -25,9 +25,8 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
-import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.actor.{GatewayHttp, GatewayApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -38,7 +37,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.Random
-import scala.collection.JavaConverters._
 
 class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
 
@@ -46,7 +44,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
   def config = configure("systemtests")
 
-  val gateway = new TestGatewayNode(config, new Gateway {
+  val gateway = new TestGatewayNode(config, new GatewayHttp with GatewayApi {
 
     import MyTestPartition._
     import context.dispatcher

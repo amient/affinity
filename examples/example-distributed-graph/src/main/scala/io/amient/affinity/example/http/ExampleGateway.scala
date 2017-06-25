@@ -24,7 +24,7 @@ import java.util.NoSuchElementException
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{ActorState, Gateway}
+import io.amient.affinity.core.actor.{ActorState, GatewayHttp, GatewayApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.data.ConfigEntry
@@ -33,27 +33,25 @@ import io.amient.affinity.example.rest.handler._
 
 import scala.util.control.NonFatal
 
-object HttpGateway {
+object ExampleGateway {
 
   def main(args: Array[String]): Unit = {
     require(args.length == 1, "Gateway Node requires 1 argument: <http-port>")
     val httpPort = args(0).toInt
-    val config = ConfigFactory.load("example").withValue(Gateway.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
+    val config = ConfigFactory.load("example").withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(httpPort))
 
     new Node(config) {
-      startGateway(new ExampleGateway)
+      startGateway(new ExampleGateway
+        with Graph
+        with Admin
+        with PublicApi
+        with Ping
+        with Fail)
     }
   }
 }
 
-class ExampleGateway extends HttpGateway
-  with Graph
-  with Admin
-  with PublicApi
-  with Ping
-  with Fail
-
-class HttpGateway extends Gateway with ActorState {
+class ExampleGateway extends GatewayHttp with GatewayApi with ActorState {
 
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
