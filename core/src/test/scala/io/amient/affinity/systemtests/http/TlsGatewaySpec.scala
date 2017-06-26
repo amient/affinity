@@ -37,9 +37,6 @@ class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
   val config = configure("tlstests")
   val system = ActorSystem.create("TlsGatewayTest", config)
 
-  private val controller = system.actorOf(Props(new Controller), name = "controller")
-  implicit val timeout = Timeout(10 seconds)
-
   val gateway = new TestGatewayNode(config, new GatewayHttp {
     override def handle: Receive = {
       case http@HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))

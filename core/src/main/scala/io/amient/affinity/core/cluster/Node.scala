@@ -109,6 +109,20 @@ class Node(config: Config) {
     * @tparam T
     * @return the httpPort on which the gateway is listening
     */
+
+  def startApi[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
+    implicit val timeout = Timeout(startupTimeout)
+    startupFutureWithShutdownFuse {
+      controller ack CreateGateway(Props(creator))
+    }
+  }
+
+  /**
+    * @param creator
+    * @param tag
+    * @tparam T
+    * @return the httpPort on which the gateway is listening
+    */
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     startupFutureWithShutdownFuse {

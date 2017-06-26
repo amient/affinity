@@ -70,20 +70,19 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
+
   class TestGatewayNode(config: Config, gatewayCreator: => Gateway)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
+
+    def this(config: Config) = {
+      this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[Gateway]).newInstance())
+    }
 
     import system.dispatcher
 
     implicit val materializer = ActorMaterializer.create(system)
 
     val httpPort: Int = Await.result(startGateway(gatewayCreator), startupTimeout)
-
-    if (httpPort <= 0) {
-      throw new IllegalStateException(s"Gateway node failed to start")
-    } else {
-      println(s"TestGatewayNode listening on $httpPort")
-    }
 
     val testSSLContext = {
       val certStore = KeyStore.getInstance(KeyStore.getDefaultType)
@@ -110,7 +109,6 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       startUpSequence
       clusterReady.synchronized(clusterReady.wait(15000))
       assert(clusterReady.get)
-      println("test gateway online")
     }
 
     def uri(path: String) = Uri(s"http://localhost:$httpPort$path")

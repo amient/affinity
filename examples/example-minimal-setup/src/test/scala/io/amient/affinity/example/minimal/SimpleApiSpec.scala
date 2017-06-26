@@ -19,27 +19,33 @@
 
 package io.amient.affinity.example.minimal
 
-import akka.util.Timeout
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.GatewayApi
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.testutil.SystemTestBase
+import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.Future
+import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
-trait MyApi extends GatewayApi {
 
-  import context.dispatcher
+class SimpleApiSpec extends FlatSpec with SystemTestBase with Matchers {
 
-  implicit val scheduler = context.system.scheduler
+  val config = ConfigFactory.load("minimal-example-test")
 
-  def getData(key: String): Future[Option[String]] = {
-    implicit val timeout = Timeout(1 second)
-    service("simple-keyspace") ack GetValue(key)
+  behavior of "Simple Api Gateway"
+
+  it should "work without the http layer" in {
+
+    new TestGatewayNode(configure(config)) with MyApiNode {
+      awaitClusterReady {
+        startContainer("simple-keyspace", List(0, 1), new MySimplePartition())
+      }
+      Await.result(getData("key1"), 1 second) should be (None)
+      Await.result(putData("key1", "value1"), 1 second) should be(None)
+      Await.result(getData("key1"), 1 second) should be(Some("value1"))
+      Await.result(putData("key1", "value2"), 1 second) should be(Some("value1"))
+      Await.result(getData("key1"), 1 second) should be(Some("value2"))
+      shutdown()
+    }
   }
 
-  def putData(key: String, value: String): Future[Option[String]] = {
-    implicit val timeout = Timeout(1 second)
-    service("simple-keyspace") ack PutValue(key, value)
-  }
 }

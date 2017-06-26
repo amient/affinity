@@ -110,7 +110,6 @@ trait GatewayApi extends Gateway {
       service ! CheckServiceAvailability(group)
     }
 
-
     case msg@ServiceAvailability(group, suspended) =>
       val (_, _, currentlySuspended) = services(group)
       if (currentlySuspended.get != suspended) {
