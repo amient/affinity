@@ -36,8 +36,8 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Service.ClusterAvailability
-import io.amient.affinity.core.actor.Gateway
+import io.amient.affinity.core.actor.Service.ClusterStatus
+import io.amient.affinity.core.actor.{Gateway, GatewayHttp}
 import io.amient.affinity.core.cluster.Node
 import org.apache.avro.util.ByteBufferInputStream
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -60,7 +60,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def configure(config: Config): Config = config
     .withValue(Node.CONFIG_NODE_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
-    .withValue(Gateway.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
+    .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
     .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
   def deleteDirectory(path: File) = if (path.exists()) {
@@ -70,20 +70,19 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
+
   class TestGatewayNode(config: Config, gatewayCreator: => Gateway)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
+
+    def this(config: Config) = {
+      this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[Gateway]).newInstance())
+    }
 
     import system.dispatcher
 
     implicit val materializer = ActorMaterializer.create(system)
 
     val httpPort: Int = Await.result(startGateway(gatewayCreator), startupTimeout)
-
-    if (httpPort <= 0) {
-      throw new IllegalStateException(s"Gateway node failed to start")
-    } else {
-      println(s"TestGatewayNode listening on $httpPort")
-    }
 
     val testSSLContext = {
       val certStore = KeyStore.getInstance(KeyStore.getDefaultType)
@@ -101,12 +100,12 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       val clusterReady = new AtomicBoolean(false)
       system.eventStream.subscribe(system.actorOf(Props(new Actor {
         override def receive: Receive = {
-          case ClusterAvailability(_, false) => {
+          case ClusterStatus(false) => {
             clusterReady.set(true)
             clusterReady.synchronized(clusterReady.notify)
           }
         }
-      })), classOf[ClusterAvailability])
+      })), classOf[ClusterStatus])
       startUpSequence
       clusterReady.synchronized(clusterReady.wait(15000))
       assert(clusterReady.get)

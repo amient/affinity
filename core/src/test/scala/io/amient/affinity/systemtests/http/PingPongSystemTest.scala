@@ -23,7 +23,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.{Gateway, Partition}
+import io.amient.affinity.core.actor.{GatewayHttp, Partition, GatewayApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
@@ -37,7 +37,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   val config = configure("pingpong")
 
-  val gateway = new TestGatewayNode(config, new Gateway {
+  val gateway = new TestGatewayNode(config, new GatewayHttp with GatewayApi {
 
     import context.dispatcher
 

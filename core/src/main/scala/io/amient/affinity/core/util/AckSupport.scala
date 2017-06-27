@@ -28,12 +28,11 @@ import akka.util.Timeout
 
 import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.{ClassTag, classTag}
 import scala.runtime.BoxedUnit
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-import scala.language.postfixOps
-import scala.language.implicitConversions
 
 /**
   * These are utilities for stateless Akka Ack pattern.
@@ -54,13 +53,13 @@ import scala.language.implicitConversions
   */
 trait AckSupport {
 
-  implicit def ack(actorRef: ActorRef): AckableActorRef = new AckableActorRef(actorRef)
+  implicit def ack(actorRef: ActorRef): AckableActorRef = new AckableActorRef(actorRef, maxRetries = 3)
 
 }
 
 trait Reply[+T]
 
-final class AckableActorRef(val target: ActorRef) extends AnyVal {
+final class AckableActorRef(val target: ActorRef, val maxRetries: Int = 3) extends AnyRef {
 
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
@@ -72,7 +71,6 @@ final class AckableActorRef(val target: ActorRef) extends AnyVal {
     * @return
     */
   def ack[T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
-    val maxRetries = 3
     val promise = Promise[T]()
     def attempt(retry: Int, delay: Duration = 0 seconds): Unit = {
       val f = if (delay.toMillis == 0) target ? message else after(timeout.duration, scheduler)(target ? message)

@@ -29,10 +29,11 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
-import io.amient.affinity.example.rest.HttpGateway
+import io.amient.affinity.example.rest.ExampleGateway
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.affinity.ws.AvroWebSocketClient
@@ -52,10 +53,11 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
   val config = ConfigFactory.load("example")
     .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
+    .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST, ConfigValueFactory.fromAnyRef("127.0.0.1"))
 
 
   val dataNode = new Node(configure(config))
-  val gatewayNode = new TestGatewayNode(configure(config), new HttpGateway
+  val gatewayNode = new TestGatewayNode(configure(config), new ExampleGateway
     with Ping
     with Admin
     with PublicApi

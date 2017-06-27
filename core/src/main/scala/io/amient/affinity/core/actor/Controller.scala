@@ -36,6 +36,8 @@ object Controller {
 
   final case class ContainerOnline(group: String)
 
+  final case class ServicesStarted()
+
   final case class CreateGateway(handlerProps: Props) extends Reply[Int]
 
   final case class GatewayCreated(httpPort: Int)
@@ -84,14 +86,13 @@ class Controller extends Actor {
       }
     }
 
-    case msg@Terminated(child) if (containers.contains(child.path.name)) =>
+    case Terminated(child) if (containers.contains(child.path.name)) =>
       val promise = containers(child.path.name)
       if (!promise.isCompleted) promise.failure(new AkkaException("Container initialisation failed"))
 
     case ContainerOnline(group) => containers(group) match {
       case promise => if (!promise.isCompleted) containers(group).success(())
     }
-
 
     case request@CreateGateway(gatewayProps) => try {
       context.watch(context.actorOf(gatewayProps, name = "gateway"))
@@ -105,10 +106,18 @@ class Controller extends Actor {
       }
     }
 
-    case msg@Terminated(child) if (child.path.name == "gateway") =>
+    case Terminated(child) if (child.path.name == "gateway") =>
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
-    case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) gatewayPromise.success(httpPort)
+    case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) {
+      log.info("Gateway online (with http)")
+      gatewayPromise.success(httpPort)
+    }
+
+    case ServicesStarted() => if (!gatewayPromise.isCompleted && !config.hasPath(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST)) {
+      log.info("Gateway online (without http)")
+      gatewayPromise.success(-1)
+    }
 
     case request@GracefulShutdown() => sender.replyWith(request) {
       implicit val timeout = Timeout(500 milliseconds)
@@ -121,7 +130,6 @@ class Controller extends Actor {
           system.terminate()
       } map (_ => ())
     }
-
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
   }

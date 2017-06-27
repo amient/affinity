@@ -24,12 +24,12 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.example.rest.HttpGateway
+import io.amient.affinity.example.rest.ExampleGateway
 
 import scala.concurrent.Promise
 
 
-trait PublicApi extends HttpGateway {
+trait PublicApi extends ExampleGateway {
 
 
   abstract override def handle: Receive = super.handle orElse {

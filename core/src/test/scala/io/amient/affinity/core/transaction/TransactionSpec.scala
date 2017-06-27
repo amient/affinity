@@ -25,8 +25,8 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.Controller.{CreateGateway, CreateContainer, GracefulShutdown}
-import io.amient.affinity.core.actor.{Controller, Gateway, Partition}
+import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.actor.{Controller, GatewayHttp, Partition, GatewayApi}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.{IntegrationTestBase, ack}
 import org.scalatest.Matchers
@@ -73,7 +73,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
 
   }))
 
-  val httpPort = Await.result(controller ? CreateGateway(Props(new Gateway() {
+  val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp with GatewayApi {
     override def handle: Receive = {
       case http@HTTP(GET, PATH("get", INT(id)), _, response) =>
         delegateAndHandleErrors(response, service("region") ack TestKey(id)) {

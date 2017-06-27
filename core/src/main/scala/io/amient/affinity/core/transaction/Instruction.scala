@@ -22,5 +22,5 @@ package io.amient.affinity.core.transaction
 import io.amient.affinity.core.util.Reply
 
 trait Instruction[R] extends Reply[R] {
-    def reverse(result: R): Option[Instruction[_]]
+    def reverse(result: R): Option[Reply[_]]
 }
