@@ -25,17 +25,17 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
-import io.amient.affinity.core.actor.WebSocketSupport
+import io.amient.affinity.core.actor.{GatewayHttp, WebSocketSupport}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.example.rest.ExampleGateway
+import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.model.graph.GraphLogic
 import io.amient.affinity.model.graph.message.Edge
 
 import scala.language.postfixOps
 
 
-trait Graph extends ExampleGateway with WebSocketSupport with GraphLogic {
+trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
 
   import context.dispatcher
 

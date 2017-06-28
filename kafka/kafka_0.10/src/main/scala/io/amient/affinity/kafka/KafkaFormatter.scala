@@ -22,19 +22,46 @@ package io.amient.affinity.kafka
 import java.io.PrintStream
 import java.util.Properties
 
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.serde.avro.AvroSerde
+import io.amient.affinity.core.serde.avro.schema.{AvroSchemaProvider, CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
 
+
+/**
+  * Usage in kafka console consumer utility:
+  *
+  * kafka-console-consumer.sh --zookeeper <> --topic <> \
+  *   --formatter io.amient.affinity.kafka.KafkaFormatter
+  *   --property schema.zookeeper.connect=localhost:8081
+  */
 class KafkaFormatter extends MessageFormatter {
 
-  override def init(props: Properties): Unit = {
+  private var serde: AvroSerde = null
 
+  override def init(props: Properties): Unit = {
+    if (props.containsKey("schema.registry.url")) {
+      serde = new CfAvroSchemaRegistry(ConfigFactory.defaultReference()
+        .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE,
+          ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
+    } else if (props.containsKey("schema.zookeeper.connect")) {
+      serde = new ZkAvroSchemaRegistry(ConfigFactory.defaultReference()
+        .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT,
+          ConfigValueFactory.fromAnyRef(props.getProperty("schema.zookeeper.connect"))))
+    } else {
+      throw new IllegalArgumentException("Required --property schema.registry.url OR --property schema.zookeeper.connect")
+    }
   }
 
   override def close(): Unit = {
-
+    if (serde != null) {
+      serde.close()
+      serde = null
+    }
   }
+
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
-    //TODO #44 AffinityKafkaFormatter
+    output.println(serde.fromBytes(consumerRecord.value()).toString)
   }
 }

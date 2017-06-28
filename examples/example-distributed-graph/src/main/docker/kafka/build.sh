@@ -20,8 +20,8 @@ ln -s /opt/zookeeper-3.4.6 /opt/zookeeper
 echo "1" >> /var/zookeeper/data/myid
 
 
-curl -fL http://archive.apache.org/dist/kafka/0.9.0.1/kafka_2.10-0.9.0.1.tgz | tar xzf - -C /opt
-ln -s /opt/kafka_2.10-0.9.0.1 /opt/kafka
+curl -fL http://archive.apache.org/dist/kafka/0.10.1.1/kafka_2.11-0.10.1.1.tgz | tar xzf - -C /opt
+ln -s /opt/kafka_2.11-0.10.1.1 /opt/kafka
 
 
 ################## CLEANUP ###################################

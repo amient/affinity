@@ -2,9 +2,7 @@ version: '2'
 services:
   kafka:
     build: ./src/main/docker/kafka
-    image: kafka
-    environment:
-      KAFKA_NUM_PARTITIONS: 4
+    image: affinity-example/kafka
     ports:
       - "2181:2181"
       - "9092:9092"
