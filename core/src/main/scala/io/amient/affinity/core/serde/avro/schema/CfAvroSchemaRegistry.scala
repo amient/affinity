@@ -32,7 +32,7 @@ import org.apache.avro.Schema
 
 import scala.collection.JavaConverters._
 
-object CfAvroSchemaProvider {
+object CfAvroSchemaRegistry {
   final val CONFIG_CF_REGISTRY_URL_BASE = "affinity.avro.confluent-schema-registry.url.base"
 }
 /**
@@ -41,9 +41,9 @@ object CfAvroSchemaProvider {
   * Instead a fully-qualified name of the class is the subject.
   */
 
-class CfAvroSchemaProvider(config: Config) extends AvroSerde with AvroSchemaProvider {
+class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
 
-  import CfAvroSchemaProvider._
+  import CfAvroSchemaRegistry._
   val client = new ConfluentSchemaRegistryClient(Uri(config.getString(CONFIG_CF_REGISTRY_URL_BASE)))
 
   override def close(): Unit = ()

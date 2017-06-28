@@ -17,16 +17,24 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka.consumer
+package io.amient.affinity.kafka
 
-import org.apache.kafka.clients.consumer.KafkaConsumer
+import java.io.PrintStream
+import java.util.Properties
 
-import scala.collection.JavaConverters._
-import scala.reflect.runtime.universe._
+import kafka.common.MessageFormatter
+import org.apache.kafka.clients.consumer.ConsumerRecord
 
-class AffinityKafkaConsumer[K: TypeTag, V: TypeTag](props: Map[String, Any]) extends KafkaConsumer[K, V](
-  props.mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
-  AffinityKafkaAvroDeserializer.create[K](props, true),
-  AffinityKafkaAvroDeserializer.create[V](props, false))
+class KafkaFormatter extends MessageFormatter {
 
+  override def init(props: Properties): Unit = {
 
+  }
+
+  override def close(): Unit = {
+
+  }
+  override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
+    //TODO #44 AffinityKafkaFormatter
+  }
+}

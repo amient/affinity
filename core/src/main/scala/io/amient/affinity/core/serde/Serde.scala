@@ -19,8 +19,10 @@
 
 package io.amient.affinity.core.serde
 
+import akka.actor.ActorSystem
+import akka.serialization.{JSerializer, SerializationExtension, Serializer}
 
-import akka.serialization.JSerializer
+import scala.reflect.ClassTag
 
 trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
@@ -40,6 +42,29 @@ trait Serde[T] extends JSerializer with AbstractSerde[T] {
     case l: Long => l.asInstanceOf[AnyRef]
     case f: Float => f.asInstanceOf[AnyRef]
     case d: Double => d.asInstanceOf[AnyRef]
+  }
+
+}
+
+object Serde {
+
+  def serializer[S: ClassTag](system: ActorSystem): Serializer = {
+    val cls = implicitly[ClassTag[S]].runtimeClass
+    serializer(cls, system)
+  }
+
+  def serializer(cls: Class[_], system: ActorSystem): Serializer = {
+    SerializationExtension(system).serializerFor(serdeClass(cls))
+  }
+
+  private def serdeClass(cls: Class[_]) = {
+    if (cls == classOf[Boolean]) classOf[java.lang.Boolean]
+    else if (cls == classOf[Byte]) classOf[java.lang.Byte]
+    else if (cls == classOf[Int]) classOf[java.lang.Integer]
+    else if (cls == classOf[Long]) classOf[java.lang.Long]
+    else if (cls == classOf[Float]) classOf[java.lang.Float]
+    else if (cls == classOf[Double]) classOf[java.lang.Double]
+    else cls
   }
 
 }
