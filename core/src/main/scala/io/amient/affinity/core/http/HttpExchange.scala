@@ -19,8 +19,16 @@
 
 package io.amient.affinity.core.http
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, headers}
 
 import scala.concurrent.Promise
+import scala.concurrent.duration.Duration
 
-final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse])
+final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse]) {
+  def timeout(newTimeout: Duration): Boolean = {
+    request.header[headers.`Timeout-Access`] match {
+      case None ⇒ false
+      case Some(t) ⇒ t.timeoutAccess.updateTimeout(newTimeout); true
+    }
+  }
+}

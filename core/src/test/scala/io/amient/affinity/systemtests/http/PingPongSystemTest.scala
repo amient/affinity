@@ -23,7 +23,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.core.actor.{GatewayHttp, Partition, GatewayApi}
+import io.amient.affinity.core.actor.{GatewayApi, GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
@@ -43,6 +43,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
+      case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
         delegateAndHandleErrors(response, service("region") ? "ping") {
@@ -79,4 +80,11 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     gateway.http_get(gateway.uri("/clusterping")).entity should be(jsonStringEntity("pong"))
   }
 
+  "A Simple Handler" should "be able to change http timeout dynamically" in {
+    val t = System.currentTimeMillis()
+    val response = gateway.http_get(gateway.uri("/timeout"))
+    response.status should be(ServiceUnavailable)
+    response.entity.toString.contains("The server was not able to produce a timely response") should be (true)
+    (System.currentTimeMillis() - t) should be < 1000L
+  }
 }
