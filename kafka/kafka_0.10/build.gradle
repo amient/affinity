@@ -29,6 +29,7 @@ ext {
 dependencies {
     compile project(':core')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':testutil:testing-kafka_0.10')
