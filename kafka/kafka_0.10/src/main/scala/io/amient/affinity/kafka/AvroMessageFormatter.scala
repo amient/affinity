@@ -33,10 +33,10 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
   * Usage in kafka console consumer utility:
   *
   * kafka-console-consumer.sh --zookeeper <> --topic <> \
-  *   --formatter io.amient.affinity.kafka.KafkaFormatter
+  *   --formatter io.amient.affinity.kafka.AvroMessageFormatter
   *   --property schema.zookeeper.connect=localhost:8081
   */
-class KafkaFormatter extends MessageFormatter {
+class AvroMessageFormatter extends MessageFormatter {
 
   private var serde: AvroSerde = null
 

@@ -24,12 +24,32 @@ ext {
     confluentVersion = '3.0.0'
 }
 
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.1"
+    }
+}
 
+apply plugin: "com.github.johnrengelman.shadow"
+
+//shadowJar {
+//    dependencies {
+//        project.configurations.provided.dependencies.each {
+//            exclude(it)
+//        }
+//    }
+//}
+assemble.dependsOn shadowJar
 
 dependencies {
     compile project(':core')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
-    compile group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: kafkaVersion
+    provided group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':testutil:testing-kafka_0.10')

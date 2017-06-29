@@ -29,8 +29,7 @@ import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.KafkaSerde
-import io.amient.affinity.kafka.partitioner.KafkaObjectHashPartitioner
+import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
 import org.apache.kafka.clients.consumer.KafkaConsumer

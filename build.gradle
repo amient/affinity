@@ -19,7 +19,6 @@ task wrapper(type: Wrapper) {
 }
 
 
-
 allprojects {
 
     apply plugin: 'idea'
