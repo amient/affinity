@@ -33,7 +33,7 @@ import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
-import io.amient.affinity.example.rest.ExampleGateway
+import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.affinity.ws.AvroWebSocketClient
@@ -57,7 +57,7 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
 
 
   val dataNode = new Node(configure(config))
-  val gatewayNode = new TestGatewayNode(configure(config), new ExampleGateway
+  val gatewayNode = new TestGatewayNode(configure(config), new ExampleGatewayRoot
     with Ping
     with Admin
     with PublicApi

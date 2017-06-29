@@ -17,13 +17,13 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.confluent
+package io.amient.affinity.systemtests
 
 import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaProvider
+import io.amient.affinity.core.serde.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import io.amient.affinity.core.util.ByteUtils
 
 object UUID {
@@ -44,11 +44,14 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
   override def hashCode(): Int = key.hashCode()
 }
 
-class TestAvroRegistry(config: Config) extends CfAvroSchemaProvider(config) {
-  register(classOf[Int])
-  register(classOf[String])
+class TestAvroRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
   register(classOf[KEY])
   register(classOf[UUID])
   register(classOf[TestRecord])
 }
 
+class TestZkAvroRegistry(config: Config) extends ZkAvroSchemaRegistry(config) {
+  register(classOf[KEY])
+  register(classOf[UUID])
+  register(classOf[TestRecord])
+}

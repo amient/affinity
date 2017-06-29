@@ -25,6 +25,7 @@ import java.util.{Observable, Observer, Optional}
 import akka.actor.ActorSystem
 import akka.serialization.{SerializationExtension, Serializer}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.serde.Serde
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -48,21 +49,6 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
                                      (implicit val partition: Int) {
 
 
-  private val serialization = SerializationExtension(system)
-
-  def serde[S: ClassTag]: Serializer = {
-    val cls = implicitly[ClassTag[S]].runtimeClass
-    val serdeClass =
-      if (cls == classOf[Boolean]) classOf[java.lang.Boolean]
-      else if (cls == classOf[Byte]) classOf[java.lang.Byte]
-      else if (cls == classOf[Int]) classOf[java.lang.Integer]
-      else if (cls == classOf[Long]) classOf[java.lang.Long]
-      else if (cls == classOf[Float]) classOf[java.lang.Float]
-      else if (cls == classOf[Double]) classOf[java.lang.Double]
-      else cls
-    serialization.serializerFor(serdeClass)
-  }
-
   import State._
 
   private val config = stateConfig.withFallback(ConfigFactory.empty()
@@ -70,8 +56,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
   )
 
-  private val keySerde = serde[K]
-  private val valueSerde = serde[V]
+  private val keySerde = Serde.serializer[K](system)
+  private val valueSerde = Serde.serializer[V](system)
   private val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
   private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])

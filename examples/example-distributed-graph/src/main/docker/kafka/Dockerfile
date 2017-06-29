@@ -1,4 +1,3 @@
-#FROM openjdk:alpine
 FROM anapsix/alpine-java
 
 RUN mkdir -p /var/zookeeper/data
@@ -28,6 +27,8 @@ ENV ZOO_LOG_DIR="/var/log/zookeeper"
 
 WORKDIR /
 
+COPY libs/*.jar /opt/kafka/libs/
+
 CMD /opt/kafka/bin/kafka-server-start.sh /etc/kafka/kafka-server.properties &> /var/log/kafka/kafka.out &
 
 COPY start.sh /
@@ -37,13 +38,3 @@ EXPOSE 2181
 EXPOSE 9092 19092
 
 ENTRYPOINT /start.sh
-
-
-
-
-
-
-
-
-
-

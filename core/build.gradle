@@ -19,7 +19,6 @@ publishing {
     }
 }
 
-
 dependencies {
 
     testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
@@ -39,6 +38,4 @@ dependencies {
     compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: '2.7.5'
 
 }
-
-
 

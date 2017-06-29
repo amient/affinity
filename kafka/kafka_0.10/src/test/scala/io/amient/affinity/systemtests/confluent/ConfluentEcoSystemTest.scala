@@ -24,16 +24,19 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.consumer.AffinityKafkaConsumer
-import io.amient.affinity.kafka.producer.AffinityKafkaProducer
+import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
+import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
-import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -66,8 +69,6 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
     registryClient.getByID(testRecordSchemaId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
     val uuidSchemaId = registryClient.getLatestSchemaMetadata(classOf[UUID].getName).getId
     registryClient.getByID(uuidSchemaId) should equal(AvroRecord.inferSchema(classOf[UUID]))
-    val intSchemaId = registryClient.getLatestSchemaMetadata(classOf[Int].getName).getId
-    registryClient.getByID(intSchemaId) should equal(AvroRecord.inferSchema(classOf[Int]))
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (high throughput scenario)" in {
@@ -100,13 +101,16 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
       "bootstrap.servers" -> kafkaBootstrap,
       "group.id" -> "group2",
       "auto.offset.reset" -> "earliest",
-      "max.poll.records" -> 1000,
-      "schema.registry.url" -> registryUrl
+      "max.poll.records" -> 1000
     )
 
-    val consumer = new AffinityKafkaConsumer[Int, TestRecord](consumerProps)
+    val consumer = new KafkaConsumer[Int, TestRecord](
+      consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
+      KafkaSerde.of(new IntSerde),
+      KafkaSerde.of[TestRecord](
+        ConfigFactory.parseMap(Map(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))))
 
-    consumer.subscribe(List(topic).asJava)
+    consumer.subscribe(List(topic))
     try {
 
       var read = 0
@@ -114,7 +118,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
       while (read < numReads) {
         val records = consumer.poll(1000)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
-        for (record <- records.asScala) {
+        for (record <- records) {
           read += 1
           record.value.key.id should equal(record.key)
           record.value.text should equal(s"test value ${record.key}")
@@ -140,10 +144,14 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
       "acks" -> "all",
       "linger.ms" -> 20,
       "batch.size" -> 20,
-      "schema.registry.url" -> registryUrl
+      "schema.registry.url" -> registryUrl,
+      "partitioner.class" -> classOf[KafkaObjectHashPartitioner].getName
     )
     val numWrites = new AtomicInteger(1000)
-    val producer = new AffinityKafkaProducer[Int, TestRecord](producerProps)
+    val producer = new KafkaProducer[Int, TestRecord](
+      producerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
+      KafkaSerde.of[Int](system),
+      KafkaSerde.of[TestRecord](system))
     try {
       val numToWrite = numWrites.get
       val l = System.currentTimeMillis()
