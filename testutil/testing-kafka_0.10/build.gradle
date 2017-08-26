@@ -8,8 +8,6 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 //uploadArchives.repositories.mavenDeployer.pom.artifactId = 'testing_kafka_0.10-scala_' + baseScalaVersion
-install.repositories.mavenInstaller.pom.artifactId = 'testing-kafka_0.10-scala_' + baseScalaVersion
-
 publishing {
     publications {
         maven(MavenPublication) {
@@ -18,6 +16,15 @@ publishing {
         }
     }
 }
+
+install.repositories.mavenInstaller.pom.artifactId = 'testing-kafka_0.10-scala_' + baseScalaVersion
+def installer = install.repositories.mavenInstaller
+[installer]*.pom*.whenConfigured { pom ->
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = 'core-scala_'+baseScalaVersion
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-core' }.artifactId = 'testing-core-scala_'+baseScalaVersion
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'kafka_' + kafkaMinorVersion}.artifactId = 'kafka_' + kafkaMinorVersion + '-scala_'+baseScalaVersion
+}
+
 
 ext {
     kafkaMinorVersion = '0.10'
