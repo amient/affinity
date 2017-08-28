@@ -350,7 +350,7 @@ trait WebSocketSupport extends GatewayHttp {
           private var frontend: Option[ActorRef] = None
 
           override def postStop(): Unit = {
-            log.info("WebSocket Sink Closing")
+            log.debug("WebSocket Sink Closing")
             keyValueMediator ! PoisonPill
           }
 
@@ -384,7 +384,7 @@ trait WebSocketSupport extends GatewayHttp {
           }
 
           override def postStop(): Unit = {
-            log.info("WebSocket Source Closing")
+            log.debug("WebSocket Source Closing")
           }
 
           private val buffer = new util.LinkedList[Message]()

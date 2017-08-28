@@ -71,7 +71,7 @@ trait ActorState extends Actor {
 
   def closeState(): Unit = {
     storageRegistry.asScala.foreach { store =>
-      log.info(s"Closing state store " + store.name + "/" + store.partition)
+      log.debug(s"Closing state store " + store.name + "/" + store.partition)
       store.storage.close()
     }
     storageRegistry.clear()

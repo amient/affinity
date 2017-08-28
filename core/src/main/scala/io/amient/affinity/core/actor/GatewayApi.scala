@@ -55,7 +55,7 @@ trait GatewayApi extends Gateway {
     config.getObject(CONFIG_SERVICES).asScala.map(_._1).map { group =>
       try {
         val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
-        log.info(s"Expecting group $group of ${serviceConfig.getString(Service.CONFIG_NUM_PARTITIONS)} partitions")
+        log.debug(s"Expecting group $group of ${serviceConfig.getString(Service.CONFIG_NUM_PARTITIONS)} partitions")
         val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(service)
@@ -122,7 +122,7 @@ trait GatewayApi extends Gateway {
         val gatewayShouldBeSuspended = services.exists(_._2._3.get)
         if (gatewayShouldBeSuspended != handlingSuspended) {
           handlingSuspended = suspended
-          log.warning("Handling " + (if (suspended) "Suspended" else "Resumed"))
+          log.info("Handling " + (if (suspended) "Suspended" else "Resumed"))
           context.system.eventStream.publish(msg)
           context.system.eventStream.publish(ClusterStatus(suspended))
         }

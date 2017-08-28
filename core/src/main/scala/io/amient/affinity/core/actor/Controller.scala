@@ -72,7 +72,7 @@ class Controller extends Actor {
 
     case request@CreateContainer(group, partitions, partitionProps) => sender.replyWith(request) {
       try {
-        log.info(s"Creating Container for $group with partitions $partitions")
+        log.debug(s"Creating Container for $group with partitions $partitions")
         context.actorOf(Props(new Container(group) {
           for (partition <- partitions) {
             context.actorOf(partitionProps, name = partition.toString)

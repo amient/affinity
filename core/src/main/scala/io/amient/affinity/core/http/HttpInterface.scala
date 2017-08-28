@@ -56,7 +56,7 @@ class HttpInterface(val httpHost: String, httpPort: Int, ssl: Option[SSLContext]
 
   def bind(gateway: ActorRef): Unit = {
     close()
-    log.info(s"binding http interface with $httpHost:$httpPort")
+    log.debug(s"binding http interface with $httpHost:$httpPort")
     val bindingFuture: Future[Http.ServerBinding] =
       incoming.to(Sink.foreach { connection =>
         connection.handleWithAsyncHandler { request =>
@@ -75,7 +75,7 @@ class HttpInterface(val httpHost: String, httpPort: Int, ssl: Option[SSLContext]
 
   def close(): Unit = {
     if (binding != null) {
-      log.info("unbinding http interface")
+      log.debug("unbinding http interface")
       listenAddress.set(null)
       Await.result(binding.unbind(), 15 seconds)
     }

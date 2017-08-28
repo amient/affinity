@@ -59,7 +59,7 @@ class Partition extends Actor with ActorState {
     */
   protected def onBecomeMaster: Unit = {
     bootState()
-    log.info(s"Became master for partition $partition")
+    log.debug(s"Became master for partition $partition")
   }
 
   /**
@@ -69,17 +69,17 @@ class Partition extends Actor with ActorState {
     */
   protected def onBecomeStandby: Unit = {
     tailState()
-    log.info(s"Became standby for partition $partition")
+    log.debug(s"Became standby for partition $partition")
   }
 
   override def preStart(): Unit = {
-    log.info("Starting partition: " + self.path.name)
+    log.debug("Starting partition: " + self.path.name)
     context.parent ! ServiceOnline(self)
     super.preStart()
   }
 
   override def postStop(): Unit = {
-    log.info("Stopping partition: " + self.path.name)
+    log.debug("Stopping partition: " + self.path.name)
     context.parent ! ServiceOffline(self)
     super.postStop()
   }

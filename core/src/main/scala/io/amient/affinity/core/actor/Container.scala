@@ -70,7 +70,7 @@ class Container(group: String) extends Actor {
     if (!coordinator.isClosed) {
       coordinator.unwatch(self)
       services.filter(_._2 != null).foreach { case (ref, handle) =>
-        log.info(s"Unregistering service: handle=${handle}, path=${ref.path}")
+        log.debug(s"Unregistering service: handle=${handle}, path=${ref.path}")
         coordinator.unregister(handle)
       }
     }
@@ -85,14 +85,14 @@ class Container(group: String) extends Actor {
     case ServiceOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
       val handle = coordinator.register(partitionActorPath)
-      log.info(s"Service online: handle=$handle, path=${partitionActorPath}")
+      log.debug(s"Service online: handle=$handle, path=${partitionActorPath}")
       services += (ref -> handle)
       if (services.values.forall(_ != null)) {
         context.parent ! ContainerOnline(group)
       }
 
     case ServiceOffline(ref) =>
-      log.info(s"Service offline: handle=${services(ref)}, path=${ref.path}")
+      log.debug(s"Service offline: handle=${services(ref)}, path=${ref.path}")
       coordinator.unregister(services(ref))
       services -= ref
 
