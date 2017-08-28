@@ -23,7 +23,6 @@ import java.nio.ByteBuffer
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
-import akka.serialization.{SerializationExtension, Serializer}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.serde.Serde
 
@@ -46,8 +45,9 @@ object State {
 }
 
 class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, stateConfig: Config)
-                                     (implicit val partition: Int) {
+                                     (implicit val partition: Int) extends Observable {
 
+  self =>
 
   import State._
 
@@ -251,13 +251,33 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
    * Observable State Support
    */
 
-  private var observables = Map[K, ObservableState]()
-
-  def push(key: K, event: Any): Unit = {
-    observables.get(key).foreach(_.notifyObservers(event))
+  /**
+    * State listeners can be instantiated at the partition level and are notified for any change in this State.
+    */
+  def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
+    addObserver(new Observer {
+      override def update(o: Observable, arg: scala.Any) = arg match {
+        case (key: K, event: Any) => pf((key, event))
+        case _ =>
+      }
+    })
   }
 
-  class ObservableState extends Observable {
+  /**
+    * Observables are attached to individual keys in this State
+    */
+  private var observables = scala.collection.mutable.Map[K, ObservableKeyValue]()
+
+  def push(key: K, event: Any): Unit = {
+    try {
+      observables.get(key).foreach(_.notifyObservers(event))
+    } finally {
+      setChanged()
+      notifyObservers((key, event))
+    }
+  }
+
+  class ObservableKeyValue extends Observable {
     override def notifyObservers(arg: scala.Any): Unit = {
       //TODO with atomic cell versioning we could cancel out redundant updates
       setChanged()
@@ -265,12 +285,12 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     }
   }
 
-  def addObserver(key: Any, observer: Observer): Observer = key match {
+  def addKeyValueObserver(key: Any, observer: Observer): Observer = key match {
     case k: K =>
       val observable = observables.get(k) match {
         case Some(o) => o
         case None =>
-          val o: ObservableState = new ObservableState()
+          val o: ObservableKeyValue = new ObservableKeyValue()
           observables += k -> o
           o
       }
@@ -279,7 +299,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       observer
   }
 
-  def removeObserver(key: Any, observer: Observer): Unit = key match {
+  def removeKeyValueObserver(key: Any, observer: Observer): Unit = key match {
     case k: K => observables.get(k).foreach {
       observable =>
         observable.deleteObserver(observer)

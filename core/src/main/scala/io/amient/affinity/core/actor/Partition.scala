@@ -118,7 +118,7 @@ class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
   implicit val scheduler = context.system.scheduler
 
   override def postStop(): Unit = {
-    observer.foreach(state.removeObserver(key, _))
+    observer.foreach(state.removeKeyValueObserver(key, _))
   }
 
   override def receive: Receive = {
@@ -126,7 +126,7 @@ class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
   }
 
   def createKeyValueObserver(key: Any, frontend: ActorRef): Unit = {
-    observer = Some(state.addObserver(key, new Observer() {
+    observer = Some(state.addKeyValueObserver(key, new Observer() {
       override def update(o: Observable, arg: scala.Any): Unit = {
         val t = 1 seconds
         implicit val timeout = Timeout(t)

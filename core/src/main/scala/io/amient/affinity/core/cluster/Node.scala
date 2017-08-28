@@ -22,7 +22,7 @@ package io.amient.affinity.core.cluster
 
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
-import com.typesafe.config.{Config, ConfigList}
+import com.typesafe.config.{Config, ConfigException, ConfigList}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
@@ -91,10 +91,15 @@ class Node(config: Config) {
   }
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
-    implicit val timeout = Timeout(startupTimeout)
-    val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
-    val serviceClass = Class.forName(serviceConfig.getString(Service.CONFIG_SERVICE_CLASS)).asSubclass(classOf[Partition])
-    startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
+    try {
+      val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
+      val serviceClass = Class.forName(serviceConfig.getString(Service.CONFIG_SERVICE_CLASS)).asSubclass(classOf[Partition])
+      implicit val timeout = Timeout(startupTimeout)
+      startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
+    } catch {
+      case e: ConfigException =>
+        throw new IllegalArgumentException(s"Could not start container for service $group with partitions ${partitions.mkString(", ")}", e)
+    }
   }
 
   def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
