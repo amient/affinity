@@ -26,7 +26,7 @@ import akka.event.Logging
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigException}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.actor.Service.{CheckServiceAvailability, ClusterStatus, ServiceAvailability}
@@ -53,12 +53,17 @@ trait GatewayApi extends Gateway {
 
   private val services: Map[String, (Coordinator, ActorRef, AtomicBoolean)] =
     config.getObject(CONFIG_SERVICES).asScala.map(_._1).map { group =>
-      val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
-      log.info(s"Expecting group $group of ${serviceConfig.getString(Service.CONFIG_NUM_PARTITIONS)} partitions")
-      val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
-      val coordinator = Coordinator.create(context.system, group)
-      context.watch(service)
-      group -> (coordinator, service, new AtomicBoolean(true))
+      try {
+        val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
+        log.info(s"Expecting group $group of ${serviceConfig.getString(Service.CONFIG_NUM_PARTITIONS)} partitions")
+        val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
+        val coordinator = Coordinator.create(context.system, group)
+        context.watch(service)
+        group -> (coordinator, service, new AtomicBoolean(true))
+      } catch {
+        case e: ConfigException =>
+          throw new IllegalArgumentException(s"Failed to configure service $group", e)
+      }
     }.toMap
   private var handlingSuspended = services.exists(_._2._3.get)
 

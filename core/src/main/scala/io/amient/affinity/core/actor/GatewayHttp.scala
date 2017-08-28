@@ -159,12 +159,24 @@ trait GatewayHttp extends Gateway {
 
 
   def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: NoSuchElementException => HttpResponse(NotFound, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: IllegalArgumentException => HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: scala.NotImplementedError => HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: UnsupportedOperationException => HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
-    case _: IllegalStateException => HttpResponse(ServiceUnavailable)
-    case NonFatal(e) => e.printStackTrace(); HttpResponse(InternalServerError)
+    case e: NoSuchElementException =>
+      log.debug("affinity exception handler", e)
+      HttpResponse(NotFound, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: IllegalArgumentException =>
+      log.debug("affinity exception handler", e)
+      HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: scala.NotImplementedError =>
+      log.error("affinity exception handler", e)
+      HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: UnsupportedOperationException =>
+      log.error("affinity exception handler", e)
+      HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
+    case e: IllegalStateException =>
+      log.error("affinity exception handler", e)
+      HttpResponse(ServiceUnavailable)
+    case NonFatal(e) =>
+      log.error("affinity exception handler", e)
+      HttpResponse(InternalServerError)
   }
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
@@ -326,7 +338,7 @@ trait WebSocketSupport extends GatewayHttp {
     implicit val timeout = Timeout(1 second)
 
     service ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
-      case keyValueActor: ActorRef =>
+      case keyValueMediator: ActorRef =>
 
         /**
           * Sink.actorRef supports custom termination message which will be sent to the source
@@ -339,7 +351,7 @@ trait WebSocketSupport extends GatewayHttp {
 
           override def postStop(): Unit = {
             log.info("WebSocket Sink Closing")
-            keyValueActor ! PoisonPill
+            keyValueMediator ! PoisonPill
           }
 
           override def receive: Receive = {
@@ -347,7 +359,7 @@ trait WebSocketSupport extends GatewayHttp {
             case msg: Message => pfDown(msg) match {
               case Unit =>
               case response: ByteString => frontend.foreach(_ ! response)
-              case other: Any => keyValueActor ! other
+              case other: Any => keyValueMediator ! other
             }
           }
         }))
@@ -366,8 +378,8 @@ trait WebSocketSupport extends GatewayHttp {
           final val maxBufferSize = context.system.settings.config.getInt(GatewayHttp.CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE)
 
           override def preStart(): Unit = {
-            context.watch(keyValueActor)
-            keyValueActor ! self
+            context.watch(keyValueMediator)
+            keyValueMediator ! self
             clientMessageReceiver ! self
           }
 
