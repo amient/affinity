@@ -20,7 +20,8 @@
 package io.amient.affinity.core.http
 
 import akka.http.scaladsl.model.Uri.{Path, Query}
-import akka.http.scaladsl.model.{HttpMethod, HttpResponse}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.HttpMethods._
 
 import scala.annotation.tailrec
 import scala.concurrent.Promise
@@ -31,6 +32,22 @@ object RequestMatchers {
     def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = {
       Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
     }
+  }
+
+  def HTTP_(method: HttpMethod, exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = {
+    exchange.request.method match {
+      case `method` =>
+        Some(exchange.request.entity.contentType, exchange.request.entity, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
+      case _ => None
+    }
+  }
+
+  object HTTP_POST {
+    def unapply(exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = HTTP_(POST, exchange)
+  }
+
+  object HTTP_PUT {
+    def unapply(exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = HTTP_(PUT, exchange)
   }
 
   object PATH {

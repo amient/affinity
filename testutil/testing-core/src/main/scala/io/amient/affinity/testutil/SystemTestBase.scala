@@ -39,6 +39,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.Service.ClusterStatus
 import io.amient.affinity.core.actor.{Gateway, GatewayHttp}
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.http.Encoder
 import org.apache.avro.util.ByteBufferInputStream
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
@@ -120,11 +121,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     }
 
     def http_get(uri: Uri, headers: List[HttpHeader] = List()): HttpResponse = {
-      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri, headers = headers)), 2 seconds)
+      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri, headers = headers)), 30 seconds)
     }
 
     def http_get(uri: Uri): HttpResponse = {
-      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri)), 5 seconds)
+      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri)), 30 seconds)
     }
 
     val mapper = new ObjectMapper()
@@ -138,8 +139,12 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
     }
 
-    def http_post(uri: Uri, entity: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
-      Await.result(http(HttpRequest(method = HttpMethods.POST, uri = uri, headers = headers)), 2 seconds)
+    def http_post(uri: Uri, entity: Array[Byte] = Array(), headers: List[HttpHeader] = List()): HttpResponse = {
+      Await.result(http(HttpRequest(entity = HttpEntity(entity), method = HttpMethods.POST, uri = uri, headers = headers)), 30 seconds)
+    }
+
+    def http_post_json(uri: Uri, json: JsonNode, headers: List[HttpHeader] = List()): HttpResponse = {
+      Await.result(http(HttpRequest(entity = HttpEntity(ContentTypes.`application/json`, Encoder.json(json)), method = HttpMethods.POST, uri = uri, headers = headers)), 30 seconds)
     }
 
     def http(req: HttpRequest) = {

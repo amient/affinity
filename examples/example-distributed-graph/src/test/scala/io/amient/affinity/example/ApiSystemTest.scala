@@ -97,7 +97,7 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
 
   "Public API requests" should "be allowed only with valid salted and time-based signature" in {
     val publicKey = "pkey1"
-    val createApiKey = http_post(uri(s"/settings/add?key=$publicKey"), "", List(Authorization.basic("admin", "1234")))
+    val createApiKey = http_post(uri(s"/settings/add?key=$publicKey"), Array(), List(Authorization.basic("admin", "1234")))
     createApiKey.status should be(OK)
     implicit val materializer = ActorMaterializer.create(gatewayNode.system)
     val salt = get_json(createApiKey).textValue

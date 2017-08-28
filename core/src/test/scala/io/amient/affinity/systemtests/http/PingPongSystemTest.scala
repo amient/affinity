@@ -19,13 +19,16 @@
 
 package io.amient.affinity.systemtests.http
 
+import akka.http.javadsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.amient.affinity.core.actor.{GatewayApi, GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.http.{Decoder, Encoder}
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
@@ -41,6 +44,8 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
     import context.dispatcher
 
+    implicit val materializer = ActorMaterializer.create(context.system)
+
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
@@ -49,6 +54,8 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
         delegateAndHandleErrors(response, service("region") ? "ping") {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
+      case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
+        response.success(Encoder.json(OK, Decoder.json(entity), gzip = true))
     }
   })
 
@@ -86,5 +93,11 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     response.status should be(ServiceUnavailable)
     response.entity.toString.contains("The server was not able to produce a timely response") should be (true)
     (System.currentTimeMillis() - t) should be < 1000L
+  }
+
+  "An Entity Handler" should "be able to stream decode json entity" in {
+    val json = new ObjectMapper().createObjectNode()
+    json.put("hello", "hello")
+    gateway.get_json(gateway.http_post_json(gateway.uri("/ping"), json)) should be(json)
   }
 }

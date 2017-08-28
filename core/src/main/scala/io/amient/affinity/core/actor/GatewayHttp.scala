@@ -166,16 +166,16 @@ trait GatewayHttp extends Gateway {
       log.debug("affinity exception handler", e)
       HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: scala.NotImplementedError =>
-      log.error("affinity exception handler", e)
+      log.error(e, "affinity exception handler")
       HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: UnsupportedOperationException =>
-      log.error("affinity exception handler", e)
+      log.error(e, "affinity exception handler")
       HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: IllegalStateException =>
-      log.error("affinity exception handler", e)
+      log.error(e, "affinity exception handler")
       HttpResponse(ServiceUnavailable)
     case NonFatal(e) =>
-      log.error("affinity exception handler", e)
+      log.error(e, "affinity exception handler")
       HttpResponse(InternalServerError)
   }
 
