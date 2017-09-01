@@ -44,7 +44,7 @@ public class MemStoreRocksDbTest {
     public void testRocksDb() throws IOException, InterruptedException {
         String tmp = folder.newFolder().toString();
         Config config = ConfigFactory.empty()
-                .withValue(MemStoreRocksDb.CONFIG_ROCKSDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp));
+                .withValue(MemStoreRocksDb.ConfigRocksDbDataPath, ConfigValueFactory.fromAnyRef(tmp));
 
         MemStore instance = new MemStoreRocksDb(config, 0);
         try {

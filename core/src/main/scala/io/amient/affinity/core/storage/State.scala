@@ -66,7 +66,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage: Storage = constructorMirror(config, partition).asInstanceOf[Storage]
+  val storage: Storage = try constructorMirror(config, partition).asInstanceOf[Storage] catch {
+    case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
+  }
 
   import system.dispatcher
 

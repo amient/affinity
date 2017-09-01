@@ -38,7 +38,7 @@ import java.util.*;
 public class MemStoreRocksDb implements MemStore {
 
 
-    public static final String CONFIG_ROCKSDB_DATA_PATH = "memstore.rocksdb.data.path";
+    public static final String ConfigRocksDbDataPath = "memstore.rocksdb.data.path";
 
     private static Map<String, Long> refs = new HashMap<>();
     private static Map<String, RocksDB> instances = new HashMap<>();
@@ -75,7 +75,7 @@ public class MemStoreRocksDb implements MemStore {
     private final RocksDB internal;
 
     public MemStoreRocksDb(Config config, int partition) throws IOException {
-        pathToData = config.getString(CONFIG_ROCKSDB_DATA_PATH) + "/" + partition + "/";
+        pathToData = config.getString(ConfigRocksDbDataPath) + "/" + partition + "/";
         containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
         Files.createDirectories(containerPath);
         Options rocksOptions = new Options().setCreateIfMissing(true);
