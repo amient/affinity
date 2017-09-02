@@ -24,7 +24,7 @@ import java.util.Properties
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.serde.avro.AvroSerde
-import io.amient.affinity.core.serde.avro.schema.{AvroSchemaProvider, CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
+import io.amient.affinity.core.serde.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
 

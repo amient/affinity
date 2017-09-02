@@ -18,7 +18,6 @@ task wrapper(type: Wrapper) {
     gradleVersion = '3.5'
 }
 
-
 allprojects {
 
     apply plugin: 'idea'
@@ -68,6 +67,7 @@ allprojects {
         dependencies {
             testCompile group: 'junit', name: 'junit', version: junitVersion
         }
+
     }
 
     plugins.withType(ScalaPlugin).whenPluginAdded {
