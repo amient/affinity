@@ -19,8 +19,10 @@
 
 package io.amient.affinity.example.minimal
 
+import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.testutil.SystemTestBase
+import io.amient.affinity.core.ack
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Await
@@ -35,15 +37,17 @@ class SimpleApiSpec extends FlatSpec with SystemTestBase with Matchers {
 
   it should "work without the http layer" in {
 
-    new TestGatewayNode(configure(config)) with MyApiNode {
+    new TestGatewayNode(configure(config)) {
       awaitClusterReady {
         startContainer("simple-keyspace", List(0, 1), new MySimplePartition())
       }
-      Await.result(getData("key1"), 1 second) should be (None)
-      Await.result(putData("key1", "value1"), 1 second) should be(None)
-      Await.result(getData("key1"), 1 second) should be(Some("value1"))
-      Await.result(putData("key1", "value2"), 1 second) should be(Some("value1"))
-      Await.result(getData("key1"), 1 second) should be(Some("value2"))
+      implicit val context = system.dispatcher
+      implicit val timeout = Timeout(1 second)
+      Await.result(gateway ack GetData("key1"), 1 second) should be (None)
+      Await.result(gateway ack PutData("key1", "value1"), 1 second) should be(None)
+      Await.result(gateway ack GetData("key1"), 1 second) should be(Some("value1"))
+      Await.result(gateway ack PutData("key1", "value2"), 1 second) should be(Some("value1"))
+      Await.result(gateway ack GetData("key1"), 1 second) should be(Some("value2"))
       shutdown()
     }
   }

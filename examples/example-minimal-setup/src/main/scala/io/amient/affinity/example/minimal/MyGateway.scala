@@ -34,30 +34,11 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-trait MyApi {
-  def getData(key: String): Future[Option[String]]
-
-  def putData(key: String, value: String): Future[Option[String]]
-
-}
-
 case class GetData(key: String) extends Reply[Option[String]]
+
 case class PutData(key: String, value: String) extends Reply[Option[String]]
 
-trait MyApiNode extends Node with MyApi {
-
-  import system.dispatcher
-
-  implicit val timeout = Timeout(1 second)
-
-  val gateway = Await.result(system.actorSelection("/user/controller/gateway").resolveOne(), timeout.duration)
-
-  def getData(key: String): Future[Option[String]] = gateway ack GetData(key)
-
-  def putData(key: String, value: String): Future[Option[String]] = gateway ack PutData(key, value)
-}
-
-class MyApiGateway extends GatewayApi with MyApi {
+class MyApiGateway extends GatewayApi {
 
   import context.dispatcher
 

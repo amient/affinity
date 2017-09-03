@@ -83,6 +83,8 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
 
     implicit val materializer = ActorMaterializer.create(system)
 
+    lazy val gateway = Await.result(system.actorSelection("/user/controller/gateway").resolveOne(10 seconds), 10 seconds )
+
     val httpPort: Int = Await.result(startGateway(gatewayCreator), startupTimeout)
 
     val testSSLContext = {

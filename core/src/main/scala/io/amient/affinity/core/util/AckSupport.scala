@@ -67,6 +67,7 @@ final class AckableActorRef(val target: ActorRef, val maxRetries: Int = 3) exten
     *
     * @param message
     * @param timeout
+    * @param scheduler
     * @param context
     * @return
     */
@@ -76,13 +77,13 @@ final class AckableActorRef(val target: ActorRef, val maxRetries: Int = 3) exten
       val f = if (delay.toMillis == 0) target ? message else after(timeout.duration, scheduler)(target ? message)
       f map {
         case result: T => promise.success(result)
-        case result: BoxedUnit if (tag == classTag[Unit]) => promise.success(().asInstanceOf[T])
+        case _: BoxedUnit if (tag == classTag[Unit]) => promise.success(().asInstanceOf[T])
         case i => promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
         case cause: AkkaException => promise.failure(cause)
         case cause: IllegalArgumentException => promise.failure(cause)
         case cause: NoSuchElementException => promise.failure(cause)
-        case cause if (retry == 0) => promise.failure(cause)
+        case cause if (retry == 0) => promise.failure(new RuntimeException(s"${target.path.name} failed ${maxRetries}x to respond to $message ", cause))
         case _: TimeoutException => attempt(retry - 1)
         case _ => attempt(retry - 1, timeout.duration)
       }
