@@ -55,23 +55,23 @@ class RegionSpec extends IntegrationTestBase with Matchers {
             context.actorOf(testPartition, name = partition.toString)
           }
         }), name = "region")
-        awaitCond(coordinator.services.size == 4)
+        awaitCond(coordinator.services.size == 4, 6 seconds)
 
         //first stop Partition explicitly - it shouldn't be restarted
         import system.dispatcher
         system.actorSelection(ActorPath.fromString(coordinator.services.head._1)).resolveOne() onSuccess {
           case actorRef => system.stop(actorRef)
         }
-        awaitCond(coordinator.services.size == 3)
+        awaitCond(coordinator.services.size == 3, 6 seconds)
 
         //now simulate error in one of the partitions
         val partitionToFail = coordinator.services.head._1
         system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne() onSuccess {
           case actorRef => actorRef ! new IllegalStateException("Exception expected by the Test")
         }
-        awaitCond(coordinator.services.size == 2 && !coordinator.services.contains(partitionToFail))
+        awaitCond(coordinator.services.size == 2 && !coordinator.services.contains(partitionToFail), 6 seconds)
         // it had a failure, it should be restarted
-        awaitCond(coordinator.services.size == 3)
+        awaitCond(coordinator.services.size == 3, 6 seconds)
         region ! PoisonPill
 
       } finally {
