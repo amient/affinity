@@ -53,7 +53,7 @@ object KafkaSerde {
   }
 
   def of[T: ClassTag](system: ActorSystem): Deserializer[T] with Serializer[T] = {
-    of(Serde.of[T](system).asInstanceOf[AbstractSerde[T]])
+    of(Serde.of[T](system.settings.config))
   }
 
   def of[T: TypeTag](config: Config): Deserializer[T] with Serializer[T] = {

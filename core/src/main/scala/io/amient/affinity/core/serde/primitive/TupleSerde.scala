@@ -20,30 +20,33 @@
 package io.amient.affinity.core.serde.primitive
 
 import akka.actor.ExtendedActorSystem
+import com.typesafe.config.Config
+import io.amient.affinity.core.serde.{Serde, Serdes}
 import io.amient.affinity.core.util.ByteUtils
 
+class TupleSerde(tools: Serdes) extends AbstractWrapSerde(tools) with Serde[Product] {
 
-class TupleSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) {
+  def this (config: Config) = this(Serde.tools(config))
+  def this(system: ExtendedActorSystem) = this(system.settings.config)
 
   override def identifier: Int = 132
 
-  override def toBinary(o: AnyRef): Array[Byte] = o match {
-    case p: Product =>
-      var result = new Array[Byte](4)
-      ByteUtils.putIntValue(p.productArity, result, 0)
-      p.productIterator.foreach {
-        m =>
-          val bytes = toBinaryWrapped(m.asInstanceOf[AnyRef])
-          val tmp = new Array[Byte](result.length + bytes.length + 4)
-          Array.copy(result, 0, tmp, 0, result.length)
-          ByteUtils.putIntValue(bytes.length, tmp, result.length)
-          Array.copy(bytes, 0, tmp, 4 + result.length, bytes.length)
-          result = tmp
-      }
-      result
+  override def toBytes(p: Product): Array[Byte] = {
+    var result = new Array[Byte](4)
+    ByteUtils.putIntValue(p.productArity, result, 0)
+    p.productIterator.foreach {
+      m =>
+        val bytes = toBinaryWrapped(m.asInstanceOf[AnyRef])
+        val tmp = new Array[Byte](result.length + bytes.length + 4)
+        Array.copy(result, 0, tmp, 0, result.length)
+        ByteUtils.putIntValue(bytes.length, tmp, result.length)
+        Array.copy(bytes, 0, tmp, 4 + result.length, bytes.length)
+        result = tmp
+    }
+    result
   }
 
-  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = {
+  override protected def fromBytes(bytes: Array[Byte]): Product = {
     val arity = ByteUtils.asIntValue(bytes, 0)
     var tmp = scala.collection.immutable.List[Any]()
     var offset = 4
@@ -70,4 +73,5 @@ class TupleSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) 
     }
   }
 
+  override def close() = ()
 }

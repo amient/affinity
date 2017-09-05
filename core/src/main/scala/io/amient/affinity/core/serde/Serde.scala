@@ -19,10 +19,17 @@
 
 package io.amient.affinity.core.serde
 
-import akka.actor.ActorSystem
-import akka.serialization._
+import java.io.NotSerializableException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
+import akka.serialization._
+import com.typesafe.config.Config
+
+import scala.collection.immutable
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+import scala.util.Try
 
 trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
@@ -48,22 +55,51 @@ trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
 object Serde {
 
-  def of[S: ClassTag](system: ActorSystem): AbstractSerde[S] = {
-    val cls = serdeClass(implicitly[ClassTag[S]].runtimeClass)
-    val ser = SerializationExtension(system).serializerFor(cls)
-    toAbstractSerde[S](ser)
-  }
+  def by[S](identity: Int, config: Config): Serde[S] = tools(config).by(identity).asInstanceOf[Serde[S]]
 
-  private def toAbstractSerde[S](serde: AnyRef) = serde match {
-    case as: AbstractSerde[_] => as.asInstanceOf[AbstractSerde[S]]
-    case s: Serializer => new AbstractSerde[S] {
-      override def fromBytes(bytes: Array[Byte]) = s.fromBinary(bytes).asInstanceOf[S]
+  def of[S: ClassTag](config: Config): AbstractSerde[S] = tools(config).of[S](config)
 
-      override def toBytes(obj: S) = s.toBinary(obj.asInstanceOf[AnyRef])
+  def find(o: AnyRef, config: Config) = tools(config).find(o)
 
-      override def close() = ()
+  private val _tools = new ConcurrentHashMap[Config, Serdes]()
+
+  def tools(config: Config): Serdes = {
+    _tools.get(config) match {
+      case null => {
+        val s = new Serdes(config)
+        _tools.putIfAbsent(config, s) match {
+          case null => s
+          case some => some
+        }
+      }
+      case some => some
     }
   }
+
+}
+
+class Serdes(val config: Config) {
+
+  type ClassSerde = (Class[_], Serde[_])
+
+  // com.google.protobuf serialization binding is only used if the class can be loaded,
+  // i.e. com.google.protobuf dependency has been added in the application project.
+  // The reason for this special case is for backwards compatibility so that we still can
+  // include "com.google.protobuf.GeneratedMessage" = proto in configured serialization-bindings.
+  def checkGoogleProtobuf(className: String): Boolean = (!className.startsWith("com.google.protobuf"))
+
+  /**
+    * Sort so that subtypes always precede their supertypes, but without
+    * obeying any order between unrelated subtypes (insert sort).
+    */
+  def sort(in: Iterable[ClassSerde]): immutable.Seq[ClassSerde] =
+    ((new ArrayBuffer[ClassSerde](in.size) /: in) { (buf, ca) ⇒
+      buf.indexWhere(_._1 isAssignableFrom ca._1) match {
+        case -1 ⇒ buf append ca
+        case x ⇒ buf insert(x, ca)
+      }
+      buf
+    }).to[immutable.Seq]
 
   private def serdeClass(cls: Class[_]) = {
     if (cls == classOf[Boolean]) classOf[java.lang.Boolean]
@@ -75,59 +111,77 @@ object Serde {
     else cls
   }
 
-//TODO custom of method without using actdor system
-//  private val serializerMap = new ConcurrentHashMap[Class[_], Serializer]()
-//
-//  def of[S: ClassTag](config: Config): AbstractSerde[S] = {
-//
-//    val clazz = serdeClass(implicitly[ClassTag[S]].runtimeClass)
-//
-//    val settings = new Serialization.Settings(config)
-//
-//    val bindings: immutable.Seq[ClassSerializer] = {
-//      val fromConfig = for {
-//        (className: String, alias: String) ← settings.SerializationBindings
-//        if alias != "none" && checkGoogleProtobuf(className)
-//      } yield (system.dynamicAccess.getClassFor[Any](className).get, serializers(alias))
-//
-//      val fromSettings = serializerDetails.flatMap { detail ⇒
-//        detail.useFor.map(clazz ⇒ clazz → detail.serializer)
-//      }
-//
-//      val result = sort(fromConfig ++ fromSettings)
-//      ensureOnlyAllowedSerializers(result.map { case (_, ser) ⇒ ser }(collection.breakOut))
-//      result
-//    }
-//
-//    val ser = serializerMap.get(clazz) match {
-//      case null ⇒ // bindings are ordered from most specific to least specific
-//        def unique(possibilities: immutable.Seq[(Class[_], Serializer)]): Boolean =
-//          possibilities.size == 1 ||
-//            (possibilities forall (_._1 isAssignableFrom possibilities(0)._1)) ||
-//            (possibilities forall (_._2 == possibilities(0)._2))
-//
-//        val ser: Serializer = {
-//          bindings.filter {
-//            case (c, _) ⇒ c isAssignableFrom clazz
-//          } match {
-//            case immutable.Seq() ⇒
-//              throw new NotSerializableException("No configured serialization-bindings for class [%s]" format clazz.getName)
-//            case possibilities ⇒
-//              //possibilities(0)._2
-//              throw new IllegalArgumentException("Multiple serializers found for " + clazz + ", choosing first: " + possibilities)
-//
-//          }
-//        }
-//        serializerMap.putIfAbsent(clazz, ser) match {
-//          case null ⇒ ser
-//          case some ⇒ some
-//        }
-//      case ser ⇒ ser
-//    }
-//    toAbstractSerde[S](ser)
-//  }
+  private val settings = new Serialization.Settings(config)
+
+  private def serdeInstance(fqn: String): Option[Serde[_]] = Try {
+    val cls = Class.forName(fqn)
+    if (!(classOf[Serde[_]]).isAssignableFrom(cls)) throw new NoSuchMethodException() else {
+      val clazz = cls.asSubclass(classOf[Serde[_]])
+      try {
+        clazz.getConstructor(classOf[Serdes]).newInstance(this)
+      } catch {
+        case _: NoSuchMethodException => clazz.getConstructor().newInstance()
+      }
+    }
+  }.toOption
 
 
+  private val serializers: Map[String, Serde[_]] = {
+    (for ((k: String, v: String) ← settings.Serializers) yield {
+      serdeInstance(v).map(x => k → x)
+    }).flatten.toMap
+  }
 
+  def by(identifier: Int): Serde[_] = serializers.map(_._2).find(_.identifier == identifier)
+    .getOrElse(throw new IllegalArgumentException(s"Serde not found, identifier: $identifier"))
 
+  val bindings: immutable.Seq[ClassSerde] = {
+
+    val fromConfig = for {
+      (className: String, alias: String) ← settings.SerializationBindings
+      if alias != "none" && checkGoogleProtobuf(className)
+      if serializers.contains(alias)
+    } yield (Class.forName(className), serializers(alias))
+
+    val result = sort(fromConfig)
+    result
+
+  }
+
+  def find(wrapped: AnyRef): Serde[_] = forClass(wrapped.getClass)
+
+  def forClass(clazz: Class[_]): Serde[_] = {
+    def unique(possibilities: immutable.Seq[(Class[_], Serde[_])]): Boolean =
+      possibilities.size == 1 ||
+        (possibilities forall (_._1 isAssignableFrom possibilities(0)._1)) ||
+        (possibilities forall (_._2 == possibilities(0)._2))
+
+    bindings.filter {
+      case (c, _) ⇒ c isAssignableFrom clazz
+    } match {
+      case immutable.Seq() ⇒
+        throw new NotSerializableException("No configured serialization-bindings for class [%s]" format clazz.getName)
+      case possibilities ⇒
+        if (!unique(possibilities))
+          throw new IllegalArgumentException("Multiple serializers found for " + clazz + ", choosing first: " + possibilities)
+        possibilities(0)._2
+    }
+  }
+
+  private val serializerMap = new ConcurrentHashMap[Class[_], Serde[_]]()
+
+  def of[S: ClassTag](config: Config): Serde[S] = {
+    val runtimeClass = implicitly[ClassTag[S]].runtimeClass
+    val ser = serializerMap.get(runtimeClass) match {
+      case null ⇒
+        val ser = forClass(serdeClass(runtimeClass))
+        serializerMap.putIfAbsent(runtimeClass, ser) match {
+          case null ⇒ ser
+          case some ⇒ some
+        }
+
+      case ser ⇒ ser
+    }
+    ser.asInstanceOf[Serde[S]]
+  }
 }

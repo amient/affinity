@@ -101,6 +101,4 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
 
 
   }
-
-  behavior of "AffinityKafkaFormatter"
 }

@@ -56,8 +56,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
   )
 
-  private val keySerde = Serde.of[K](system)
-  private val valueSerde = Serde.of[V](system)
+  private val keySerde = Serde.of[K](system.settings.config)
+  private val valueSerde = Serde.of[V](system.settings.config)
   private val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
   private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])

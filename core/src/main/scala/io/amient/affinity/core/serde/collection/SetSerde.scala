@@ -22,13 +22,18 @@ package io.amient.affinity.core.serde.collection
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream}
 
 import akka.actor.ExtendedActorSystem
+import com.typesafe.config.Config
+import io.amient.affinity.core.serde.{Serde, Serdes}
 import io.amient.affinity.core.serde.primitive.AbstractWrapSerde
 
-class SetSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) {
+class SetSerde(tools: Serdes) extends AbstractWrapSerde(tools) with Serde[Set[Any]] {
+
+  def this(config: Config) = this(Serde.tools(config))
+  def this(system: ExtendedActorSystem) = this(system.settings.config)
 
   override def identifier: Int = 142
 
-  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = {
+  override protected def fromBytes(bytes: Array[Byte]): Set[Any] = {
     val di = new DataInputStream(new ByteArrayInputStream(bytes))
     val numItems = di.readInt()
     val result = ((1 to numItems) map { _ =>
@@ -41,21 +46,19 @@ class SetSerde(system: ExtendedActorSystem) extends AbstractWrapSerde(system) {
     result
   }
 
-  override def toBinary(o: AnyRef): Array[Byte] = {
-    o match {
-      case set: Set[_] =>
-        val os = new ByteArrayOutputStream()
-        val d = new DataOutputStream(os)
-        d.writeInt(set.size)
-        for (a: Any <- set) a match {
-          case ref: AnyRef =>
-            val item = toBinaryWrapped(ref)
-            d.writeInt(item.length)
-            d.write(item)
-        }
-        os.close
-        os.toByteArray
+  override def toBytes(set: Set[Any]): Array[Byte] = {
+    val os = new ByteArrayOutputStream()
+    val d = new DataOutputStream(os)
+    d.writeInt(set.size)
+    for (a: Any <- set) a match {
+      case ref: AnyRef =>
+        val item = toBinaryWrapped(ref)
+        d.writeInt(item.length)
+        d.write(item)
     }
-
+    os.close
+    os.toByteArray
   }
+
+  override def close() = ()
 }

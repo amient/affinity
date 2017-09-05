@@ -19,22 +19,22 @@
 
 package io.amient.affinity.core.serde.primitive
 
-import akka.actor.ExtendedActorSystem
-import akka.serialization.{JSerializer, SerializationExtension}
+import akka.serialization.JSerializer
+import io.amient.affinity.core.serde.Serdes
 import io.amient.affinity.core.util.ByteUtils
 
-abstract class AbstractWrapSerde(val system: ExtendedActorSystem) extends JSerializer {
+abstract class AbstractWrapSerde(serdes: Serdes) extends JSerializer {
 
-  def fromBinaryWrapped(bytes: Array[Byte]) = {
+  def fromBinaryWrapped(bytes: Array[Byte]): Any = {
     val serializerIdentifier = ByteUtils.asIntValue(bytes)
     val data = new Array[Byte](bytes.length - 4)
     Array.copy(bytes, 4, data, 0, bytes.length - 4)
-    val wrappedSerde = SerializationExtension(system).serializerByIdentity(serializerIdentifier)
-    wrappedSerde.fromBinary(data)
+    val wrappedSerde = serdes.by(serializerIdentifier)
+    wrappedSerde.fromBytes(data)
   }
 
   def toBinaryWrapped(wrapped: AnyRef, offset: Int = 0): Array[Byte] = {
-      val delegate = SerializationExtension(system).findSerializerFor(wrapped)
+      val delegate = serdes.find(wrapped)
       val bytes = delegate.toBinary(wrapped)
       val result = new Array[Byte](bytes.length + 4 + offset)
       ByteUtils.putIntValue(delegate.identifier, result, 0)

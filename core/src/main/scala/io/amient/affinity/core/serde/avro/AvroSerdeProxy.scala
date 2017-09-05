@@ -1,13 +1,16 @@
 package io.amient.affinity.core.serde.avro
 
 import akka.actor.ExtendedActorSystem
-import io.amient.affinity.core.serde.Serde
+import com.typesafe.config.Config
+import io.amient.affinity.core.serde.{Serde, Serdes}
 
-final class AvroSerdeProxy(system: ExtendedActorSystem) extends Serde[Any] {
+final class AvroSerdeProxy(tools: Serdes) extends Serde[Any] {
 
-  val config = system.settings.config
+  def this(config: Config) = this(Serde.tools(config))
 
-  val internal = AvroSerde.create(system.settings.config)
+  def this(system: ExtendedActorSystem) = this(system.settings.config)
+
+  val internal = AvroSerde.create(tools.config)
 
   override def fromBytes(bytes: Array[Byte]): Any = internal.fromBytes(bytes)
 

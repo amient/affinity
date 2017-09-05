@@ -20,13 +20,14 @@
 package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.IntegrationTestBase
+import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.{OptionSerde, StringSerde}
 import io.amient.affinity.core.transaction.TestKey
 import org.scalatest.Matchers
 
 import scala.collection.immutable.Seq
-import scala.util.Try
 
 class WrapSerdesSpec extends IntegrationTestBase with Matchers {
 
@@ -69,6 +70,10 @@ class WrapSerdesSpec extends IntegrationTestBase with Matchers {
       val y: Array[Byte] = SerializationExtension(system).serialize(x).get
       val z: Seq[TestKey] = SerializationExtension(system).deserialize(y, classOf[List[TestKey]]).get
       z should be(x)
+    }
+
+    "be constructible from a simple Config" in {
+      Serde.of[List[Long]](ConfigFactory.defaultReference()).isInstanceOf[SeqSerde] should be (true)
     }
   }
 
