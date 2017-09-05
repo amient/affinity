@@ -56,8 +56,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
   )
 
-  private val keySerde = Serde.serializer[K](system)
-  private val valueSerde = Serde.serializer[V](system)
+  private val keySerde = Serde.of[K](system)
+  private val valueSerde = Serde.of[V](system)
   private val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
 
   private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
@@ -83,9 +83,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
   def apply(key: K): Option[V] = {
-    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
+    val k = ByteBuffer.wrap(keySerde.toBytes(key))
     option(storage.memstore(k)) map[V] { (cell: ByteBuffer) =>
-      valueSerde.fromBinary(cell.array) match {
+      valueSerde.fromBytes(cell.array) match {
         case value: V => value
         case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
       }
@@ -94,8 +94,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   def iterator: Iterator[(K, V)] = {
     storage.memstore.iterator.asScala.map { entry =>
-      (keySerde.fromBinary(entry.getKey.array()).asInstanceOf[K],
-        valueSerde.fromBinary(entry.getValue.array).asInstanceOf[V])
+      (keySerde.fromBytes(entry.getKey.array()),
+        valueSerde.fromBytes(entry.getValue.array))
     }
   }
 
@@ -190,8 +190,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         the future option will be equal to None if new a value was inserted
     */
   private def put(key: K, value: V): Future[Option[V]] = {
-    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
-    val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBinary(value.asInstanceOf[AnyRef]))
+    val k = ByteBuffer.wrap(keySerde.toBytes(key))
+    val write = if (value == null) null else ByteBuffer.wrap(valueSerde.toBytes(value))
     option(storage.memstore.update(k, write)) match {
       case Some(prev) if prev == write => Future.successful(Some(value))
       case differentOrNone =>
@@ -214,7 +214,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         the future option will be equal to None if new a value was inserted
     */
   private def delete(key: K): Future[Option[V]] = {
-    val k = ByteBuffer.wrap(keySerde.toBinary(key.asInstanceOf[AnyRef]))
+    val k = ByteBuffer.wrap(keySerde.toBytes(key))
     option(storage.memstore.remove(k)) match {
       case None => Future.successful(None)
       case some =>
@@ -234,7 +234,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         Future.Failure(Throwable) if the failure occurs
     */
   private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
-    def commit(success: Any) = prev.map(x => valueSerde.fromBinary(x.array).asInstanceOf[V])
+    def commit(success: Any) = prev.map(x => valueSerde.fromBytes(x.array).asInstanceOf[V])
 
     def revert(failure: Throwable) = {
       //write to storage failed - reverting the memstore modification

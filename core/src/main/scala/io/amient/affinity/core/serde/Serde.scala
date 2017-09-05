@@ -48,13 +48,18 @@ trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
 object Serde {
 
-  def serializer[S: ClassTag](system: ActorSystem): Serializer = {
+  def of[S: ClassTag](system: ActorSystem): AbstractSerde[S] = {
     val cls = implicitly[ClassTag[S]].runtimeClass
-    serializer(cls, system)
-  }
+    SerializationExtension(system).serializerFor(serdeClass(cls)) match {
+      case as: AbstractSerde[_] => as.asInstanceOf[AbstractSerde[S]]
+      case s: Serializer => new AbstractSerde[S] {
+        override def fromBytes(bytes: Array[Byte]) = s.fromBinary(bytes).asInstanceOf[S]
 
-  def serializer(cls: Class[_], system: ActorSystem): Serializer = {
-    SerializationExtension(system).serializerFor(serdeClass(cls))
+        override def toBytes(obj: S) = s.toBinary(obj.asInstanceOf[AnyRef])
+
+        override def close() = ()
+      }
+    }
   }
 
   private def serdeClass(cls: Class[_]) = {
