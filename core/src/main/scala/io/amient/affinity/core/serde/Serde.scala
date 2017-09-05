@@ -20,7 +20,7 @@
 package io.amient.affinity.core.serde
 
 import akka.actor.ActorSystem
-import akka.serialization.{JSerializer, SerializationExtension, Serializer}
+import akka.serialization._
 
 import scala.reflect.ClassTag
 
@@ -49,16 +49,19 @@ trait Serde[T] extends JSerializer with AbstractSerde[T] {
 object Serde {
 
   def of[S: ClassTag](system: ActorSystem): AbstractSerde[S] = {
-    val cls = implicitly[ClassTag[S]].runtimeClass
-    SerializationExtension(system).serializerFor(serdeClass(cls)) match {
-      case as: AbstractSerde[_] => as.asInstanceOf[AbstractSerde[S]]
-      case s: Serializer => new AbstractSerde[S] {
-        override def fromBytes(bytes: Array[Byte]) = s.fromBinary(bytes).asInstanceOf[S]
+    val cls = serdeClass(implicitly[ClassTag[S]].runtimeClass)
+    val ser = SerializationExtension(system).serializerFor(cls)
+    toAbstractSerde[S](ser)
+  }
 
-        override def toBytes(obj: S) = s.toBinary(obj.asInstanceOf[AnyRef])
+  private def toAbstractSerde[S](serde: AnyRef) = serde match {
+    case as: AbstractSerde[_] => as.asInstanceOf[AbstractSerde[S]]
+    case s: Serializer => new AbstractSerde[S] {
+      override def fromBytes(bytes: Array[Byte]) = s.fromBinary(bytes).asInstanceOf[S]
 
-        override def close() = ()
-      }
+      override def toBytes(obj: S) = s.toBinary(obj.asInstanceOf[AnyRef])
+
+      override def close() = ()
     }
   }
 
@@ -71,5 +74,60 @@ object Serde {
     else if (cls == classOf[Double]) classOf[java.lang.Double]
     else cls
   }
+
+//TODO custom of method without using actdor system
+//  private val serializerMap = new ConcurrentHashMap[Class[_], Serializer]()
+//
+//  def of[S: ClassTag](config: Config): AbstractSerde[S] = {
+//
+//    val clazz = serdeClass(implicitly[ClassTag[S]].runtimeClass)
+//
+//    val settings = new Serialization.Settings(config)
+//
+//    val bindings: immutable.Seq[ClassSerializer] = {
+//      val fromConfig = for {
+//        (className: String, alias: String) ← settings.SerializationBindings
+//        if alias != "none" && checkGoogleProtobuf(className)
+//      } yield (system.dynamicAccess.getClassFor[Any](className).get, serializers(alias))
+//
+//      val fromSettings = serializerDetails.flatMap { detail ⇒
+//        detail.useFor.map(clazz ⇒ clazz → detail.serializer)
+//      }
+//
+//      val result = sort(fromConfig ++ fromSettings)
+//      ensureOnlyAllowedSerializers(result.map { case (_, ser) ⇒ ser }(collection.breakOut))
+//      result
+//    }
+//
+//    val ser = serializerMap.get(clazz) match {
+//      case null ⇒ // bindings are ordered from most specific to least specific
+//        def unique(possibilities: immutable.Seq[(Class[_], Serializer)]): Boolean =
+//          possibilities.size == 1 ||
+//            (possibilities forall (_._1 isAssignableFrom possibilities(0)._1)) ||
+//            (possibilities forall (_._2 == possibilities(0)._2))
+//
+//        val ser: Serializer = {
+//          bindings.filter {
+//            case (c, _) ⇒ c isAssignableFrom clazz
+//          } match {
+//            case immutable.Seq() ⇒
+//              throw new NotSerializableException("No configured serialization-bindings for class [%s]" format clazz.getName)
+//            case possibilities ⇒
+//              //possibilities(0)._2
+//              throw new IllegalArgumentException("Multiple serializers found for " + clazz + ", choosing first: " + possibilities)
+//
+//          }
+//        }
+//        serializerMap.putIfAbsent(clazz, ser) match {
+//          case null ⇒ ser
+//          case some ⇒ some
+//        }
+//      case ser ⇒ ser
+//    }
+//    toAbstractSerde[S](ser)
+//  }
+
+
+
 
 }
