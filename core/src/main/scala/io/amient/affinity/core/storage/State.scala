@@ -234,11 +234,11 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         Future.Failure(Throwable) if the failure occurs
     */
   private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
-    def commit(success: Any) = prev.map(x => valueSerde.fromBytes(x.array).asInstanceOf[V])
+    def commit(success: Any) = prev.map(x => valueSerde.fromBytes(x.array))
 
     def revert(failure: Throwable) = {
       //write to storage failed - reverting the memstore modification
-      //TODO use cell versioning or timestamp to cancel revert if another write succeeded after the one being reverted
+      //TODO use cell versioning to cancel revert if another write succeeded after the one being reverted
       prev match {
         case None => storage.memstore.remove(k)
         case Some(rollback) => storage.memstore.update(k, rollback)

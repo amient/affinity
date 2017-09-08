@@ -43,7 +43,7 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.actor.Service.{ClusterStatus, ServiceAvailability}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
+import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.util.ByteBufferInputStream
@@ -160,10 +160,10 @@ trait GatewayHttp extends Gateway {
 
   def handleException: PartialFunction[Throwable, HttpResponse] = {
     case e: NoSuchElementException =>
-      log.debug("affinity exception handler", e)
+      log.error(e, "affinity exception handler")
       HttpResponse(NotFound, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: IllegalArgumentException =>
-      log.debug("affinity exception handler", e)
+      log.error(e, "affinity exception handler")
       HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
     case e: scala.NotImplementedError =>
       log.error(e, "affinity exception handler")
@@ -246,7 +246,7 @@ trait WebSocketSupport extends GatewayHttp {
   protected def jsonWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
                              (pfCustomHandle: PartialFunction[JsonNode, Unit]): Future[HttpResponse] = {
     genericWebSocket(upgrade, keyspace, stateStoreName, key) {
-      case text: TextMessage => log.info(text.getStrictText)
+      case text: TextMessage => pfCustomHandle(Decoder.json(text.getStrictText))
       case binary: BinaryMessage =>
         val buf = binary.getStrictData.asByteBuffer
         val json = Encoder.mapper.readValue(new ByteBufferInputStream(List(buf).asJava), classOf[JsonNode])
