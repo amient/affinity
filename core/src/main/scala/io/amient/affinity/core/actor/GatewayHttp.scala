@@ -41,7 +41,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.Service.{ClusterStatus, ServiceAvailability}
+import io.amient.affinity.core.actor.Service.ClusterStatus
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
@@ -153,30 +153,22 @@ trait GatewayHttp extends Gateway {
   override def unhandled: Receive = {
     case exchange: HttpExchange => {
       //no handler matched the HttpExchange
-      exchange.promise.success(handleException(new NoSuchElementException))
+      exchange.promise.success(HttpResponse(NotFound, entity = "Server did not understand your request"))
     }
   }
 
 
+  private def errorResponse(e: Throwable, status: StatusCode, message: String = ""): HttpResponse = {
+    log.error(e, "affinity default exception handler")
+    HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage)
+  }
+
   def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: NoSuchElementException =>
-      log.error(e, "affinity exception handler")
-      HttpResponse(NotFound, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: IllegalArgumentException =>
-      log.error(e, "affinity exception handler")
-      HttpResponse(BadRequest, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: scala.NotImplementedError =>
-      log.error(e, "affinity exception handler")
-      HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: UnsupportedOperationException =>
-      log.error(e, "affinity exception handler")
-      HttpResponse(NotImplemented, entity = if (e.getMessage == null) "" else e.getMessage)
-    case e: IllegalStateException =>
-      log.error(e, "affinity exception handler")
-      HttpResponse(ServiceUnavailable)
-    case NonFatal(e) =>
-      log.error(e, "affinity exception handler")
-      HttpResponse(InternalServerError)
+    case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage)
+    case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage)
+    case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage)
+    case e: UnsupportedOperationException =>errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage)
+    case NonFatal(e) => errorResponse(e, InternalServerError)
   }
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
