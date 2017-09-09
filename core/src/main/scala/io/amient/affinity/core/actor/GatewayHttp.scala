@@ -142,7 +142,7 @@ trait GatewayHttp extends Gateway {
       if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
         suspendedHttpRequestQueue += exchange
       } else {
-        handleException(new IllegalStateException)
+        new RuntimeException("Suspension queue overflow")
       }
 
     case request@GracefulShutdown() => sender.reply(request) {
@@ -158,30 +158,30 @@ trait GatewayHttp extends Gateway {
   }
 
 
-  private def errorResponse(e: Throwable, status: StatusCode, message: String = ""): HttpResponse = {
+  private def errorResponse(e: Throwable, status: StatusCode, message: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
     log.error(e, "affinity default exception handler")
-    HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage)
+    HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage, headers = headers)
   }
 
-  def handleException: PartialFunction[Throwable, HttpResponse] = {
-    case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage)
-    case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage)
-    case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage)
-    case e: UnsupportedOperationException =>errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage)
-    case NonFatal(e) => errorResponse(e, InternalServerError)
+  def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {
+    case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: UnsupportedOperationException =>errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
+    case NonFatal(e) => errorResponse(e, InternalServerError, headers = headers)
   }
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
                             (implicit ctx: ExecutionContext) {
-    promise.completeWith(f recover handleException)
+    promise.completeWith(f recover handleException())
   }
 
   def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
                              (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(delegate map f recover handleException)
+    promise.completeWith(delegate map f recover handleException())
   }
 
-  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any): Unit = try {
+  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
     val data = dataGenerator
     data match {
       case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
@@ -196,14 +196,14 @@ trait GatewayHttp extends Gateway {
           case other => Encoder.json(OK, other)
         }
       } catch {
-        case NonFatal(e) => handleException(e)
+        case NonFatal(e) => handleException(headers)(e)
       })
     }
   } catch {
-    case e: Throwable => response.success(handleException(e))
+    case e: Throwable => response.success(handleException(headers)(e))
   }
 
-  def accept(response: Promise[HttpResponse], dataGenerator: => Any): Unit = try {
+  def accept(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
     val data = dataGenerator
     data match {
       case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
@@ -214,7 +214,7 @@ trait GatewayHttp extends Gateway {
       case _ => HttpResponse(Accepted)
     }
   } catch {
-    case e: Throwable => response.success(handleException(e))
+    case e: Throwable => response.success(handleException(headers)(e))
   }
 }
 

@@ -62,7 +62,7 @@ class ExampleGatewayRoot extends GatewayHttp with GatewayApi with ActorState {
     */
   val settings = state[String, ConfigEntry]("settings", partition = 0)
 
-  override def handleException: PartialFunction[Throwable, HttpResponse] = {
+  override def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)
     case e: NoSuchElementException => Encoder.json(NotFound, "Haven't got that" -> e.getMessage)
     case e: IllegalArgumentException => Encoder.json(BadRequest, "BadRequest" -> e.getMessage)
