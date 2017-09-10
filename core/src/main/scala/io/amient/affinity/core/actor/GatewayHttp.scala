@@ -163,7 +163,9 @@ trait GatewayHttp extends Gateway {
     HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage, headers = headers)
   }
 
-  def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {
+  def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
+
+  def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
     case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
@@ -173,12 +175,12 @@ trait GatewayHttp extends Gateway {
 
   def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
                             (implicit ctx: ExecutionContext) {
-    promise.completeWith(f recover handleException())
+    promise.completeWith(f recover handleException)
   }
 
   def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
                              (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(delegate map f recover handleException())
+    promise.completeWith(delegate map f recover handleException)
   }
 
   def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {

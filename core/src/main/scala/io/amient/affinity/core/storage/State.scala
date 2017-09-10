@@ -259,7 +259,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
-        case (key: K, event: Any) => pf((key, event))
+        case (key: K, event: Any) => pf.lift((key, event))
         case _ =>
       }
     })
