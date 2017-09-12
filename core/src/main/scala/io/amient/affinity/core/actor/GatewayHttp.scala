@@ -22,6 +22,7 @@ package io.amient.affinity.core.actor
 import java.io.FileInputStream
 import java.security.{KeyStore, SecureRandom}
 import java.util
+import java.util.concurrent.ExecutionException
 import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
@@ -166,8 +167,10 @@ trait GatewayHttp extends Gateway {
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 
   def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
+    case e: ExecutionException  => handleException(e.getCause)
     case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: java.lang.AssertionError => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: UnsupportedOperationException =>errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
     case NonFatal(e) => errorResponse(e, InternalServerError, headers = headers)
