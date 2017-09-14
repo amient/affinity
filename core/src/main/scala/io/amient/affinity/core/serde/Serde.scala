@@ -21,7 +21,6 @@ package io.amient.affinity.core.serde
 
 import java.io.NotSerializableException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
 import akka.serialization._
 import com.typesafe.config.Config
@@ -29,7 +28,6 @@ import com.typesafe.config.Config
 import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
-import scala.util.Try
 
 trait Serde[T] extends JSerializer with AbstractSerde[T] {
 
@@ -113,18 +111,24 @@ class Serdes(val config: Config) {
 
   private val settings = new Serialization.Settings(config)
 
-  private def serdeInstance(fqn: String): Option[Serde[_]] = Try {
+  private def serdeInstance(fqn: String): Option[Serde[_]] = {
     val cls = Class.forName(fqn)
-    if (!(classOf[Serde[_]]).isAssignableFrom(cls)) throw new NoSuchMethodException() else {
+    if (!(classOf[Serde[_]]).isAssignableFrom(cls))  {
+      None
+    } else {
       val clazz = cls.asSubclass(classOf[Serde[_]])
       try {
-        clazz.getConstructor(classOf[Serdes]).newInstance(this)
+        Some(clazz.getConstructor(classOf[Serdes]).newInstance(this))
       } catch {
-        case _: NoSuchMethodException => clazz.getConstructor().newInstance()
+        case _: NoSuchMethodException =>
+          try {
+            Some(clazz.getConstructor().newInstance())
+          } catch {
+            case _: NoSuchMethodException => None
+          }
       }
     }
-  }.toOption
-
+  }
 
   private val serializers: Map[String, Serde[_]] = {
     (for ((k: String, v: String) ← settings.Serializers) yield {
