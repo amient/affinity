@@ -81,7 +81,6 @@ class WrapSerdesSpec extends IntegrationTestBase with Matchers {
 
     "serialize correctly when elements are AvroRecords" in {
       val x: Set[TestKey] = Set(TestKey(1), TestKey(2), TestKey(3))
-      println(x.getClass)
       val y: Array[Byte] = SerializationExtension(system).serialize(x).get
       val z: Set[TestKey] = SerializationExtension(system).deserialize(y, classOf[Set[TestKey]]).get
       z should be(x)

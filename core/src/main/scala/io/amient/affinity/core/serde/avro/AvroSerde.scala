@@ -35,11 +35,13 @@ object AvroSerde {
       Class.forName(providerClassName).asSubclass(classOf[AvroSerde])
     }
 
-    if (providerClass == null) null else try {
+    val instance = if (providerClass == null) null else try {
       providerClass.getConstructor(classOf[Config]).newInstance(config)
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }
+    if (instance != null) instance.initialize()
+    instance
   }
 }
 

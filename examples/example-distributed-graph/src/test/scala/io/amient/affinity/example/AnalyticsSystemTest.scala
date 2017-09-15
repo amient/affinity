@@ -25,6 +25,7 @@ import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.example.data.MyAvroSerde
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -96,7 +97,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     })
 
     val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
-      new IntSerde, new MyAvroSerde(serializedConfig.value), compacted = true)
+      new IntSerde, AvroSerde.create(serializedConfig.value), compacted = true)
       .repartition(1)
       .sortByKey()
 
@@ -109,7 +110,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     }
 
     val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
-      new IntSerde, new MyAvroSerde(serializedConfig.value), compacted = true)
+      new IntSerde, AvroSerde.create(serializedConfig.value), compacted = true)
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>

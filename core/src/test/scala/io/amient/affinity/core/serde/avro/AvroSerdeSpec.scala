@@ -36,6 +36,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
     register(classOf[_V1_Composite], AvroRecord.inferSchema(classOf[Composite]))
     register(classOf[Base])
+    initialize()
 
     override def close(): Unit = ()
   }
@@ -45,6 +46,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     * the previous V1 schema version now points to the newest case class.
     */
   val newSerde = new TestAvroSerde
+  newSerde.initialize()
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBytes(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10))

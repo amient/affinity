@@ -38,9 +38,11 @@ class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with SystemTestBas
   val serde = new ZkAvroSchemaRegistry(system.settings.config)
   serde.register(classOf[ID])
   serde.register(classOf[Base])
-  val backwardSchemaId = serde.register(classOf[Composite], v1schema)
-  val currentSchemaId = serde.register(classOf[Composite])
-  val forwardSchemaId = serde.register(classOf[Composite], v3schema)
+  serde.register(classOf[Composite], v1schema)
+  serde.register(classOf[Composite])
+  serde.register(classOf[Composite], v3schema)
+
+  val List(_, _, backwardSchemaId, currentSchemaId, forwardSchemaId) = serde.initialize()
 
   "ZkAvroRegistry" should "work in a backward-compatibility scenario" in {
     val oldValue = _V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10)
