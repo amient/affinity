@@ -47,7 +47,10 @@ trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
     }
   }
 
-  override private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)] = {
-    internal.asScala.filter(_._2._1 == cls).mapValues(_._2).toList
+  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
+    internal.asScala.mapValues(_._2).toList
   }
+
+  override private[schema] def hypersynchronized[X](f: => X): X = synchronized(f)
+
 }

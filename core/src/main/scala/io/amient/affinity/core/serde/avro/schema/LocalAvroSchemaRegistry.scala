@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.serde.avro.schema
 
+import java.io.{FileInputStream, RandomAccessFile}
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 
@@ -41,14 +42,17 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde with EmbeddedAvr
   else {
     Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        val id = file.getFileName.toString.split("\\.")(0).toInt
-        val schema = new Schema.Parser().parse(file.toFile)
-        try {
-          internal.put(id, (Class.forName(schema.getFullName), schema))
-        } catch {
-          case _: ClassNotFoundException =>
-            //s"schema $id for ${schema.getFullName} no longer has a compile time class associated"
-            internal.put(id, (null, schema))
+        val filename = file.getFileName.toString
+        if (filename.matches("^[0-9]+\\.avsc$")) {
+          val id = filename.split("\\.")(0).toInt
+          val schema = new Schema.Parser().parse(file.toFile)
+          try {
+            internal.put(id, (Class.forName(schema.getFullName), schema))
+          } catch {
+            case _: ClassNotFoundException =>
+              //s"schema $id for ${schema.getFullName} no longer has a compile time class associated"
+              internal.put(id, (null, schema))
+          }
         }
         super.visitFile(file, attrs)
       }
@@ -67,5 +71,21 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde with EmbeddedAvr
     }
     id
   }
+
+  override private[schema] def hypersynchronized[X](f: => X) = synchronized {
+    val in = new RandomAccessFile(dataPath.resolve(".lock").toFile, "rw")
+    try {
+      val lock = in.getChannel.lock()
+      try {
+        f
+      } finally {
+        lock.release()
+      }
+    } finally {
+      in.close()
+    }
+
+  }
+
 
 }

@@ -111,8 +111,13 @@ trait AvroSchemaProvider {
     register(typeOf[T], cls, schema)
   }
 
-  private def register(tpe: Type, cls: Class[_], schema: Schema): Int = synchronized {
+  private def register(tpe: Type, cls: Class[_], schema: Schema): Int = hypersynchronized {
+    val all = getAllRegistered
 
+    def getVersions(cls: Class[_]): List[(Int, Schema)] = {
+      val FQN = cls.getName
+      all.filter(_._2.getFullName == FQN)
+    }
     val alreadyRegisteredId: Int = (getVersions(cls).map { case (id2, schema2) =>
       register += ((id2, schema2, cls, tpe))
       if (schema2 == schema) id2 else -1
@@ -140,7 +145,9 @@ trait AvroSchemaProvider {
 
   private[schema] def getSchema(id: Int): Option[Schema]
 
-  private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)]
+  private[schema] def getAllRegistered: List[(Int, Schema)]
+
+  private[schema] def hypersynchronized[X](f: => X): X
 
 
 

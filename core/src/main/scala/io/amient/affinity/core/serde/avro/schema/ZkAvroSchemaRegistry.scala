@@ -25,8 +25,10 @@ import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
+import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
+import org.apache.zookeeper.KeeperException.NodeExistsException
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable
@@ -72,16 +74,33 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     id
   }
 
-  override private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)] = {
-    val FQN = cls.getName
+  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
     val ids = zk.getChildren(zkRoot)
     ids.asScala.toList.map { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
       val schemaId = id.toInt
       (schemaId, schema)
-    } filter {
-      _._2.getFullName == FQN
     }
+  }
+
+  override private[schema] def hypersynchronized[X](f: => X): X = synchronized {
+    val lockPath = zkRoot + "-lock"
+    var acquired = 0
+    do {
+      try {
+        zk.createEphemeral(lockPath)
+        acquired = 1
+      } catch {
+        case _: ZkNodeExistsException =>
+          acquired -= 1
+          if (acquired < -100) {
+            throw new IllegalStateException("Could not acquire zk registry lock")
+          } else {
+            Thread.sleep(500)
+          }
+      }
+    } while (acquired != 1)
+    try f finally zk.delete(lockPath)
   }
 
   private def updateInternal(ids: util.List[String]): Unit = {

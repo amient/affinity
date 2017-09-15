@@ -59,11 +59,13 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     client.registerSchema(subject, schema)
   }
 
-  override private[schema] def getVersions(cls: Class[_]): List[(Int, Schema)] = {
-    val subject = cls.getName
-    client.getVersions(subject).toList.map { version =>
-      client.getSchema(subject, version)
-    }
+  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
+    client.getSubjects.flatMap {
+      subject =>
+        client.getVersions(subject).toList.map { version =>
+          client.getSchema(subject, version)
+        }
+    }.toList
   }
 
   class ConfluentSchemaRegistryClient(baseUrl: Uri) {
@@ -157,4 +159,8 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     }
   }
 
+  override private[schema] def hypersynchronized[X](f: => X) = synchronized {
+    //TODO implement hyerlock for cf registry
+    f
+  }
 }
