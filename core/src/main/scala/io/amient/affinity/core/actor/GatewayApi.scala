@@ -25,6 +25,7 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.event.Logging
 import akka.pattern.ask
 import akka.routing._
+import akka.serialization.SerializationExtension
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigException}
 import io.amient.affinity.core.ack
@@ -32,6 +33,7 @@ import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.actor.Service.{CheckServiceAvailability, ClusterStatus, ServiceAvailability}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
+import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde, AvroSerdeProxy}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -71,9 +73,16 @@ trait GatewayApi extends Gateway {
 
   private implicit val scheduler = context.system.scheduler
 
-  def describeServices = services.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
+  def describeAvro: scala.collection.immutable.Map[String, String] = {
+    val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
+    serde.describeSchemas.map {
+      case (id, (tpe, _)) => ((id.toString, tpe.toString))
+    }
+  }
 
-  def describeRegions: List[String] = {
+  def describeServices: scala.collection.immutable.Map[String, String] = services.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
+
+  def describeRegions: scala.collection.immutable.List[String] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
     val routeeSets = Future.sequence {
