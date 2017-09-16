@@ -48,6 +48,8 @@ trait AvroSchemaProvider {
 
   private[schema] def hypersynchronized[X](f: => X): X
 
+  def describeSchemas: Map[Int, (Type, Schema)] = cache1
+
   /**
     * Get current current schema for the compile time class
     *
