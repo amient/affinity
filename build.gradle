@@ -10,7 +10,7 @@ ext {
     akkaVersion = '2.4.20'
     akkaHttpVersion = '10.0.10'
     zkClientVersion = '0.9'
-    avroVersion = '1.8.1'
+    avroVersion = '1.8.2'
     jacksonVersion = '2.7.5'
 }
 
