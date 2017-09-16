@@ -47,6 +47,7 @@ object AvroSerde {
 
 trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
 
+
   override def close(): Unit = ()
 
   /**
@@ -73,25 +74,26 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else {
-      val writerSchema = obj match {
-        case record: IndexedRecord => record.getSchema
-        case _: Boolean => BOOLEAN_SCHEMA
-        case _: Byte => INT_SCHEMA
-        case _: Int => INT_SCHEMA
-        case _: Long => LONG_SCHEMA
-        case _: Float => FLOAT_SCHEMA
-        case _: Double => DOUBLE_SCHEMA
-        case _: String => STRING_SCHEMA
-        case _: ByteBuffer => BYTES_SCHEMA
-        case other => throw new IllegalArgumentException("Unsupported mapping from Any to Avro Type")
+      val schemaFQN = obj match {
+        case record: IndexedRecord => record.getSchema.getFullName
+        case _: Boolean => BOOLEAN_SCHEMA.getFullName
+        case _: Byte => INT_SCHEMA.getFullName
+        case _: Int => INT_SCHEMA.getFullName
+        case _: Long => LONG_SCHEMA.getFullName
+        case _: Float => FLOAT_SCHEMA.getFullName
+        case _: Double => DOUBLE_SCHEMA.getFullName
+        case _: String => STRING_SCHEMA.getFullName
+        case _: ByteBuffer => BYTES_SCHEMA.getFullName
+        case _ => throw new IllegalArgumentException("Unsupported mapping from Any to Avro Type")
       }
 
-      val schemaId = schema(writerSchema) match {
-        case None => throw new IllegalArgumentException("Avro schema not registered for " + obj.getClass)
-        case Some(schemaId) => schemaId
-      }
+      (for (
+        schemaId <- schema(schemaFQN);
+        (_, schema) <- schema(schemaId)
+      ) yield {
+        AvroRecord.write(obj, schema, schemaId)
+      }).getOrElse(throw new IllegalArgumentException(s"Schema not registered for $schemaFQN"))
 
-      AvroRecord.write(obj, writerSchema, schemaId)
     }
   }
 

@@ -21,6 +21,7 @@ package io.amient.affinity.core.serde.avro
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
@@ -41,7 +42,7 @@ object AvroRecord {
 
   private val MAGIC: Byte = 0
 
-  private val typeSchemaCache = scala.collection.mutable.Map[Type, Schema]()
+  private val typeSchemaCache = new ConcurrentHashMap[Type, Schema]()
 
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
     write(x, x.getSchema, schemaId)
@@ -193,8 +194,8 @@ object AvroRecord {
   private def inferSchema(tpe: Type): Schema = {
 
     typeSchemaCache.get(tpe) match {
-      case Some(schema) => schema
-      case None =>
+      case some if some != null => some
+      case _ =>
 
         val schema: Schema =
           if (tpe =:= typeOf[String]) {

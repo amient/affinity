@@ -24,6 +24,7 @@ import org.apache.avro.Schema
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
+import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
 /**
@@ -33,8 +34,6 @@ import scala.reflect.runtime.universe._
 trait AvroSchemaProvider {
 
   private var cache1: immutable.Map[Int, (Type, Schema)] = Map()
-
-  private var cache2: immutable.Map[Schema, Int] = Map()
 
   private var cache3 = immutable.Map[Int, Option[(Type, Schema)]]()
 
@@ -53,18 +52,10 @@ trait AvroSchemaProvider {
   /**
     * Get current current schema for the compile time class
     *
-    * @param cls
+    * @param fqn fully qualified name of the schema
     * @return
     */
-  final def schema(cls: String): Option[Int] = cache4.get(cls)
-
-  /**
-    * Get schema id which is associated with a concrete schema instance
-    *
-    * @param schema
-    * @return
-    */
-  final def schema(schema: Schema): Option[Int] = cache2.get(schema)
+  final def schema(fqn: String): Option[Int] = cache4.get(fqn)
 
   /**
     * Get Type and Schema by a schema Id.
@@ -96,7 +87,7 @@ trait AvroSchemaProvider {
     }
   }
 
-  private var registration = ListBuffer[(Type, Class[_], Schema)]()
+  @volatile private var registration = ListBuffer[(Type, Class[_], Schema)]()
 
   final def initialize(): List[Int] = hypersynchronized {
     val all = getAllRegistered
@@ -128,10 +119,9 @@ trait AvroSchemaProvider {
           id2 -> (tpe3, schema2)
         }.toMap
 
-        cache2 = _register .map { case (id2, schema2, cls2, tpe2) => schema2 -> id2 }.toMap
-
-        cache4 += cls.getName -> schemaId
+        cache4 += schema.getFullName -> schemaId
     }
+
     result.result()
   }
 
