@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core.serde.avro.schema
 
-import java.io.{FileInputStream, RandomAccessFile}
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 
@@ -27,65 +26,57 @@ import com.typesafe.config.Config
 import io.amient.affinity.core.serde.avro.AvroSerde
 import org.apache.avro.Schema
 
-import scala.collection.JavaConverters._
-
 object LocalAvroSchemaRegistry {
   final val CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH = "affinity.avro.local-schema-registry.data.path"
 }
 
-class LocalAvroSchemaRegistry(config: Config) extends AvroSerde with EmbeddedAvroSchemaProvider {
+class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
 
   import LocalAvroSchemaRegistry._
 
   val dataPath = Paths.get(config.getString(CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH))
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
-  else {
+
+  override def close(): Unit = ()
+
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
+    val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
+    val schemaPath = dataPath.resolve(s"$id.avsc")
+    Files.createFile(schemaPath)
+    Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
+    id
+  }
+
+  override private[schema] def hypersynchronized[X](f: => X) = synchronized {
+    val file = dataPath.resolve(".lock").toFile
+    def getLock(countDown: Int = 30): Unit = {
+      if (!file.createNewFile()) if (countDown > 0) {
+        Thread.sleep(1000)
+        getLock(countDown - 1)
+      } else throw new java.nio.file.FileAlreadyExistsException("atomic createNewFile failed")
+    }
+    getLock()
+    try {
+      f
+    } finally {
+      file.delete()
+    }
+  }
+
+
+  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
+    val builder = List.newBuilder[(Int, Schema)]
     Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         val filename = file.getFileName.toString
         if (filename.matches("^[0-9]+\\.avsc$")) {
           val id = filename.split("\\.")(0).toInt
           val schema = new Schema.Parser().parse(file.toFile)
-          try {
-            internal.put(id, (Class.forName(schema.getFullName), schema))
-          } catch {
-            case _: ClassNotFoundException =>
-              //s"schema $id for ${schema.getFullName} no longer has a compile time class associated"
-              internal.put(id, (null, schema))
-          }
+          builder += (id -> schema)
         }
         super.visitFile(file, attrs)
       }
     })
+    builder.result()
   }
-
-  override def close(): Unit = ()
-
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
-    val isNew = internal.asScala.filter(_._2 == (cls, schema)).isEmpty
-    val id = super.registerSchema(cls, schema)
-    if (isNew) {
-      val schemaPath = dataPath.resolve(s"$id.avsc")
-      Files.createFile(schemaPath)
-      Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
-    }
-    id
-  }
-
-  override private[schema] def hypersynchronized[X](f: => X) = synchronized {
-    val in = new RandomAccessFile(dataPath.resolve(".lock").toFile, "rw")
-    try {
-      val lock = in.getChannel.lock()
-      try {
-        f
-      } finally {
-        lock.release()
-      }
-    } finally {
-      in.close()
-    }
-
-  }
-
-
 }

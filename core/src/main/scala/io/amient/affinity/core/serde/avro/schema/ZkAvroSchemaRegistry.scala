@@ -28,7 +28,6 @@ import org.I0Itec.zkclient.IZkChildListener
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
-import org.apache.zookeeper.KeeperException.NodeExistsException
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable
@@ -60,12 +59,6 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override def close(): Unit = {
     zk.close()
-  }
-
-  override private[schema] def getSchema(id: Int): Option[Schema] = try {
-    Some(new Schema.Parser().parse(zk.readData[String](s"$zkRoot/${id.toString.reverse.padTo(10, "0").reverse.mkString}")))
-  } catch {
-    case e: Throwable => e.printStackTrace(); None
   }
 
   override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = {

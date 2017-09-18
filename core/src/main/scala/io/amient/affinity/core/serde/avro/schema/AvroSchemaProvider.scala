@@ -24,7 +24,6 @@ import org.apache.avro.Schema
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
 /**
@@ -40,8 +39,6 @@ trait AvroSchemaProvider {
   private var cache4 = immutable.Map[String, Int]()
 
   private[schema] def registerSchema(cls: Class[_], schema: Schema): Int
-
-  private[schema] def getSchema(id: Int): Option[Schema]
 
   private[schema] def getAllRegistered: List[(Int, Schema)]
 
@@ -72,25 +69,15 @@ trait AvroSchemaProvider {
       case None =>
         cache3.get(id) match {
           case Some(cached) => cached
-          case None => synchronized {
-            val result = getSchema(id).map { schema =>
-              //lookup type in the current registry, if the compile-time type is new, then null
-              val sameFQNs = cache1.values.filter(_._2.getFullName == schema.getFullName).map(_._1)
-              val tpe = sameFQNs.headOption.getOrElse(null)
-              (tpe, schema)
-            }
-            cache3 = cache3 + (id -> result)
-            result
-          }
+          case None => throw new NoSuchElementException(s"Schema with id $id is not recognized")
         }
-
     }
   }
 
   @volatile private var registration = ListBuffer[(Type, Class[_], Schema)]()
 
   final def initialize(): List[Int] = hypersynchronized {
-    val all = getAllRegistered
+    val all: List[(Int, Schema)] = getAllRegistered
     def getVersions(cls: Class[_]): List[(Int, Schema)] = {
       val FQN = cls.getName
       all.filter(_._2.getFullName == FQN)

@@ -48,12 +48,6 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override def close(): Unit = ()
 
-  override private[schema] def getSchema(id: Int): Option[Schema] = try {
-    Some(client.getSchema(id))
-  } catch {
-    case e: Throwable => e.printStackTrace(); None
-  }
-
   override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = {
     val subject = cls.getName
     client.registerSchema(subject, schema)

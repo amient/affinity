@@ -29,12 +29,12 @@ trait EmbeddedAvroSchemaProvider extends AvroSchemaProvider {
 
   protected val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
 
-  override def getSchema(id: Int): Option[Schema] = {
-    internal.getOrDefault(id,null) match {
-      case null => None
-      case value => Some(value._2)
-    }
-  }
+//  override def getSchema(id: Int): Option[Schema] = {
+//    internal.getOrDefault(id,null) match {
+//      case null => None
+//      case value => Some(value._2)
+//    }
+//  }
 
   override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
     val existing = internal.asScala.filter(_._2 == (cls, schema))
