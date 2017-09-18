@@ -52,7 +52,7 @@ trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, service("graph"), "graph", vertex) {
+          avroWebSocket(upgrade, graphService, "graph", vertex) {
             case x: Edge => println("My custom handler of Edge: " + x)
           }
         }
@@ -76,7 +76,7 @@ trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, service("graph"), "components", cid) {
+          avroWebSocket(upgrade, graphService, "components", cid) {
             case _ =>
           }
         }

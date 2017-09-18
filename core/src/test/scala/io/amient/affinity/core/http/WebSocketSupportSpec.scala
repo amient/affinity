@@ -56,10 +56,11 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     }
   }))
 
-  val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with GatewayApi with WebSocketSupport {
+  val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with WebSocketSupport {
+    val regionService = service("region")
     override def handle: Receive = {
       case http@HTTP(GET, PATH("test"), _, response) =>
-        avroWebSocket(http, service("region"),  "test", 1) {
+        avroWebSocket(http, regionService,  "test", 1) {
           case null =>
         }
     }

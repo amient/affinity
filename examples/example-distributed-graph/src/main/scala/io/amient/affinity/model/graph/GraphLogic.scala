@@ -21,35 +21,36 @@ package io.amient.affinity.model.graph
 
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.GatewayApi
+import io.amient.affinity.core.actor.ServicesApi
 import io.amient.affinity.core.transaction.Transaction
 import io.amient.affinity.model.graph.message._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
-import scala.util.control.NonFatal
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
-trait GraphLogic extends GatewayApi {
+trait GraphLogic extends ServicesApi {
 
   import context.dispatcher
 
   implicit val scheduler = context.system.scheduler
 
+  val graphService = service("graph")
 
   protected def getVertexProps(vid: Int): Future[Option[VertexProps]] = {
     implicit val timeout = Timeout(1 seconds)
-    service("graph") ack GetVertexProps(vid)
+    graphService ack GetVertexProps(vid)
   }
 
   protected def getGraphComponent(cid: Int): Future[Option[Component]] = {
     implicit val timeout = Timeout(1 seconds)
-    service("graph") ack GetComponent(cid)
+    graphService ack GetComponent(cid)
   }
 
   protected def connect(v1: Int, v2: Int): Future[Set[Int]] = {
     implicit val timeout = Timeout(5 seconds)
-    Transaction(service("graph")) { transaction =>
+    Transaction(graphService) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
         case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
@@ -70,7 +71,7 @@ trait GraphLogic extends GatewayApi {
 
   protected def disconnect(v1: Int, v2: Int): Future[Set[Int]] = {
     implicit val timeout = Timeout(5 seconds)
-    Transaction(service("graph")) { transaction =>
+    Transaction(graphService) { transaction =>
       val ts = System.currentTimeMillis
       transaction execute ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
         case props1 => transaction execute ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
@@ -104,7 +105,7 @@ trait GraphLogic extends GatewayApi {
       if (queue.isEmpty) {
         promise.success(Component(ts, agg))
       }
-      else service("graph") ack GetVertexProps(queue.head) map {
+      else graphService ack GetVertexProps(queue.head) map {
         _ match {
           case None => throw new NoSuchElementException
           case Some(VertexProps(_, cid, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)

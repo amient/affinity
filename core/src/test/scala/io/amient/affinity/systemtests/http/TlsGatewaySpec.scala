@@ -19,17 +19,15 @@
 
 package io.amient.affinity.systemtests.http
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethods.GET
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.model.StatusCodes._
-import akka.util.Timeout
-import io.amient.affinity.core.actor.{Controller, GatewayHttp, GatewayApi}
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
+import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.RequestMatchers.HTTP
 import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {

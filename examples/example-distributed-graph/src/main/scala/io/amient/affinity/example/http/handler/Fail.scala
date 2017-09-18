@@ -36,6 +36,8 @@ trait Fail extends ExampleGatewayRoot {
 
   import context.dispatcher
 
+  private val graphService = service("graph")
+
   abstract override def handle: Receive = super.handle orElse {
 
     /**
@@ -53,7 +55,7 @@ trait Fail extends ExampleGatewayRoot {
       */
     case HTTP(POST, PATH("down", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = service("graph") ! (partition, "down")
+      val task = graphService ! (partition, "down")
       Thread.sleep(1000)
       response.success(HttpResponse(MovedPermanently, headers = List(headers.Location(Uri("/")))))
 
@@ -62,7 +64,7 @@ trait Fail extends ExampleGatewayRoot {
       */
     case HTTP(POST, PATH("fail", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = service("graph") ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
+      val task = graphService ? (partition, new IllegalStateException(System.currentTimeMillis.toString))
       delegateAndHandleErrors(response, task) {
         case any => HttpResponse(status = StatusCodes.Accepted)
       }
@@ -72,7 +74,7 @@ trait Fail extends ExampleGatewayRoot {
       */
     case HTTP(POST, PATH("bug", INT(partition)), _, response) =>
       implicit val timeout = Timeout(1 second)
-      val task = service("graph") ? (partition, "message-that-can't-be-handled")
+      val task = graphService ? (partition, "message-that-can't-be-handled")
       delegateAndHandleErrors(response, task) {
         case any => Encoder.json(OK, any)
       }

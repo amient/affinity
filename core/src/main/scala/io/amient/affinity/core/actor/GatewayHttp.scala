@@ -42,7 +42,6 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.Service.ClusterStatus
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
@@ -69,7 +68,7 @@ object GatewayHttp {
   final val CONFIG_GATEWAY_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
 }
 
-trait GatewayHttp extends Gateway {
+trait GatewayHttp extends ServicesApi {
 
   import GatewayHttp._
 
@@ -84,7 +83,7 @@ trait GatewayHttp extends Gateway {
 
   private implicit val scheduler = context.system.scheduler
 
-  private var isSuspended = false
+  private var isSuspended = true
 
   val sslContext = if (!config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
@@ -117,9 +116,19 @@ trait GatewayHttp extends Gateway {
     super.preStart()
     log.info("Gateway starting")
     httpInterface.bind(self)
-    system.eventStream.subscribe(self, classOf[ClusterStatus])
     //FIXME This probably causes the following akka warning: Message [java.lang.Integer] from Actor[akka://VPCAPI/deadLetters] to..
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
+  }
+
+  override def onClusterStatus(suspended: Boolean): Unit = if (isSuspended != suspended) {
+    isSuspended = suspended
+    log.info("Handling " + (if (suspended) "Suspended" else "Resumed"))
+    if (!isSuspended) {
+      val reprocess = suspendedHttpRequestQueue.toList
+      suspendedHttpRequestQueue.clear
+      if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
+      reprocess.foreach(handle(_))
+    }
   }
 
   abstract override def postStop: Unit = {
@@ -129,14 +138,6 @@ trait GatewayHttp extends Gateway {
   }
 
   abstract override def manage: Receive = super.manage orElse {
-    case msg@ClusterStatus(suspended) if isSuspended != suspended =>
-      isSuspended = suspended
-      if (!isSuspended) {
-        val reprocess = suspendedHttpRequestQueue.toList
-        suspendedHttpRequestQueue.clear
-        if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
-        reprocess.foreach(handle(_))
-      }
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)

@@ -35,6 +35,8 @@ trait Ping extends ExampleGatewayRoot {
 
   import context.dispatcher
 
+  val userMediator = service("user-mediator")
+
   abstract override def handle: Receive = super.handle orElse {
 
     /**
@@ -47,7 +49,7 @@ trait Ping extends ExampleGatewayRoot {
       */
     case HTTP(PUT, PATH("ping"), query, response) =>
       implicit val timeout = Timeout(1 minute)
-      service("user-mediator") ? "hello" onSuccess {
+      userMediator ? "hello" onSuccess {
         case userInput: String => response.success(Encoder.json(OK, Map("userInput" -> userInput)))
       }
   }

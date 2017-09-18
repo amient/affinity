@@ -32,7 +32,6 @@ object Service {
   final val CONFIG_NUM_PARTITIONS = s"num.partitions"
   final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
   final case class ServiceAvailability(group: String, suspended: Boolean)
-  final case class ClusterStatus(suspended: Boolean)
 }
 
 class Service(config: Config) extends Actor {

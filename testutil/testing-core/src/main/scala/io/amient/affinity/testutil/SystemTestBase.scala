@@ -22,6 +22,7 @@ package io.amient.affinity.testutil
 import java.io.File
 import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
+import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.zip.GZIPInputStream
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
@@ -36,8 +37,8 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Service.ClusterStatus
-import io.amient.affinity.core.actor.{Gateway, GatewayHttp}
+import io.amient.affinity.core.actor.ServicesApi.GatewayClusterStatus
+import io.amient.affinity.core.actor.{GatewayHttp, ServicesApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import org.apache.avro.util.ByteBufferInputStream
@@ -60,6 +61,7 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
     .withFallback(ConfigFactory.defaultReference()))
 
   def configure(config: Config): Config = config
+    .withValue(Node.CONFIG_NODE_SYSTEM_NAME, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
     .withValue(Node.CONFIG_NODE_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
     .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
     .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
@@ -72,11 +74,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
 
-  class TestGatewayNode(config: Config, gatewayCreator: => Gateway)
+  class TestGatewayNode(config: Config, gatewayCreator: => ServicesApi)
     extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
 
     def this(config: Config) = {
-      this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[Gateway]).newInstance())
+      this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi]).newInstance())
     }
 
     import system.dispatcher
@@ -103,12 +105,11 @@ trait SystemTestBase extends Suite with BeforeAndAfterAll {
       val clusterReady = new AtomicBoolean(false)
       system.eventStream.subscribe(system.actorOf(Props(new Actor {
         override def receive: Receive = {
-          case ClusterStatus(false) => {
+          case GatewayClusterStatus(false) =>
             clusterReady.set(true)
             clusterReady.synchronized(clusterReady.notify)
-          }
         }
-      })), classOf[ClusterStatus])
+      })), classOf[GatewayClusterStatus])
       startUpSequence
       clusterReady.synchronized(clusterReady.wait(15000))
       assert(clusterReady.get)

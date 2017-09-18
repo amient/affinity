@@ -24,7 +24,7 @@ import java.util.NoSuchElementException
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{ActorState, Gateway, GatewayApi, GatewayHttp}
+import io.amient.affinity.core.actor.{ActorState, GatewayHttp}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.example.data.ConfigEntry
@@ -52,7 +52,7 @@ class ExampleGateway extends ExampleGatewayRoot
   with Ping
   with Fail
 
-class ExampleGatewayRoot extends GatewayHttp with GatewayApi with ActorState {
+class ExampleGatewayRoot extends GatewayHttp with ActorState {
 
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication

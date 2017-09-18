@@ -27,13 +27,12 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
 
-import scala.concurrent.{Await, Future}
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
-import scala.language.postfixOps
-import scala.language.implicitConversions
-import scala.collection.JavaConverters._
 
 object Node {
 
@@ -85,7 +84,7 @@ class Node(config: Config) {
     }
 
     if (config.hasPath(GatewayHttp.CONFIG_GATEWAY_CLASS)) {
-      val cls = Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[Gateway])
+      val cls = Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi])
       startGateway(cls.newInstance())
     }
   }
@@ -114,21 +113,7 @@ class Node(config: Config) {
     * @tparam T
     * @return the httpPort on which the gateway is listening
     */
-
-  def startApi[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
-    implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse {
-      controller ack CreateGateway(Props(creator))
-    }
-  }
-
-  /**
-    * @param creator
-    * @param tag
-    * @tparam T
-    * @return the httpPort on which the gateway is listening
-    */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
+  def startGateway[T <: ServicesApi](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     startupFutureWithShutdownFuse {
       controller ack CreateGateway(Props(creator))

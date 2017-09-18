@@ -26,7 +26,7 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.amient.affinity.core.actor.{GatewayApi, GatewayHttp, Partition}
+import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{Decoder, Encoder}
 import io.amient.affinity.core.http.RequestMatchers._
@@ -40,18 +40,22 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   val config = configure("pingpong")
 
-  val gateway = new TestGatewayNode(config, new GatewayHttp with GatewayApi {
+
+  val gateway = new TestGatewayNode(config, new GatewayHttp {
 
     import context.dispatcher
 
     implicit val materializer = ActorMaterializer.create(context.system)
+
+    val regionService = service("region")
+
 
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
-        delegateAndHandleErrors(response, service("region") ? "ping") {
+        delegateAndHandleErrors(response, regionService ? "ping") {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
       case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>

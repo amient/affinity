@@ -41,7 +41,7 @@ object Partition {
   case class BecomeMaster() extends Reply[Unit]
 }
 
-class Partition extends Actor with ActorState {
+trait Partition extends ActorHandler with ActorState {
 
   import Partition._
 
@@ -84,13 +84,7 @@ class Partition extends Actor with ActorState {
     super.postStop()
   }
 
-  final override def receive: Receive = manage orElse handle
-
-  def handle: Receive = {
-    case null =>
-  }
-
-  protected def manage: Receive = {
+  abstract override def manage: Receive = super.manage orElse {
 
     case msg@BecomeMaster() =>
       sender.reply(msg) {}

@@ -40,6 +40,8 @@ trait Admin extends ExampleGatewayRoot {
 
   import context.dispatcher
 
+  private val graphService = service("graph")
+
   abstract override def handle: Receive = super.handle orElse {
 
     case http@HTTP(GET, PATH("settings"), _, _) => AUTH_ADMIN(http) { (user: String) =>
@@ -70,7 +72,7 @@ trait Admin extends ExampleGatewayRoot {
 
     case http@HTTP(GET, PATH("status", INT(p)), _, response) => AUTH_ADMIN(http) { (user: String) =>
       implicit val timeout = Timeout(1 second)
-      service("graph") ? (p.toInt, "status") map {
+      graphService ? (p.toInt, "status") map {
         case any => Encoder.json(OK, any)
       }
     }

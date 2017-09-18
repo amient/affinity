@@ -26,7 +26,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{GatewayHttp, GatewayApi}
+import io.amient.affinity.core.actor.{GatewayHttp}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -44,17 +44,19 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
   def config = configure("systemtests")
 
-  val gateway = new TestGatewayNode(config, new GatewayHttp with GatewayApi {
+  val gateway = new TestGatewayNode(config, new GatewayHttp {
 
     import MyTestPartition._
     import context.dispatcher
 
     implicit val scheduler = context.system.scheduler
 
+    val keyspace1 = service("keyspace1")
+
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
-        delegateAndHandleErrors(response, service("keyspace1") ack GetValue(key)) {
+        delegateAndHandleErrors(response, keyspace1 ack GetValue(key)) {
           _ match {
             case None => HttpResponse(NotFound)
             case Some(value) => Encoder.json(OK, value, gzip = false)
@@ -63,7 +65,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
 
       case HTTP(POST, PATH(key, value), _, response) =>
         implicit val timeout = Timeout(1500 milliseconds)
-        delegateAndHandleErrors(response, service("keyspace1") ack PutValue(key, value)) {
+        delegateAndHandleErrors(response, keyspace1 ack PutValue(key, value)) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }

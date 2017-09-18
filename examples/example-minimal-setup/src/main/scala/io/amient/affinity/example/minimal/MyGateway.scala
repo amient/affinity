@@ -24,13 +24,12 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.{Accepted, NotFound, OK}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{GatewayApi, GatewayHttp}
-import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.actor.{GatewayHttp, ServicesApi}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.util.Reply
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -38,7 +37,7 @@ case class GetData(key: String) extends Reply[Option[String]]
 
 case class PutData(key: String, value: String) extends Reply[Option[String]]
 
-class MyApiGateway extends GatewayApi {
+class MyApiGateway extends ServicesApi {
 
   import context.dispatcher
 
@@ -46,9 +45,11 @@ class MyApiGateway extends GatewayApi {
 
   implicit val timeout = Timeout(1 second)
 
-  def getData(key: String): Future[Option[String]] = service("simple-keyspace") ack GetValue(key)
+  val simpleService = service("simple-keyspace")
 
-  def putData(key: String, value: String): Future[Option[String]] = service("simple-keyspace") ack PutValue(key, value)
+  def getData(key: String): Future[Option[String]] = simpleService ack GetValue(key)
+
+  def putData(key: String, value: String): Future[Option[String]] = simpleService ack PutValue(key, value)
 
   override def handle: Receive = super.handle orElse {
     case request@GetData(key) => sender.replyWith(request) { getData(key) }
