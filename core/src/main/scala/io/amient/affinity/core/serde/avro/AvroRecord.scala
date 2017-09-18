@@ -216,7 +216,7 @@ object AvroRecord {
             SchemaBuilder.builder().stringType()
           } else if (tpe =:= typeOf[Null]) {
             SchemaBuilder.builder().nullType()
-          } else if (tpe <:< typeOf[Map[_, _]]) {
+          } else if (tpe <:< typeOf[Map[String, _]]) {
             SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
           } else if (tpe <:< typeOf[Iterable[_]]) {
             SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
