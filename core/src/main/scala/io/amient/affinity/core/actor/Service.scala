@@ -75,7 +75,16 @@ class Service(config: Config) extends Actor {
 
   private def getRoutee(message: Any): ActorRefRoutee = {
     val partition = message match {
-      case p: Product => partitioner.partition(p.productElement(0), numPartitions)
+      case (t1,_) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
+      case (t1,_, _, _, _, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
       case v => partitioner.partition(v, numPartitions)
     }
 

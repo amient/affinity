@@ -32,12 +32,14 @@ case class TestValue(items: List[Int]) extends AvroRecord[TestValue] {
 }
 
 case class AddItem(key: TestKey, item: Int) extends AvroRecord[AddItem] with Instruction[TestValue] {
+  override def hashCode() = key.hashCode()
   override def reverse(result: TestValue): Option[Instruction[_]] = {
     if (result.items.contains(item)) None else Some(RemoveItem(key, item))
   }
 }
 
 case class RemoveItem(key: TestKey, item: Int) extends AvroRecord[RemoveItem] with Instruction[TestValue] {
+  override def hashCode() = key.hashCode()
   override def reverse(result: TestValue): Option[Instruction[_]] = {
     if (result.items.contains(item)) Some(AddItem(key, item)) else None
   }
