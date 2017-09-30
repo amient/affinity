@@ -23,7 +23,8 @@ import java.io.{ByteArrayOutputStream, OutputStream, OutputStreamWriter, Writer}
 import java.util.zip.GZIPOutputStream
 
 import akka.http.scaladsl.model.headers.HttpEncodings
-import akka.http.scaladsl.model.{HttpEntity, _}
+import akka.http.scaladsl.model.{HttpEntity, StatusCode, HttpHeader, HttpResponse, DateTime, MessageEntity, ContentTypes, ContentType}
+import akka.http.scaladsl.model.headers.{Date, `Content-Encoding`}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.fasterxml.jackson.core.JsonGenerator
@@ -51,10 +52,11 @@ object Encoder {
     result
   }
 
-  def json(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+  def json(status: StatusCode, value: Any, gzip: Boolean = true, headers: List[HttpHeader] = List()): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
-    h += headers.Date(DateTime.now)
-    h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
+    h ++= headers
+    h += Date(DateTime.now)
+    h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
     HttpResponse(status, entity = json(value, gzip), headers = h.toList)
   }
 
@@ -143,8 +145,8 @@ object Encoder {
 
   def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
-    h += headers.Date(DateTime.now)
-    h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
+    h += Date(DateTime.now)
+    h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
     HttpResponse(status, entity = html(value, gzip), headers = h.toList)
   }
 
@@ -157,8 +159,8 @@ object Encoder {
 
   def plain(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
-    h += headers.Date(DateTime.now)
-    h += headers.`Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
+    h += Date(DateTime.now)
+    h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
     HttpResponse(status, entity = plain(value, gzip), headers = h.toList)
   }
 
