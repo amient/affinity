@@ -136,7 +136,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   def isClosed = closed.get
 
   final protected def updateGroup(newState: Map[String, String]): Unit = {
-    if (!closed.get) synchronized {
+    if (!closed.get) {
 
       val t = 3 seconds
       val attempts = Future.sequence(newState.map { case (handle, actorPath) =>
@@ -155,20 +155,22 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
           case Success((handle, actor)) => (handle, actor)
       })
 
-      val prevMasters: Set[ActorRef] = getCurrentMasters
-      handles.clear()
+      synchronized {
+        val prevMasters: Set[ActorRef] = getCurrentMasters
+        handles.clear()
 
-      Await.result(actors, t * 2).foreach { case (handle, actor) =>
-        handles.put(handle, actor)
-      }
+        Await.result(actors, t * 2).foreach { case (handle, actor) =>
+          handles.put(handle, actor)
+        }
 
-      val currentMasters: Set[ActorRef] = getCurrentMasters
+        val currentMasters: Set[ActorRef] = getCurrentMasters
 
-      val add = currentMasters.filter(!prevMasters.contains(_))
-      val remove = prevMasters.filter(!currentMasters.contains(_))
-      if (!add.isEmpty || !remove.isEmpty) {
-        val update = MasterStatusUpdate(group, add, remove)
-        notifyWatchers(update)
+        val add = currentMasters.filter(!prevMasters.contains(_))
+        val remove = prevMasters.filter(!currentMasters.contains(_))
+        if (!add.isEmpty || !remove.isEmpty) {
+          val update = MasterStatusUpdate(group, add, remove)
+          notifyWatchers(update)
+        }
       }
     }
 
