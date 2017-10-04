@@ -23,18 +23,18 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{ActorNotFound, ActorPath, ActorRef, ActorSystem}
-import akka.pattern.ask
+import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.util.Reply
 
-import scala.collection.{Set, immutable}
-import scala.concurrent.{Await, Future}
+import scala.collection.Set
 import scala.concurrent.duration._
-import scala.util.control.NonFatal
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 object Coordinator {
 
@@ -68,6 +68,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   import system.dispatcher
 
   implicit val scheduler = system.scheduler
+
+  private val logger = Logging.getLogger(system, this)
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
 
@@ -138,28 +140,27 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   final protected def updateGroup(newState: Map[String, String]): Unit = {
     if (!closed.get) {
 
-      val t = 3 seconds
       val attempts = Future.sequence(newState.map { case (handle, actorPath) =>
         val selection = system.actorSelection(actorPath)
-        implicit val timeout = new Timeout(t)
+        implicit val timeout = new Timeout(6 seconds)
         selection.resolveOne() map (a => Success((handle, a))) recover {
-          case e: ActorNotFound => Failure(e)//most likely the actor has gone and there will be another update right away
-          case e: TimeoutException => Failure(e)//most likely the node has gone
-          case e: IllegalStateException => Failure(e)//closed
           case NonFatal(e) =>
-            if (!closed.get) e.printStackTrace()
+            logger.warning(s"$handle: ${e.getMessage}")
             Failure(e)
         }
       })
-      val actors: Future[Iterable[(String, ActorRef)]] = attempts.map(_.collect {
+
+      val actorRefs: Future[Iterable[(String, ActorRef)]] = attempts.map(_.collect {
           case Success((handle, actor)) => (handle, actor)
       })
+
+      val actors = Await.result(actorRefs, 1 minute)
 
       synchronized {
         val prevMasters: Set[ActorRef] = getCurrentMasters
         handles.clear()
 
-        Await.result(actors, t * 2).foreach { case (handle, actor) =>
+        actors.foreach { case (handle, actor) =>
           handles.put(handle, actor)
         }
 
@@ -189,14 +190,12 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       try {
         watcher ack (if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
           case e: Throwable => if (!closed.get) {
-            e.printStackTrace()
-            system.terminate()
+            logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)
           }
         }
       } catch {
         case e: Throwable => if (!closed.get) {
-          e.printStackTrace()
-          system.terminate()
+          logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)
         }
       }
     }
