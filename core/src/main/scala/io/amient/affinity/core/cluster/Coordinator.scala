@@ -19,19 +19,22 @@
 
 package io.amient.affinity.core.cluster
 
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{ActorNotFound, ActorPath, ActorRef, ActorSystem}
+import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.util.Reply
 
-import scala.collection.Set
-import scala.concurrent.Await
+import scala.collection.{Set, immutable}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.language.postfixOps
+import scala.util.{Failure, Success, Try}
 
 object Coordinator {
 
@@ -133,19 +136,30 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   def isClosed = closed.get
 
   final protected def updateGroup(newState: Map[String, String]): Unit = {
-    val t = 7 seconds
-    implicit val timeout = new Timeout(t)
     if (!closed.get) synchronized {
+
+      val t = 3 seconds
+      val attempts = Future.sequence(newState.map { case (handle, actorPath) =>
+        val selection = system.actorSelection(actorPath)
+        implicit val timeout = new Timeout(t)
+        selection.resolveOne() map (a => Success((handle, a))) recover {
+          case e: ActorNotFound => Failure(e)//most likely the actor has gone and there will be another update right away
+          case e: TimeoutException => Failure(e)//most likely the node has gone
+          case e: IllegalStateException => Failure(e)//closed
+          case NonFatal(e) =>
+            if (!closed.get) e.printStackTrace()
+            Failure(e)
+        }
+      })
+      val actors: Future[Iterable[(String, ActorRef)]] = attempts.map(_.collect {
+          case Success((handle, actor)) => (handle, actor)
+      })
+
       val prevMasters: Set[ActorRef] = getCurrentMasters
       handles.clear()
-      newState.foreach { case (handle, actorPath) =>
-        try {
-          handles.put(handle, Await.result(system.actorSelection(actorPath).resolveOne(), t))
-        } catch {
-          case _: ActorNotFound => //most likely the actor has gone and there will be another update right away
-          case _: IllegalStateException => //closed
-          case NonFatal(e) => if (!closed.get) e.printStackTrace()
-        }
+
+      Await.result(actors, t * 2).foreach { case (handle, actor) =>
+        handles.put(handle, actor)
       }
 
       val currentMasters: Set[ActorRef] = getCurrentMasters
