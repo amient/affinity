@@ -22,8 +22,8 @@ package io.amient.affinity.systemtests
 import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import io.amient.affinity.core.util.ByteUtils
 
 object UUID {

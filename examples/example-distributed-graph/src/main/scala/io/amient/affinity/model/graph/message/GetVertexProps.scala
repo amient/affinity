@@ -19,7 +19,7 @@
 
 package io.amient.affinity.model.graph.message
 
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.Reply
 
 final case class GetVertexProps(vertex: Int) extends AvroRecord[GetVertexProps] with Reply[Option[VertexProps]] {

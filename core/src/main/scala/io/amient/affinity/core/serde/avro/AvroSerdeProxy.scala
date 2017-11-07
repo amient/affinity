@@ -2,6 +2,7 @@ package io.amient.affinity.core.serde.avro
 
 import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
+import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.serde.{Serde, Serdes}
 
 final class AvroSerdeProxy(tools: Serdes) extends Serde[Any] {

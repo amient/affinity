@@ -24,12 +24,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.kafka.KafkaSerde
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
+import io.amient.affinity.kafka.KafkaObjectHashPartitioner
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -150,8 +151,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
     val numWrites = new AtomicInteger(1000)
     val producer = new KafkaProducer[Int, TestRecord](
       producerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerde.of[Int](system),
-      KafkaSerde.of[TestRecord](system))
+      KafkaSerde.of[Int](system.settings.config),
+      KafkaSerde.of[TestRecord](system.settings.config))
     try {
       val numToWrite = numWrites.get
       val l = System.currentTimeMillis()

@@ -21,6 +21,7 @@ package io.amient.affinity.core.serde.avro
 
 import java.util.UUID
 
+import io.amient.affinity.avro.AvroRecord
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalatest.prop.PropertyChecks

@@ -7,22 +7,17 @@ apply plugin: 'signing'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'kafka_0.10-scala_' + baseScalaVersion
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'avro-kafka_0.10-scala_' + baseScalaVersion
 publishing {
     publications {
         maven(MavenPublication) {
-            artifactId 'kafka_0.10-scala_' + baseScalaVersion
+            artifactId 'avro-kafka_0.10-scala_' + baseScalaVersion
             from components.java
         }
     }
 }
 
-install.repositories.mavenInstaller.pom.artifactId = 'kafka_0.10-scala_' + baseScalaVersion
-def installer = install.repositories.mavenInstaller
-[installer]*.pom*.whenConfigured { pom ->
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = 'core-scala_'+baseScalaVersion
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-kafka_0.10' }.artifactId = 'testing-kafka_0.10-scala_' + baseScalaVersion
-}
+install.repositories.mavenInstaller.pom.artifactId = 'avro-kafka_0.10-scala_' + baseScalaVersion
 
 ext {
     kafkaVersion = '0.10.0.1'
@@ -52,12 +47,11 @@ apply plugin: "com.github.johnrengelman.shadow"
 assemble.dependsOn shadowJar
 
 dependencies {
-    compile project(':core')
-    compile project(':avro-kafka:avro-kafka_0.10')
+    compile project(':api')
+    compile project(':avro')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
-    testCompile project(':testutil:testing-kafka_0.10')
 }
 
 

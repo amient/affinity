@@ -17,14 +17,14 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro
+package io.amient.affinity.avro
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
+import io.amient.affinity.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol

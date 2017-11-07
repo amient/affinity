@@ -1,4 +1,6 @@
-include ':api', ':core', ':rocksdb', ':mapdb', ':ws-client', ':testutil:testing-core',
+include ':api',
+        ':avro', ':avro-kafka:avro-kafka_0.10',
+        ':core', ':rocksdb', ':mapdb', ':ws-client', ':testutil:testing-core',
         ':kafka:kafka_0.10', ':kafka:kafka_0.10:avro-formatter', ':testutil:testing-kafka_0.10',
         ':spark:spark_2.0',
         ':examples:example-distributed-graph',

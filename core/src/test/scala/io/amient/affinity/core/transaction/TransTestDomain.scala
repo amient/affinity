@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.transaction
 
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.Reply
 
 case class TestKey(val id: Int) extends AvroRecord[TestKey] with Reply[Option[TestValue]] {

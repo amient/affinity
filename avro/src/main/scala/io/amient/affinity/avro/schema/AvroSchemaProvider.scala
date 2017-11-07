@@ -17,9 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro.schema
+package io.amient.affinity.avro.schema
 
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 import org.apache.avro.Schema
 
 import scala.collection.mutable.ListBuffer

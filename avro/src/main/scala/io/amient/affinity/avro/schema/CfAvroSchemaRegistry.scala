@@ -17,17 +17,15 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro.schema
+package io.amient.affinity.avro.schema
 
 
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
-//FIXME de-couple from akka http model by using standard java URL
-import akka.http.scaladsl.model._
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.avro.AvroSerde
+import io.amient.affinity.avro.AvroSerde
 import org.apache.avro.Schema
 
 import scala.collection.JavaConverters._
@@ -44,7 +42,7 @@ object CfAvroSchemaRegistry {
 class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
 
   import CfAvroSchemaRegistry._
-  val client = new ConfluentSchemaRegistryClient(Uri(config.getString(CONFIG_CF_REGISTRY_URL_BASE)))
+  val client = new ConfluentSchemaRegistryClient(new URL(config.getString(CONFIG_CF_REGISTRY_URL_BASE)))
 
   override def close(): Unit = ()
 
@@ -62,7 +60,7 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     }.toList
   }
 
-  class ConfluentSchemaRegistryClient(baseUrl: Uri) {
+  class ConfluentSchemaRegistryClient(baseUrl: URL) {
 
     private val mapper = new ObjectMapper
 
@@ -134,7 +132,7 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     }
 
     private def http(path: String)(init: HttpURLConnection => Unit ): String = {
-      val url = new URL(baseUrl.withPath(Uri.Path(path)).toString)
+      val url = new URL(baseUrl.toString + path)
       val connection = url.openConnection.asInstanceOf[HttpURLConnection]
       connection.setConnectTimeout(5000)
       connection.setReadTimeout(5000)

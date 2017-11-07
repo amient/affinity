@@ -19,7 +19,7 @@
 
 package io.amient.affinity.model.graph.message
 
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.transaction.Instruction
 
 final case class UpdateComponent(cid: Int, component: Component) extends AvroRecord[UpdateComponent] with Instruction[Option[Component]] {

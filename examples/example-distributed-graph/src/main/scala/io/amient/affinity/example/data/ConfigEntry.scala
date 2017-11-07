@@ -20,7 +20,7 @@
 package io.amient.affinity.example.data
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 
 

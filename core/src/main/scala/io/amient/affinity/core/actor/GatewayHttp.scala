@@ -44,7 +44,7 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.util.ByteBufferInputStream
 

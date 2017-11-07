@@ -22,11 +22,9 @@ package io.amient.affinity.testutil
 import java.nio.channels.ServerSocketChannel
 
 import com.typesafe.config.{Config, ConfigValueFactory}
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.confluent.kafka.schemaregistry.rest.{SchemaRegistryConfig, SchemaRegistryRestApplication}
-
-import scala.collection.JavaConverters._
 
 trait SystemTestBaseWithConfluentRegistry extends SystemTestBaseWithKafka {
 

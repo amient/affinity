@@ -17,13 +17,13 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro
+package io.amient.affinity.avro
 
 import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
+import io.amient.affinity.avro.schema.AvroSchemaProvider
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 

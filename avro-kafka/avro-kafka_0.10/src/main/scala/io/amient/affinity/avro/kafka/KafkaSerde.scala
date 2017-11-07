@@ -17,21 +17,20 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka
+package io.amient.affinity.avro.kafka
 
 import java.util
 
-import akka.actor.ActorSystem
-import com.typesafe.config.{Config, ConfigFactory}
-import io.amient.affinity.core.serde.avro.AvroRecord
-import io.amient.affinity.core.serde.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
-import io.amient.affinity.core.serde.{AbstractSerde, Serde}
+import com.typesafe.config.Config
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
+import io.amient.affinity.core.serde.AbstractSerde
 import io.confluent.kafka.serializers.{KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericContainer
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
-import scala.collection.JavaConversions._
+
 import scala.reflect.runtime.universe._
-import scala.reflect.ClassTag
+
 
 object KafkaSerde {
 
@@ -50,10 +49,6 @@ object KafkaSerde {
         serde.toBytes(data)
       }
     }
-  }
-
-  def of[T: ClassTag](system: ActorSystem): Deserializer[T] with Serializer[T] = {
-    of(Serde.of[T](system.settings.config))
   }
 
   def of[T: TypeTag](config: Config): Deserializer[T] with Serializer[T] = {
@@ -98,22 +93,11 @@ object KafkaSerde {
     } else if (config.hasPath(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT)) {
       new Serializer[T] with Deserializer[T] {
 
-        private var internal: ZkAvroSchemaRegistry = null
+        private val internal: ZkAvroSchemaRegistry = new ZkAvroSchemaRegistry(config)
 
-        override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
-          val config = ConfigFactory
-            .parseMap(configs.map { case (k,v) => (k.replace("schema.registry.", "affinity.avro.zookeeper-schema-registry."), v)})
-            .withFallback(ConfigFactory.defaultReference())
+        override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = ()
 
-          internal = new ZkAvroSchemaRegistry(config)
-        }
-
-        override def close(): Unit = {
-          if (internal != null) {
-            internal.close()
-            internal = null
-          }
-        }
+        override def close(): Unit = internal.close()
 
         override def serialize(topic: String, data: T): Array[Byte] = {
           internal.toBytes(data)

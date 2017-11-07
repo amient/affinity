@@ -5,11 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.serde.avro.AvroSerde
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.kafka.KafkaSerde
+import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.KafkaSerde
 import io.amient.affinity.systemtests.{KEY, TestRecord, TestZkAvroRegistry, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -78,8 +78,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
 
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
-      KafkaSerde.of[Int](system),
-      KafkaSerde.of[TestRecord](system))
+      KafkaSerde.of[Int](system.settings.config),
+      KafkaSerde.of[TestRecord](system.settings.config))
 
     consumer.subscribe(List(topic).asJava)
     try {

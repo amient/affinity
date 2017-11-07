@@ -19,8 +19,9 @@
 
 package io.amient.affinity.core
 
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.serde.avro._
-import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
+import io.amient.affinity.avro.schema.EmbeddedAvroSchemaProvider
 import io.amient.affinity.core.transaction.{TestKey, TestValue}
 
 class TestAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {

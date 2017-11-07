@@ -17,20 +17,29 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro.schema
+package io.amient.affinity.avro.schema
 
 import java.util
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.avro.AvroSerde
-import io.amient.affinity.core.util.ZooKeeperClient
-import org.I0Itec.zkclient.IZkChildListener
+import io.amient.affinity.avro.AvroSerde
+import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
+import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable
+
+class ZooKeeperClient(zkConnect: String, zkSessionTimeout: Int = 30000, zkConnectTimeout: Int = 6000) extends ZkClient(
+  zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
+    def serialize(o: Object): Array[Byte] = o.toString.getBytes
+
+    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+  }) {
+
+}
 
 object ZkAvroSchemaRegistry {
   final val CONFIG_ZOOKEEPER_ROOT = "affinity.avro.zookeeper-schema-registry.zookeeper.root"

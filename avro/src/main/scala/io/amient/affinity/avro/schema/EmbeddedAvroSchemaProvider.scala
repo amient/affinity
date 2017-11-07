@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro.schema
+package io.amient.affinity.avro.schema
 
 import java.util.concurrent.ConcurrentHashMap
 

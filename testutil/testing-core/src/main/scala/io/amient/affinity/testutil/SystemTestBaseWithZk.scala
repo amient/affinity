@@ -25,7 +25,7 @@ import java.nio.file.Files
 
 import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.cluster.CoordinatorZk
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 
 trait SystemTestBaseWithZk extends SystemTestBase {

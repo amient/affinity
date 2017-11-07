@@ -18,6 +18,6 @@
  */
 package io.amient.affinity.model.graph.message
 
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 
 final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord[Component]

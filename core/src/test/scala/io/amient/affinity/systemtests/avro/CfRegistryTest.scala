@@ -3,8 +3,9 @@ package io.amient.affinity.systemtests.avro
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.serde.avro._
-import io.amient.affinity.core.serde.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
 import org.scalatest.FlatSpec
 
