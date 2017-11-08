@@ -18,6 +18,10 @@ publishing {
 }
 
 install.repositories.mavenInstaller.pom.artifactId = 'avro-formatter-kafka_0.10-scala_' + baseScalaVersion
+def installer = install.repositories.mavenInstaller
+[installer]*.pom*.whenConfigured { pom ->
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro-serde-kafka' }.artifactId = 'avro-serde-kafka_0.10-scala_' + baseScalaVersion
+}
 
 buildscript {
     repositories {

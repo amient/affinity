@@ -28,7 +28,7 @@ def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = 'core-scala_'+baseScalaVersion
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-core' }.artifactId = 'testing-core-scala_'+baseScalaVersion
-    //pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'storage-kafka_0.10'}.artifactId = 'storage-kafka_0.10-scala_'+baseScalaVersion
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'storage-kafka'}.artifactId = 'storage-kafka_0.10-scala_'+baseScalaVersion
 }
 
 
