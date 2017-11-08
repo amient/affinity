@@ -6,11 +6,11 @@ import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.kafka.KafkaDeserializer
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.kafka.KafkaDeserializer
 import io.amient.affinity.systemtests.{KEY, TestRecord, TestZkAvroRegistry, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer

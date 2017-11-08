@@ -53,7 +53,7 @@ assemble.dependsOn shadowJar
 
 dependencies {
     compile project(':core')
-    compile project(':avro-kafka:avro-kafka_0.10')
+    compile project(':avro-kafka:avro-kafka_0.10:avro-serde-kafka')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-avro-serializer', version: confluentVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion

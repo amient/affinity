@@ -1,4 +1,4 @@
-package io.amient.affinity.avro.kafka
+package io.amient.affinity.kafka
 
 import java.util
 
