@@ -35,7 +35,7 @@ ext {
 dependencies {
     compile project(':core')
     compile project(':testutil:testing-core')
-    compile project(':kafka:kafka_' + kafkaMinorVersion)
+    compile project(':kafka:kafka_' + kafkaMinorVersion + ':storage-kafka')
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion

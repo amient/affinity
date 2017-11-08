@@ -1,4 +1,0 @@
-ext {
-    kafkaVersion = '0.10.0.1'
-    confluentVersion = '3.0.0'
-}

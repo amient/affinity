@@ -35,8 +35,8 @@ apply plugin: "com.github.johnrengelman.shadow"
 assemble.dependsOn shadowJar
 
 dependencies {
-    compile project(':avro-kafka:avro-kafka_0.10:avro-serde-kafka')
-    provided group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: project(':avro-kafka:avro-kafka_0.10').kafkaVersion
+    compile project(':kafka:kafka_0.10:avro-serde-kafka')
+    provided group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: project(':kafka:kafka_0.10').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
 }
 
