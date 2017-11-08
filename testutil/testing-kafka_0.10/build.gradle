@@ -1,6 +1,12 @@
 group = rootProject.group
 version = rootProject.version
 
+ext {
+    kafkaVersion = project(':kafka:kafka_0.10').ext.kafkaVersion
+    confluentVersion = project(':kafka:kafka_0.10').ext.confluentVersion
+}
+
+
 apply plugin: 'scala'
 apply plugin: 'java'
 apply plugin: 'signing'
@@ -22,20 +28,14 @@ def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = 'core-scala_'+baseScalaVersion
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-core' }.artifactId = 'testing-core-scala_'+baseScalaVersion
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'kafka_' + kafkaMinorVersion}.artifactId = 'kafka_' + kafkaMinorVersion + '-scala_'+baseScalaVersion
+    //pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'storage-kafka_0.10'}.artifactId = 'storage-kafka_0.10-scala_'+baseScalaVersion
 }
 
-
-ext {
-    kafkaMinorVersion = '0.10'
-    kafkaVersion = project(':kafka:kafka_' + kafkaMinorVersion).ext.kafkaVersion
-    confluentVersion = project(':kafka:kafka_' + kafkaMinorVersion).ext.confluentVersion
-}
 
 dependencies {
     compile project(':core')
     compile project(':testutil:testing-core')
-    compile project(':kafka:kafka_' + kafkaMinorVersion + ':storage-kafka')
+    compile project(':kafka:kafka_0.10:storage-kafka')
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion

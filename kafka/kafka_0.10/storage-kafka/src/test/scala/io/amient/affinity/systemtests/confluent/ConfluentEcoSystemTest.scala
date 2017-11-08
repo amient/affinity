@@ -29,7 +29,7 @@ import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
+import io.amient.affinity.kafka.{KafkaDeserializer, KafkaObjectHashPartitioner, KafkaSerde}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -106,7 +106,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRe
 
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerde.of(new IntSerde),
+      KafkaDeserializer(new IntSerde),
       KafkaSerde.of[TestRecord](
         ConfigFactory.parseMap(Map(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))))
 
