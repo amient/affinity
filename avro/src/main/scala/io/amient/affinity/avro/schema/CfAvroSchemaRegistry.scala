@@ -152,7 +152,7 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
   }
 
   override private[schema] def hypersynchronized[X](f: => X) = synchronized {
-    //TODO implement hyerlock for cf registry
+    //TODO: verify that confluent schema registry behaves well under concurrent attempts to register the same schema
     f
   }
 }
