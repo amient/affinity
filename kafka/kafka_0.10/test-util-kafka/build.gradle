@@ -26,6 +26,7 @@ install.repositories.mavenInstaller.pom.artifactId = 'test-util-kafka_0.10-scala
 def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-zk' }.artifactId = 'testing-zk-scala_'+baseScalaVersion
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro' }.artifactId = 'avro-scala_'+baseScalaVersion
 }
 
 dependencies {
