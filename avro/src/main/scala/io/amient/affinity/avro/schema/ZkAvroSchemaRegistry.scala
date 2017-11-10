@@ -20,12 +20,13 @@
 package io.amient.affinity.avro.schema
 
 import java.util
+import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
-import org.I0Itec.zkclient.exception.ZkNodeExistsException
+import org.I0Itec.zkclient.exception.{ZkNodeExistsException, ZkTimeoutException}
 import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
 
@@ -46,6 +47,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
   val zkConnectTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
 
   private val zkRoot = config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_ROOT)
+
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
 
   @volatile private var internal = immutable.Map[String, List[(Int, Schema)]]()
@@ -57,9 +59,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     }
   }))
 
-  override def close(): Unit = {
-    zk.close()
-  }
+  override def close(): Unit = zk.close()
 
   override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = {
     val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)

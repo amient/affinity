@@ -33,6 +33,7 @@ import io.amient.affinity.model.graph.GraphLogic
 import io.amient.affinity.model.graph.message.Edge
 
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
 
 trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
@@ -52,8 +53,12 @@ trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, graphService, "graph", vertex) {
-            case x: Edge => println("My custom handler of Edge: " + x)
+          try {
+            avroWebSocket(upgrade, graphService, "graph", vertex) {
+              case x: Edge => println("My custom handler of Edge: " + x)
+            }
+          } catch {
+            case NonFatal(e) => e.printStackTrace(); throw e
           }
         }
       }

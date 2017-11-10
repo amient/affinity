@@ -345,7 +345,6 @@ trait WebSocketSupport extends GatewayHttp {
 
     service ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
       case keyValueMediator: ActorRef =>
-
         /**
           * Sink.actorRef supports custom termination message which will be sent to the source
           * by the websocket materialized flow when the client closes the connection.

@@ -67,6 +67,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
   val DOUBLE_SCHEMA = Schema.create(Schema.Type.DOUBLE)
   val STRING_SCHEMA = Schema.create(Schema.Type.STRING)
   val BYTES_SCHEMA = Schema.create(Schema.Type.BYTES)
+  val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
 
   /**
     * @param obj instance to serialize

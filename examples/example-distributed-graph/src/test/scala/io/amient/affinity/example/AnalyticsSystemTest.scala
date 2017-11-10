@@ -26,7 +26,6 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
@@ -96,7 +95,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     })
 
     val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
-      new IntSerde, AvroSerde.create(serializedConfig.value), compacted = true)
+      AvroSerde.create(serializedConfig.value), compacted = true)
       .repartition(1)
       .sortByKey()
 
@@ -109,7 +108,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     }
 
     val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
-      new IntSerde, AvroSerde.create(serializedConfig.value), compacted = true)
+      AvroSerde.create(serializedConfig.value), compacted = true)
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>
@@ -117,7 +116,6 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     }
 
     val updateBatch: RDD[(Int, Component)] = sc.parallelize(Array((1, null), (2, Component(0L, Set()))))
-
     componentRdd.update(updateBatch)
 
     componentRdd.collect.toList match {

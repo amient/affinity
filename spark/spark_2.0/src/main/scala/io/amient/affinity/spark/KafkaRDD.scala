@@ -37,6 +37,9 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
                                          valueSerde: => AbstractSerde[_ >: V],
                                          compacted: Boolean = false) extends RDD[(K, V)](sc, Nil) {
 
+  def this(sc: SparkContext, client: KafkaClient, serde: => AbstractSerde[Any], compacted: Boolean) =
+    this(sc, client, serde, serde, compacted)
+
 
   val compactor = (m1: PayloadAndOffset, m2: PayloadAndOffset) => if (m1.offset > m2.offset) m1 else m2
 
@@ -94,20 +97,26 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       val keySerdeInstance = keySerde
       val valueSerdeInstance = valueSerde
 
-      val iterator = partition.map { case (k, v) =>
-        val partition = partitioner.partition(k, kafkaPartitions.length)
-        val payloadAndOffset = new PayloadAndOffset(partition.toLong, valueSerdeInstance.toBytes(v))
-        new KeyPayloadAndOffset(new ByteKey(keySerdeInstance.toBytes(k)), payloadAndOffset)
-      }.asJava
+      try {
+        val iterator = partition.map { case (k, v) =>
+          val partition = partitioner.partition(k, kafkaPartitions.length)
+          val payloadAndOffset = new PayloadAndOffset(partition.toLong, valueSerdeInstance.toBytes(v))
+          new KeyPayloadAndOffset(new ByteKey(keySerdeInstance.toBytes(k)), payloadAndOffset)
+        }.asJava
 
-      val checker = new java.util.function.Function[java.lang.Long, java.lang.Boolean] {
-        override def apply(partialCount: java.lang.Long): java.lang.Boolean = {
-          produced.add(partialCount)
-          !context.isInterrupted()
+        val checker = new java.util.function.Function[java.lang.Long, java.lang.Boolean] {
+          override def apply(partialCount: java.lang.Long): java.lang.Boolean = {
+            produced.add(partialCount)
+            !context.isInterrupted()
+          }
         }
-      }
 
-      client.publish(iterator, checker)
+        client.publish(iterator, checker)
+      } finally try {
+        keySerdeInstance.close()
+      } finally {
+        valueSerdeInstance.close()
+      }
     }
 
     log.info(s"Producing into ${client} ...")

@@ -22,8 +22,9 @@ package io.amient.affinity.core.serde
 import akka.serialization.SerializationExtension
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.IntegrationTestBase
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.serde.collection.SeqSerde
-import io.amient.affinity.core.serde.primitive.{OptionSerde, StringSerde}
+import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.transaction.TestKey
 import org.scalatest.Matchers
 
@@ -31,6 +32,15 @@ import scala.collection.immutable.Seq
 
 class WrapSerdesSpec extends IntegrationTestBase with Matchers {
 
+  "TupleSerde" must {
+    "work with wrapped tuple3" in {
+      val in = (1000, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, "graph")
+      val bytes = SerializationExtension(system).serialize(in).get
+      val out = SerializationExtension(system).deserialize(bytes, classOf[Tuple3[Int, String, String]]).get
+      out should be(in)
+    }
+
+  }
 
   "OptionSerde" must {
 
@@ -42,13 +52,13 @@ class WrapSerdesSpec extends IntegrationTestBase with Matchers {
       serde.fromBinary(bytes) should be(None)
     }
     "work with with wrapped string" in {
-      val stringSerde = SerializationExtension(system).serializerOf(classOf[StringSerde].getName).get
+      val stringSerde = SerializationExtension(system).serializerFor(classOf[String])
       val string = stringSerde.toBinary("XYZ")
-      string.mkString(".") should equal("88.89.90")
+      string.mkString(".") should equal("0.0.0.0.6.6.88.89.90")
       stringSerde.fromBinary(string) should be("XYZ")
 
       val bytes = serde.toBinary(Some("XYZ"))
-      bytes.mkString(".") should equal("0.0.0.103.88.89.90")
+      bytes.mkString(".") should equal("0.0.0.-56.0.0.0.0.6.6.88.89.90")
       serde.fromBinary(bytes) should be(Some("XYZ"))
     }
     "work with wrapped unit" in {
@@ -58,7 +68,7 @@ class WrapSerdesSpec extends IntegrationTestBase with Matchers {
     }
     "work with wrapped tuple" in {
       val bytes = serde.toBinary(Some(("XYZ", 10)))
-      bytes.mkString(".") should equal("0.0.0.-124.0.0.0.2.0.0.0.7.0.0.0.103.88.89.90.0.0.0.8.0.0.0.101.0.0.0.10")
+      bytes.mkString(".") should equal("0.0.0.-124.0.0.0.2.0.0.0.13.0.0.0.-56.0.0.0.0.6.6.88.89.90.0.0.0.10.0.0.0.-56.0.0.0.0.2.20")
       serde.fromBinary(bytes) should be(Some(("XYZ", 10)))
     }
   }

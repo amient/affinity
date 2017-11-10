@@ -29,26 +29,14 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
   it should "write case classes with generic registry and confluent schema registry deserializer should read them as GenericRecords" in {
 
-    val registry: AvroSerde = AvroSerde.create(ConfigFactory.defaultReference
+
+    val registryConfig = ConfigFactory.defaultReference
       .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
-      .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl)))
+      .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
 
-    registry should not be (null)
-
-    val topic = "test"
-    val numWrites = new AtomicInteger(0)
-
-    val producer = new KafkaProducer[Int, TestRecord](
-      Map("bootstrap.servers" -> kafkaBootstrap).mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerializer[Int](registry),
-      KafkaSerializer[TestRecord](registry)
+    val producerConfig = Map(
+      "bootstrap.servers" -> kafkaBootstrap
     )
-    val updates = for (i <- (1 to 10)) yield {
-      producer.send(new ProducerRecord[Int, TestRecord](
-        topic, i, TestRecord(i, System.currentTimeMillis(), s"test value $i"))).get
-      numWrites.incrementAndGet
-    }
-    numWrites.get should be > (0)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
@@ -60,12 +48,26 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
       "max.poll.records" -> 1000
     )
 
+    val producer = new KafkaProducer[Int, TestRecord](
+      producerConfig.mapValues(_.toString.asInstanceOf[AnyRef]),
+      KafkaAvroSerializer[Int](registryConfig),
+      KafkaAvroSerializer[TestRecord](registryConfig)
+    )
+
+    val topic = "test"
+    val numWrites = new AtomicInteger(0)
+    for (i <- (1 to 10)) {
+      producer.send(new ProducerRecord[Int, TestRecord](
+        topic, i, TestRecord(i, System.currentTimeMillis(), s"test value $i"))).get
+      numWrites.incrementAndGet
+    }
+    numWrites.get should be > (0)
+
     val consumer = new KafkaConsumer[Int, GenericRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
 
     consumer.subscribe(List(topic))
     try {
-
       var read = 0
       while (read < numWrites.get) {
         val records = consumer.poll(1000)
@@ -81,17 +83,10 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
     }
   }
 
-  it should "work with specific registry" in {
+  it should "write case classes via pre-configured confluent registry and read with affinity deserializer" in {
 
     object TestRegistry extends CfAvroSchemaRegistry(ConfigFactory
       .defaultReference.withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))) {
-      register(classOf[Boolean])
-      register(classOf[Int])
-      register(classOf[Long])
-      register(classOf[Float])
-      register(classOf[Double])
-      register(classOf[String])
-      register(classOf[Null])
       register(classOf[TestRecord])
       initialize()
     }
@@ -101,8 +96,8 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
     val producer = new KafkaProducer[Int, TestRecord](
       Map("bootstrap.servers" -> kafkaBootstrap).mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerializer[Int](TestRegistry),
-      KafkaSerializer[TestRecord](TestRegistry)
+      KafkaAvroSerializer[Int](TestRegistry),
+      KafkaAvroSerializer[TestRecord](TestRegistry)
     )
 
     val updates = for (i <- (1 to 10)) yield {
@@ -120,8 +115,8 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaDeserializer[Int](TestRegistry),
-      KafkaDeserializer[TestRecord](TestRegistry))
+      KafkaAvroDeserializer[Int](TestRegistry),
+      KafkaAvroDeserializer[TestRecord](TestRegistry))
 
     consumer.subscribe(List(topic))
     try {
