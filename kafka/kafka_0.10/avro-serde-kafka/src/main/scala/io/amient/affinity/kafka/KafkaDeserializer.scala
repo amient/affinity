@@ -12,6 +12,9 @@ object KafkaDeserializer {
   def apply[T](config: Config): Deserializer[T] = apply[T](AvroSerde.create(config))
 
   def apply[T](serde: AbstractSerde[_ >: T]) = new Deserializer[T] {
+
+    require(serde != null, "null serde provided")
+
     override def configure(configs: util.Map[String, _], isKey: Boolean) = ()
 
     override def close() = serde.close()

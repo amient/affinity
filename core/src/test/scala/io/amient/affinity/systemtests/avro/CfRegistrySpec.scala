@@ -17,7 +17,7 @@ class MyConfluentRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
   register(classOf[Composite])
 }
 
-class CfRegistryTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
+class CfRegistrySpec extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
 
   val config = configure(ConfigFactory.defaultReference)
     .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))

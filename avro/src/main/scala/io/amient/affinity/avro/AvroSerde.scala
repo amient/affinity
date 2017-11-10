@@ -30,17 +30,18 @@ import org.apache.avro.generic.IndexedRecord
 object AvroSerde {
   final val CONFIG_PROVIDER_CLASS = "affinity.avro.schema.provider.class"
   def create(config: Config): AvroSerde = {
-    val providerClass: Class[_ <: AvroSerde] = if (!config.hasPath(CONFIG_PROVIDER_CLASS)) null else {
+    require(config.hasPath(CONFIG_PROVIDER_CLASS), "missing configuration " + CONFIG_PROVIDER_CLASS)
+    val providerClass: Class[_ <: AvroSerde] = {
       val providerClassName = config.getString(CONFIG_PROVIDER_CLASS)
       Class.forName(providerClassName).asSubclass(classOf[AvroSerde])
     }
 
-    val instance = if (providerClass == null) null else try {
+    val instance = try {
       providerClass.getConstructor(classOf[Config]).newInstance(config)
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }
-    if (instance != null) instance.initialize()
+    instance.initialize()
     instance
   }
 }
