@@ -44,7 +44,7 @@ trait AvroSchemaProvider {
 
   private[schema] def hypersynchronized[X](f: => X): X
 
-  @volatile private var registration = ListBuffer[(Type, Class[_], Schema)]()
+  private val registration = ListBuffer[(Type, Class[_], Schema)]()
 
   register(classOf[Null])
   register(classOf[Boolean])
@@ -87,8 +87,17 @@ trait AvroSchemaProvider {
   final def initialize(): List[Int] = hypersynchronized {
     val all: List[(Int, Schema)] = getAllRegistered
     def getVersions(cls: Class[_]): List[(Int, Schema)] = {
-      val FQN = cls.getName
-      all.filter(_._2.getFullName == FQN)
+      all.filter(_._2.getFullName match {
+        case "null" => cls == classOf[Null]
+        case "boolean" => cls == classOf[Boolean]
+        case "int" => cls == classOf[Int]
+        case "long" => cls == classOf[Long]
+        case "float" => cls == classOf[Float]
+        case "double" => cls == classOf[Double]
+        case "string" => cls == classOf[String]
+        case "bytes" => cls == classOf[java.nio.ByteBuffer]
+        case fqn => cls.getName == fqn
+      })
     }
     val result = ListBuffer[Int]()
     val _register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
@@ -142,8 +151,6 @@ trait AvroSchemaProvider {
   final def register[T: TypeTag](cls: Class[T], schema: Schema): Unit = {
     registration += ((typeOf[T], cls, schema))
   }
-
-
 
 
 

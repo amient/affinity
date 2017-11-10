@@ -18,7 +18,6 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   def numPartitions: Int
 
   private val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
-  println(s"Embedded Kafka Test dir: $testDir")
   testDir.mkdirs()
 
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
@@ -40,6 +39,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
   val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
   tmpZkClient.close
+  println(s"Embedded Kafka $kafkaBootstrap, data dir: $testDir")
 
   abstract override def afterAll(): Unit = {
     try {

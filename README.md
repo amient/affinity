@@ -59,7 +59,7 @@ The codebase is split into several modules:
  - `kafka/kafka_10/test-util-kafka` provides EmbeddedKafka and EmbeddedCfRegistry for testing
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
- - `spark/spark_2.0` exposes underlying kafka storage as CompactedKafkaRDD with all the serde magic
+ - `spark/spark_2.0` exposes underlying kafka storage as KafkaRDD with all the serde magic
  - `testutil/testing-core` system test utilities (see examples for usage) (Scala)
  - `testutil/testing-kafka_0.10` system test utilities with embedded kafka storage and avro registries
  - `testutil/testing-zk` provides EmbeddedZookeeper utility for testing

@@ -34,12 +34,12 @@ abstract class AbstractWrapSerde(serdes: Serdes) extends JSerializer {
   }
 
   def toBinaryWrapped(wrapped: AnyRef, offset: Int = 0): Array[Byte] = {
-      val delegate = serdes.find(wrapped)
-      val bytes = delegate.toBinary(wrapped)
-      val result = new Array[Byte](bytes.length + 4 + offset)
-      ByteUtils.putIntValue(delegate.identifier, result, 0)
-      Array.copy(bytes, 0, result, 4 + offset, bytes.length)
-      result
+    val delegate = serdes.find(wrapped)
+    val bytes = delegate.toBinary(wrapped)
+    val result = new Array[Byte](bytes.length + 4 + offset)
+    ByteUtils.putIntValue(delegate.identifier, result, 0)
+    Array.copy(bytes, 0, result, 4 + offset, bytes.length)
+    result
   }
 
   override def includeManifest: Boolean = false

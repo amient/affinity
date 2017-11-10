@@ -12,7 +12,6 @@ trait EmbeddedZooKeeper extends BeforeAndAfterAll {
   self: Suite =>
 
   private val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
-  println(s"Embedded ZooKeeper test dir: $testDir")
   testDir.mkdirs()
 
   private val embeddedZkPath = new File(testDir, "local-zookeeper")
@@ -22,6 +21,7 @@ trait EmbeddedZooKeeper extends BeforeAndAfterAll {
   private val zkFactory = new NIOServerCnxnFactory
   zkFactory.configure(new InetSocketAddress(0), 10)
   val zkConnect = "localhost:" + zkFactory.getLocalPort
+  println(s"Embedded ZooKeeper $zkConnect, data directory: $testDir")
   zkFactory.startup(zookeeper)
 
   abstract override def afterAll(): Unit = {

@@ -22,8 +22,9 @@ package io.amient.affinity.core.serde
 import akka.serialization.SerializationExtension
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.IntegrationTestBase
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.serde.collection.SeqSerde
-import io.amient.affinity.core.serde.primitive.{OptionSerde}
+import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.transaction.TestKey
 import org.scalatest.Matchers
 
@@ -31,6 +32,15 @@ import scala.collection.immutable.Seq
 
 class WrapSerdesSpec extends IntegrationTestBase with Matchers {
 
+  "TupleSerde" must {
+    "work with wrapped tuple3" in {
+      val in = (1000, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, "graph")
+      val bytes = SerializationExtension(system).serialize(in).get
+      val out = SerializationExtension(system).deserialize(bytes, classOf[Tuple3[Int, String, String]]).get
+      out should be(in)
+    }
+
+  }
 
   "OptionSerde" must {
 

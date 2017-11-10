@@ -50,11 +50,9 @@ trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
       * WebSocket GET /vertex?id=<vid>
       */
     case http@HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>
-      System.err.println("!!!!!!!!!!!!!!!!!!!!!!!")
       http.request.header[UpgradeToWebSocket] match {
         case None => response.success(Encoder.html(OK, html))
         case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          System.err.println("$$$$$$$$$$$$$$$$$$$$$$")
           try {
             avroWebSocket(upgrade, graphService, "graph", vertex) {
               case x: Edge => println("My custom handler of Edge: " + x)

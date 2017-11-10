@@ -116,7 +116,6 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     }
 
     val updateBatch: RDD[(Int, Component)] = sc.parallelize(Array((1, null), (2, Component(0L, Set()))))
-
     componentRdd.update(updateBatch)
 
     componentRdd.collect.toList match {
