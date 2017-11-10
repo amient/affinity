@@ -17,21 +17,34 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.primitive
+package io.amient.affinity.avro.schema
 
-import io.amient.affinity.core.serde.Serde
+import java.util.concurrent.ConcurrentHashMap
 
-class StringSerde extends Serde[String] {
+import io.amient.affinity.avro.AvroSerde
+import org.apache.avro.Schema
 
-  override def fromBytes(bytes: Array[Byte]): String = if (bytes == null) null else {
-    new String(bytes, "UTF-8")
+import scala.collection.JavaConverters._
+
+class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
+
+  protected val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
+
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
+    val existing = internal.asScala.filter(_._2 == (cls, schema))
+    if (existing.isEmpty) {
+      val newId = internal.size
+      internal.put(newId, (cls, schema))
+      newId
+    } else {
+      existing.keys.max
+    }
   }
 
-  override def toBytes(obj: String): Array[Byte] = if (obj == null) null else {
-    obj.getBytes("UTF-8")
+  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
+    internal.asScala.mapValues(_._2).toList
   }
 
-  override def identifier: Int = 103
+  override private[schema] def hypersynchronized[X](f: => X): X = synchronized(f)
 
-  override def close(): Unit = ()
 }

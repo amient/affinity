@@ -37,6 +37,9 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
                                          valueSerde: => AbstractSerde[_ >: V],
                                          compacted: Boolean = false) extends RDD[(K, V)](sc, Nil) {
 
+  def this(sc: SparkContext, client: KafkaClient, serde: => AbstractSerde[Any], compacted: Boolean) =
+    this(sc, client, serde, serde, compacted)
+
 
   val compactor = (m1: PayloadAndOffset, m2: PayloadAndOffset) => if (m1.offset > m2.offset) m1 else m2
 

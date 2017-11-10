@@ -19,22 +19,15 @@
 
 package io.amient.affinity.core
 
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.serde.avro._
-import io.amient.affinity.avro.schema.EmbeddedAvroSchemaProvider
 import io.amient.affinity.core.transaction.{TestKey, TestValue}
 
-class TestAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
+class TestAvroSerde extends MemorySchemaRegistry {
   register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
   register(classOf[Composite])
   register(classOf[Base])
-  register(classOf[Boolean])
-  register(classOf[Int])
-  register(classOf[Long])
-  register(classOf[Float])
-  register(classOf[Double])
-  register(classOf[String])
-  register(classOf[Null])
   register(classOf[TestKey])
   register(classOf[TestValue])
 

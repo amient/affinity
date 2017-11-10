@@ -26,10 +26,9 @@ import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.{KafkaDeserializer, KafkaObjectHashPartitioner, KafkaSerde}
+import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.{SystemTestBaseWithConfluentRegistry, SystemTestBaseWithKafka}
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -104,11 +103,12 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
       "max.poll.records" -> 1000
     )
 
+    val serdeConfig = ConfigFactory.parseMap(Map(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaDeserializer(new IntSerde),
-      KafkaSerde.of[TestRecord](
-        ConfigFactory.parseMap(Map(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))))
+      KafkaSerde.of[Int](serdeConfig),
+      KafkaSerde.of[TestRecord](serdeConfig))
+
 
     consumer.subscribe(List(topic))
     try {

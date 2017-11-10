@@ -7,10 +7,9 @@ import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
-import io.amient.affinity.core.serde.primitive.IntSerde
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.KafkaDeserializer
+import io.amient.affinity.kafka.KafkaAvroDeserializer
 import io.amient.affinity.systemtests.{KEY, TestRecord, TestZkAvroRegistry, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -80,8 +79,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
     val registry = AvroSerde.create(system.settings.config)
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
-      KafkaDeserializer(new IntSerde()),
-      KafkaDeserializer[TestRecord](registry))
+      KafkaAvroDeserializer[Int](registry),
+      KafkaAvroDeserializer[TestRecord](registry))
 
     consumer.subscribe(List(topic).asJava)
     try {

@@ -26,7 +26,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.confluent.kafka.serializers.{KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericContainer
 import org.apache.kafka.common.serialization.{Deserializer, Serializer}
 import scala.collection.JavaConversions._
@@ -65,11 +64,11 @@ object KafkaSerde {
         val props = new java.util.HashMap[String, Object]()
         props.put("schema.registry.url", config.getString(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE))
 
-        val cfDeserializer = new KafkaAvroDeserializer() {
+        val cfDeserializer = new io.confluent.kafka.serializers.KafkaAvroDeserializer() {
           configure(props, false)
         }
 
-        val cfSerializer = new KafkaAvroSerializer() {
+        val cfSerializer = new io.confluent.kafka.serializers.KafkaAvroSerializer() {
           configure(props, false)
           override protected def serializeImpl(subject: String, data: Any): Array[Byte] = {
             //internal registry will lookup the schema by <topic>-value or <topic>-key so we need to intercept

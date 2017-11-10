@@ -26,6 +26,7 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{Decoder, Encoder}

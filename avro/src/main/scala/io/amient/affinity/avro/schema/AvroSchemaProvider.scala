@@ -44,6 +44,16 @@ trait AvroSchemaProvider {
 
   private[schema] def hypersynchronized[X](f: => X): X
 
+  @volatile private var registration = ListBuffer[(Type, Class[_], Schema)]()
+
+  register(classOf[Null])
+  register(classOf[Boolean])
+  register(classOf[Int])
+  register(classOf[Long])
+  register(classOf[Float])
+  register(classOf[Double])
+  register(classOf[String])
+
   def describeSchemas: Map[Int, (Type, Schema)] = cache1
 
   /**
@@ -73,8 +83,6 @@ trait AvroSchemaProvider {
         }
     }
   }
-
-  @volatile private var registration = ListBuffer[(Type, Class[_], Schema)]()
 
   final def initialize(): List[Int] = hypersynchronized {
     val all: List[(Int, Schema)] = getAllRegistered

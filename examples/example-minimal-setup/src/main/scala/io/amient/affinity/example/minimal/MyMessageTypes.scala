@@ -20,11 +20,11 @@
 
 package io.amient.affinity.example.minimal
 
-import io.amient.affinity.avro.schema.EmbeddedAvroSchemaProvider
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.util.Reply
 
-class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {
+class MyAvroSerde extends MemorySchemaRegistry {
     register(classOf[GetValue])
     register(classOf[PutValue])
 }
