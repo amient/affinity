@@ -6,7 +6,8 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
+import io.amient.affinity.kafka.EmbeddedCfRegistry
+import io.amient.affinity.testutil.{SystemTestBase, SystemTestBaseWithConfluentRegistry}
 import org.scalatest.FlatSpec
 
 
@@ -16,9 +17,10 @@ class MyConfluentRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
   register(classOf[Composite])
 }
 
-class CfRegistryTest extends FlatSpec with SystemTestBaseWithConfluentRegistry {
+class CfRegistryTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
 
   val config = configure(ConfigFactory.defaultReference)
+    .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
     .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))
 
   assert(config.getString(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE) == registryUrl)

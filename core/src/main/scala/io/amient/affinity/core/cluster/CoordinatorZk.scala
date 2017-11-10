@@ -23,7 +23,7 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
-import io.amient.affinity.core.util.ZooKeeperClient
+import io.amient.affinity.avro.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
 import org.apache.zookeeper.CreateMode
 

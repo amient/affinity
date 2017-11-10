@@ -37,14 +37,6 @@ buildscript {
 }
 
 apply plugin: "com.github.johnrengelman.shadow"
-
-//shadowJar {
-//    dependencies {
-//        project.configurations.provided.dependencies.each {
-//            exclude(it)
-//        }
-//    }
-//}
 assemble.dependsOn shadowJar
 
 dependencies {

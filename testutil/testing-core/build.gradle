@@ -25,14 +25,13 @@ def installer = install.repositories.mavenInstaller
 
 dependencies {
     compile project(':core')
-    compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
-    compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
-    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
+    compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
+    compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: scalaCheckVersion
+    compile group: 'org.apache.zookeeper', name: 'zookeeper', version: zookeeperVersion, ext: 'pom'
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaHttpVersion
-    compile group: 'org.apache.avro', name: 'avro', version: avroVersion
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
     compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: jacksonVersion
 }

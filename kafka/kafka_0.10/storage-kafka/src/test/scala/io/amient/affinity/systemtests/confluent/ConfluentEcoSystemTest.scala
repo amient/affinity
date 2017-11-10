@@ -31,7 +31,7 @@ import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.kafka.{KafkaDeserializer, KafkaObjectHashPartitioner, KafkaSerde}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
-import io.amient.affinity.testutil.SystemTestBaseWithConfluentRegistry
+import io.amient.affinity.testutil.{SystemTestBaseWithConfluentRegistry, SystemTestBaseWithKafka}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
@@ -41,7 +41,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithConfluentRegistry with Matchers {
+class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with SystemTestBaseWithConfluentRegistry with Matchers {
 
   override def numPartitions = 2
 

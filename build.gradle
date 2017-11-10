@@ -5,11 +5,14 @@ ext {
     javaVersion = '1.8'
     junitVersion = '4.12'
     scalaVersion = '2.11.8'
+    scalaTestVersion = '2.2.6'
+    scalaCheckVersion = '1.12.5'
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
     typesafeConfigVersion = '1.3.0'
     akkaVersion = '2.4.20'
     akkaHttpVersion = '10.0.10'
-    zkClientVersion = '0.9'
+    zkClientVersion = '0.8'
+    zookeeperVersion = '3.4.5'
     avroVersion = '1.8.2'
     jacksonVersion = '2.7.5'
 }
@@ -80,7 +83,7 @@ allprojects {
         test.dependsOn scalaTest
 
         dependencies {
-            testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: '2.2.6'
+            testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
             testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
         }
     }

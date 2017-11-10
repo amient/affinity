@@ -1,0 +1,41 @@
+group = rootProject.group
+version = rootProject.version
+
+ext {
+    kafkaVersion = project(':kafka:kafka_0.10').ext.kafkaVersion
+    confluentVersion = project(':kafka:kafka_0.10').ext.confluentVersion
+}
+
+
+apply plugin: 'scala'
+apply plugin: 'java'
+apply plugin: 'signing'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'test-util-kafka_0.10-scala_' + baseScalaVersion
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId 'test-util-kafka_0.10-scala_' + baseScalaVersion
+            from components.java
+        }
+    }
+}
+install.repositories.mavenInstaller.pom.artifactId = 'test-util-kafka_0.10-scala_' + baseScalaVersion
+def installer = install.repositories.mavenInstaller
+[installer]*.pom*.whenConfigured { pom ->
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-zk' }.artifactId = 'testing-zk-scala_'+baseScalaVersion
+}
+
+dependencies {
+    compile project(':avro')
+    compile project(':testutil:testing-zk')
+    compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
+    compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
+    compile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
+    compile group: 'io.confluent', name: 'kafka-schema-registry-client', version: confluentVersion
+}
+
+
+
