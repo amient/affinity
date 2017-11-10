@@ -50,15 +50,21 @@ but the design is expecting this to come in future).
 The codebase is split into several modules:
 
  - `api` is the internal programming api and utiliities for writing memstore and storage plugins (Java)
+ - `avro` scala case class <--> avro automatic conversion with schema registry wrappers (conf,zk,local,embedded) (Scala)
  - `core` is the main scala library with js-avro extension (Scala)
- - `examples/..` contain example applications of the core library (Scala)
- - `testutil/testing-core` system test utilities (see examples for usage) (Scala)
- - `testutil/testing-kafka_0.10` system test utilities with embedded kafka and registry
- - `kafka` module with kafka storage and confluent schema provider (Scala)
+ - `examples/..` contain example applications (Scala)
+ - `kafka/kafka_10/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
+ - `kafka/kafka_10/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala) 
+ - `kafka/kafka_10/storage-kafka` module with kafka storage and confluent schema provider (Scala)
+ - `kafka/kafka_10/test-util-kafka` provides EmbeddedKafka and EmbeddedCfRegistry for testing
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
+ - `spark/spark_2.0` exposes underlying kafka storage as CompactedKafkaRDD with all the serde magic
+ - `testutil/testing-core` system test utilities (see examples for usage) (Scala)
+ - `testutil/testing-kafka_0.10` system test utilities with embedded kafka storage and avro registries
+ - `testutil/testing-zk` provides EmbeddedZookeeper utility for testing
  - `ws-client` custom web socket with avro support written (Java)
- - `spark` module exposes underlying kafka storage as CompactedKafkaRDD with all the serialization support
+ 
  
 The following core features are already in place:
 
@@ -147,3 +153,10 @@ When doing a lot of work on the javascript watchify can be used
     npm install -g watchify
     watchify core/src/main/resources/affinity_node.js -v -o core/src/main/resources/affinity.js -d
  
+## Avro Schemas
+
+..
+
+### Avro Kafka Serializer and Deserializer
+
+...

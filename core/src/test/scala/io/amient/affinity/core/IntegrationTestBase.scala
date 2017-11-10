@@ -69,7 +69,7 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
     servicesReady.synchronized {
       while (!servicesReady.contains(group)) {
         servicesReady.wait(5000)
-        if (System.currentTimeMillis() - t > 15000) assert(servicesReady.contains(group))
+        if (System.currentTimeMillis() - t > 15000) require(servicesReady.contains(group))
       }
     }
   }

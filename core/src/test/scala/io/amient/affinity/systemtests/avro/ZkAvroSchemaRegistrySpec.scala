@@ -20,9 +20,10 @@
 package io.amient.affinity.systemtests.avro
 
 import akka.actor.ActorSystem
+import io.amient.affinity.avro._
+import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.avro.util.ZooKeeperClient
 import io.amient.affinity.core.serde.avro._
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
-import io.amient.affinity.core.util.ZooKeeperClient
 import io.amient.affinity.testutil.SystemTestBaseWithZk
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}

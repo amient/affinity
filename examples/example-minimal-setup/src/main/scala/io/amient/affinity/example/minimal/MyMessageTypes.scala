@@ -20,8 +20,8 @@
 
 package io.amient.affinity.example.minimal
 
-import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.schema.EmbeddedAvroSchemaProvider
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.Reply
 
 class MyAvroSerde extends AvroSerde with EmbeddedAvroSchemaProvider {

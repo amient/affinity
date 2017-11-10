@@ -18,7 +18,7 @@
  */
 package io.amient.affinity.model.graph.message
 
-import io.amient.affinity.core.serde.avro.AvroRecord
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.transaction.Instruction
 
 final case class DeleteComponent(cid: Int) extends AvroRecord[DeleteComponent] with Instruction[Option[Component]] {

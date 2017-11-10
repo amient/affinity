@@ -44,7 +44,7 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
-import io.amient.affinity.core.serde.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.util.ByteBufferInputStream
 
@@ -52,6 +52,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.postfixOps
+import scala.util.Try
 import scala.util.control.NonFatal
 
 object GatewayHttp {
@@ -232,14 +233,20 @@ trait WebSocketSupport extends GatewayHttp {
 
   private val config: Config = context.system.settings.config
 
-  private val afjs = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/affinity.js")).mkString
+  private val afjs = try {
+    Some(scala.io.Source.fromInputStream(getClass.getResourceAsStream("/affinity.js")).mkString)
+  } catch {
+    case NonFatal(e) =>
+      log.warning("Could not load /affinity.js - it probably wasn't compiled from the affinity_node.js source, see README file for instructions: " + e.getMessage )
+      None
+  }
 
   private val serializers = SerializationExtension(context.system).serializerByIdentity
 
   private val avroSerde = AvroSerde.create(config)
 
   abstract override def handle: Receive = super.handle orElse {
-    case http@HTTP(GET, PATH("affinity.js"), _, response) => response.success(Encoder.plain(OK, afjs))
+    case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.plain(OK, afjs.get))
   }
 
   protected def jsonWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)

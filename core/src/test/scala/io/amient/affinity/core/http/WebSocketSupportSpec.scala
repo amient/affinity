@@ -27,6 +27,7 @@ import akka.actor.Props
 import akka.http.scaladsl.model.HttpMethods.GET
 import akka.pattern.ask
 import akka.util.Timeout
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor._

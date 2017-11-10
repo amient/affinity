@@ -20,7 +20,7 @@
 package io.amient.affinity.example.data
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.model.graph.GraphData
 
 class MyAvroSerde(config: Config) extends ZkAvroSchemaRegistry(config) {

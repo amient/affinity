@@ -1,19 +1,11 @@
 package io.amient.affinity.core.cluster
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.HttpMethods.GET
-import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes.{NotFound, OK}
-import akka.util.Timeout
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{GatewayHttp}
-import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.testutil.{MyTestPartition, SystemTestBaseWithZk}
+import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.testutil.SystemTestBaseWithZk
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.duration._
 import scala.collection.JavaConversions._
 
 class ZkCoordinatorTest extends FlatSpec with SystemTestBaseWithZk with Matchers {
@@ -42,8 +34,6 @@ class ZkCoordinatorTest extends FlatSpec with SystemTestBaseWithZk with Matchers
 //        }
 //    }
   })
-
-  import gatewayNode._
 
   val regionNode1 = new Node(config.withValue("affinity.node.container.region",
     ConfigValueFactory.fromIterable(List(0,1,2,3))))

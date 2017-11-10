@@ -23,11 +23,10 @@ import java.util.Properties
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.serde.avro.AvroSerde
 import io.amient.affinity.core.serde.primitive.IntSerde
-import io.amient.affinity.example.data.MyAvroSerde
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping

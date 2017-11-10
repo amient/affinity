@@ -8,8 +8,6 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 //uploadArchives.repositories.mavenDeployer.pom.artifactId = 'core-scala_' + baseScalaVersion
-install.repositories.mavenInstaller.pom.artifactId = 'core-scala_' + baseScalaVersion
-
 publishing {
     publications {
         maven(MavenPublication) {
@@ -18,6 +16,12 @@ publishing {
         }
     }
 }
+install.repositories.mavenInstaller.pom.artifactId = 'core-scala_' + baseScalaVersion
+def installer = install.repositories.mavenInstaller
+[installer]*.pom*.whenConfigured { pom ->
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro' }.artifactId = 'avro-scala_'+baseScalaVersion
+}
+
 
 dependencies {
 
@@ -27,13 +31,13 @@ dependencies {
     testCompile project(':ws-client')
 
     compile project(':api')
+    compile project(':avro')
     compile 'org.scala-lang:scala-library:' + scalaVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaHttpVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
-    compile group: 'org.apache.avro', name: 'avro', version: avroVersion
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
     compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: jacksonVersion
 

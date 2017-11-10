@@ -19,44 +19,17 @@
 
 package io.amient.affinity.testutil
 
-import java.io.File
-import java.util.Properties
-
 import com.typesafe.config.{Config, ConfigValueFactory}
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{Service, Partition}
+import io.amient.affinity.core.actor.{Partition, Service}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.core.util.{Reply, ZooKeeperClient}
-import kafka.cluster.Broker
-import kafka.server.{KafkaConfig, KafkaServerStartable}
-import org.apache.kafka.common.protocol.SecurityProtocol
+import io.amient.affinity.core.util.Reply
+import io.amient.affinity.kafka.EmbeddedKafka
 
 import scala.collection.JavaConverters._
 
-trait SystemTestBaseWithKafka extends SystemTestBaseWithZk {
-
-  def numPartitions: Int
-
-  private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
-  private val kafkaConfig = new KafkaConfig(new Properties {
-    {
-      put("broker.id", "1")
-      put("host.name", "localhost")
-      put("port", "0")
-      put("log.dir", embeddedKafkaPath.toString)
-      put("num.partitions", numPartitions.toString)
-      put("auto.create.topics.enable", "true")
-      put("zookeeper.connect", zkConnect)
-    }
-  })
-  private val kafka = new KafkaServerStartable(kafkaConfig)
-  kafka.startup()
-
-  val tmpZkClient = new ZooKeeperClient(zkConnect)
-  val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
-  val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
-  tmpZkClient.close
+trait SystemTestBaseWithKafka extends SystemTestBaseWithZk with EmbeddedKafka {
 
   override def configure(config: Config): Config = super.configure(config)
     .withValue(Service.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2)) match {
@@ -70,16 +43,6 @@ trait SystemTestBaseWithKafka extends SystemTestBaseWithZk {
           cfg.withValue(p + "." + KafkaStorage.CONFIG_KAFKA_BOOTSTRAP_SERVERS, ConfigValueFactory.fromAnyRef(kafkaBootstrap))
         }
   }
-
-  override def afterAll(): Unit = {
-    try {
-      kafka.shutdown()
-    } catch {
-      case e: IllegalStateException => //
-    }
-    super.afterAll()
-  }
-
   class MyTestPartition(topic: String) extends Partition {
 
     import MyTestPartition._

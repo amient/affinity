@@ -19,8 +19,9 @@
 
 package io.amient.affinity.core.serde.avro
 
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.TestAvroSerde
-import io.amient.affinity.core.serde.avro.schema.EmbeddedAvroSchemaProvider
+import io.amient.affinity.avro.schema.EmbeddedAvroSchemaProvider
 import org.scalatest.{FlatSpec, Matchers}
 
 class AvroSerdeSpec extends FlatSpec with Matchers {

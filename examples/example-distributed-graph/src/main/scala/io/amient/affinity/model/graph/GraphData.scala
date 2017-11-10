@@ -19,7 +19,7 @@
 
 package io.amient.affinity.model.graph
 
-import io.amient.affinity.core.serde.avro.schema.AvroSchemaProvider
+import io.amient.affinity.avro.schema.AvroSchemaProvider
 import io.amient.affinity.model.graph.message._
 
 object GraphData {

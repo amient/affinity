@@ -1,5 +1,13 @@
-include ':api', ':core', ':rocksdb', ':mapdb', ':ws-client', ':testutil:testing-core',
-        ':kafka:kafka_0.10', ':kafka:kafka_0.10:avro-formatter', ':testutil:testing-kafka_0.10',
+include ':api', ':avro', ':core', ':rocksdb', ':mapdb',
+        ':kafka:kafka_0.10',
+        ':kafka:kafka_0.10:storage-kafka',
+        ':kafka:kafka_0.10:avro-serde-kafka',
+        ':kafka:kafka_0.10:avro-formatter-kafka',
+        ':kafka:kafka_0.10:test-util-kafka',
         ':spark:spark_2.0',
+        ':ws-client',
         ':examples:example-distributed-graph',
-        ':examples:example-minimal-setup'
+        ':examples:example-minimal-setup',
+        ':testutil:testing-core',
+        ':testutil:testing-zk',
+        ':testutil:testing-kafka_0.10'

@@ -21,6 +21,7 @@ package io.amient.affinity.core.serde.avro
 import java.nio.ByteBuffer
 import java.util.UUID
 
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.ByteUtils
 
 object Side extends Enumeration {
