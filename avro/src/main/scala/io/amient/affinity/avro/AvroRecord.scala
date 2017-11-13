@@ -81,6 +81,23 @@ object AvroRecord {
     read(record)
   }
 
+  def deriveValue(schemaField: Schema, value: Any): AnyRef = {
+    schemaField.getType match {
+      case ARRAY => value.asInstanceOf[Iterable[_]].map(deriveValue(schemaField.getElementType, _)).asJava
+      case ENUM => new EnumSymbol(schemaField, value)
+      case MAP => value.asInstanceOf[Map[String, _]].mapValues(deriveValue(schemaField.getValueType, _)).asJava
+      case UNION => value match {
+        case None => null
+        case Some(x) => deriveValue(schemaField.getTypes.get(1), x)
+      }
+      case _ => value match {
+        case ref: AnyRef => ref
+        case any => throw new NotImplementedError(s"Unsupported avro type conversion for $any")
+      }
+    }
+  }
+
+
 
   /**
     *
@@ -135,9 +152,6 @@ object AvroRecord {
   }
 
   private def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
-    if (datum == null) {
-      return null
-    }
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])
@@ -146,7 +160,9 @@ object AvroRecord {
       case DOUBLE => new java.lang.Double(datum.asInstanceOf[Double])
       case LONG => new java.lang.Long(datum.asInstanceOf[Long])
       case BYTES => datum.asInstanceOf[java.nio.ByteBuffer]
+      case STRING if datum == null => null
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
+      case RECORD if datum == null => null
       case RECORD =>
         val record = datum.asInstanceOf[GenericRecord]
         val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
@@ -184,8 +200,13 @@ object AvroRecord {
         } else {
           iterable
         }
+      case UNION if (tpe <:< typeOf[Option[_]]) =>
+        datum match {
+          case null => None
+          case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
+        }
+      case UNION => throw new NotImplementedError("Only Option-like Avro Unions are supported, e.g. union(null, X)")
       case FIXED => throw new NotImplementedError("Avro Fixed are not supported")
-      case UNION => throw new NotImplementedError("Avro Unions are not supported")
     }
   }
 
@@ -230,6 +251,8 @@ object AvroRecord {
                 val args = enumSymbols.toSeq.map(_.toString)
                 SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
             }
+          } else if (tpe <:< typeOf[Option[_]]) {
+            SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
           } else if (tpe <:< typeOf[AvroRecord[_]]) {
 
             val moduleMirror = rootMirror.reflectModule(tpe.typeSymbol.companion.asModule)
@@ -238,22 +261,14 @@ object AvroRecord {
             val params = constructor.asMethod.paramLists(0)
             val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
               case (assembler, (symbol, i)) =>
-                val field = assembler.name(symbol.name.toString).`type`(inferSchema(symbol.typeSignature))
+                val fieldSchema = inferSchema(symbol.typeSignature)
+                val field = assembler.name(symbol.name.toString).`type`(fieldSchema)
                 val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
                 if (defaultDef == NoSymbol) {
                   field.noDefault()
                 } else {
-                  val methodMirror = companionMirror.reflectMethod(defaultDef.asMethod)
-                  val default = methodMirror()
-                  if (symbol.typeSignature <:< typeOf[scala.Enumeration#Value]) {
-                    field.withDefault(default.asInstanceOf[Enumeration#Value].toString)
-                  } else if (tpe <:< typeOf[Map[_, _]]) {
-                    field.withDefault(default.asInstanceOf[Map[String, _]].asJava)
-                  } else if (symbol.typeSignature <:< typeOf[Iterable[_]]) {
-                    field.withDefault(default.asInstanceOf[Iterable[_]].toList.asJava)
-                  } else {
-                    field.withDefault(default)
-                  }
+                  val defaultGetter = companionMirror.reflectMethod(defaultDef.asMethod)
+                  field.withDefault(deriveValue(fieldSchema, defaultGetter()))
                 }
             }
             assembler.endRecord()
@@ -289,14 +304,7 @@ abstract class AvroRecord[X: TypeTag] extends SpecificRecord with java.io.Serial
   override def getSchema: Schema = schema
 
   final override def get(i: Int): AnyRef = {
-    val schemaField = schema.getFields.get(i)
-    val field = fields(i)
-    schemaField.schema().getType match {
-      case ARRAY => field.get(this).asInstanceOf[Iterable[_]].asJava
-      case ENUM => new EnumSymbol(schemaField.schema, field.get(this))
-      case MAP => field.get(this).asInstanceOf[Map[String, _]].asJava
-      case _ => field.get(this)
-    }
+    AvroRecord.deriveValue(schema.getFields.get(i).schema(), fields(i).get(this))
   }
 
   final override def put(i: Int, v: scala.Any): Unit = {

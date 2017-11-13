@@ -30,6 +30,9 @@ class TestAvroSerde extends MemorySchemaRegistry {
   register(classOf[Base])
   register(classOf[TestKey])
   register(classOf[TestValue])
+  register(classOf[AvroEnums])
+  register(classOf[AvroPrmitives])
+  register(classOf[AvroNamedRecords])
 
   override def close(): Unit = ()
 }

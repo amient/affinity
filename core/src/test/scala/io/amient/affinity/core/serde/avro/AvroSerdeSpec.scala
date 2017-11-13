@@ -70,5 +70,39 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     newSerde.fromBytes(newSerde.toBytes("hello")) should equal("hello")
   }
 
+  "Scala Enums" should "be treated as EnumSymbols" in {
+    val serialized = newSerde.toBytes(AvroEnums())
+    newSerde.fromBytes(serialized) should be (AvroEnums())
+    val a = AvroEnums(Side.RIGHT, Some(Side.RIGHT), None, List(Side.LEFT, Side.RIGHT), List(None, Some(Side.RIGHT)))
+    val as = newSerde.toBytes(a)
+    newSerde.fromBytes(as) should be (a)
+  }
+
+  "Optional types" should "be treated as union(null, X)" in {
+    val emptySerialized = newSerde.toBytes(AvroPrmitives())
+    val empty = newSerde.fromBytes(emptySerialized)
+    empty should equal(AvroPrmitives())
+    val nonEmpty = AvroPrmitives(
+      None, Some(true),
+      None, Some(Int.MinValue),
+      None, Some(Long.MaxValue),
+      None, Some(Float.MaxValue),
+      None, Some(Double.MaxValue),
+      None, Some("Hello")
+    )
+    val nonEmptySerialized = newSerde.toBytes(nonEmpty)
+    newSerde.fromBytes(nonEmptySerialized) should equal(nonEmpty)
+  }
+
+  "Case class types" should "be treated as Named Types" in {
+    val emptySerialized = newSerde.toBytes(AvroNamedRecords())
+    val empty = newSerde.fromBytes(emptySerialized)
+    empty should equal(AvroNamedRecords())
+
+    val a = AvroNamedRecords(ID(99), Some(ID(99)), None, List(ID(99), ID(100)), List(None, Some(ID(99)), None))
+    val as = newSerde.toBytes(a)
+    newSerde.fromBytes(as) should be (a)
+
+  }
 
 }

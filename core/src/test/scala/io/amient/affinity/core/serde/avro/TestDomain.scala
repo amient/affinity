@@ -54,3 +54,32 @@ case class AvroUUID(val data: ByteBuffer) extends AvroRecord[AvroUUID] {
   def uuid: UUID = ByteUtils.uuid(data.array)
   override def hashCode(): Int = data.hashCode()
 }
+
+case class AvroEnums(raw: Side.Value = Side.LEFT,
+                     on: Option[Side.Value] = None,
+                     sd: Option[Side.Value] = Some(Side.LEFT),
+                     l: List[Side.Value] = List(),
+                     lo: List[Option[Side.Value]] = List(Some(Side.RIGHT))
+                    ) extends AvroRecord[AvroEnums]
+
+case class AvroNamedRecords(
+                   e: ID = ID(0),
+                   rn: Option[ID] = None,
+                   rs: Option[ID] = Some(ID(0)),
+                   l: List[ID] = List(ID(0)),
+                   lo: List[Option[ID]] = List()) extends AvroRecord[AvroNamedRecords]
+
+case class AvroPrmitives(
+                        bn: Option[Boolean] = None,
+                       bs: Option[Boolean] = Some(true),
+                       in: Option[Int] = None,
+                       is: Option[Int] = Some(Int.MinValue),
+                       ln: Option[Long] = None,
+                       ls: Option[Long] = Some(Long.MinValue),
+                       fn: Option[Float] = None,
+                       fs: Option[Float] = Some(Float.MinValue),
+                       dn: Option[Double] = None,
+                       ds: Option[Double] = Some(Double.MinValue),
+                       sn: Option[String] = None,
+                       ss: Option[String] = Some("Hello")
+                       ) extends AvroRecord[AvroPrmitives]
