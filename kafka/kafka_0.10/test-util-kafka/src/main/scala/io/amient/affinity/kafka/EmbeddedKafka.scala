@@ -4,10 +4,10 @@ import java.io.File
 import java.nio.file.Files
 import java.util.Properties
 
-import io.amient.affinity.avro.util.ZooKeeperClient
-import io.amient.affinity.testutil.EmbeddedZooKeeper
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
+import org.I0Itec.zkclient.ZkClient
+import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.kafka.common.protocol.SecurityProtocol
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
@@ -35,7 +35,11 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   private val kafka = new KafkaServerStartable(kafkaConfig)
   kafka.startup()
 
-  val tmpZkClient = new ZooKeeperClient(zkConnect)
+  val tmpZkClient = new ZkClient(zkConnect, 5000, 6000, new ZkSerializer {
+    def serialize(o: Object): Array[Byte] = o.toString.getBytes
+    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+  })
+
   val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
   val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
   tmpZkClient.close

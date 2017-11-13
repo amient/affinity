@@ -1,23 +1,25 @@
-package io.amient.affinity.systemtests.avro
+package io.amient.affinity.core.serde
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.kafka.EmbeddedCfRegistry
-import io.amient.affinity.testutil.{SystemTestBase, SystemTestBaseWithConfluentRegistry}
+import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.FlatSpec
 
 
-class MyConfluentRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
-  register(classOf[ID])
-  register(classOf[Base])
-  register(classOf[Composite])
+case class ExampleType(val id: Int) extends AvroRecord[ExampleType] {
+  override def hashCode(): Int = id.hashCode()
 }
 
-class CfRegistrySpec extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
+
+class MyConfluentRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
+  register(classOf[ExampleType])
+}
+
+class AkkaSerializationSystemTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
 
   val config = configure(ConfigFactory.defaultReference)
     .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
@@ -31,8 +33,8 @@ class CfRegistrySpec extends FlatSpec with SystemTestBase with EmbeddedCfRegistr
     val system = ActorSystem.create("CfTest", config)
     try {
       val serialization = SerializationExtension(system)
-      val serde = serialization.serializerFor(classOf[ID])
-      assert(serde.fromBinary(serde.toBinary(ID(101))) == ID(101))
+      val serde = serialization.serializerFor(classOf[ExampleType])
+      assert(serde.fromBinary(serde.toBinary(ExampleType(101))) == ExampleType(101))
     } finally {
       system.terminate()
     }

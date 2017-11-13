@@ -56,13 +56,12 @@ The codebase is split into several modules:
  - `kafka/kafka_10/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
  - `kafka/kafka_10/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala) 
  - `kafka/kafka_10/storage-kafka` module with kafka storage and confluent schema provider (Scala)
- - `kafka/kafka_10/test-util-kafka` provides EmbeddedKafka and EmbeddedCfRegistry for testing
+ - `kafka/kafka_10/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
  - `spark/spark_2.0` exposes underlying kafka storage as KafkaRDD with all the serde magic
  - `testutil/testing-core` system test utilities (see examples for usage) (Scala)
  - `testutil/testing-kafka_0.10` system test utilities with embedded kafka storage and avro registries
- - `testutil/testing-zk` provides EmbeddedZookeeper utility for testing
  - `ws-client` custom web socket with avro support written (Java)
  
  

@@ -30,7 +30,7 @@ import org.scalatest.Matchers
 
 import scala.collection.immutable.Seq
 
-class WrapSerdesSpec extends IntegrationTestBase with Matchers {
+class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
 
   "TupleSerde" must {
     "work with wrapped tuple3" in {

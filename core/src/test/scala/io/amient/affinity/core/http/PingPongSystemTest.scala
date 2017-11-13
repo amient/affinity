@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.http
+package io.amient.affinity.core.http
 
 import akka.http.javadsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpMethods._
@@ -26,10 +26,8 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.{Decoder, Encoder}
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.testutil.SystemTestBase
 import org.scalatest.{FlatSpec, Matchers}

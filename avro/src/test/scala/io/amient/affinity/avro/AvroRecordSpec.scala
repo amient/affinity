@@ -1,42 +1,21 @@
-/*
- * Copyright 2016 Michal Harish, michal.harish@gmail.com
- *
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+package io.amient.affinity.avro
 
-package io.amient.affinity.core.serde.avro
-
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.TestAvroSerde
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import org.scalatest.{FlatSpec, Matchers}
 
-class AvroSerdeSpec extends FlatSpec with Matchers {
+class AvroRecordSpec extends FlatSpec with Matchers {
 
   /**
     * Data version 1 is written at some point in the past
     */
   val oldSerde = new MemorySchemaRegistry {
-    register(classOf[_V1_Composite])
+    register(classOf[Record_V1])
 
     //Future schema V2 available in old version - slightly unrealistic for embedded registry but here we're testing
     //the API for handling serialization, not the embedded implementation of registry, i.e. this would be true
     //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
-    register(classOf[_V1_Composite], AvroRecord.inferSchema(classOf[Composite]))
-    register(classOf[Base])
+    register(classOf[Record_V1], AvroRecord.inferSchema(classOf[Record]))
+    register(classOf[SimpleRecord])
     initialize()
 
     override def close(): Unit = ()
@@ -46,19 +25,19 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     * New version 2 of the case class and schema is added at the end of registry
     * the previous V1 schema version now points to the newest case class.
     */
-  val newSerde = new TestAvroSerde
+  val newSerde = new AvroRecordTestSerde
   newSerde.initialize()
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
-    val oldValue = oldSerde.toBytes(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 10))
+    val oldValue = oldSerde.toBytes(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 10))
     val renderedValue = newSerde.fromBytes(oldValue)
-    renderedValue should be(Composite(Seq(Base(ID(1), Side.LEFT)), Map()))
+    renderedValue should be(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map()))
   }
 
   "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
-    val newValue = newSerde.toBytes(Composite(Seq(Base(ID(1), Side.LEFT)), Map("1" -> Base(ID(1), Side.LEFT))))
+    val newValue = newSerde.toBytes(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("1" -> SimpleRecord(SimpleKey(1), SimpleEnum.A))))
     val downgradedValue = oldSerde.fromBytes(newValue)
-    downgradedValue should be(_V1_Composite(Seq(Base(ID(1), Side.LEFT)), 0))
+    downgradedValue should be(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 0))
   }
 
   "Primitive types" should "be handled directly without registration" in {
@@ -73,7 +52,7 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
   "Scala Enums" should "be treated as EnumSymbols" in {
     val serialized = newSerde.toBytes(AvroEnums())
     newSerde.fromBytes(serialized) should be (AvroEnums())
-    val a = AvroEnums(Side.RIGHT, Some(Side.RIGHT), None, List(Side.LEFT, Side.RIGHT), List(None, Some(Side.RIGHT)))
+    val a = AvroEnums(SimpleEnum.B, Some(SimpleEnum.B), None, List(SimpleEnum.A, SimpleEnum.B), List(None, Some(SimpleEnum.B)))
     val as = newSerde.toBytes(a)
     newSerde.fromBytes(as) should be (a)
   }
@@ -99,10 +78,12 @@ class AvroSerdeSpec extends FlatSpec with Matchers {
     val empty = newSerde.fromBytes(emptySerialized)
     empty should equal(AvroNamedRecords())
 
-    val a = AvroNamedRecords(ID(99), Some(ID(99)), None, List(ID(99), ID(100)), List(None, Some(ID(99)), None))
+    val a = AvroNamedRecords(SimpleKey(99), Some(SimpleKey(99)), None, List(SimpleKey(99), SimpleKey(100)), List(None, Some(SimpleKey(99)), None))
     val as = newSerde.toBytes(a)
     newSerde.fromBytes(as) should be (a)
-
   }
+
+  //TODO #32 "Incompatible change" should "result in exception during registration" in
+
 
 }

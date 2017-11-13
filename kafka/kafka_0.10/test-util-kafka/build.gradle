@@ -25,14 +25,13 @@ publishing {
 install.repositories.mavenInstaller.pom.artifactId = 'test-util-kafka_0.10-scala_' + baseScalaVersion
 def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-zk' }.artifactId = 'testing-zk-scala_'+baseScalaVersion
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro' }.artifactId = 'avro-scala_'+baseScalaVersion
 }
 
 dependencies {
-    compile project(':avro')
-    compile project(':testutil:testing-zk')
     compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
+    compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: scalaCheckVersion
+    compile group: 'org.apache.zookeeper', name: 'zookeeper', version: zookeeperVersion, ext: 'pom'
+    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
     compile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
     compile group: 'io.confluent', name: 'kafka-schema-registry-client', version: confluentVersion

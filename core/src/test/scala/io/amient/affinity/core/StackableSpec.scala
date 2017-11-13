@@ -1,9 +1,9 @@
-package io.amient.affinity
+package io.amient.affinity.core
 
 import akka.actor.Actor.Receive
 
 
-object StackableTest extends App {
+object StackableSpec extends App {
 
   val gate = new Gate with Module1 with Module2
   gate.handle.apply("HI")

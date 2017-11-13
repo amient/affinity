@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.testutil.EmbeddedZooKeeper
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.util.Utf8
 import org.apache.kafka.clients.consumer.KafkaConsumer

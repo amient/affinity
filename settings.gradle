@@ -9,5 +9,4 @@ include ':api', ':avro', ':core', ':rocksdb', ':mapdb',
         ':examples:example-distributed-graph',
         ':examples:example-minimal-setup',
         ':testutil:testing-core',
-        ':testutil:testing-zk',
         ':testutil:testing-kafka_0.10'

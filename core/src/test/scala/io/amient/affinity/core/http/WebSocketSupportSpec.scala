@@ -32,6 +32,7 @@ import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.serde.{Base, ID, Side}
 import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.ws.AvroWebSocketClient
 import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
@@ -109,7 +110,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
       })
       try {
-        val schema = ws.getSchema("io.amient.affinity.core.serde.avro.Base")
+        val schema = ws.getSchema("io.amient.affinity.core.serde.Base")
         schema should equal(AvroRecord.inferSchema(classOf[Base]))
         ws.send(Base(ID(1), Side.LEFT, Seq(ID(2))))
         lastMessage.synchronized {

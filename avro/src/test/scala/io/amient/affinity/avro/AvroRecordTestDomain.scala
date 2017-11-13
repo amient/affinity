@@ -16,35 +16,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.amient.affinity.core.serde.avro
+package io.amient.affinity.avro
 
 import java.nio.ByteBuffer
 import java.util.UUID
 
-import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.ByteUtils
 
-object Side extends Enumeration {
-  type Side = Value
-  val LEFT, RIGHT = Value
+object SimpleEnum extends Enumeration {
+  type SimpleEnum = Value
+  val A, B, C = Value
 }
 
-case class ID(val id: Int) extends AvroRecord[ID] {
+case class SimpleKey(val id: Int) extends AvroRecord[SimpleKey] {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base] {
+case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord[SimpleRecord] {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class Composite(
-    val items: Seq[Base] = Seq(),
-    val index: Map[String, Base] = Map(),
-    val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord[Composite]
 
-case class _V1_Composite(val items: Seq[Base] = Seq(), val removed: Int = 0) extends AvroRecord[_V1_Composite]
+case class Record_V1(val items: Seq[SimpleRecord] = Seq(), val removed: Int = 0) extends AvroRecord[Record_V1]
 
-case class _V3_Composite(val items: Seq[Base] = Seq(), val index: Map[String, Base] = Map()) extends AvroRecord[_V3_Composite]
+case class Record(
+                val items: Seq[SimpleRecord] = Seq(),
+                val index: Map[String, SimpleRecord] = Map(),
+                val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord[Record]
+
+case class Record_V3(val items: Seq[SimpleRecord] = Seq(), val index: Map[String, SimpleRecord] = Map()) extends AvroRecord[Record_V3]
 
 object AvroUUID {
   def apply(uuid: UUID): AvroUUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
@@ -55,19 +55,19 @@ case class AvroUUID(val data: ByteBuffer) extends AvroRecord[AvroUUID] {
   override def hashCode(): Int = data.hashCode()
 }
 
-case class AvroEnums(raw: Side.Value = Side.LEFT,
-                     on: Option[Side.Value] = None,
-                     sd: Option[Side.Value] = Some(Side.LEFT),
-                     l: List[Side.Value] = List(),
-                     lo: List[Option[Side.Value]] = List(Some(Side.RIGHT))
+case class AvroEnums(raw: SimpleEnum.Value = SimpleEnum.A,
+                     on: Option[SimpleEnum.Value] = None,
+                     sd: Option[SimpleEnum.Value] = Some(SimpleEnum.A),
+                     l: List[SimpleEnum.Value] = List(),
+                     lo: List[Option[SimpleEnum.Value]] = List(Some(SimpleEnum.B))
                     ) extends AvroRecord[AvroEnums]
 
 case class AvroNamedRecords(
-                   e: ID = ID(0),
-                   rn: Option[ID] = None,
-                   rs: Option[ID] = Some(ID(0)),
-                   l: List[ID] = List(ID(0)),
-                   lo: List[Option[ID]] = List()) extends AvroRecord[AvroNamedRecords]
+                             e: SimpleKey = SimpleKey(0),
+                             rn: Option[SimpleKey] = None,
+                             rs: Option[SimpleKey] = Some(SimpleKey(0)),
+                             l: List[SimpleKey] = List(SimpleKey(0)),
+                             lo: List[Option[SimpleKey]] = List()) extends AvroRecord[AvroNamedRecords]
 
 case class AvroPrmitives(
                         bn: Option[Boolean] = None,

@@ -144,6 +144,7 @@ object AvroRecord {
           reader.read(null, decoder)
         } else {
           val readerSchema = inferSchema(tpe)
+          //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
           val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
           val record = reader.read(null, decoder)
           readDatum(record, tpe, readerSchema)

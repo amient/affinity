@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.http
+package io.amient.affinity.core.http
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethods.GET
@@ -30,7 +30,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.language.postfixOps
 
-class TlsGatewaySpec extends FlatSpec with SystemTestBase with Matchers {
+class TlsGatewaySystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   val config = configure("tlstests")
   val system = ActorSystem.create("TlsGatewayTest", config)

@@ -20,13 +20,12 @@
 package io.amient.affinity.avro.schema
 
 import java.util
-import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
-import org.I0Itec.zkclient.exception.{ZkNodeExistsException, ZkTimeoutException}
+import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
 

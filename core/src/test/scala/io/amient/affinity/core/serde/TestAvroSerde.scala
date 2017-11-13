@@ -17,22 +17,30 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core
+package io.amient.affinity.core.serde
 
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
-import io.amient.affinity.core.serde.avro._
 import io.amient.affinity.core.transaction.{TestKey, TestValue}
 
 class TestAvroSerde extends MemorySchemaRegistry {
-  register(classOf[Composite], AvroRecord.inferSchema(classOf[_V1_Composite]))
-  register(classOf[Composite])
   register(classOf[Base])
   register(classOf[TestKey])
   register(classOf[TestValue])
-  register(classOf[AvroEnums])
-  register(classOf[AvroPrmitives])
-  register(classOf[AvroNamedRecords])
 
   override def close(): Unit = ()
 }
+
+object Side extends Enumeration {
+  type Side = Value
+  val LEFT, RIGHT = Value
+}
+
+case class ID(val id: Int) extends AvroRecord[ID] {
+  override def hashCode(): Int = id.hashCode()
+}
+
+case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base] {
+  override def hashCode(): Int = id.hashCode()
+}
+

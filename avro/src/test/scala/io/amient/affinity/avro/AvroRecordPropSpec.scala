@@ -17,28 +17,27 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.avro
+package io.amient.affinity.avro
 
 import java.util.UUID
 
-import io.amient.affinity.avro.AvroRecord
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalatest.prop.PropertyChecks
-import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.{Matchers, PropSpec}
 
-class AvroRecordSpec extends PropSpec with PropertyChecks with Matchers {
+class AvroRecordPropSpec extends PropSpec with PropertyChecks with Matchers {
 
-  import Side._
+  import SimpleEnum._
 
   property("Case Class constructor default arguments are AvroRecord defaults") {
-    val b = Base()
-    assert(b == Base(ID(0), LEFT, Seq()))
-    AvroRecord.read(AvroRecord.write(b, b.schema), classOf[Base], b.schema) should equal(Base(ID(0), LEFT, Seq()))
-    val c = Composite()
-    assert(c == Composite(Seq(), Map(), Set()))
-    AvroRecord.read(AvroRecord.write(c, c.schema), classOf[Composite], c.schema) should equal(Composite(Seq(), Map(), Set()))
+    val b = SimpleRecord()
+    assert(b == SimpleRecord(SimpleKey(0), A, Seq()))
+    AvroRecord.read(AvroRecord.write(b, b.schema), classOf[SimpleRecord], b.schema) should equal(SimpleRecord(SimpleKey(0), A, Seq()))
+    val c = Record()
+    assert(c == Record(Seq(), Map(), Set()))
+    AvroRecord.read(AvroRecord.write(c, c.schema), classOf[Record], c.schema) should equal(Record(Seq(), Map(), Set()))
   }
 
   def uuids: Gen[UUID] = for {
@@ -54,23 +53,23 @@ class AvroRecordSpec extends PropSpec with PropertyChecks with Matchers {
       copy.uuid should be(uuid)
     }
   }
-  def bases: Gen[Base] = for {
+  def bases: Gen[SimpleRecord] = for {
     id <- arbitrary[Int]
-    side <- Gen.oneOf(Side.LEFT, Side.RIGHT)
+    side <- Gen.oneOf(SimpleEnum.A, SimpleEnum.B)
     ints <- listOf(arbitrary[Int])
-  } yield Base(ID(id), side, ints.map(ID(_)))
+  } yield SimpleRecord(SimpleKey(id), side, ints.map(SimpleKey(_)))
 
-  def composites: Gen[Composite] = for {
+  def composites: Gen[Record] = for {
      nitems <- Gen.choose(1, 2)
      items <- listOfN(nitems, bases)
      keys <- listOfN(nitems, Gen.alphaStr)
      longs <- listOf(arbitrary[Long])
-  } yield Composite(items, keys.zip(items).toMap, longs.toSet)
+  } yield Record(items, keys.zip(items).toMap, longs.toSet)
 
   property("AvroRecord.write is fully reversible by AvroRecord.read") {
-    forAll(composites) { composite: Composite =>
+    forAll(composites) { composite: Record =>
       val bytes = AvroRecord.write(composite, composite.schema)
-      AvroRecord.read(bytes, classOf[Composite], composite.schema) should equal(composite )
+      AvroRecord.read(bytes, classOf[Record], composite.schema) should equal(composite )
     }
   }
 

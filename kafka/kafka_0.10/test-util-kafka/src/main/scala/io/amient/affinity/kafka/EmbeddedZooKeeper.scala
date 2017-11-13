@@ -1,4 +1,4 @@
-package io.amient.affinity.testutil
+package io.amient.affinity.kafka
 
 import java.io.File
 import java.net.InetSocketAddress

@@ -29,7 +29,6 @@ def installer = install.repositories.mavenInstaller
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = 'core-scala_'+baseScalaVersion
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-core' }.artifactId = 'testing-core-scala_'+baseScalaVersion
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'storage-kafka'}.artifactId = 'storage-kafka_0.10-scala_'+baseScalaVersion
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-zk'}.artifactId = 'testing-zk-scala_'+baseScalaVersion
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'test-util-kafka'}.artifactId = 'test-util-kafka_0.10-scala_'+baseScalaVersion
 }
 
@@ -37,7 +36,6 @@ def installer = install.repositories.mavenInstaller
 dependencies {
     compile project(':core')
     compile project(':testutil:testing-core')
-    compile project(':testutil:testing-zk')
     compile project(':kafka:kafka_0.10:storage-kafka')
     compile project(':kafka:kafka_0.10:test-util-kafka')
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
