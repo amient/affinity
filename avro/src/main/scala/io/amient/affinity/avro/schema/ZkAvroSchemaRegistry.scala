@@ -26,10 +26,10 @@ import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.util.ZooKeeperClient
 import org.I0Itec.zkclient.IZkChildListener
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
-import org.apache.avro.Schema
+import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.zookeeper.CreateMode
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.collection.immutable
 
 object ZkAvroSchemaRegistry {
@@ -49,6 +49,8 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
 
+  private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
+
   @volatile private var internal = immutable.Map[String, List[(Int, Schema)]]()
 
   if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
@@ -60,7 +62,8 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override def close(): Unit = zk.close()
 
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = {
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int = {
+    validator.validate(schema, existing)
     val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
     val id = path.substring(zkRoot.length + 1).toInt
     id
@@ -68,7 +71,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override private[schema] def getAllRegistered: List[(Int, Schema)] = {
     val ids = zk.getChildren(zkRoot)
-    ids.asScala.toList.map { id =>
+    ids.toList.map { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
       val schemaId = id.toInt
       (schemaId, schema)
@@ -96,7 +99,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
   }
 
   private def updateInternal(ids: util.List[String]): Unit = {
-    internal = ids.asScala.toList.map { id =>
+    internal = ids.toList.map { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
       val FQN = schema.getFullName
       val schemaId = id.toInt

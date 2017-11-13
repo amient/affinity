@@ -38,7 +38,7 @@ trait AvroSchemaProvider {
 
   private var cache4 = immutable.Map[String, Int]()
 
-  private[schema] def registerSchema(cls: Class[_], schema: Schema): Int
+  private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int
 
   private[schema] def getAllRegistered: List[(Int, Schema)]
 
@@ -103,13 +103,14 @@ trait AvroSchemaProvider {
     val _register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
     registration.result.foreach {
       case (tpe, cls, schema) =>
-        val alreadyRegisteredId: Int = (getVersions(cls).map { case (id2, schema2) =>
+        val versions = getVersions(cls)
+        val alreadyRegisteredId: Int = (versions.map { case (id2, schema2) =>
           _register  += ((id2, schema2, cls, tpe))
           if (schema2 == schema) id2 else -1
         } :+ (-1)).max
 
         val schemaId = if (alreadyRegisteredId == -1) {
-          val newlyRegisteredId = registerSchema(cls, schema)
+          val newlyRegisteredId = registerSchema(cls, schema, versions.map(_._2))
           _register  += ((newlyRegisteredId, schema, cls, tpe))
           newlyRegisteredId
         } else {

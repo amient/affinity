@@ -22,27 +22,30 @@ package io.amient.affinity.avro.schema
 import java.util.concurrent.ConcurrentHashMap
 
 import io.amient.affinity.avro.AvroSerde
-import org.apache.avro.Schema
+import org.apache.avro.{Schema, SchemaValidatorBuilder}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 
 class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
 
   protected val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
 
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema): Int = synchronized {
-    val existing = internal.asScala.filter(_._2 == (cls, schema))
-    if (existing.isEmpty) {
+  private val validator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
+
+  override private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int = synchronized {
+    validator.validate(schema, existing)
+    val equivalent = internal.filter(_._2 == (cls, schema))
+    if (equivalent.isEmpty) {
       val newId = internal.size
       internal.put(newId, (cls, schema))
       newId
     } else {
-      existing.keys.max
+      equivalent.keys.max
     }
   }
 
   override private[schema] def getAllRegistered: List[(Int, Schema)] = {
-    internal.asScala.mapValues(_._2).toList
+    internal.mapValues(_._2).toList
   }
 
   override private[schema] def hypersynchronized[X](f: => X): X = synchronized(f)

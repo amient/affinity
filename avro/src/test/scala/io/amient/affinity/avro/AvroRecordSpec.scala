@@ -1,6 +1,7 @@
 package io.amient.affinity.avro
 
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
+import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
 
 class AvroRecordSpec extends FlatSpec with Matchers {
@@ -83,7 +84,10 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     newSerde.fromBytes(as) should be (a)
   }
 
-  //TODO #32 "Incompatible change" should "result in exception during registration" in
+  "In-memory shema registry" should "reject backward-incompatible schema" in {
+    val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
+    newSerde.register(classOf[Record], v4schema)
+    an[SchemaValidationException] should be thrownBy (newSerde.initialize())
 
-
+  }
 }
