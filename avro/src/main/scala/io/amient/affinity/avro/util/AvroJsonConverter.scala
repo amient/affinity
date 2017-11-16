@@ -24,6 +24,7 @@ import scala.collection.JavaConversions._
 //  private def toJson(datum: Any, schemas: List[Schema]): Json = {
 //    def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)
 //    schemas.map(_.getType) match {
+//      case Schema.Type.ENUM :: Nil => Json.fromString(datum.toString)
 //      case Schema.Type.UNION :: Nil => toJson(datum, schemas(0).getTypes.toList)
 //      case Schema.Type.RECORD :: Nil =>
 //        val record = datum.asInstanceOf[IndexedRecord]
@@ -31,6 +32,8 @@ import scala.collection.JavaConversions._
 //          (f.name(), toJson(record.get(i), List(f.schema())))
 //        }.toList
 //        Json.fromFields(f)
+//      //TODO case Schema.Type.FIXED :: Nil =>
+//      //TODO case Schema.Type.BYTES :: Nil =>
 //      case _ => datum match {
 //        case null if typeIsAllowed(Schema.Type.NULL) => Json.Null
 //        case null => throw new IllegalArgumentException("Illegal null value for schemas: " + schemas.map(_.getType).mkString(","))
