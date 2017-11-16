@@ -214,15 +214,11 @@ object AvroRecord {
   def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
 
   private def inferSchema(tpe: Type): Schema = {
-
     typeSchemaCache.get(tpe) match {
       case some if some != null => some
       case _ =>
-
         val schema: Schema =
-          if (tpe =:= typeOf[String]) {
-            SchemaBuilder.builder().stringType()
-          } else if (tpe =:= definitions.IntTpe) {
+          if (tpe =:= definitions.IntTpe) {
             SchemaBuilder.builder().intType()
           } else if (tpe =:= definitions.LongTpe) {
             SchemaBuilder.builder().longType()
@@ -245,8 +241,9 @@ object AvroRecord {
           } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
             tpe match {
               case TypeRef(enumType, _, _) =>
-                val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
-                val instanceMirror = rootMirror.reflect(moduleMirror.instance)
+                val typeMirror = universe.runtimeMirror(Class.forName(enumType.typeSymbol.asClass.fullName).getClassLoader)
+                val moduleMirror = typeMirror.reflectModule(enumType.termSymbol.asModule)
+                val instanceMirror = typeMirror.reflect(moduleMirror.instance)
                 val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
                 val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
                 val args = enumSymbols.toSeq.map(_.toString)
@@ -255,9 +252,9 @@ object AvroRecord {
           } else if (tpe <:< typeOf[Option[_]]) {
             SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
           } else if (tpe <:< typeOf[AvroRecord[_]]) {
-
-            val moduleMirror = rootMirror.reflectModule(tpe.typeSymbol.companion.asModule)
-            val companionMirror = rootMirror.reflect(moduleMirror.instance)
+            val typeMirror = universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
+            val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
+            val companionMirror = typeMirror.reflect(moduleMirror.instance)
             val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
             val params = constructor.asMethod.paramLists(0)
             val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
