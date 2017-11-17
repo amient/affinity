@@ -31,6 +31,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBytes(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 10))
+    oldValue.mkString(".") should be ("0.0.0.0.7.2.2.0.0.0.20")
     val renderedValue = newSerde.fromBytes(oldValue)
     renderedValue should be(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map()))
   }
