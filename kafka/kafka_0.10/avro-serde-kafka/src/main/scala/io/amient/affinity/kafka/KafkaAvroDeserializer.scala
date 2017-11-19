@@ -2,32 +2,26 @@ package io.amient.affinity.kafka
 
 import java.util
 
-import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroSerde
 import org.apache.kafka.common.serialization.Deserializer
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
+class KafkaAvroDeserializer extends Deserializer[Any] {
 
-object KafkaAvroDeserializer {
+  var isKey: Boolean = false
+  var serde: AvroSerde = null
 
-  def apply[T: TypeTag: ClassTag](config: Config): Deserializer[T] = apply[T](AvroSerde.create(config))
+  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
+    val config = ConfigFactory.parseMap(configs)
+    this.serde = AvroSerde.create(config)
+    this.isKey = isKey
+  }
 
-  def apply[T: TypeTag: ClassTag](serde: AvroSerde): Deserializer[T] = new Deserializer[T] {
+  override def close(): Unit = if (serde != null) serde.close()
 
-    require(serde != null, "null serde provided")
-
-    val runtimeClass = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]]
-    if (serde.schema(runtimeClass.getCanonicalName).isEmpty) {
-      serde.register[T](runtimeClass)
-      serde.initialize()
-      require(serde.schema(runtimeClass.getCanonicalName).isDefined)
-    }
-
-    override def configure(configs: util.Map[String, _], isKey: Boolean) = ()
-
-    override def close() = serde.close()
-
-    override def deserialize(topic: String, data: Array[Byte]) = serde.fromBytes(data).asInstanceOf[T]
+  override def deserialize(topic: String, data: Array[Byte]): Any = {
+    require(serde != null, "AvroSerde not configured")
+    //val subject = s"$topic-${if (isKey) "key" else "value"}"
+    serde.fromBytes(data)
   }
 }

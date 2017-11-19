@@ -25,6 +25,7 @@ import org.apache.avro.Schema
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
 import scala.reflect.runtime.universe._
+import scala.util.control.NonFatal
 
 /**
   * This trait ensures that all the getters are fast and thread-safe.
@@ -32,37 +33,47 @@ import scala.reflect.runtime.universe._
   */
 trait AvroSchemaProvider {
 
-  private var cache1: immutable.Map[Int, (Type, Schema)] = Map()
+  private var cacheByFqn = immutable.Map[String, (Int, Schema)]() // schema.fqn -> current schema id
 
-  private var cache3 = immutable.Map[Int, Option[(Type, Schema)]]()
+  private var cacheById: immutable.Map[Int, Schema] = Map() // schema id -> schema
 
-  private var cache4 = immutable.Map[String, Int]()
+  private var cacheBySchema: immutable.Map[Schema, Int] = Map() // schema id -> schema
 
-  private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int
+  private var cacheBySubject: immutable.Map[String, List[(Int, Schema)]] = Map() // subject -> schema ids
 
-  private[schema] def getAllRegistered: List[(Int, Schema)]
+  private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int
+
+  private[schema] def getAllRegistered: List[(Int, String, Schema)]
 
   private[schema] def hypersynchronized[X](f: => X): X
 
-  private val registration = ListBuffer[(Type, Class[_], Schema)]()
+  private val registration = ListBuffer[(String, Schema)]()
 
-  register(classOf[Null])
-  register(classOf[Boolean])
-  register(classOf[Int])
-  register(classOf[Long])
-  register(classOf[Float])
-  register(classOf[Double])
-  register(classOf[String])
+  register[Null]("null")
+  register[Boolean]("boolean")
+  register[Int]("int")
+  register[Long]("long")
+  register[Float]("float")
+  register[Double]("double")
+  register[String]("string")
+  //register[java.nio.ByteBuffer]("bytes")
 
-  def describeSchemas: Map[Int, (Type, Schema)] = cache1
+  def describeSchemas: Map[Int, Schema] = cacheById
 
   /**
-    * Get current current schema for the compile time class
+    * Get current current compile-time schema for the given fully qualified type name
     *
-    * @param fqn fully qualified name of the schema
+    * @param fqn fuly qualified name of the type
     * @return
     */
-  final def schema(fqn: String): Option[Int] = cache4.get(fqn)
+  final def getCurrentSchema(fqn: String): Option[(Int, Schema)] = cacheByFqn.get(fqn)
+
+  /**
+    * Get id of a given schema as registered by the underlying registry
+    * @param schema
+    * @return
+    */
+  final def getSchemaId(schema: Schema): Option[Int] = cacheBySchema.get(schema)
 
   /**
     * Get Type and Schema by a schema Id.
@@ -73,45 +84,38 @@ trait AvroSchemaProvider {
     * @param id schema id
     * @return
     */
-  final def schema(id: Int): Option[(Type, Schema)] = {
-    cache1.get(id) match {
+  final def schema(id: Int): Option[Schema] = {
+    cacheById.get(id) match {
       case Some(existing) => Some(existing)
       case None =>
-        cache3.get(id) match {
-          case Some(cached) => cached
-          case None => throw new NoSuchElementException(s"Schema with id $id is not recognized")
+        initialize()
+        cacheById.get(id) match {
+          case Some(existing) => Some(existing)
+          case None =>
+            throw new NoSuchElementException(s"Schema with id $id is not recognized")
         }
     }
   }
 
   final def initialize(): List[Int] = hypersynchronized {
-    val all: List[(Int, Schema)] = getAllRegistered
-    def getVersions(cls: Class[_]): List[(Int, Schema)] = {
-      all.filter(_._2.getFullName match {
-        case "null" => cls == classOf[Null]
-        case "boolean" => cls == classOf[Boolean]
-        case "int" => cls == classOf[Int]
-        case "long" => cls == classOf[Long]
-        case "float" => cls == classOf[Float]
-        case "double" => cls == classOf[Double]
-        case "string" => cls == classOf[String]
-        case "bytes" => cls == classOf[java.nio.ByteBuffer]
-        case fqn => cls.getName == fqn
-      })
+    val all: List[(Int, String, Schema)] = getAllRegistered
+    all.foreach { case (id, subject, schema) =>
+      cacheById += id -> schema
+      cacheBySchema += schema -> id
+      cacheBySubject += subject -> (cacheBySubject.get(subject).getOrElse(List()) :+ (id, schema))
     }
     val result = ListBuffer[Int]()
-    val _register = mutable.HashSet[(Int, Schema, Class[_], Type)]()
+    val _register = mutable.HashSet[(Int, Schema, String)]()
     registration.result.foreach {
-      case (tpe, cls, schema) =>
-        val versions = getVersions(cls)
+      case (subject, schema) =>
+        val versions = cacheBySubject.get(subject).getOrElse(List())
         val alreadyRegisteredId: Int = (versions.map { case (id2, schema2) =>
-          _register  += ((id2, schema2, cls, tpe))
+          _register  += ((id2, schema2, subject))
           if (schema2 == schema) id2 else -1
         } :+ (-1)).max
-
         val schemaId = if (alreadyRegisteredId == -1) {
-          val newlyRegisteredId = registerSchema(cls, schema, versions.map(_._2))
-          _register  += ((newlyRegisteredId, schema, cls, tpe))
+          val newlyRegisteredId = registerSchema(subject, schema, versions.map(_._2))
+          _register  += ((newlyRegisteredId, schema, subject))
           newlyRegisteredId
         } else {
           alreadyRegisteredId
@@ -119,40 +123,48 @@ trait AvroSchemaProvider {
 
         result += schemaId
 
-        cache1 = _register .map { case (id2, schema2, cls2, tpe2) =>
-          val tpe3 = if (cls == cls2) tpe else tpe2 //update all schema versions for the same class with its runtime type
-          id2 -> (tpe3, schema2)
-        }.toMap
-
-        cache4 += schema.getFullName -> schemaId
+        _register.foreach { case (id2, schema2, subject2) =>
+          cacheById += id2 -> schema2
+          cacheBySchema += schema2 -> id2
+          cacheBySubject += subject2 -> (cacheBySubject.get(subject2).getOrElse(List()) :+ (id2, schema2))
+        }
     }
 
+    cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
+      try {
+        val schema = AvroRecord.inferSchema(fqn)
+        cacheByFqn += fqn -> (cacheBySchema(schema), schema)
+      } catch {
+        case NonFatal(e) => e.printStackTrace()
+      }
+    }
+
+//    System.err.println("------------------------------------- cacheById:")
+//    cacheById.toList.sortBy(_._1).foreach(System.err.println)
+//    System.err.println("------------------------------------- cacheBySchema:")
+//    cacheBySchema.toList.foreach(System.err.println)
+//    System.err.println("------------------------------------- cacheBySubject:")
+//    cacheBySubject.toList.sortBy(_._1).foreach(System.err.println)
+//    System.err.println("-------------------------------------  cacheByFQN:")
+//    cacheByFqn.toList.sortBy(_._1).foreach(System.err.println)
+//    System.err.println("-------------------------------------")
+    registration.clear()
     result.result()
   }
 
-  /**
-    * register compile-time type with its current schema
-    *
-    * @param cls compile time class
-    * @tparam T compile time type
-    * @return unique schema id
-    */
-  final def register[T: TypeTag](cls: Class[T]): Unit = {
-    registration += ((typeOf[T], cls, AvroRecord.inferSchema(cls)))
-  }
 
-  /**
-    * register compile-time type with older schema version
-    *
-    * @param schema schema to register with the compile time class/type
-    * @param cls    compile time class
-    * @tparam T compile time type
-    * @return unique schema id
-    */
-  final def register[T: TypeTag](cls: Class[T], schema: Schema): Unit = {
-    registration += ((typeOf[T], cls, schema))
-  }
+  //register compile-time type with a specific schema version and its fqn as subject
+  final def register[T: TypeTag](schema: Schema): Unit = register(typeOf[T].typeSymbol.fullName, schema)
 
+  //register compile-time type with its current/actual schema and a custom subject
+  final def register[T: TypeTag](subject: String): Unit = register(subject, AvroRecord.inferSchema(typeOf[T]))
+
+  //register compile-time type with its current/actual schema and its fqn as subject
+  final def register[T: TypeTag]: Unit = register(typeOf[T].typeSymbol.fullName, AvroRecord.inferSchema(typeOf[T]))
+
+  final def register(subject: String, schema: Schema) = {
+    registration += ((subject, schema))
+  }
 
 
 }

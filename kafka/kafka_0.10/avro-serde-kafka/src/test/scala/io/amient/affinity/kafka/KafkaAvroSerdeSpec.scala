@@ -49,8 +49,8 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
     val producer = new KafkaProducer[Int, TestRecord](
       producerConfig.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaAvroSerializer[Int](registryConfig),
-      KafkaAvroSerializer[TestRecord](registryConfig)
+      KafkaAvroSerde.key[Int](registryConfig),
+      KafkaAvroSerde.value[TestRecord](registryConfig)
     )
 
     val topic = "test"
@@ -86,7 +86,7 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
     object TestRegistry extends CfAvroSchemaRegistry(ConfigFactory
       .defaultReference.withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))) {
-      register(classOf[TestRecord])
+      register[TestRecord]
       initialize()
     }
 
@@ -95,8 +95,8 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
     val producer = new KafkaProducer[Int, TestRecord](
       Map("bootstrap.servers" -> kafkaBootstrap).mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaAvroSerializer[Int](TestRegistry),
-      KafkaAvroSerializer[TestRecord](TestRegistry)
+      KafkaAvroSerde.key[Int](TestRegistry),
+      KafkaAvroSerde.value[TestRecord](TestRegistry)
     )
 
     val updates = for (i <- (1 to 10)) yield {
@@ -114,8 +114,8 @@ class KafkaAvroSerdeSpec extends FlatSpec with Suite
 
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaAvroDeserializer[Int](TestRegistry),
-      KafkaAvroDeserializer[TestRecord](TestRegistry))
+      KafkaAvroSerde.key[Int](TestRegistry),
+      KafkaAvroSerde.value[TestRecord](TestRegistry))
 
     consumer.subscribe(List(topic))
     try {

@@ -46,16 +46,17 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override def close(): Unit = ()
 
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int = {
-    val subject = cls.getName
+  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
     client.registerSchema(subject, schema)
   }
 
-  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
+  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
     client.getSubjects.flatMap {
       subject =>
         client.getVersions(subject).toList.map { version =>
-          client.getSchema(subject, version)
+          client.getSchema(subject, version) match {
+            case (id, schema) => (id, subject, schema)
+          }
         }
     }.toList
   }
@@ -96,7 +97,7 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
       (j.get("id").intValue(), new Schema.Parser().parse(j.get("schema").textValue()))
     }
 
-    def getSchema(id: Int) = {
+    def getSchema(id: Int): Schema = {
       val j = mapper.readValue(get(s"/schemas/ids/$id"), classOf[JsonNode])
       if (j.has("error_code")) throw new RuntimeException(j.get("message").textValue())
       new Schema.Parser().parse(j.get("schema").textValue())

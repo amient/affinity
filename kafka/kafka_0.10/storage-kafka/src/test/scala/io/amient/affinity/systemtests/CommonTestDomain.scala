@@ -46,14 +46,14 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
 
 class TestAvroRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
 
-  register(classOf[KEY])
-  register(classOf[UUID])
-  register(classOf[TestRecord])
+  register[KEY]
+  register[UUID]
+  register[TestRecord]
 
 }
 
 class TestZkAvroRegistry(config: Config) extends ZkAvroSchemaRegistry(config) {
-  register(classOf[KEY])
-  register(classOf[UUID])
-  register(classOf[TestRecord])
+  register[KEY]
+  register[UUID]
+  register[TestRecord]
 }

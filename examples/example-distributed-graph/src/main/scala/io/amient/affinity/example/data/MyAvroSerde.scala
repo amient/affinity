@@ -24,6 +24,6 @@ import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.model.graph.GraphData
 
 class MyAvroSerde(config: Config) extends ZkAvroSchemaRegistry(config) {
-  register(classOf[ConfigEntry])
+  register[ConfigEntry]
   GraphData.registerMessages(this)
 }

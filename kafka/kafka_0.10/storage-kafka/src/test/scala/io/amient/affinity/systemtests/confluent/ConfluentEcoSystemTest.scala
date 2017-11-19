@@ -28,7 +28,7 @@ import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
+import io.amient.affinity.kafka.{KafkaAvroDeserializer, KafkaObjectHashPartitioner}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.{SystemTestBaseWithConfluentRegistry, SystemTestBaseWithKafka}
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -100,15 +100,14 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
       "bootstrap.servers" -> kafkaBootstrap,
       "group.id" -> "group2",
       "auto.offset.reset" -> "earliest",
-      "max.poll.records" -> 1000
+      "max.poll.records" -> 1000,
+      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[CfAvroSchemaRegistry].getName,
+      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl,
+      "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
+      "value.deserializer" -> classOf[KafkaAvroDeserializer].getName
     )
 
-    val serdeConfig = ConfigFactory.parseMap(Map(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))
-    val consumer = new KafkaConsumer[Int, TestRecord](
-      consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerde.of[Int](serdeConfig),
-      KafkaSerde.of[TestRecord](serdeConfig))
-
+    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
 
     consumer.subscribe(List(topic))
     try {
@@ -144,14 +143,13 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
       "acks" -> "all",
       "linger.ms" -> 20,
       "batch.size" -> 20,
-      "schema.registry.url" -> registryUrl,
-      "partitioner.class" -> classOf[KafkaObjectHashPartitioner].getName
+      "partitioner.class" -> classOf[KafkaObjectHashPartitioner].getName,
+      "key.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
+      "value.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
+      "schema.registry.url" -> registryUrl
     )
     val numWrites = new AtomicInteger(1000)
-    val producer = new KafkaProducer[Int, TestRecord](
-      producerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerde.of[Int](system.settings.config),
-      KafkaSerde.of[TestRecord](system.settings.config))
+    val producer = new KafkaProducer[Int, TestRecord](producerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
     try {
       val numToWrite = numWrites.get
       val l = System.currentTimeMillis()

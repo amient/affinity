@@ -109,7 +109,7 @@ trait ServicesApi extends ActorHandler {
   def describeAvro: scala.collection.immutable.Map[String, String] = {
     val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
     serde.describeSchemas.map {
-      case (id, (tpe, _)) => ((id.toString, tpe.toString))
+      case (id, schema) => ((id.toString, schema.toString))
     }
   }
 

@@ -19,13 +19,11 @@
 
 package io.amient.affinity.avro
 
-import java.nio.ByteBuffer
-
-import com.typesafe.config.Config
-import io.amient.affinity.core.serde.AbstractSerde
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.schema.AvroSchemaProvider
+import io.amient.affinity.core.serde.AbstractSerde
 import org.apache.avro.Schema
-import org.apache.avro.generic.IndexedRecord
+import org.apache.avro.generic.GenericContainer
 
 object AvroSerde {
   final val CONFIG_PROVIDER_CLASS = "affinity.avro.schema.provider.class"
@@ -37,7 +35,7 @@ object AvroSerde {
     }
 
     val instance = try {
-      providerClass.getConstructor(classOf[Config]).newInstance(config)
+      providerClass.getConstructor(classOf[Config]).newInstance(config.withFallback(ConfigFactory.defaultReference()))
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }
@@ -60,14 +58,21 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
     */
   override def fromBytes(bytes: Array[Byte]): Any = AvroRecord.read(bytes, this)
 
-  val INT_SCHEMA = Schema.create(Schema.Type.INT)
-  val BOOLEAN_SCHEMA = Schema.create(Schema.Type.BOOLEAN)
-  val LONG_SCHEMA = Schema.create(Schema.Type.LONG)
-  val FLOAT_SCHEMA = Schema.create(Schema.Type.FLOAT)
-  val DOUBLE_SCHEMA = Schema.create(Schema.Type.DOUBLE)
-  val STRING_SCHEMA = Schema.create(Schema.Type.STRING)
-  val BYTES_SCHEMA = Schema.create(Schema.Type.BYTES)
-  val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
+
+  def getSchema(obj: Any): Schema = {
+    obj match {
+      case container: GenericContainer => container.getSchema
+      case _: Boolean => AvroRecord.BOOLEAN_SCHEMA
+      case _: Byte => AvroRecord.INT_SCHEMA
+      case _: Int => AvroRecord.INT_SCHEMA
+      case _: Long => AvroRecord.LONG_SCHEMA
+      case _: Float => AvroRecord.FLOAT_SCHEMA
+      case _: Double => AvroRecord.DOUBLE_SCHEMA
+      case _: String => AvroRecord.STRING_SCHEMA
+      case _: Array[Byte] => AvroRecord.BYTES_SCHEMA
+      case _ => throw new IllegalArgumentException("Unsupported mapping from Any to Avro Type")
+    }
+  }
 
   /**
     * @param obj instance to serialize
@@ -76,26 +81,9 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else {
-      val schemaFQN = obj match {
-        case record: IndexedRecord => record.getSchema.getFullName
-        case _: Boolean => BOOLEAN_SCHEMA.getFullName
-        case _: Byte => INT_SCHEMA.getFullName
-        case _: Int => INT_SCHEMA.getFullName
-        case _: Long => LONG_SCHEMA.getFullName
-        case _: Float => FLOAT_SCHEMA.getFullName
-        case _: Double => DOUBLE_SCHEMA.getFullName
-        case _: String => STRING_SCHEMA.getFullName
-        case _: ByteBuffer => BYTES_SCHEMA.getFullName
-        case _ => throw new IllegalArgumentException("Unsupported mapping from Any to Avro Type")
-      }
-
-      (for (
-        schemaId <- schema(schemaFQN);
-        (_, schema) <- schema(schemaId)
-      ) yield {
-        AvroRecord.write(obj, schema, schemaId)
-      }).getOrElse(throw new IllegalArgumentException(s"Schema not registered for $schemaFQN"))
-
+      val s = getSchema(obj)
+      val schemaId = getSchemaId(s).getOrElse(throw new IllegalArgumentException(s"Schema not registered: $s"))
+      AvroRecord.write(obj, s, schemaId)
     }
   }
 
