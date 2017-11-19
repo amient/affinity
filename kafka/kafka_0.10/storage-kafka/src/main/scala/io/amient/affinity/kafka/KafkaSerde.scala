@@ -32,6 +32,7 @@ import scala.collection.JavaConversions._
 import scala.reflect.runtime.universe._
 import scala.reflect.ClassTag
 
+@deprecated
 object KafkaSerde {
 
   def of[T](serde: AbstractSerde[T]): Deserializer[T] with Serializer[T] = {

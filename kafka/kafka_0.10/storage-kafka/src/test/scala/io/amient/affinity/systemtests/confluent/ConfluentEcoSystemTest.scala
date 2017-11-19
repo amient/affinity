@@ -24,11 +24,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, AvroSchemaProvider}
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.{KafkaObjectHashPartitioner, KafkaSerde}
+import io.amient.affinity.kafka.{KafkaAvroSerde, KafkaObjectHashPartitioner, KafkaSerde}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
 import io.amient.affinity.testutil.{SystemTestBaseWithConfluentRegistry, SystemTestBaseWithKafka}
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -103,11 +103,13 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
       "max.poll.records" -> 1000
     )
 
-    val serdeConfig = ConfigFactory.parseMap(Map(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))
+    val serdeConfig = ConfigFactory.parseMap(Map(
+      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[CfAvroSchemaRegistry].getName,
+      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl))
     val consumer = new KafkaConsumer[Int, TestRecord](
       consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerde.of[Int](serdeConfig),
-      KafkaSerde.of[TestRecord](serdeConfig))
+      KafkaAvroSerde.key[Int](serdeConfig),
+      KafkaAvroSerde.value[TestRecord](serdeConfig))
 
 
     consumer.subscribe(List(topic))
@@ -150,8 +152,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
     val numWrites = new AtomicInteger(1000)
     val producer = new KafkaProducer[Int, TestRecord](
       producerProps.mapValues(_.toString.asInstanceOf[AnyRef]),
-      KafkaSerde.of[Int](system.settings.config),
-      KafkaSerde.of[TestRecord](system.settings.config))
+      KafkaAvroSerde.key[Int](system.settings.config),
+      KafkaAvroSerde.value[TestRecord](system.settings.config))
     try {
       val numToWrite = numWrites.get
       val l = System.currentTimeMillis()
