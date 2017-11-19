@@ -47,7 +47,7 @@ object POC extends App {
   consumer.subscribe(List(topic))
 
   println("consuming")
-  consumer.poll(5000).foreach {
+  consumer.poll(15000).foreach {
     record: ConsumerRecord[String, Transaction] =>
       println(record.value())
   }

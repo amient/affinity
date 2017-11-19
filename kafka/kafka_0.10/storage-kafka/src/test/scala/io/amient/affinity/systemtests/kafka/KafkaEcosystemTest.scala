@@ -4,18 +4,18 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.KafkaAvroSerde
-import io.amient.affinity.systemtests.{KEY, TestRecord, TestZkAvroRegistry, UUID}
+import io.amient.affinity.kafka.KafkaAvroDeserializer
+import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
 import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -23,13 +23,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
 
   override def numPartitions: Int = 2
 
-  val config = configure {
-    ConfigFactory.load("systemtests")
-      .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
-        ConfigValueFactory.fromAnyRef(classOf[TestZkAvroRegistry].getName))
-      .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT,
-        ConfigValueFactory.fromAnyRef(zkConnect))
-  }
+  val config = configure(ConfigFactory.load("systemtests"))
   val system = ActorSystem.create("ConfluentEcoSystem", config)
 
   import system.dispatcher
@@ -73,16 +67,16 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
       "bootstrap.servers" -> kafkaBootstrap,
       "group.id" -> "group2",
       "auto.offset.reset" -> "earliest",
-      "max.poll.records" -> 1000
+      "max.poll.records" -> 1000,
+      "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
+      "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
+      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[ZkAvroSchemaRegistry].getName,
+      ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT -> zkConnect
     )
 
-    val registry = AvroSerde.create(system.settings.config)
-    val consumer = new KafkaConsumer[Int, TestRecord](
-      consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava,
-      KafkaAvroSerde.key[Int](registry),
-      KafkaAvroSerde.value[TestRecord](registry))
+    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
 
-    consumer.subscribe(List(topic).asJava)
+    consumer.subscribe(List(topic))
     try {
 
       var read = 0
@@ -90,7 +84,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
       while (read < numReads) {
         val records = consumer.poll(10000)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
-        for (record <- records.asScala) {
+        for (record <- records) {
           read += 1
           record.value.key.id should equal(record.key)
           record.value.text should equal(s"test value ${record.key}")

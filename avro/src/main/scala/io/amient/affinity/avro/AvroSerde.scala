@@ -19,7 +19,7 @@
 
 package io.amient.affinity.avro
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.serde.AbstractSerde
 import org.apache.avro.Schema
@@ -35,7 +35,7 @@ object AvroSerde {
     }
 
     val instance = try {
-      providerClass.getConstructor(classOf[Config]).newInstance(config)
+      providerClass.getConstructor(classOf[Config]).newInstance(config.withFallback(ConfigFactory.defaultReference()))
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }

@@ -25,6 +25,7 @@ import org.apache.avro.Schema
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
 import scala.reflect.runtime.universe._
+import scala.util.control.NonFatal
 
 /**
   * This trait ensures that all the getters are fast and thread-safe.
@@ -130,8 +131,12 @@ trait AvroSchemaProvider {
     }
 
     cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
-      val schema = AvroRecord.inferSchema(fqn)
-      cacheByFqn += fqn -> (cacheBySchema(schema), schema)
+      try {
+        val schema = AvroRecord.inferSchema(fqn)
+        cacheByFqn += fqn -> (cacheBySchema(schema), schema)
+      } catch {
+        case NonFatal(e) => e.printStackTrace()
+      }
     }
 
 //    System.err.println("------------------------------------- cacheById:")
