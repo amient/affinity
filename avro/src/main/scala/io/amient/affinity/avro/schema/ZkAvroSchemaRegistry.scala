@@ -62,19 +62,19 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override def close(): Unit = zk.close()
 
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int = {
+  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
     validator.validate(schema, existing)
     val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
     val id = path.substring(zkRoot.length + 1).toInt
     id
   }
 
-  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
+  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
     val ids = zk.getChildren(zkRoot)
     ids.toList.map { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
       val schemaId = id.toInt
-      (schemaId, schema)
+      (schemaId, schema.getFullName, schema) //TODO schema.getFullName is a lazy subject, we need /zkRoot/subjects + /zkRoot/schemas
     }
   }
 

@@ -25,8 +25,8 @@ import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.util.Reply
 
 class MyAvroSerde extends MemorySchemaRegistry {
-    register(classOf[GetValue])
-    register(classOf[PutValue])
+    register[PutValue]
+    register[GetValue]
 }
 
 case class GetValue(key: String) extends AvroRecord[GetValue] with Reply[Option[String]] {

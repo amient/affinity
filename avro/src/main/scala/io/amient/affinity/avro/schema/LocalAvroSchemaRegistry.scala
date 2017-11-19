@@ -42,7 +42,7 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
 
   override def close(): Unit = ()
 
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int = synchronized {
+  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
     validator.validate(schema, existing)
     val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
     val schemaPath = dataPath.resolve(s"$id.avsc")
@@ -68,15 +68,15 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
   }
 
 
-  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
-    val builder = List.newBuilder[(Int, Schema)]
+  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
+    val builder = List.newBuilder[(Int, String, Schema)]
     Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         val filename = file.getFileName.toString
         if (filename.matches("^[0-9]+\\.avsc$")) {
           val id = filename.split("\\.")(0).toInt
           val schema = new Schema.Parser().parse(file.toFile)
-          builder += (id -> schema)
+          builder += ((id, schema.getFullName, schema))
         }
         super.visitFile(file, attrs)
       }

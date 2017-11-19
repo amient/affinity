@@ -16,7 +16,7 @@ case class ExampleType(val id: Int) extends AvroRecord[ExampleType] {
 
 
 class MyConfluentRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
-  register(classOf[ExampleType])
+  register[ExampleType]
 }
 
 class AkkaSerializationSystemTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {

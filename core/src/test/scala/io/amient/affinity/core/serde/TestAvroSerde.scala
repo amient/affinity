@@ -24,9 +24,9 @@ import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.transaction.{TestKey, TestValue}
 
 class TestAvroSerde extends MemorySchemaRegistry {
-  register(classOf[Base])
-  register(classOf[TestKey])
-  register(classOf[TestValue])
+  register[Base]
+  register[TestKey]
+  register[TestValue]
 
   override def close(): Unit = ()
 }

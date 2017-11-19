@@ -25,27 +25,35 @@ import io.amient.affinity.avro.AvroSerde
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
+import scala.collection.immutable.Seq
 
 class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
 
-  protected val internal = new ConcurrentHashMap[Int, (Class[_], Schema)]()
+  protected val internal = new ConcurrentHashMap[Int, Schema]()
+
+  protected val internal2 = new ConcurrentHashMap[String, List[Int]]()
 
   private val validator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
 
-  override private[schema] def registerSchema(cls: Class[_], schema: Schema, existing: List[Schema]): Int = synchronized {
+  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
     validator.validate(schema, existing)
-    val equivalent = internal.filter(_._2 == (cls, schema))
-    if (equivalent.isEmpty) {
-      val newId = internal.size
-      internal.put(newId, (cls, schema))
-      newId
-    } else {
-      equivalent.keys.max
+    val schemaId: Int = internal.find(_._2 == schema) match {
+      case None =>
+        val newId = internal.size
+        internal.put(newId, schema)
+        newId
+      case Some((id, _)) => id
     }
+    internal2.put(subject, (Option(internal2.get(subject)).getOrElse(List()) :+ schemaId))
+    schemaId
   }
 
-  override private[schema] def getAllRegistered: List[(Int, Schema)] = {
-    internal.mapValues(_._2).toList
+  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
+    internal2.flatMap {
+      case (subject: String, ids: Seq[Int]) => ids.map {
+        case id => (id, subject, internal.get(id))
+      }
+    }.toList
   }
 
   override private[schema] def hypersynchronized[X](f: => X): X = synchronized(f)

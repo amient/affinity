@@ -44,6 +44,16 @@ object AvroRecord {
 
   private val typeSchemaCache = new ConcurrentHashMap[Type, Schema]()
 
+  val INT_SCHEMA = Schema.create(Schema.Type.INT)
+  val BOOLEAN_SCHEMA = Schema.create(Schema.Type.BOOLEAN)
+  val LONG_SCHEMA = Schema.create(Schema.Type.LONG)
+  val FLOAT_SCHEMA = Schema.create(Schema.Type.FLOAT)
+  val DOUBLE_SCHEMA = Schema.create(Schema.Type.DOUBLE)
+  val STRING_SCHEMA = Schema.create(Schema.Type.STRING)
+  val BYTES_SCHEMA = Schema.create(Schema.Type.BYTES)
+  val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
+
+
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
     write(x, x.getSchema, schemaId)
   }
@@ -138,16 +148,30 @@ object AvroRecord {
     val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
     schemaRegistry.schema(schemaId) match {
       case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
-      case Some((tpe, writerSchema)) =>
-        if (tpe == null) {
-          val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
-          reader.read(null, decoder)
-        } else {
-          val readerSchema = inferSchema(tpe)
-          //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
-          val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-          val record = reader.read(null, decoder)
-          readDatum(record, tpe, readerSchema)
+      case Some(writerSchema) =>
+        schemaRegistry.getCurrentSchema(writerSchema.getFullName) match {
+          case None =>
+            val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
+            reader.read(null, decoder)
+          case Some((readerSchemaId: Int, readerSchema)) =>
+            //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
+            val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
+            val record = reader.read(null, decoder)
+            val tpe = readerSchema.getType match {
+              case NULL => typeOf[Null]
+              case BOOLEAN => typeOf[Boolean]
+              case INT => typeOf[Int]
+              case LONG => typeOf[Long]
+              case FLOAT => typeOf[Float]
+              case DOUBLE => typeOf[Double]
+              case STRING => typeOf[String]
+              case BYTES => typeOf[java.nio.ByteBuffer]
+              case _ =>
+                val cls = Class.forName(readerSchema.getFullName)
+                val m = runtimeMirror(cls.getClassLoader)
+                m.staticClass(cls.getName).selfType
+            }
+            readDatum(record, tpe , readerSchema)
         }
     }
   }
@@ -211,9 +235,31 @@ object AvroRecord {
     }
   }
 
+  def inferSchema(fqn: String): Schema = {
+    fqn match {
+      case "null" => NULL_SCHEMA
+      case "boolean" => BOOLEAN_SCHEMA
+      case "int" => INT_SCHEMA
+      case "long" => LONG_SCHEMA
+      case "float" => FLOAT_SCHEMA
+      case "double" => DOUBLE_SCHEMA
+      case "string" => STRING_SCHEMA
+      case _ =>
+        val cls = Class.forName(fqn)
+        val m = runtimeMirror(cls.getClassLoader)
+        inferSchema(m.staticClass(cls.getName).selfType)
+    }
+  }
+
+  def inferSchema[X](data: X): Schema = {
+    val m = runtimeMirror(data.getClass.getClassLoader)
+    val classSymbol = m.staticClass(data.getClass.getName)
+    inferSchema(classSymbol.selfType)
+  }
+
   def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
 
-  private def inferSchema(tpe: Type): Schema = {
+  def inferSchema(tpe: Type): Schema = {
     typeSchemaCache.get(tpe) match {
       case some if some != null => some
       case _ =>

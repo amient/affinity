@@ -281,7 +281,7 @@ trait WebSocketSupport extends GatewayHttp {
                              (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
 
     def buildSchemaPushMessage(schemaId: Int): ByteString = {
-      val schemaBytes = avroSerde.schema(schemaId).get._2.toString(true).getBytes()
+      val schemaBytes = avroSerde.schema(schemaId).get.toString(true).getBytes()
       val echoBytes = new Array[Byte](schemaBytes.length + 5)
       echoBytes(0) = 123
       ByteUtils.putIntValue(schemaId, echoBytes, 1)
@@ -305,7 +305,7 @@ trait WebSocketSupport extends GatewayHttp {
     genericWebSocket(upgrade, service, stateStoreName, key) {
       case text: TextMessage =>
         try {
-          buildSchemaPushMessage(avroSerde.schema(text.getStrictText).get)
+          buildSchemaPushMessage(avroSerde.getCurrentSchema(text.getStrictText).get._1)
         } catch {
           case NonFatal(e) => log.warning("Invalid websocket schema type request: " + text.getStrictText)
         }

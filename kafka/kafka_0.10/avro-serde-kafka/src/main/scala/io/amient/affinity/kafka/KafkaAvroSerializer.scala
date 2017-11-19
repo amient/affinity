@@ -2,33 +2,39 @@ package io.amient.affinity.kafka
 
 import java.util
 
-import com.typesafe.config.Config
-import io.amient.affinity.avro.AvroSerde
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import org.apache.kafka.common.serialization.Serializer
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
+class KafkaAvroSerializer extends Serializer[Any] {
 
-object KafkaAvroSerializer {
+  var isKey: Boolean = false
+  var serde: AvroSerde = null
 
-  def apply[T: TypeTag: ClassTag](config: Config): Serializer[T] = apply[T](AvroSerde.create(config))
-
-  def apply[T: TypeTag: ClassTag](serde: AvroSerde): Serializer[T] = new Serializer[T] {
-
-    require(serde != null, "null serde provided")
-
-    val runtimeClass = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]]
-    if (serde.schema(runtimeClass.getCanonicalName).isEmpty) {
-      serde.register[T](runtimeClass)
-      serde.initialize()
-      require(serde.schema(runtimeClass.getCanonicalName).isDefined)
-    }
-
-    override def configure(configs: util.Map[String, _], isKey: Boolean) = ()
-
-    override def close() = serde.close()
-
-    override def serialize(topic: String, data: T) = serde.toBytes(data)
+  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
+    val config = ConfigFactory.parseMap(configs)
+    this.serde = AvroSerde.create(config)
+    this.isKey = isKey
   }
-}
 
+  override def serialize(topic: String, data: Any): Array[Byte] = {
+    require(serde != null, "AvroSerde not configured")
+    val subject = s"$topic-${if (isKey) "key" else "value"}"
+    val schema = serde.getSchema(data)
+    val schemaId: Int = serde.getSchemaId(schema) match  {
+      case Some(id) => id
+      case None =>
+        serde.register(subject, schema)
+        serde.register(schema.getFullName, schema)
+        serde.initialize()
+        serde.getSchemaId(schema) match {
+          case None => throw new IllegalStateException(s"Failed to register schema for $subject")
+          case Some(id) => id
+        }
+    }
+    AvroRecord.write(data, schema, schemaId)
+    serde.toBytes(data)
+  }
+
+  override def close(): Unit = if (serde != null) serde.close()
+}

@@ -25,15 +25,15 @@ import io.amient.affinity.model.graph.message._
 object GraphData {
 
   def registerMessages(serde: AvroSchemaProvider) = {
-    serde.register(classOf[Edge])
-    serde.register(classOf[VertexProps])
-    serde.register(classOf[GetVertexProps])
-    serde.register(classOf[ModifyGraph])
-    serde.register(classOf[UpdateVertexComponent])
-    serde.register(classOf[Component])
-    serde.register(classOf[GetComponent])
-    serde.register(classOf[UpdateComponent])
-    serde.register(classOf[DeleteComponent])
+    serde.register[Edge]
+    serde.register[VertexProps]
+    serde.register[GetVertexProps]
+    serde.register[ModifyGraph]
+    serde.register[UpdateVertexComponent]
+    serde.register[Component]
+    serde.register[GetComponent]
+    serde.register[UpdateComponent]
+    serde.register[DeleteComponent]
   }
 
 }

@@ -6,19 +6,15 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class AvroRecordSpec extends FlatSpec with Matchers {
 
-  /**
-    * Data version 1 is written at some point in the past
-    */
+  val recordV2Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_V1\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}},{\"name\":\"setOfPrimitives\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}")
+
   val oldSerde = new MemorySchemaRegistry {
-    register(classOf[Record_V1])
-
-    //Future schema V2 available in old version - slightly unrealistic for embedded registry but here we're testing
-    //the API for handling serialization, not the embedded implementation of registry, i.e. this would be true
-    //in case of shared registry, like zookeeper of kafka-based, or confluent schema registry
-    register(classOf[Record_V1], AvroRecord.inferSchema(classOf[Record]))
-    register(classOf[SimpleRecord])
+    //Data version 1 is written at some point in the past
+    register[Record_V1]
+    //"future" version of the Record is registered
+    register[Record_V1](recordV2Schema)
+    register[SimpleRecord]
     initialize()
-
     override def close(): Unit = ()
   }
 
@@ -26,7 +22,18 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     * New version 2 of the case class and schema is added at the end of registry
     * the previous V1 schema version now points to the newest case class.
     */
-  val newSerde = new AvroRecordTestSerde
+  val newSerde = new MemorySchemaRegistry {
+    val recordV1Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
+
+    register[Record](recordV1Schema)
+    register[Record]
+    register[SimpleRecord]
+    register[AvroEnums]
+    register[AvroPrmitives]
+    register[AvroNamedRecords]
+
+    override def close(): Unit = ()
+  }
   newSerde.initialize()
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
@@ -38,6 +45,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
     val newValue = newSerde.toBytes(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("1" -> SimpleRecord(SimpleKey(1), SimpleEnum.A))))
+    newValue.mkString(",") should be ("0,0,0,0,8,2,2,0,0,0,2,2,49,2,0,0,0,0")
     val downgradedValue = oldSerde.fromBytes(newValue)
     downgradedValue should be(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 0))
   }
@@ -87,7 +95,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "In-memory shema registry" should "reject backward-incompatible schema" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-    newSerde.register(classOf[Record], v4schema)
+    newSerde.register[Record](v4schema)
     an[SchemaValidationException] should be thrownBy (newSerde.initialize())
 
   }
