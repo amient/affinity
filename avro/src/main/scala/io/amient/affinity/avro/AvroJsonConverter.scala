@@ -4,6 +4,7 @@ import java.io.{StringWriter, Writer}
 
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
+import org.apache.avro.util.Utf8
 import org.codehaus.jackson.JsonFactory
 
 import scala.collection.JavaConversions._
@@ -44,6 +45,7 @@ object AvroJsonConverter {
           case f: Float if typeIsAllowed(Schema.Type.FLOAT) => gen.writeNumber(f)
           case d: Double if typeIsAllowed(Schema.Type.DOUBLE) => gen.writeNumber(d)
           case s: String if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s)
+          case s: Utf8 if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s.toString)
           case b: java.nio.ByteBuffer if typeIsAllowed(Schema.Type.BYTES) => gen.writeBinary(b.array())
           case b: Array[Byte] if typeIsAllowed(Schema.Type.FIXED) => gen.writeBinary(b)
           case r: IndexedRecord if typeIsAllowed(Schema.Type.RECORD) =>
@@ -83,7 +85,7 @@ object AvroJsonConverter {
               generate(v, s)
             }
             gen.writeEndObject()
-          case x => throw new IllegalArgumentException(s"Unsupported avro-json conversion for ${x.getClass}")
+          case x => throw new IllegalArgumentException(s"Unsupported avro-json conversion for ${x.getClass} and allowed schemas ${schemas.mkString(",")}")
         }
       }
     }
