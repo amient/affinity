@@ -30,7 +30,7 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
     val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
     serde.register[Record](v3schema)
     val thrown = intercept[RuntimeException](serde.initialize())
-    thrown.getMessage should startWith("Schema being registered is incompatible with an earlier schema")
+    thrown.getMessage should include("incompatible")
 
   }
 }
