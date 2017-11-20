@@ -69,7 +69,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
       case _: Float => AvroRecord.FLOAT_SCHEMA
       case _: Double => AvroRecord.DOUBLE_SCHEMA
       case _: String => AvroRecord.STRING_SCHEMA
-      case _: Array[Byte] => AvroRecord.BYTES_SCHEMA
+      case _: java.nio.ByteBuffer => AvroRecord.BYTES_SCHEMA
       case _ => throw new IllegalArgumentException("Unsupported mapping from Any to Avro Type")
     }
   }

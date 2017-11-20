@@ -23,7 +23,7 @@ import java.io.PrintStream
 import java.util.Properties
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.{AvroJsonConverter, AvroSerde}
 import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -32,9 +32,11 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 /**
   * Usage in kafka console consumer utility:
   *
-  * kafka-console-consumer.sh --zookeeper <> --topic <> \
-  *   --formatter io.amient.affinity.kafka.AvroMessageFormatter
-  *   --property schema.zookeeper.connect=localhost:8081
+  * kafka-console-consumer.sh \
+  *   --formatter io.amient.affinity.kafka.AvroMessageFormatter \
+  *   --property schema.zookeeper.connect=localhost:2181 OR --property schema.registry.url=http://localhost:8081 \
+  *   --zookeeper ...\
+  *   --topic ... \
   */
 class AvroMessageFormatter extends MessageFormatter {
 
@@ -62,6 +64,8 @@ class AvroMessageFormatter extends MessageFormatter {
   }
 
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
-    output.println(serde.fromBytes(consumerRecord.value()).toString)
+    val x: Any = serde.fromBytes(consumerRecord.value())
+    val schema = serde.getSchema(x)
+    output.println(AvroJsonConverter.toJson(x, schema))
   }
 }
