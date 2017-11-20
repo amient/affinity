@@ -76,8 +76,8 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
 
   "Spark Module" should "be able to see avro-serialised state in kafka" in {
 
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").intValue should be(1)
+    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(1)
 
     val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")

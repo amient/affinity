@@ -19,16 +19,23 @@
 
 package io.amient.affinity.core.http
 
+import io.amient.affinity.avro.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
+
+case class TestRecord(a: String, b: Int) extends AvroRecord[TestRecord]
 
 class EncoderSpec extends FlatSpec with Matchers {
 
-  case class Test(a: String, b: Int)
-  "Json Encoder" should "automatically format case classes" in {
-    Encoder.json(Test("hello", 123)) should be ("{\"a\":\"hello\",\"b\":123}")
+  "Encoder" should "decorate AvroRecord with type and data fields" in {
+    Encoder.json(TestRecord("hello", 123)) should be ("{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"hello\",\"b\":123}}")
   }
 
-  "Json Encoder" should "automatically format Products" in {
+  "Encoder" should "automatically format Maps" in {
+    Encoder.json(Map("a" -> "hello", "b" -> 123)) should be ("{\"a\":\"hello\",\"b\":123}")
+  }
+
+  "Encoder" should "automatically format Products" in {
     Encoder.json(("hello", 123)) should be ("[\"hello\",123]")
   }
+
 }

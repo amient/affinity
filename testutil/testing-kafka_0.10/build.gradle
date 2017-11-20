@@ -44,9 +44,6 @@ dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaHttpVersion
     compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
-    compile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
-    compile group: 'io.confluent', name: 'kafka-schema-registry-client', version: confluentVersion
-
 }
 
 

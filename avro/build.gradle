@@ -21,14 +21,11 @@ publishing {
 
 dependencies {
 
-    testCompile project(':kafka:kafka_0.10:test-util-kafka')
     compile project(':api')
     compile 'org.scala-lang:scala-library:' + scalaVersion
     compile 'org.scala-lang:scala-reflect:' + scalaVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
-    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
-    compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: jacksonVersion
-
+    testCompile project(':kafka:kafka_0.10:test-util-kafka')
 }
 

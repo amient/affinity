@@ -23,7 +23,7 @@ import java.io.PrintStream
 import java.util.Properties
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.{AvroJsonConverter, AvroSerde}
+import io.amient.affinity.avro.{AvroJsonConverter, AvroRecord, AvroSerde}
 import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -64,8 +64,7 @@ class AvroMessageFormatter extends MessageFormatter {
   }
 
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
-    val x: Any = serde.fromBytes(consumerRecord.value())
-    val schema = serde.getSchema(x)
-    output.println(AvroJsonConverter.toJson(x, schema))
+    val value: Any = serde.fromBytes(consumerRecord.value)
+    output.println(AvroJsonConverter.toJson(value))
   }
 }

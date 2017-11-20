@@ -19,9 +19,9 @@
 
 package io.amient.affinity.example.data
 
-import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
+import org.codehaus.jackson.annotate.JsonIgnore
 
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord[ConfigEntry] {

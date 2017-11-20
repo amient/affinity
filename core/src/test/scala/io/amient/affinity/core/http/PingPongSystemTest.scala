@@ -25,11 +25,11 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.testutil.SystemTestBase
+import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -39,7 +39,6 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
 
   val config = configure("pingpong")
 
-
   val gateway = new TestGatewayNode(config, new GatewayHttp {
 
     import context.dispatcher
@@ -47,7 +46,6 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
     implicit val materializer = ActorMaterializer.create(context.system)
 
     val regionService = service("region")
-
 
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
@@ -101,6 +99,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
   "An Entity Handler" should "be able to stream decode json entity" in {
     val json = new ObjectMapper().createObjectNode()
     json.put("hello", "hello")
+    Encoder.json(json) should be("{\"hello\":\"hello\"}")
     gateway.get_json(gateway.http_post_json(gateway.uri("/ping"), json)) should be(json)
   }
 }

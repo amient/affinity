@@ -30,7 +30,7 @@ import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.kafka.{KafkaAvroDeserializer, KafkaObjectHashPartitioner}
 import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
-import io.amient.affinity.testutil.{SystemTestBaseWithConfluentRegistry, SystemTestBaseWithKafka}
+import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
@@ -40,12 +40,14 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with SystemTestBaseWithConfluentRegistry with Matchers {
+
+class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with EmbeddedCfRegistry with Matchers {
 
   override def numPartitions = 2
 
   val config = configure {
     ConfigFactory.load("systemtests")
+      .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
       .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
         ConfigValueFactory.fromAnyRef(classOf[TestAvroRegistry].getName))
   }
@@ -115,7 +117,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
       var read = 0
       val numReads = numWrites.get
       while (read < numReads) {
-        val records = consumer.poll(1000)
+        val records = consumer.poll(10000)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1

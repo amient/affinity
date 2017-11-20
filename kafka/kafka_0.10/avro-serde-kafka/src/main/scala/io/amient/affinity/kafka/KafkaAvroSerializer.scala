@@ -21,7 +21,7 @@ class KafkaAvroSerializer extends Serializer[Any] {
   override def serialize(topic: String, data: Any): Array[Byte] = {
     require(serde != null, "AvroSerde not configured")
     val subject = s"$topic-${if (isKey) "key" else "value"}"
-    val objSchema = serde.getSchema(data)
+    val objSchema = AvroRecord.inferSchema(data)
     val schemaId = serde.getCurrentSchema(objSchema.getFullName) match {
       case Some((schemaId: Int, regSchema: Schema)) if regSchema == objSchema => schemaId
       case _ =>
