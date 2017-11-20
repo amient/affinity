@@ -44,10 +44,9 @@ dependencies {
     compile project(':kafka:kafka_0.10:avro-serde-kafka')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka:kafka_0.10').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
     testCompile project(':testutil:testing-kafka_0.10')
-    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion) {
-        exclude group: 'org.apache.kafka', module: 'kafka_' + baseScalaVersion
-    }
+    testCompile group: 'io.confluent', name: 'kafka-avro-serializer', version: project(':kafka:kafka_0.10').confluentVersion
 }
 
 
