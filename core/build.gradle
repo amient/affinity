@@ -38,9 +38,6 @@ dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaHttpVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
-    //TODO get rid of dependency on jackson and rely on the avro module only
-    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
-    compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_' + baseScalaVersion, version: jacksonVersion
 
 }
 

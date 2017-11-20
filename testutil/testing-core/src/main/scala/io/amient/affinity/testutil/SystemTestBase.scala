@@ -35,13 +35,14 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.ServicesApi.GatewayClusterStatus
 import io.amient.affinity.core.actor.{GatewayHttp, ServicesApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import org.apache.avro.util.ByteBufferInputStream
+import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.collection.JavaConverters._

@@ -1,14 +1,15 @@
 package io.amient.affinity.avro
 
-import java.io.ByteArrayOutputStream
+import java.io.{StringWriter, Writer}
 
-import com.fasterxml.jackson.core.{JsonEncoding, JsonFactory}
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
+import org.codehaus.jackson.JsonFactory
 
 import scala.collection.JavaConversions._
 
 object AvroJsonConverter {
+
 
   //TODO def toAvro[T: TypeTag](data: Json, registry: AvroSchemaProvider)
 
@@ -16,72 +17,78 @@ object AvroJsonConverter {
 
   private val jfactory = new JsonFactory()
 
-  def toJson(data: IndexedRecord): String = toJson(data, data.getSchema)
+  def toJson(data: Any): String = {
+    val out = new StringWriter()
+    toJson(out, data)
+    out.toString()
+  }
 
-  def toJson(data: Any, schema: Schema): String = {
-    val stream = new ByteArrayOutputStream()
-    val j = jfactory.createGenerator(stream, JsonEncoding.UTF8)
+  def toJson(writer: Writer, data: Any): Unit = toJson(writer, AvroRecord.inferSchema(data), data)
+
+  def toJson(out: Writer, schema: Schema, data: Any): Unit = {
+    val gen = jfactory.createJsonGenerator(out)
 
     def generate(datum: Any, schemas: List[Schema]): Unit = {
       def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)
+
       schemas.map(_.getType) match {
-        case Schema.Type.ENUM :: Nil => j.writeString(datum.toString)
+        case Schema.Type.ENUM :: Nil => gen.writeString(datum.toString)
         case Schema.Type.UNION :: Nil => generate(datum, schemas(0).getTypes.toList)
-        case Schema.Type.RECORD :: Nil =>
-          val record = datum.asInstanceOf[IndexedRecord]
-          j.writeStartObject()
-          schemas(0).getFields.zipWithIndex.foreach { case (f, i) =>
-            j.writeFieldName(f.name())
-            generate(record.get(i), List(f.schema()))
-          }
-          j.writeEndObject()
-        case Schema.Type.BYTES :: Nil => j.writeBinary(datum.asInstanceOf[java.nio.ByteBuffer].array())
-        case Schema.Type.FIXED :: Nil => j.writeBinary(datum.asInstanceOf[Array[Byte]])
         case _ => datum match {
-          case null if typeIsAllowed(Schema.Type.NULL) => j.writeNull()
+          case null if typeIsAllowed(Schema.Type.NULL) => gen.writeNull()
           case null => throw new IllegalArgumentException("Illegal null value for schemas: " + schemas.map(_.getType).mkString(","))
-          case b: Boolean if typeIsAllowed(Schema.Type.BOOLEAN) => j.writeBoolean(b)
-          case b: Byte if typeIsAllowed(Schema.Type.INT) => j.writeNumber(b)
-          case i: Int if typeIsAllowed(Schema.Type.INT) => j.writeNumber(i)
-          case l: Long if typeIsAllowed(Schema.Type.LONG) => j.writeNumber(l)
-          case f: Float if typeIsAllowed(Schema.Type.FLOAT) => j.writeNumber(f)
-          case d: Double if typeIsAllowed(Schema.Type.DOUBLE) => j.writeNumber(d)
-          case s: String if typeIsAllowed(Schema.Type.STRING) => j.writeString(s)
+          case b: Boolean if typeIsAllowed(Schema.Type.BOOLEAN) => gen.writeBoolean(b)
+          case b: Byte if typeIsAllowed(Schema.Type.INT) => gen.writeNumber(b)
+          case i: Int if typeIsAllowed(Schema.Type.INT) => gen.writeNumber(i)
+          case l: Long if typeIsAllowed(Schema.Type.LONG) => gen.writeNumber(l)
+          case f: Float if typeIsAllowed(Schema.Type.FLOAT) => gen.writeNumber(f)
+          case d: Double if typeIsAllowed(Schema.Type.DOUBLE) => gen.writeNumber(d)
+          case s: String if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s)
+          case b: java.nio.ByteBuffer if typeIsAllowed(Schema.Type.BYTES) => gen.writeBinary(b.array())
+          case b: Array[Byte] if typeIsAllowed(Schema.Type.FIXED) => gen.writeBinary(b)
+          case r: IndexedRecord if typeIsAllowed(Schema.Type.RECORD) =>
+            gen.writeStartObject()
+            schemas(0).getFields.zipWithIndex.foreach { case (f, i) =>
+              gen.writeFieldName(f.name())
+              generate(r.get(i), List(f.schema()))
+            }
+            gen.writeEndObject()
           case i: Seq[_] if typeIsAllowed(Schema.Type.ARRAY) =>
             val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)
-            j.writeStartArray()
+            gen.writeStartArray()
             i.foreach(generate(_, s))
-            j.writeEndArray()
+            gen.writeEndArray()
           case i: Iterable[_] if typeIsAllowed(Schema.Type.ARRAY) =>
             val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)
-            j.writeStartArray()
+            gen.writeStartArray()
             i.toSeq.foreach(generate(_, s))
-            j.writeEndArray()
+            gen.writeEndArray()
           case w: java.util.AbstractCollection[_] if schemas.exists(_.getType == Schema.Type.ARRAY) =>
-            j.writeStartArray()
+            gen.writeStartArray()
             w.toSeq.foreach(generate(_, schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)))
-            j.writeEndArray()
+            gen.writeEndArray()
           case i: Map[_, _] if typeIsAllowed(Schema.Type.MAP) =>
-            j.writeStartObject()
+            gen.writeStartObject()
             val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getValueType)
             i.toSeq.foreach { case (k, v) =>
-              j.writeFieldName(k.toString)
+              gen.writeFieldName(k.toString)
               generate(v, s)
             }
-            j.writeEndObject()
+            gen.writeEndObject()
           case i: java.util.Map[_, _] if typeIsAllowed(Schema.Type.MAP) =>
-            j.writeStartObject()
+            gen.writeStartObject()
             val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getValueType)
             i.toSeq.foreach { case (k, v) =>
-              j.writeFieldName(k.toString)
+              gen.writeFieldName(k.toString)
               generate(v, s)
             }
-            j.writeEndObject()
+            gen.writeEndObject()
           case x => throw new IllegalArgumentException(s"Unsupported avro-json conversion for ${x.getClass}")
         }
       }
     }
+
     generate(data, List(schema))
-    stream.toString()
+    gen.flush()
   }
 }

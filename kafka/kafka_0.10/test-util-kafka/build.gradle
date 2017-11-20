@@ -33,8 +33,6 @@ dependencies {
     compile group: 'org.apache.zookeeper', name: 'zookeeper', version: zookeeperVersion, ext: 'pom'
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
-    compile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
-    compile group: 'io.confluent', name: 'kafka-schema-registry-client', version: confluentVersion
 }
 
 

@@ -20,6 +20,8 @@
 package io.amient.affinity.core.actor
 
 import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import java.security.{KeyStore, SecureRandom}
 import java.util
 import java.util.concurrent.ExecutionException
@@ -38,7 +40,6 @@ import akka.stream.actor.ActorPublisher
 import akka.stream.actor.ActorPublisherMessage.Request
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
-import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
@@ -47,6 +48,7 @@ import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterfa
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.util.ByteBufferInputStream
+import org.codehaus.jackson.JsonNode
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -250,13 +252,12 @@ trait WebSocketSupport extends GatewayHttp {
   }
 
   protected def jsonWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
-                             (pfCustomHandle: PartialFunction[JsonNode, Unit]): Future[HttpResponse] = {
+                             (pfCustomHandle: PartialFunction[String, Unit]): Future[HttpResponse] = {
     genericWebSocket(upgrade, keyspace, stateStoreName, key) {
-      case text: TextMessage => pfCustomHandle(Decoder.json(text.getStrictText))
+      case text: TextMessage => pfCustomHandle(text.getStrictText)
       case binary: BinaryMessage =>
         val buf = binary.getStrictData.asByteBuffer
-        val json = Encoder.mapper.readValue(new ByteBufferInputStream(List(buf).asJava), classOf[JsonNode])
-        pfCustomHandle(json)
+        pfCustomHandle(StandardCharsets.UTF_8.decode(buf).toString())
     } {
       case None => TextMessage.Strict("null") //FIXME none type representation
       case Some(value) => TextMessage.Strict(Encoder.json(value))

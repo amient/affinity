@@ -11,10 +11,9 @@ ext {
     typesafeConfigVersion = '1.3.0'
     akkaVersion = '2.4.20'
     akkaHttpVersion = '10.0.10'
-    zkClientVersion = '0.8' // zk client is interdependent with kafka version
+    zkClientVersion = '0.8'
     zookeeperVersion = '3.4.9' // zookeeper version is interdependent with kafka version
-    avroVersion = '1.8.2' // avro version is interdependent with confluent version in kafka modules
-    jacksonVersion = '2.8.4' //jackson version is interdependent with confluent version in kakfa modules
+    avroVersion = '1.8.2' // avro version provides also jackson transiently
 }
 
 task wrapper(type: Wrapper) {

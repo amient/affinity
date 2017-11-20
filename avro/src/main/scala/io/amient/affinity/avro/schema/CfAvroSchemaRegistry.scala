@@ -23,10 +23,11 @@ package io.amient.affinity.avro.schema
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSerde
 import org.apache.avro.Schema
+import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 
@@ -68,12 +69,12 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     def getSubjects: Iterator[String] = {
       val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
       if (!j.has("error_code")) {
-        j.elements().asScala.map(_.textValue())
+        j.getElements().asScala.map(_.getTextValue)
       } else {
-        if (j.get("error_code").intValue() == 40401) {
+        if (j.get("error_code").getIntValue == 40401) {
           Iterator.empty
         } else {
-          throw new RuntimeException(j.get("message").textValue())
+          throw new RuntimeException(j.get("message").getTextValue)
         }
       }
     }
@@ -81,42 +82,42 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     def getVersions(subject: String): Iterator[Int] = {
       val j = mapper.readValue(get(s"/subjects/$subject/versions"), classOf[JsonNode])
       if (!j.has("error_code")) {
-        j.elements().asScala.map(_.intValue())
+        j.getElements().asScala.map(_.getIntValue)
       } else {
-        if (j.get("error_code").intValue() == 40401) {
+        if (j.get("error_code").getIntValue == 40401) {
           Iterator.empty
         } else {
-          throw new RuntimeException(j.get("message").textValue())
+          throw new RuntimeException(j.get("message").getTextValue)
         }
       }
     }
 
     def getSchema(subject: String, version: Int): (Int, Schema) = {
       val j = mapper.readValue(get(s"/subjects/$subject/versions/$version"), classOf[JsonNode])
-      if (j.has("error_code")) throw new RuntimeException(j.get("message").textValue())
-      (j.get("id").intValue(), new Schema.Parser().parse(j.get("schema").textValue()))
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
+      (j.get("id").getIntValue, new Schema.Parser().parse(j.get("schema").getTextValue))
     }
 
     def getSchema(id: Int): Schema = {
       val j = mapper.readValue(get(s"/schemas/ids/$id"), classOf[JsonNode])
-      if (j.has("error_code")) throw new RuntimeException(j.get("message").textValue())
-      new Schema.Parser().parse(j.get("schema").textValue())
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
+      new Schema.Parser().parse(j.get("schema").getTextValue)
     }
 
     def checkSchema(subject: String, schema: Schema): Option[Int] = {
       val entity = mapper.createObjectNode()
       entity.put("schema", schema.toString)
       val j = mapper.readValue(post(s"/subjects/$subject", entity.toString), classOf[JsonNode])
-      if (j.has("error_code")) throw new RuntimeException(j.get("message").textValue())
-      if (j.has("id")) Some(j.get("id").intValue()) else None
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
+      if (j.has("id")) Some(j.get("id").getIntValue) else None
     }
 
     def registerSchema(subject: String, schema: Schema): Int = {
       val entity = mapper.createObjectNode()
       entity.put("schema", schema.toString)
       val j = mapper.readValue(post(s"/subjects/$subject/versions", entity.toString), classOf[JsonNode])
-      if (j.has("error_code")) throw new RuntimeException(j.get("message").textValue())
-      if (j.has("id")) j.get("id").intValue() else throw new IllegalArgumentException
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
+      if (j.has("id")) j.get("id").getIntValue else throw new IllegalArgumentException
     }
 
     private def get(path: String): String = http(path) { connection =>

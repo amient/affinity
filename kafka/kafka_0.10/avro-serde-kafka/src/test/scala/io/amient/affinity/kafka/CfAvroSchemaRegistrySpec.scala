@@ -1,10 +1,29 @@
-package io.amient.affinity.avro
+package io.amient.affinity.kafka
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.kafka.EmbeddedCfRegistry
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
+
+object SimpleEnum extends Enumeration {
+  type SimpleEnum = Value
+  val A, B, C = Value
+}
+
+case class SimpleKey(val id: Int) extends AvroRecord[SimpleKey] {
+  override def hashCode(): Int = id.hashCode()
+}
+
+case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord[SimpleRecord] {
+  override def hashCode(): Int = id.hashCode()
+}
+
+case class Record(
+                   val items: Seq[SimpleRecord] = Seq(),
+                   val index: Map[String, SimpleRecord] = Map(),
+                   val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord[Record]
+
 
 class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfRegistry {
 
