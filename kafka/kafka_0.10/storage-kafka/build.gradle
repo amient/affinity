@@ -45,7 +45,9 @@ dependencies {
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka:kafka_0.10').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':testutil:testing-kafka_0.10')
-    testCompile group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion
+    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion) {
+        exclude group: 'org.apache.kafka', module: 'kafka_' + baseScalaVersion
+    }
 }
 
 
