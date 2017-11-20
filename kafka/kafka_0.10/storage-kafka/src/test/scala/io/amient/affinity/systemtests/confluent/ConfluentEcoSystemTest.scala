@@ -115,7 +115,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
       var read = 0
       val numReads = numWrites.get
       while (read < numReads) {
-        val records = consumer.poll(1000)
+        val records = consumer.poll(10000)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1

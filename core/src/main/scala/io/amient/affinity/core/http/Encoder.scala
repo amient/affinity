@@ -37,6 +37,7 @@ import org.apache.avro.util.ByteBufferOutputStream
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
+//TODO deprecate Encoder and refactor usages to KafkaAvroSerde
 object Encoder {
 
   val mapper = new ObjectMapper()
