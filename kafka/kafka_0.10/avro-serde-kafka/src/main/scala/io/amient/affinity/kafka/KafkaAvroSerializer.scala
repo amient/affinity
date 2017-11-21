@@ -4,6 +4,7 @@ import java.util
 
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import org.apache.avro.Schema
 import org.apache.kafka.common.serialization.Serializer
 
 class KafkaAvroSerializer extends Serializer[Any] {
@@ -20,19 +21,19 @@ class KafkaAvroSerializer extends Serializer[Any] {
   override def serialize(topic: String, data: Any): Array[Byte] = {
     require(serde != null, "AvroSerde not configured")
     val subject = s"$topic-${if (isKey) "key" else "value"}"
-    val schema = serde.getSchema(data)
-    val schemaId: Int = serde.getSchemaId(schema) match  {
-      case Some(id) => id
-      case None =>
-        serde.register(subject, schema)
-        serde.register(schema.getFullName, schema)
+    val objSchema = AvroRecord.inferSchema(data)
+    val schemaId = serde.getCurrentSchema(objSchema.getFullName) match {
+      case Some((schemaId: Int, regSchema: Schema)) if regSchema == objSchema => schemaId
+      case _ =>
+        serde.register(subject, objSchema)
+        serde.register(objSchema.getFullName, objSchema)
         serde.initialize()
-        serde.getSchemaId(schema) match {
+        serde.getSchemaId(objSchema) match {
           case None => throw new IllegalStateException(s"Failed to register schema for $subject")
           case Some(id) => id
         }
     }
-    AvroRecord.write(data, schema, schemaId)
+    AvroRecord.write(data, objSchema, schemaId)
     serde.toBytes(data)
   }
 

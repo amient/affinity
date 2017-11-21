@@ -8,6 +8,7 @@ import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.protocol.SecurityProtocol
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
@@ -30,6 +31,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
       put("num.partitions", numPartitions.toString)
       put("auto.create.topics.enable", "true")
       put("zookeeper.connect", zkConnect)
+      put("offsets.topic.replication.factor", "1")
     }
   })
   private val kafka = new KafkaServerStartable(kafkaConfig)
@@ -41,7 +43,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   })
 
   val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
-  val kafkaBootstrap = broker.getBrokerEndPoint(SecurityProtocol.PLAINTEXT).connectionString()
+  val kafkaBootstrap = broker.getBrokerEndPoint(ListenerName.forSecurityProtocol(SecurityProtocol.PLAINTEXT)).connectionString()
   tmpZkClient.close
   println(s"Embedded Kafka $kafkaBootstrap, data dir: $testDir")
 

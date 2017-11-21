@@ -23,9 +23,9 @@ import java.util
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.util.ZooKeeperClient
-import org.I0Itec.zkclient.IZkChildListener
+import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
+import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.zookeeper.CreateMode
 
@@ -47,7 +47,11 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   private val zkRoot = config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_ROOT)
 
-  private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
+  private val zk = new ZkClient(zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
+    def serialize(o: Object): Array[Byte] = o.toString.getBytes
+    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+  })
+
 
   private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
 

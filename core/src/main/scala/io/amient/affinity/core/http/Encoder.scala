@@ -19,34 +19,27 @@
 
 package io.amient.affinity.core.http
 
-import java.io.{ByteArrayOutputStream, OutputStream, OutputStreamWriter, Writer}
+import java.io.{ByteArrayOutputStream, OutputStreamWriter, Writer}
 import java.util.zip.GZIPOutputStream
 
-import akka.http.scaladsl.model.headers.HttpEncodings
-import akka.http.scaladsl.model.{HttpEntity, StatusCode, HttpHeader, HttpResponse, DateTime, MessageEntity, ContentTypes, ContentType}
-import akka.http.scaladsl.model.headers.{Date, `Content-Encoding`}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.{Date, HttpEncodings, `Content-Encoding`}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.apache.avro.generic.{GenericDatumWriter, IndexedRecord}
-import org.apache.avro.io.EncoderFactory
+import io.amient.affinity.avro.AvroJsonConverter
+import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferOutputStream
+import org.codehaus.jackson.JsonNode
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 object Encoder {
 
-  val mapper = new ObjectMapper()
-  mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
-  mapper.registerModule(DefaultScalaModule)
-
   def json(value: Any): String = {
     val out = new ByteArrayOutputStream()
     val writer = new OutputStreamWriter(out)
-    jsonWrite(value, out, writer)
+    jsonWrite(value, writer)
     val result = out.toString("UTF-8")
     writer.close()
     result
@@ -61,29 +54,35 @@ object Encoder {
   }
 
   def json(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`application/json`, gzip) { (out, writer) =>
-      jsonWrite(value, out, writer)
+    encode(ContentTypes.`application/json`, gzip) { (writer) =>
+      jsonWrite(value, writer)
       writer.close()
     }
   }
 
-  private def jsonWrite(value: Any, out: OutputStream, writer: Writer): Unit = {
+  private def jsonWrite(value: Any, writer: Writer): Unit = {
 
-    def jsonWriteRecursive(value: Any, out: OutputStream, writer: Writer): Unit = {
+    def jsonWriteRecursive(value: Any, writer: Writer): Unit = {
       value match {
+        case j: JsonNode => writer.append(j.toString())
+        case null => writer.append("null")
+        case b: Boolean => writer.append(b.toString)
+        case b: Byte => writer.append(b.toString)
+        case i: Int => writer.append(i.toString)
+        case l: Long => writer.append(l.toString)
+        case f: Float => writer.append(f.toString)
+        case d: Double => writer.append(d.toString)
+        case s: String => writer.append("\"").append(s.replace("\"", "\\\"")).append("\"")
         case record: IndexedRecord =>
           val schema = record.getSchema
-          val avroEncoder = EncoderFactory.get().jsonEncoder(schema, out, false)
-          val datumWriter = new GenericDatumWriter[Any](schema)
           writer.append("{\"type\":\"" + schema.getFullName+ "\",\"data\":")
           writer.flush
-          datumWriter.write(record, avroEncoder)
-          avroEncoder.flush()
+          AvroJsonConverter.toJson(writer, schema, value)
           writer.append("}")
           writer.flush
 
-        case None => jsonWriteRecursive(null, out, writer)
-        case Some(optional) => jsonWriteRecursive(optional, out, writer)
+        case None => jsonWriteRecursive(null, writer)
+        case Some(optional) => jsonWriteRecursive(optional, writer)
         case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_, _)] && i.head.asInstanceOf[(_, _)]._1.isInstanceOf[String]) =>
           writer.append("{")
           writer.flush()
@@ -94,10 +93,10 @@ object Encoder {
               writer.append(",")
               writer.flush()
             }
-            jsonWriteRecursive(k, out, writer)
+            jsonWriteRecursive(k, writer)
             writer.append(":")
             writer.flush()
-            jsonWriteRecursive(v, out, writer)
+            jsonWriteRecursive(v, writer)
           }
           writer.append("}")
           writer.flush()
@@ -111,36 +110,16 @@ object Encoder {
               writer.append(",")
               writer.flush()
             }
-            jsonWriteRecursive(el, out, writer)
+            jsonWriteRecursive(el, writer)
           }
           writer.append("]")
           writer.flush()
-        case s: (_, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case s: (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => jsonWriteRecursive(s.productIterator, out, writer)
-        case other => mapper.writeValue(out, other)
+        case p: Product => jsonWriteRecursive(p.productIterator, writer)
+        case other => throw new IllegalArgumentException(s"Unsupported Conversion for type ${other.getClass}")
       }
     }
-
-    jsonWriteRecursive(value, out, writer)
+    jsonWriteRecursive(value, writer)
+    writer.flush()
   }
 
   def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
@@ -151,7 +130,7 @@ object Encoder {
   }
 
   def html(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`text/html(UTF-8)`, gzip) { (out, writer) =>
+    encode(ContentTypes.`text/html(UTF-8)`, gzip) { (writer) =>
       writer.append(value.toString)
       writer.close()
     }
@@ -165,18 +144,18 @@ object Encoder {
   }
 
   def plain(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`text/plain(UTF-8)`, gzip) { (out, writer) =>
+    encode(ContentTypes.`text/plain(UTF-8)`, gzip) { (writer) =>
       writer.append(value.toString)
       writer.close()
     }
   }
 
-  private def encode(contentType: ContentType, gzip: Boolean )(f: (OutputStream, Writer) => Unit): MessageEntity = {
+  private def encode(contentType: ContentType, gzip: Boolean )(f: (Writer) => Unit): MessageEntity = {
 
     val out = new ByteBufferOutputStream()
     val gout = if (gzip) new GZIPOutputStream(out) else out
     val writer = new OutputStreamWriter(gout)
-    f(gout, writer)
+    f(writer)
     val buffers = out.getBufferList
 
     buffers.size match {

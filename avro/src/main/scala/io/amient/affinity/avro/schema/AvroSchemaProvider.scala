@@ -142,7 +142,7 @@ trait AvroSchemaProvider {
         val schema = AvroRecord.inferSchema(fqn)
         cacheByFqn += fqn -> (cacheBySchema(schema), schema)
       } catch {
-        case NonFatal(e) => e.printStackTrace()
+        case _: java.lang.ClassNotFoundException => cacheByFqn -= fqn
       }
     }
 

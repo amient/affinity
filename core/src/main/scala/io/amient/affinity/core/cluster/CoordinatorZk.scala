@@ -23,8 +23,8 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
-import io.amient.affinity.avro.util.ZooKeeperClient
-import org.I0Itec.zkclient.IZkChildListener
+import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
@@ -46,7 +46,10 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
   val zkRoot = config.getString(CONFIG_ZOOKEEPER_ROOT)
   val groupRoot = s"$zkRoot/$group"
 
-  private val zk = new ZooKeeperClient(zkConnect, zkSessionTimeout, zkConnectTimeout)
+  private val zk = new ZkClient(zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
+    def serialize(o: Object): Array[Byte] = o.toString.getBytes
+    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+  })
 
   private var currentState = Map[String, String]()
 

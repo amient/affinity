@@ -27,7 +27,6 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
-import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
@@ -39,6 +38,7 @@ import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.affinity.ws.AvroWebSocketClient
 import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
 import org.apache.avro.generic.{GenericData, GenericRecord}
+import org.codehaus.jackson.JsonNode
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -100,7 +100,7 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
     val createApiKey = http_post(uri(s"/settings/add?key=$publicKey"), Array(), List(Authorization.basic("admin", "1234")))
     createApiKey.status should be(OK)
     implicit val materializer = ActorMaterializer.create(gatewayNode.system)
-    val salt = get_json(createApiKey).textValue
+    val salt = get_json(createApiKey).getTextValue
     val crypto = new TimeCryptoProofSHA256(salt)
 
     val requestUrl = uri("/profile/mypii")
@@ -118,8 +118,8 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
     //the response should also be signed by the server and the response signature must be valid
     val json2 = Await.result(response2.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
     val jsonNode = mapper.readValue(json2, classOf[JsonNode])
-    jsonNode.get("pii").textValue() should be("mypii")
-    val responseSignature = jsonNode.get("signature").textValue()
+    jsonNode.get("pii").getTextValue should be("mypii")
+    val responseSignature = jsonNode.get("signature").getTextValue
     crypto.verify(responseSignature, requestSignature + "!")
 
   }
@@ -130,36 +130,36 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
     http_get(uri("/vertex/2")).status should be(NotFound)
     http_post(uri("/connect/1/2")).status should be(SeeOther)
     http_post(uri("/connect/3/4")).status should be(SeeOther)
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/2"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/3"))).get("data").get("component").intValue should be(3)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").intValue should be(3)
-    get_json(http_get(uri("/component/1"))).get("data").get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1, 2)) should be(Set())
+    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/2"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/3"))).get("data").get("component").getIntValue should be(3)
+    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(3)
+    get_json(http_get(uri("/component/1"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2)) should be(Set())
     http_get(uri("/component/2")).status should be(NotFound)
-    get_json(http_get(uri("/component/3"))).get("data").get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(3, 4)) should be(Set())
+    get_json(http_get(uri("/component/3"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(3, 4)) should be(Set())
     http_get(uri("/component/4")).status should be(NotFound)
 
     //(3~>1)         ==> component1(1,2,3,4)
     http_post(uri("/connect/3/1")).status should be(SeeOther)
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/2"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/3"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/component/1"))).get("data").get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
+    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/2"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/3"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/component/1"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
     http_get(uri("/component/2")).status should be(NotFound)
     http_get(uri("/component/3")).status should be(NotFound)
     http_get(uri("/component/4")).status should be(NotFound)
 
     //(4!>3)         ==> component1(1,2,3), component4(4)
     http_post(uri("/disconnect/4/3")).status should be(SeeOther)
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/2"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/3"))).get("data").get("component").intValue should be(1)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").intValue should be(4)
-    get_json(http_get(uri("/component/1"))).get("data").get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(1, 2, 3)) should be(Set())
+    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/2"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/3"))).get("data").get("component").getIntValue should be(1)
+    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(4)
+    get_json(http_get(uri("/component/1"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2, 3)) should be(Set())
     http_get(uri("/component/2")).status should be(NotFound)
     http_get(uri("/component/3")).status should be(NotFound)
-    get_json(http_get(uri("/component/4"))).get("data").get("connected").elements().asScala.map(_.intValue).toSet.diff(Set(4)) should be(Set())
+    get_json(http_get(uri("/component/4"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(4)) should be(Set())
 
   }
 

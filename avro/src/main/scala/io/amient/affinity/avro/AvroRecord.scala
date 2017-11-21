@@ -23,7 +23,6 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
-import com.fasterxml.jackson.annotation.JsonIgnore
 import io.amient.affinity.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
@@ -33,6 +32,7 @@ import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.{ByteBufferInputStream, Utf8}
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
+import org.codehaus.jackson.annotate.JsonIgnore
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe
@@ -91,7 +91,7 @@ object AvroRecord {
     read(record)
   }
 
-  def deriveValue(schemaField: Schema, value: Any): AnyRef = {
+  private def deriveValue(schemaField: Schema, value: Any): AnyRef = {
     schemaField.getType match {
       case ARRAY => value.asInstanceOf[Iterable[_]].map(deriveValue(schemaField.getElementType, _)).asJava
       case ENUM => new EnumSymbol(schemaField, value)
@@ -106,7 +106,6 @@ object AvroRecord {
       }
     }
   }
-
 
 
   /**
@@ -189,7 +188,7 @@ object AvroRecord {
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
       case RECORD if datum == null => null
       case RECORD =>
-        val record = datum.asInstanceOf[GenericRecord]
+        val record = datum.asInstanceOf[IndexedRecord]
         val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
         val params = constructor.paramLists(0)
         val arguments = record.getSchema.getFields.asScala.map { field =>
@@ -251,10 +250,22 @@ object AvroRecord {
     }
   }
 
-  def inferSchema[X](data: X): Schema = {
-    val m = runtimeMirror(data.getClass.getClassLoader)
-    val classSymbol = m.staticClass(data.getClass.getName)
-    inferSchema(classSymbol.selfType)
+  def inferSchema(obj: Any): Schema = {
+    obj match {
+      case container: GenericContainer => container.getSchema
+      case _: Boolean => AvroRecord.BOOLEAN_SCHEMA
+      case _: Byte => AvroRecord.INT_SCHEMA
+      case _: Int => AvroRecord.INT_SCHEMA
+      case _: Long => AvroRecord.LONG_SCHEMA
+      case _: Float => AvroRecord.FLOAT_SCHEMA
+      case _: Double => AvroRecord.DOUBLE_SCHEMA
+      case _: String => AvroRecord.STRING_SCHEMA
+      case _: java.nio.ByteBuffer => AvroRecord.BYTES_SCHEMA
+      case _ =>
+        val m = runtimeMirror(obj.getClass.getClassLoader)
+        val classSymbol = m.staticClass(obj.getClass.getName)
+        AvroRecord.inferSchema(classSymbol.selfType)
+    }
   }
 
   def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
@@ -297,7 +308,7 @@ object AvroRecord {
             }
           } else if (tpe <:< typeOf[Option[_]]) {
             SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
-          } else if (tpe <:< typeOf[AvroRecord[_]]) {
+          } else { //if (tpe <:< typeOf[AvroRecord[_]]) {
             val typeMirror = universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
             val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
             val companionMirror = typeMirror.reflect(moduleMirror.instance)
@@ -316,9 +327,9 @@ object AvroRecord {
                 }
             }
             assembler.endRecord()
-          } else {
+          } /*else {
             throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
-          }
+          }*/
 
         typeSchemaCache.put(tpe, schema)
         schema
