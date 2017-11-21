@@ -30,6 +30,7 @@ object AvroJsonConverter {
   def toJson(out: Writer, schema: Schema, data: Any): Unit = {
     val gen: JsonGenerator = jfactory.createJsonGenerator(out)
     def generate(datum: Any, schemas: List[Schema]): Unit = {
+      require(schemas.size > 0, s"No schemas provided for datum: ${datum.getClass}")
       def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)
 
       schemas.map(_.getType) match {
@@ -71,7 +72,7 @@ object AvroJsonConverter {
             gen.writeEndArray()
           case i: Map[_, _] if typeIsAllowed(Schema.Type.MAP) =>
             gen.writeStartObject()
-            val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getValueType)
+            val s = schemas.filter(_.getType == Schema.Type.MAP).map(_.getValueType)
             i.toSeq.foreach { case (k, v) =>
               gen.writeFieldName(k.toString)
               generate(v, s)
@@ -79,13 +80,13 @@ object AvroJsonConverter {
             gen.writeEndObject()
           case i: java.util.Map[_, _] if typeIsAllowed(Schema.Type.MAP) =>
             gen.writeStartObject()
-            val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getValueType)
+            val s = schemas.filter(_.getType == Schema.Type.MAP).map(_.getValueType)
             i.toSeq.foreach { case (k, v) =>
               gen.writeFieldName(k.toString)
               generate(v, s)
             }
             gen.writeEndObject()
-          case x => throw new IllegalArgumentException(s"Unsupported avro-json conversion for ${x.getClass} and allowed schemas ${schemas.mkString(",")}")
+          case x => throw new IllegalArgumentException(s"Unsupported avro-json conversion for ${x.getClass} and the following schemas: { ${schemas.mkString(",")} }")
         }
       }
     }
