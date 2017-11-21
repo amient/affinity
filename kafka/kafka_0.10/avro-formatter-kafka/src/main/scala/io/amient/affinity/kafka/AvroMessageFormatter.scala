@@ -23,10 +23,12 @@ import java.io.PrintStream
 import java.util.Properties
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.{AvroJsonConverter, AvroRecord, AvroSerde}
 import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
+import io.amient.affinity.avro.{AvroJsonConverter, AvroSerde}
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
 
 
 /**
@@ -34,7 +36,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
   *
   * kafka-console-consumer.sh \
   *   --formatter io.amient.affinity.kafka.AvroMessageFormatter \
-  *   --property schema.zookeeper.connect=localhost:2181 OR --property schema.registry.url=http://localhost:8081 \
+  *  [--property schema.zookeeper.connect=localhost:2181 \]
+  *  [--property schema.registry.url=http://localhost:8081 \]
+  *  [--property pretty \]
   *   --zookeeper ...\
   *   --topic ... \
   */
@@ -42,7 +46,12 @@ class AvroMessageFormatter extends MessageFormatter {
 
   private var serde: AvroSerde = null
 
+  private var pretty = false
+
   override def init(props: Properties): Unit = {
+    if (props.containsKey("pretty")) {
+      pretty = true
+    }
     if (props.containsKey("schema.registry.url")) {
       serde = new CfAvroSchemaRegistry(ConfigFactory.defaultReference()
         .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE,
@@ -63,8 +72,16 @@ class AvroMessageFormatter extends MessageFormatter {
     }
   }
 
+  val mapper = new ObjectMapper()
+
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
     val value: Any = serde.fromBytes(consumerRecord.value)
-    output.println(AvroJsonConverter.toJson(value))
+    val simpleJson: String = AvroJsonConverter.toJson(value)
+    if (pretty) {
+      val json: JsonNode = mapper.readTree(simpleJson)
+      output.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json))
+    } else {
+      output.println(simpleJson)
+    }
   }
 }

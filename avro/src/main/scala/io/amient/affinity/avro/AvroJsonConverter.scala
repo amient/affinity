@@ -5,7 +5,8 @@ import java.io.{StringWriter, Writer}
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.Utf8
-import org.codehaus.jackson.JsonFactory
+import org.codehaus.jackson.map.SerializationConfig
+import org.codehaus.jackson.{JsonFactory, JsonGenerator}
 
 import scala.collection.JavaConversions._
 
@@ -27,8 +28,7 @@ object AvroJsonConverter {
   def toJson(writer: Writer, data: Any): Unit = toJson(writer, AvroRecord.inferSchema(data), data)
 
   def toJson(out: Writer, schema: Schema, data: Any): Unit = {
-    val gen = jfactory.createJsonGenerator(out)
-
+    val gen: JsonGenerator = jfactory.createJsonGenerator(out)
     def generate(datum: Any, schemas: List[Schema]): Unit = {
       def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)
 
