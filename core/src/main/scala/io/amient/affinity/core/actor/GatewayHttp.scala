@@ -281,12 +281,16 @@ trait WebSocketSupport extends GatewayHttp {
                              (pfCustomHandle: PartialFunction[Any, Unit]): Future[HttpResponse] = {
 
     def buildSchemaPushMessage(schemaId: Int): ByteString = {
-      val schemaBytes = avroSerde.schema(schemaId).get.toString(true).getBytes()
-      val echoBytes = new Array[Byte](schemaBytes.length + 5)
-      echoBytes(0) = 123
-      ByteUtils.putIntValue(schemaId, echoBytes, 1)
-      Array.copy(schemaBytes, 0, echoBytes, 5, schemaBytes.length)
-      ByteString(echoBytes) //ByteString is a direct response over the push channel
+      try {
+        val schemaBytes = avroSerde.schema(schemaId).get.toString(true).getBytes()
+        val echoBytes = new Array[Byte](schemaBytes.length + 5)
+        echoBytes(0) = 123
+        ByteUtils.putIntValue(schemaId, echoBytes, 1)
+        Array.copy(schemaBytes, 0, echoBytes, 5, schemaBytes.length)
+        ByteString(echoBytes) //ByteString is a direct response over the push channel
+      } catch {
+        case e: Throwable => e.printStackTrace(); throw e
+      }
     }
 
     /** Avro Web Socket Protocol:
@@ -304,10 +308,14 @@ trait WebSocketSupport extends GatewayHttp {
 
     genericWebSocket(upgrade, service, stateStoreName, key) {
       case text: TextMessage =>
-        try {
-          buildSchemaPushMessage(avroSerde.getCurrentSchema(text.getStrictText).get._1)
-        } catch {
-          case NonFatal(e) => log.warning("Invalid websocket schema type request: " + text.getStrictText)
+        val schemaFqn = text.getStrictText
+        avroSerde.getCurrentSchema(schemaFqn) match {
+          case Some((schemaId, _)) => buildSchemaPushMessage(schemaId)
+          case None =>
+            avroSerde.initialize(schemaFqn, AvroRecord.inferSchema(schemaFqn)) match {
+              case schemaId :: Nil => buildSchemaPushMessage(schemaId)
+              case _ => log.error(s"Invalid avro websocket schema type request: $schemaFqn")
+            }
         }
       case binary: BinaryMessage =>
         try {

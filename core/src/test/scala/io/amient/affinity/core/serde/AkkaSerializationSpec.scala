@@ -20,7 +20,9 @@
 package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.serde.collection.SeqSerde
@@ -83,7 +85,8 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
     }
 
     "be constructible from a simple Config" in {
-      Serde.of[List[Long]](ConfigFactory.defaultReference()).isInstanceOf[SeqSerde] should be (true)
+      Serde.of[List[Long]](ConfigFactory.defaultReference().withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName)))
+        .isInstanceOf[SeqSerde] should be (true)
     }
   }
 

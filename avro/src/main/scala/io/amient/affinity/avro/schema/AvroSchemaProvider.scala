@@ -97,7 +97,14 @@ trait AvroSchemaProvider {
     }
   }
 
-  final def initialize(): List[Int] = hypersynchronized {
+  final def initialize(): List[Int]  = initialize(None)
+
+  final def initialize(subject: String, schema: Schema): List[Int] = initialize(Some(subject, schema))
+
+  private def initialize(onDemandRegister: Option[(String, Schema)]): List[Int] = hypersynchronized {
+    onDemandRegister.foreach {
+      case (onDemandSubject, onDemandSchema) => register(onDemandSubject, onDemandSchema)
+    }
     val all: List[(Int, String, Schema)] = getAllRegistered
     all.foreach { case (id, subject, schema) =>
       cacheById += id -> schema
@@ -139,15 +146,6 @@ trait AvroSchemaProvider {
       }
     }
 
-//    System.err.println("------------------------------------- cacheById:")
-//    cacheById.toList.sortBy(_._1).foreach(System.err.println)
-//    System.err.println("------------------------------------- cacheBySchema:")
-//    cacheBySchema.toList.foreach(System.err.println)
-//    System.err.println("------------------------------------- cacheBySubject:")
-//    cacheBySubject.toList.sortBy(_._1).foreach(System.err.println)
-//    System.err.println("-------------------------------------  cacheByFQN:")
-//    cacheByFqn.toList.sortBy(_._1).foreach(System.err.println)
-//    System.err.println("-------------------------------------")
     registration.clear()
     result.result()
   }

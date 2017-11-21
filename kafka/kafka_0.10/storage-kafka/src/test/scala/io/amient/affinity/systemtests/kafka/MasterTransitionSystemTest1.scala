@@ -25,8 +25,11 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
+import com.typesafe.config.ConfigValueFactory
+import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{GatewayHttp}
+import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -43,6 +46,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka 
   override def numPartitions = 2
 
   def config = configure("systemtests")
+    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
   val gateway = new TestGatewayNode(config, new GatewayHttp {
 

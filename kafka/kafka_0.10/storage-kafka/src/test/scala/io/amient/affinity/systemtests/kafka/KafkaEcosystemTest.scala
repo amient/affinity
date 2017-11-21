@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.storage.State
@@ -23,7 +23,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
 
   override def numPartitions: Int = 2
 
-  val config = configure(ConfigFactory.load("systemtests"))
+  val config = configure(ConfigFactory.load("systemtests")
+    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName)))
   val system = ActorSystem.create("ConfluentEcoSystem", config)
 
   import system.dispatcher
@@ -45,6 +46,9 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matc
   behavior of "KafkaDeserializer"
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
+    config.getString(AvroSerde.CONFIG_PROVIDER_CLASS) should be (classOf[ZkAvroSchemaRegistry].getName)
+    system.settings.config.getString(AvroSerde.CONFIG_PROVIDER_CLASS) should be (classOf[ZkAvroSchemaRegistry].getName)
+
     val stateStoreName = "throughput-test"
     val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
     val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)

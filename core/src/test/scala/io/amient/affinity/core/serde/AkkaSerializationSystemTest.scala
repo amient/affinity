@@ -2,7 +2,7 @@ package io.amient.affinity.core.serde
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.kafka.EmbeddedCfRegistry
@@ -15,15 +15,11 @@ case class ExampleType(val id: Int) extends AvroRecord[ExampleType] {
 }
 
 
-class MyConfluentRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
-  register[ExampleType]
-}
-
 class AkkaSerializationSystemTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
 
   val config = configure(ConfigFactory.defaultReference)
     .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
-    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MyConfluentRegistry].getName))
+    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
 
   assert(config.getString(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE) == registryUrl)
 

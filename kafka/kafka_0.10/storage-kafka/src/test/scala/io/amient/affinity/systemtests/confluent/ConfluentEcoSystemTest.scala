@@ -29,7 +29,7 @@ import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.kafka.{KafkaAvroDeserializer, KafkaObjectHashPartitioner}
-import io.amient.affinity.systemtests.{KEY, TestAvroRegistry, TestRecord, UUID}
+import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
 import io.amient.affinity.testutil.{SystemTestBaseWithConfluentRegistry, SystemTestBaseWithKafka}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
@@ -47,7 +47,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
   val config = configure {
     ConfigFactory.load("systemtests")
       .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
-        ConfigValueFactory.fromAnyRef(classOf[TestAvroRegistry].getName))
+        ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
   }
 
   val system = ActorSystem.create("ConfluentEcoSystem", config)
@@ -64,10 +64,13 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with 
   }
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
+    val stateStoreName = "visibility-test"
+    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
+    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
+    state.insert(1, TestRecord(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
     val testRecordSchemaId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
     registryClient.getByID(testRecordSchemaId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
-    val uuidSchemaId = registryClient.getLatestSchemaMetadata(classOf[UUID].getName).getId
-    registryClient.getByID(uuidSchemaId) should equal(AvroRecord.inferSchema(classOf[UUID]))
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (high throughput scenario)" in {

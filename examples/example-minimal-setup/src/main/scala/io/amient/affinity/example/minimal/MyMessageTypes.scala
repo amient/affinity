@@ -21,13 +21,7 @@
 package io.amient.affinity.example.minimal
 
 import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.util.Reply
-
-class MyAvroSerde extends MemorySchemaRegistry {
-    register[PutValue]
-    register[GetValue]
-}
 
 case class GetValue(key: String) extends AvroRecord[GetValue] with Reply[Option[String]] {
   override def hashCode(): Int = key.hashCode()

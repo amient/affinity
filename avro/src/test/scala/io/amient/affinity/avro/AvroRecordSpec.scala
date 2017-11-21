@@ -9,13 +9,10 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   val recordV2Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_V1\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}},{\"name\":\"setOfPrimitives\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}")
 
   val oldSerde = new MemorySchemaRegistry {
-    //Data version 1 is written at some point in the past
-    register[Record_V1]
-    //"future" version of the Record is registered
-    register[Record_V1](recordV2Schema)
+    register[Record_V1] //Data version 1 is current from the point of view of oldSerde
+    register[Record_V1](recordV2Schema) //"future" version of the Record is registered
     register[SimpleRecord]
     initialize()
-    override def close(): Unit = ()
   }
 
   /**
@@ -24,17 +21,11 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     */
   val newSerde = new MemorySchemaRegistry {
     val recordV1Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
-
-    register[Record](recordV1Schema)
-    register[Record]
+    register[Record](recordV1Schema) //in new serde, v1 is the previous version
+    register[Record] // current version the current compile-time version of the Record
     register[SimpleRecord]
-    register[AvroEnums]
-    register[AvroPrmitives]
-    register[AvroNamedRecords]
-
-    override def close(): Unit = ()
+    initialize()
   }
-  newSerde.initialize()
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBytes(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 10))

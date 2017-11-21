@@ -43,17 +43,3 @@ case class KEY(id: Int) extends AvroRecord[KEY] {
 case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord[TestRecord] {
   override def hashCode(): Int = key.hashCode()
 }
-
-class TestAvroRegistry(config: Config) extends CfAvroSchemaRegistry(config) {
-
-  register[KEY]
-  register[UUID]
-  register[TestRecord]
-
-}
-
-class TestZkAvroRegistry(config: Config) extends ZkAvroSchemaRegistry(config) {
-  register[KEY]
-  register[UUID]
-  register[TestRecord]
-}

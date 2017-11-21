@@ -17,13 +17,21 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.core.http
 
-import com.typesafe.config.Config
-import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
-import io.amient.affinity.model.graph.GraphData
+import io.amient.affinity.avro.AvroRecord
 
-class MyAvroSerde(config: Config) extends ZkAvroSchemaRegistry(config) {
-  register[ConfigEntry]
-  GraphData.registerMessages(this)
+
+object Side extends Enumeration {
+  type Side = Value
+  val LEFT, RIGHT = Value
 }
+
+case class ID(val id: Int) extends AvroRecord[ID] {
+  override def hashCode(): Int = id.hashCode()
+}
+
+case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base] {
+  override def hashCode(): Int = id.hashCode()
+}
+
