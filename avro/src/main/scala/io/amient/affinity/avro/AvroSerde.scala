@@ -68,9 +68,10 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
       val schemaId = getSchemaId(s) match {
         case Some(id) => id
         case None =>
-          initialize(s.getFullName, s) match {
-            case id :: Nil => id
-            case _ => throw new IllegalArgumentException(s"Could not register schema for ${s.getFullName}")
+          initialize(s.getFullName, s)
+          getSchemaId(s)match {
+            case Some(id) => id
+            case None => throw new IllegalArgumentException(s"Could not register schema for ${s.getFullName}")
           }
       }
       AvroRecord.write(obj, s, schemaId)
