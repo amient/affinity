@@ -156,26 +156,30 @@ object AvroRecord {
             //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
             val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
             val record = reader.read(null, decoder)
-            val tpe = readerSchema.getType match {
-              case NULL => typeOf[Null]
-              case BOOLEAN => typeOf[Boolean]
-              case INT => typeOf[Int]
-              case LONG => typeOf[Long]
-              case FLOAT => typeOf[Float]
-              case DOUBLE => typeOf[Double]
-              case STRING => typeOf[String]
-              case BYTES => typeOf[java.nio.ByteBuffer]
-              case _ =>
-                val cls = Class.forName(readerSchema.getFullName)
-                val m = runtimeMirror(cls.getClassLoader)
-                m.staticClass(cls.getName).selfType
-            }
-            readDatum(record, tpe , readerSchema)
+            read(record, readerSchema)
         }
     }
   }
 
-  private def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
+  def read(record: Any, schema: Schema) = {
+    val tpe = schema.getType match {
+      case NULL => typeOf[Null]
+      case BOOLEAN => typeOf[Boolean]
+      case INT => typeOf[Int]
+      case LONG => typeOf[Long]
+      case FLOAT => typeOf[Float]
+      case DOUBLE => typeOf[Double]
+      case STRING => typeOf[String]
+      case BYTES => typeOf[java.nio.ByteBuffer]
+      case _ =>
+        val cls = Class.forName(schema.getFullName)
+        val m = runtimeMirror(cls.getClassLoader)
+        m.staticClass(cls.getName).selfType
+    }
+    readDatum(record, tpe , schema)
+  }
+
+  def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])
@@ -197,7 +201,8 @@ object AvroRecord {
         val classMirror = rootMirror.reflectClass(tpe.typeSymbol.asClass)
         val constructorMirror = classMirror.reflectConstructor(constructor)
         constructorMirror(arguments: _*)
-      case ENUM => tpe match {
+      case ENUM =>
+        tpe match {
         case TypeRef(enumType, _, _) =>
           val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
           val instanceMirror = rootMirror.reflect(moduleMirror.instance)
@@ -308,7 +313,7 @@ object AvroRecord {
             }
           } else if (tpe <:< typeOf[Option[_]]) {
             SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
-          } else { //if (tpe <:< typeOf[AvroRecord[_]]) {
+          } else if (tpe <:< typeOf[AvroRecord[_]]) {
             val typeMirror = universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
             val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
             val companionMirror = typeMirror.reflect(moduleMirror.instance)
@@ -327,9 +332,9 @@ object AvroRecord {
                 }
             }
             assembler.endRecord()
-          } /*else {
+          } else {
             throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
-          }*/
+          }
 
         typeSchemaCache.put(tpe, schema)
         schema

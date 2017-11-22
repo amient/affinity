@@ -3,19 +3,18 @@ package io.amient.affinity.avro
 import java.io.{StringWriter, Writer}
 
 import org.apache.avro.Schema
-import org.apache.avro.generic.IndexedRecord
+import org.apache.avro.generic.GenericData.EnumSymbol
+import org.apache.avro.generic.{GenericRecordBuilder, IndexedRecord}
 import org.apache.avro.util.Utf8
-import org.codehaus.jackson.map.SerializationConfig
-import org.codehaus.jackson.{JsonFactory, JsonGenerator}
+import org.codehaus.jackson.map.ObjectMapper
+import org.codehaus.jackson.{JsonFactory, JsonGenerator, JsonNode}
 
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
+import scala.collection.immutable.Seq
+import scala.util.Try
 
 object AvroJsonConverter {
-
-
-  //TODO def toAvro[T: TypeTag](data: Json, registry: AvroSchemaProvider)
-
-  //TODO def toAvro(data: Json, schema: Schema): GenericRecord
 
   private val jfactory = new JsonFactory()
 
@@ -29,16 +28,19 @@ object AvroJsonConverter {
 
   def toJson(out: Writer, schema: Schema, data: Any): Unit = {
     val gen: JsonGenerator = jfactory.createJsonGenerator(out)
+
     def generate(datum: Any, schemas: List[Schema]): Unit = {
+      //      println(s"$datum -> ${schemas.mkString(",")}")
       require(schemas.size > 0, s"No schemas provided for datum: ${datum.getClass}")
+
       def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)
 
       schemas.map(_.getType) match {
-        case Schema.Type.ENUM :: Nil => gen.writeString(datum.toString)
         case Schema.Type.UNION :: Nil => generate(datum, schemas(0).getTypes.toList)
         case _ => datum match {
           case null if typeIsAllowed(Schema.Type.NULL) => gen.writeNull()
           case null => throw new IllegalArgumentException("Illegal null value for schemas: " + schemas.map(_.getType).mkString(","))
+          case _ if typeIsAllowed(Schema.Type.ENUM) => gen.writeString(datum.toString)
           case b: Boolean if typeIsAllowed(Schema.Type.BOOLEAN) => gen.writeBoolean(b)
           case b: Byte if typeIsAllowed(Schema.Type.INT) => gen.writeNumber(b)
           case i: Int if typeIsAllowed(Schema.Type.INT) => gen.writeNumber(i)
@@ -51,7 +53,8 @@ object AvroJsonConverter {
           case b: Array[Byte] if typeIsAllowed(Schema.Type.FIXED) => gen.writeBinary(b)
           case r: IndexedRecord if typeIsAllowed(Schema.Type.RECORD) =>
             gen.writeStartObject()
-            schemas(0).getFields.zipWithIndex.foreach { case (f, i) =>
+            val s = schemas.find(_.getType == Schema.Type.RECORD).get
+            s.getFields.zipWithIndex.foreach { case (f, i) =>
               gen.writeFieldName(f.name())
               generate(r.get(i), List(f.schema()))
             }
@@ -93,5 +96,43 @@ object AvroJsonConverter {
 
     generate(data, List(schema))
     gen.flush()
+  }
+
+  private val mapper = new ObjectMapper()
+
+  def toAvro(data: String, schema: Schema): Any = {
+
+    //TODO    val parser = jfactory.createJsonParser(data)
+
+    def to(data: JsonNode, schema: Schema): Any = {
+      schema.getType match {
+        case Schema.Type.NULL if data.isNull => null
+        case Schema.Type.INT if data.isNumber => data.getIntValue
+        case Schema.Type.LONG if data.isNumber => data.getLongValue
+        case Schema.Type.FLOAT if data.isNumber => data.getDoubleValue.toFloat
+        case Schema.Type.DOUBLE if data.isNumber => data.getDoubleValue
+        case Schema.Type.STRING if data.isTextual => new Utf8(data.getTextValue)
+        case Schema.Type.UNION if schema.getTypes.size == 2 && schema.getTypes.get(0).getType == Schema.Type.NULL =>
+          schema.getTypes.toIterator.map(s => Try(to(data, s))).find(_.isSuccess).map(_.get).get
+        case Schema.Type.ARRAY if data.isArray => data.getElements.map(x => to(x, schema.getElementType)).toList.asJava
+        case Schema.Type.MAP if data.isObject =>
+          val builder = Map.newBuilder[String, Any]
+          schema.getFields foreach { field =>
+            builder += field.name -> to(data.get(field.name), field.schema)
+          }
+          builder.result.asJava
+        case Schema.Type.ENUM if data.isTextual => new EnumSymbol(schema, data.getTextValue)
+        case Schema.Type.RECORD if data.isObject =>
+          val builder = new GenericRecordBuilder(schema)
+          schema.getFields foreach { field =>
+            val d = data.get(field.name)
+            builder.set(field, to(d, field.schema()))
+          }
+          builder.build()
+        case _ => throw new IllegalArgumentException(s"Can't convert ${data} using schema: $schema")
+      }
+    }
+
+    AvroRecord.read(to(mapper.readTree(data), schema), schema)
   }
 }
