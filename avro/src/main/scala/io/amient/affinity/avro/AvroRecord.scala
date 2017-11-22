@@ -258,6 +258,7 @@ object AvroRecord {
   def inferSchema(obj: Any): Schema = {
     obj match {
       case container: GenericContainer => container.getSchema
+      case null => AvroRecord.NULL_SCHEMA
       case _: Boolean => AvroRecord.BOOLEAN_SCHEMA
       case _: Byte => AvroRecord.INT_SCHEMA
       case _: Int => AvroRecord.INT_SCHEMA
