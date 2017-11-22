@@ -198,7 +198,8 @@ object AvroRecord {
         val arguments = record.getSchema.getFields.asScala.map { field =>
           readDatum(record.get(field.pos), params(field.pos).typeSignature, field.schema)
         }
-        val classMirror = rootMirror.reflectClass(tpe.typeSymbol.asClass)
+        val typeMirror = universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
+        val classMirror = typeMirror.reflectClass(tpe.typeSymbol.asClass)
         val constructorMirror = classMirror.reflectConstructor(constructor)
         constructorMirror(arguments: _*)
       case ENUM =>
