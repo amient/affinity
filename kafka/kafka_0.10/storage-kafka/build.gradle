@@ -21,7 +21,6 @@ install.repositories.mavenInstaller.pom.artifactId = 'storage-kafka_0.10-scala_'
 def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = 'core-scala_'+baseScalaVersion
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'testing-kafka_0.10' }.artifactId = 'testing-kafka_0.10-scala_' + baseScalaVersion
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro-serde-kafka' }.artifactId = 'avro-serde-kafka_0.10-scala_' + baseScalaVersion
 }
 
@@ -45,7 +44,7 @@ dependencies {
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka:kafka_0.10').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
-    testCompile project(':testutil:testing-kafka_0.10')
+    testCompile project(':kafka:kafka_0.10:test-util-kafka')
     testCompile group: 'io.confluent', name: 'kafka-avro-serializer', version: project(':kafka:kafka_0.10').confluentVersion
 }
 

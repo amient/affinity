@@ -19,7 +19,6 @@
 
 package io.amient.affinity.kafka;
 
-import java.io.Closeable;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;

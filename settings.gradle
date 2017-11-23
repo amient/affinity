@@ -7,6 +7,4 @@ include ':api', ':avro', ':core', ':rocksdb', ':mapdb',
         ':spark:spark_2.0',
         ':ws-client',
         ':examples:example-distributed-graph',
-        ':examples:example-minimal-setup',
-        ':testutil:testing-core',
-        ':testutil:testing-kafka_0.10'
+        ':examples:example-minimal-setup'

@@ -28,9 +28,9 @@ import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.{KafkaAvroDeserializer, KafkaObjectHashPartitioner}
+import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer, KafkaObjectHashPartitioner}
 import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
-import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
@@ -41,16 +41,16 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
 
-class ConfluentEcoSystemTest extends FlatSpec with SystemTestBaseWithKafka with EmbeddedCfRegistry with Matchers {
+class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with EmbeddedCfRegistry with Matchers {
 
   override def numPartitions = 2
 
-  val config = configure {
+  val config = configure(
     ConfigFactory.load("systemtests")
       .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
       .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
         ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
-  }
+    , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = ActorSystem.create("ConfluentEcoSystem", config)
 

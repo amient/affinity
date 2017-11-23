@@ -5,7 +5,7 @@ import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.testutil.SystemTestBase
+import io.amient.affinity.core.util.SystemTestBase
 import org.scalatest.FlatSpec
 
 

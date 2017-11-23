@@ -1,4 +1,4 @@
-package io.amient.affinity.testutil.storage
+package io.amient.affinity.systemtests.kafka
 
 import java.nio.ByteBuffer
 import java.util.concurrent.{Callable, Executors, Future}

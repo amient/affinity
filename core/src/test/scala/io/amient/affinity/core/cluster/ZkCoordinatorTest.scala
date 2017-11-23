@@ -3,14 +3,15 @@ package io.amient.affinity.core.cluster
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.core.actor.GatewayHttp
-import io.amient.affinity.testutil.SystemTestBaseWithZk
+import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.kafka.EmbeddedZooKeeper
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConversions._
 
-class ZkCoordinatorTest extends FlatSpec with SystemTestBaseWithZk with Matchers {
+class ZkCoordinatorTest extends FlatSpec with SystemTestBase with EmbeddedZooKeeper with Matchers {
 
-  def config = configure("distributedit")
+  def config = configure("distributedit", zkConnect = Some(zkConnect))
 
   val system = ActorSystem.create("test", config)
   val gatewayNode = new TestGatewayNode(config, new GatewayHttp {

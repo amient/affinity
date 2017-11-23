@@ -25,14 +25,15 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.RequestMatchers.HTTP
-import io.amient.affinity.testutil.SystemTestBase
-import org.scalatest.{FlatSpec, Matchers}
+import io.amient.affinity.core.util.SystemTestBase
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.language.postfixOps
 
-class TlsGatewaySystemTest extends FlatSpec with SystemTestBase with Matchers {
+class TlsGatewaySystemTest extends FlatSpec with SystemTestBase with BeforeAndAfterAll with Matchers {
 
   val config = configure("tlstests")
+
   val system = ActorSystem.create("TlsGatewayTest", config)
 
   val gateway = new TestGatewayNode(config, new GatewayHttp {

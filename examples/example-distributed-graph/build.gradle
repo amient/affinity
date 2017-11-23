@@ -25,10 +25,10 @@ dependencies {
     compile project(':kafka:kafka_' + kafkaMinorVersion + ':storage-kafka')
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':ws-client')
+    testCompile project(':kafka:kafka_' + kafkaMinorVersion + ':test-util-kafka')
     testCompile project(':spark:spark_' + baseSparkVersion)
     testCompile group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
     testCompile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
-    testCompile project(':testutil:testing-kafka_' + kafkaMinorVersion)
 }
 
 

@@ -30,11 +30,11 @@ import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.util.TimeCryptoProofSHA256
+import io.amient.affinity.core.util.{SystemTestBase, TimeCryptoProofSHA256}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
-import io.amient.affinity.testutil.SystemTestBaseWithKafka
+import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.ws.AvroWebSocketClient
 import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
 import org.apache.avro.generic.{GenericData, GenericRecord}
@@ -46,7 +46,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 2
 
@@ -56,8 +56,8 @@ class ApiSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers 
     .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST, ConfigValueFactory.fromAnyRef("127.0.0.1"))
 
 
-  val dataNode = new Node(configure(config))
-  val gatewayNode = new TestGatewayNode(configure(config), new ExampleGatewayRoot
+  val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val gatewayNode = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)), new ExampleGatewayRoot
     with Ping
     with Admin
     with PublicApi

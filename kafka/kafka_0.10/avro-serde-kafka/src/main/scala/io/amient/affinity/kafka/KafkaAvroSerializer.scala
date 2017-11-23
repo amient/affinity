@@ -21,18 +21,7 @@ class KafkaAvroSerializer extends Serializer[Any] {
   override def serialize(topic: String, data: Any): Array[Byte] = {
     require(serde != null, "AvroSerde not configured")
     val subject = s"$topic-${if (isKey) "key" else "value"}"
-    val objSchema = AvroRecord.inferSchema(data)
-    val schemaId = serde.getCurrentSchema(objSchema.getFullName) match {
-      case Some((schemaId: Int, regSchema: Schema)) if regSchema == objSchema => schemaId
-      case _ =>
-        serde.register(subject, objSchema)
-        serde.register(objSchema.getFullName, objSchema)
-        serde.initialize()
-        serde.getSchemaId(objSchema) match {
-          case None => throw new IllegalStateException(s"Failed to register schema for $subject")
-          case Some(id) => id
-        }
-    }
+    val (objSchema, schemaId) = serde.getOrRegisterSchema(data, subject)
     AvroRecord.write(data, objSchema, schemaId)
     serde.toBytes(data)
   }

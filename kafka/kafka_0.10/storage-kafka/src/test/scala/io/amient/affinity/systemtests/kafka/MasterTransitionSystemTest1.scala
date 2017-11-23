@@ -33,7 +33,9 @@ import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.testutil.{MyTestPartition, SystemTestBaseWithKafka}
+import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
+import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -41,16 +43,15 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.Random
 
-class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 2
 
-  def config = configure("systemtests")
+  def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
     .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
   val gateway = new TestGatewayNode(config, new GatewayHttp {
 
-    import MyTestPartition._
     import context.dispatcher
 
     implicit val scheduler = context.system.scheduler

@@ -28,14 +28,14 @@ import akka.util.Timeout
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.testutil.SystemTestBase
+import io.amient.affinity.core.util.SystemTestBase
 import org.codehaus.jackson.map.ObjectMapper
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.language.{existentials, implicitConversions, postfixOps}
 
-class PingPongSystemTest extends FlatSpec with SystemTestBase with Matchers {
+class PingPongSystemTest extends FlatSpec with SystemTestBase with BeforeAndAfterAll with Matchers {
 
   val config = configure("pingpong")
 

@@ -30,7 +30,6 @@ dependencies {
     compile project(':core')
     compile project(':rocksdb')
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
-    testCompile project(':testutil:testing-core')
 }
 
 

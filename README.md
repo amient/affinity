@@ -2,11 +2,12 @@
 
  - library for building stateful, scalable Data APIs on top of streaming foundation
  - can be attached to stream-processing pipelines based around kafka and participate
-   either as a producer/source or consumer/materializer of state 
+   either as a producer/source or consumer/materializer of state
  - fault-tolerance build on top of a distributed-log
  - horizontally scalable and fully asynchronous
  - zero-downtime possible
  
+
 # Architecture
  
 
@@ -60,8 +61,6 @@ The codebase is split into several modules:
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
  - `spark/spark_2.0` exposes underlying kafka storage as KafkaRDD with all the serde magic
- - `testutil/testing-core` system test utilities (see examples for usage) (Scala)
- - `testutil/testing-kafka_0.10` system test utilities with embedded kafka storage and avro registries
  - `ws-client` custom web socket with avro support written (Java)
  
  

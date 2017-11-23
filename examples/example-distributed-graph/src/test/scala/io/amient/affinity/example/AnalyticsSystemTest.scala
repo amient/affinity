@@ -26,19 +26,19 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
-import io.amient.affinity.kafka.KafkaClientImpl
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaClientImpl}
 import io.amient.affinity.model.graph.message.{Component, VertexProps}
-import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import io.amient.util.spark.KafkaRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
-class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 4
 
@@ -47,8 +47,8 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
     .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST, ConfigValueFactory.fromAnyRef("127.0.0.1"))
 
 
-  val dataNode = new Node(configure(config))
-  val gatewayNode = new TestGatewayNode(configure(config), new ExampleGatewayRoot
+  val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val gatewayNode = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)), new ExampleGatewayRoot
     with Ping
     with Admin
     with PublicApi
@@ -84,7 +84,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBaseWithKafka with Mat
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val serializedConfig = sc.broadcast(configure(config))
+    val serializedConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
     val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
       put("bootstrap.servers", kafkaBootstrap)

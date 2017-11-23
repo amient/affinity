@@ -9,9 +9,9 @@ import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.kafka.KafkaAvroDeserializer
+import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer}
 import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
-import io.amient.affinity.testutil.SystemTestBaseWithKafka
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -19,12 +19,14 @@ import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class KafkaEcosystemTest extends FlatSpec with SystemTestBaseWithKafka with Matchers {
+class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions: Int = 2
 
   val config = configure(ConfigFactory.load("systemtests")
-    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName)))
+    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName))
+    , Some(zkConnect), Some(kafkaBootstrap))
+
   val system = ActorSystem.create("ConfluentEcoSystem", config)
 
   import system.dispatcher

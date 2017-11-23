@@ -22,6 +22,7 @@ package io.amient.affinity.avro
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.serde.AbstractSerde
+import org.apache.avro.Schema
 
 object AvroSerde {
   final val CONFIG_PROVIDER_CLASS = "affinity.avro.schema.provider.class"
@@ -64,19 +65,26 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else {
-      val s = AvroRecord.inferSchema(obj)
-      val schemaId = getSchemaId(s) match {
-        case Some(id) => id
-        case None =>
-          initialize(s.getFullName, s)
-          getSchemaId(s)match {
-            case Some(id) => id
-            case None => throw new IllegalArgumentException(s"Could not register schema for ${s.getFullName}")
-          }
-      }
+      val (s, schemaId) = getOrRegisterSchema(obj)
       AvroRecord.write(obj, s, schemaId)
     }
   }
 
+  def getOrRegisterSchema(data: Any, subjectOption: String = null): (Schema, Int) = {
+    val schema = AvroRecord.inferSchema(data)
+    val subject = Option(subjectOption).getOrElse(schema.getFullName)
+    val schemaId = getCurrentSchema(schema.getFullName) match {
+      case Some((schemaId: Int, regSchema: Schema)) if regSchema == schema => schemaId
+      case _ =>
+        register(subject, schema)
+        register(schema.getFullName, schema)
+        initialize()
+        getSchemaId(schema) match {
+          case None => throw new IllegalStateException(s"Failed to register schema for $subject")
+          case Some(id) => id
+        }
+    }
+    (schema, schemaId)
+  }
 
 }
