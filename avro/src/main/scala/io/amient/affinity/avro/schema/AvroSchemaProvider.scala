@@ -138,12 +138,8 @@ trait AvroSchemaProvider {
     }
 
     cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
-      try {
-        val schema = AvroRecord.inferSchema(fqn)
-        cacheByFqn += fqn -> (cacheBySchema(schema), schema)
-      } catch {
-        case _: java.lang.ClassNotFoundException => cacheByFqn -= fqn
-      }
+      val schema = AvroRecord.inferSchema(fqn)
+      cacheBySchema.get(schema).foreach(schemaId => cacheByFqn += fqn -> (schemaId, schema))
     }
 
     registration.clear()
