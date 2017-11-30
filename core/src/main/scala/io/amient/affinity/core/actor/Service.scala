@@ -42,7 +42,7 @@ class Service(config: Config) extends Actor {
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
-  //TODO #17 partitioner should be configurable via blackbox
+  //TODO partitioner should be configurable via blackbox
   val partitioner = new ObjectHashPartitioner
 
 

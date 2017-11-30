@@ -18,7 +18,6 @@
  */
 package io.amient.affinity.core.storage
 
-import java.nio.ByteBuffer
 import java.util.concurrent.{CompletableFuture, Future}
 
 import com.typesafe.config.Config
@@ -33,7 +32,7 @@ class NoopStorage(config: Config, partition:Int) extends Storage(config, partiti
 
   override def stop(): Unit = ()
 
-  override def write(key: ByteBuffer, value: ByteBuffer): Future[_] = CompletableFuture.completedFuture(())
+  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[_] = CompletableFuture.completedFuture(())
 
-  override def delete(key: ByteBuffer): Future[_] = CompletableFuture.completedFuture(())
+  override def delete(key: Array[Byte]): Future[_] = CompletableFuture.completedFuture(())
 }

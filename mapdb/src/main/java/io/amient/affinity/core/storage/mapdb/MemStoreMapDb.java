@@ -34,7 +34,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 
-public class MemStoreMapDb implements MemStore {
+public class MemStoreMapDb extends MemStore {
 
     public static final String CONFIG_MAPDB_DATA_PATH = "memstore.mapdb.data.path";
     public static final String CONFIG_MAPDB_MMAP_ENABLED = "memstore.mapdb.mmap.enabled";

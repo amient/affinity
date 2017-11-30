@@ -57,8 +57,7 @@ class ExampleGatewayRoot extends GatewayHttp with ActorState {
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication
     * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
-    * partition 0. MemStoreConcurrentMap is mixed in instead of MemStoreSimpleMap because the settings
-    * can be modified by other nodes and need to be accessed concurrently
+    * partition 0.
     */
   val settings = state[String, ConfigEntry]("settings", partition = 0)
 

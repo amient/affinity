@@ -18,7 +18,7 @@
  - akka for asynchronous communication 
  - akka http as the main interface with websocket layer
  - zookeeper for distributed coordination (other coordinators pluggable)
- - RocksDb, MemDb, ConcurrentMap and other MemStore implementations
+ - RocksDb, MemDb, SimpleMap implementations
  - kafka as a fault-tolerant change log storage
 
 ## State Management

@@ -54,8 +54,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
         data.update(key) {
           case None => (Some(request), Some(TestValue(List(item))), TestValue(List()))
           case Some(prev) if (prev.items.contains(item)) => (None, Some(prev), prev)
-          case Some(prev) if (item == 106) =>
-            throw new IllegalArgumentException("Simulated transaction failure")
+          case Some(_) if (item == 106) => throw new IllegalArgumentException("Simulated transaction failure")
           case Some(prev) => (Some(request), Some(prev.withAddedItem(item)), prev)
         }
       }

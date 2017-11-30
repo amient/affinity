@@ -70,6 +70,7 @@ trait AvroSchemaProvider {
 
   /**
     * Get id of a given schema as registered by the underlying registry
+    *
     * @param schema
     * @return
     */
@@ -97,7 +98,7 @@ trait AvroSchemaProvider {
     }
   }
 
-  final def initialize(): List[Int]  = initialize(None)
+  final def initialize(): List[Int] = initialize(None)
 
   final def initialize(subject: String, schema: Schema): List[Int] = initialize(Some(subject, schema))
 
@@ -117,12 +118,12 @@ trait AvroSchemaProvider {
       case (subject, schema) =>
         val versions = cacheBySubject.get(subject).getOrElse(List())
         val alreadyRegisteredId: Int = (versions.map { case (id2, schema2) =>
-          _register  += ((id2, schema2, subject))
+          _register += ((id2, schema2, subject))
           if (schema2 == schema) id2 else -1
         } :+ (-1)).max
         val schemaId = if (alreadyRegisteredId == -1) {
           val newlyRegisteredId = registerSchema(subject, schema, versions.map(_._2))
-          _register  += ((newlyRegisteredId, schema, subject))
+          _register += ((newlyRegisteredId, schema, subject))
           newlyRegisteredId
         } else {
           alreadyRegisteredId
@@ -138,8 +139,12 @@ trait AvroSchemaProvider {
     }
 
     cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
-      val schema = AvroRecord.inferSchema(fqn)
-      cacheBySchema.get(schema).foreach(schemaId => cacheByFqn += fqn -> (schemaId, schema))
+      try {
+        val schema = AvroRecord.inferSchema(fqn)
+        cacheBySchema.get(schema).foreach(schemaId => cacheByFqn += fqn -> (schemaId, schema))
+      } catch {
+        case _: java.lang.ClassNotFoundException => //class doesn't exist in the current runtime - not a problem, we'll use generic records
+      }
     }
 
     registration.clear()
