@@ -1,7 +1,7 @@
 package io.amient.affinity.core.storage;
 
 import java.time.Instant;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 public interface EventTime {
@@ -15,7 +15,7 @@ public interface EventTime {
     /**
      * @return event time translated into LocalDate instance
      */
-    default LocalDate eventTimeLocal() {
-        return Instant.ofEpochMilli(eventTimeUtc()).atZone(ZoneId.systemDefault()).toLocalDate();
+    default LocalDateTime eventTimeLocal() {
+        return Instant.ofEpochMilli(eventTimeUtc()).atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 }

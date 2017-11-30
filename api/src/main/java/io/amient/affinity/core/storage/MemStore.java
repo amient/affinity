@@ -87,7 +87,7 @@ public abstract class MemStore {
      */
     final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
         if (ttlMs < Long.MAX_VALUE && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
-            //TODO this is the only place where expired records get actually cleaned from the memstore but we need also a regular full compaction process that will get the memstore iterator and call this method
+            //TODO #65 this is the only place where expired records get actually cleaned from the memstore but we need also a regular full compaction process that will get the memstore iterator and call this method
             remove(key);
             return Optional.empty();
         } else {
@@ -103,14 +103,14 @@ public abstract class MemStore {
     /**
      * boostrapping methods: load(), unload()
      */
-    //TODO remove formatter used for debugging
-    private SimpleDateFormat formatter = new SimpleDateFormat("dd HH:mm:ss:SSS");
 
     final public void unload(byte[] key) {
         remove(ByteBuffer.wrap(key));
     }
 
     final public void load(byte[] key, byte[] value, long timestamp) {
+        //TODO remove formatter used for debugging
+        SimpleDateFormat formatter = new SimpleDateFormat("dd HH:mm:ss:SSS");
         System.out.println(formatter.format(new Date(timestamp)) + ":" + key + "->" + value);
         ByteBuffer valueBuffer = wrap(value, timestamp);
         update(ByteBuffer.wrap(key), valueBuffer);
