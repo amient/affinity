@@ -81,6 +81,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
+  implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
+
   /**
     * Retrieve a value from the store asynchronously
     *
@@ -216,8 +218,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       option(storage.memstore.update(k, memStoreValue)) match {
         case Some(prev) if prev == memStoreValue => Future.successful(Some(value))
         case differentOrNone =>
-          val javaToScalaFuture = Future(storage.write(keyBytes, valueBytes, recordTimestamp).get)
-          writeWithMemstoreRollback(k, differentOrNone, javaToScalaFuture)
+          val writeOperation: Future[_] = storage.write(keyBytes, valueBytes, recordTimestamp)
+          writeWithMemstoreRollback(k, differentOrNone, writeOperation)
       }
     }
   }
@@ -239,8 +241,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     option(storage.memstore.remove(k)) match {
       case None => Future.successful(None)
       case some =>
-        val javaToScalaFuture = Future(storage.delete(keyBytes).get)
-        writeWithMemstoreRollback(k, some, javaToScalaFuture)
+        val deleteOperation: Future[_] = storage.delete(keyBytes)
+        writeWithMemstoreRollback(k, some, deleteOperation)
     }
   }
 

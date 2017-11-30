@@ -101,7 +101,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
         case e: Throwable => e.printStackTrace(); throw e
       }
     })
-    Await.ready(updates, 100 seconds)
+    Await.ready(updates, 10 seconds)
     val spentMs = System.currentTimeMillis() - l
     println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
     state.size should equal(numWrites.get)

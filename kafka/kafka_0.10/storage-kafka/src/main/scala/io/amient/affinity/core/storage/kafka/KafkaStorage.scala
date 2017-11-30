@@ -189,7 +189,8 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
   }
 
   def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
+    //kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
+    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
   }
 
   def delete(key: Array[Byte]): Future[RecordMetadata] = {

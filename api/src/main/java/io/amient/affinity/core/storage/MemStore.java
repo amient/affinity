@@ -71,6 +71,7 @@ public abstract class MemStore {
      */
     final public ByteBuffer wrap(byte[] value, long timestamp) {
         ByteBuffer memStoreValue = ByteBuffer.allocate(8 + value.length);
+        memStoreValue.order(ByteOrder.BIG_ENDIAN);
         memStoreValue.putLong(timestamp);
         memStoreValue.put(value);
         memStoreValue.flip();
@@ -102,6 +103,7 @@ public abstract class MemStore {
     /**
      * boostrapping methods: load(), unload()
      */
+    //TODO remove formatter used for debugging
     private SimpleDateFormat formatter = new SimpleDateFormat("dd HH:mm:ss:SSS");
 
     final public void unload(byte[] key) {
