@@ -30,7 +30,6 @@ def installer = install.repositories.mavenInstaller
 dependencies {
     compile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
     compile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: scalaCheckVersion
-//    compile group: 'org.apache.zookeeper', name: 'zookeeper', version: zookeeperVersion, ext: 'pom'
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.apache.kafka', name: 'kafka_'+ baseScalaVersion, version: kafkaVersion
 }

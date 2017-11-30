@@ -12,7 +12,6 @@ ext {
     akkaVersion = '2.4.20'
     akkaHttpVersion = '10.0.10'
     zkClientVersion = '0.10' // zkclient provides zookeeper server transitively
-    //zookeeperVersion = '3.4.9' // zookeeper version is interdependent with kafka version
     avroVersion = '1.8.2' // avro version provides also jackson transiently
 }
 
