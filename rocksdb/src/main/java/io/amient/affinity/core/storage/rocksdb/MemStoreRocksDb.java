@@ -35,7 +35,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 
-public class MemStoreRocksDb implements MemStore {
+public class MemStoreRocksDb extends MemStore {
 
 
     public static final String ConfigRocksDbDataPath = "memstore.rocksdb.data.path";

@@ -16,9 +16,9 @@ class FailingKafkaStorage(config: Config, partition: Int) extends KafkaStorage(c
 
   val executor = Executors.newFixedThreadPool(1)
 
-  override def write(key: ByteBuffer, value: ByteBuffer): Future[RecordMetadata] = {
+  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[RecordMetadata] = {
 
-    val javaFuture: Future[RecordMetadata] = kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
+    val javaFuture: Future[RecordMetadata] = kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
     return executor.submit(new Callable[RecordMetadata]() {
       override def call(): RecordMetadata = {
         if (System.currentTimeMillis() % 10 == 0) {

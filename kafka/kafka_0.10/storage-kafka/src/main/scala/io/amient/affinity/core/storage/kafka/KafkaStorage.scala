@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core.storage.kafka
 
-import java.nio.ByteBuffer
 import java.util
 import java.util.Properties
 import java.util.concurrent.Future
@@ -31,7 +30,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.BrokerNotAvailableException
-import org.apache.kafka.common.serialization.{ByteBufferDeserializer, ByteBufferSerializer}
+import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
@@ -65,8 +64,8 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
       }
     }
     put("bootstrap.servers", brokers)
-    put("key.serializer", classOf[ByteBufferSerializer].getName)
-    put("value.serializer", classOf[ByteBufferSerializer].getName)
+    put("key.serializer", classOf[ByteArraySerializer].getName)
+    put("value.serializer", classOf[ByteArraySerializer].getName)
   }
 
   val consumerProps = new Properties() {
@@ -82,11 +81,11 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     }
     put("bootstrap.servers", brokers)
     put("enable.auto.commit", "false")
-    put("key.deserializer", classOf[ByteBufferDeserializer].getName)
-    put("value.deserializer", classOf[ByteBufferDeserializer].getName)
+    put("key.deserializer", classOf[ByteArrayDeserializer].getName)
+    put("value.deserializer", classOf[ByteArrayDeserializer].getName)
   }
 
-  protected val kafkaProducer = new KafkaProducer[ByteBuffer, ByteBuffer](producerProps)
+  protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
   @volatile private var tailing = true
 
@@ -96,7 +95,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
 
   private val consumer = new Thread {
 
-    val kafkaConsumer = new KafkaConsumer[ByteBuffer, ByteBuffer](consumerProps)
+    val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
 
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
@@ -123,9 +122,9 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
               for (r <- records.iterator().asScala) {
                 fetchedNumRecrods += 1
                 if (r.value == null) {
-                  memstore.remove(r.key)
+                  memstore.unload(r.key)
                 } else {
-                  memstore.update(r.key, r.value)
+                  memstore.load(r.key, r.value, r.timestamp())
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {
@@ -189,12 +188,12 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     }
   }
 
-  def write(key: ByteBuffer, value: ByteBuffer): Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, key, value))
+  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[RecordMetadata] = {
+    kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
   }
 
-  def delete(key: ByteBuffer): Future[RecordMetadata] = {
-    write(key, null)
+  def delete(key: Array[Byte]): Future[RecordMetadata] = {
+    write(key, null, 0L)
   }
 
 }

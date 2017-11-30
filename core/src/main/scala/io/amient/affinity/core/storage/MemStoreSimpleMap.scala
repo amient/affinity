@@ -23,10 +23,13 @@ import java.nio.ByteBuffer
 import java.util
 import java.util.Map.Entry
 import java.util.Optional
+import java.util.concurrent.ConcurrentHashMap
 
 class MemStoreSimpleMap extends MemStore {
 
-  private val internal = new util.HashMap[ByteBuffer, ByteBuffer]()
+  private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
+
+  override def close(): Unit = internal.clear()
 
   override def iterator(): util.Iterator[Entry[ByteBuffer, ByteBuffer]] = {
     internal.entrySet().iterator()
@@ -42,9 +45,5 @@ class MemStoreSimpleMap extends MemStore {
 
   override def remove(key: ByteBuffer): Optional[ByteBuffer] = {
     Optional.ofNullable(internal.remove(key))
-  }
-
-  override def close(): Unit = {
-    internal.clear()
   }
 }

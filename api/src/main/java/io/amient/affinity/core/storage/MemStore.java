@@ -20,6 +20,9 @@
 package io.amient.affinity.core.storage;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -29,34 +32,87 @@ import java.util.Optional;
  *  Config config
  *  int partition
  */
-public interface MemStore {
+public abstract class MemStore {
 
-    Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
+    public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
     /**
      * @param key ByteBuffer representation of the key
      * @return Some(MV) if key exists
      * None if the key doesn't exist
      */
-    Optional<ByteBuffer> apply(ByteBuffer key);
+    public abstract Optional<ByteBuffer> apply(ByteBuffer key);
 
     /**
      * @param key ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
      * @return optional value held at the key position before the update
      */
-    Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value);
+    public abstract Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value);
 
     /**
      * @param key ByteBuffer representation whose value will be removed
      * @return optional value held at the key position before the update, None if the key doesn't exist
      */
-    Optional<ByteBuffer> remove(ByteBuffer key);
+    public abstract Optional<ByteBuffer> remove(ByteBuffer key);
 
     /**
      * close() will be called whenever the owning storage is closing
      * implementation should clean-up any resources here
      */
-    void close();
+    public abstract void close();
+
+
+    /**
+     * Wraps record value with metadata into a storable cell
+     * @param value
+     * @param timestamp
+     * @return
+     */
+    final public ByteBuffer wrap(byte[] value, long timestamp) {
+        ByteBuffer memStoreValue = ByteBuffer.allocate(8 + value.length);
+        memStoreValue.putLong(timestamp);
+        memStoreValue.put(value);
+        memStoreValue.flip();
+        return memStoreValue;
+    }
+
+    /**
+     * Unwraps stored cell into metadata and value bytes, returning the underlying value only if it hasn't expired
+     * with respect to the provided ttl ms parameter and system time
+     * @param valueAndMetadata
+     * @param ttlMs
+     * @return
+     */
+    final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
+        if (ttlMs < Long.MAX_VALUE && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
+            //TODO this is the only place where expired records get actually cleaned from the memstore but we need also a regular full compaction process that will get the memstore iterator and call this method
+            remove(key);
+            return Optional.empty();
+        } else {
+            int len = valueAndMetadata.limit();
+            byte[] result = new byte[len - 8];
+            valueAndMetadata.position(8);
+            valueAndMetadata.get(result);
+            return Optional.of(result);
+        }
+    }
+
+
+    /**
+     * boostrapping methods: load(), unload()
+     */
+    private SimpleDateFormat formatter = new SimpleDateFormat("dd HH:mm:ss:SSS");
+
+    final public void unload(byte[] key) {
+        remove(ByteBuffer.wrap(key));
+    }
+
+    final public void load(byte[] key, byte[] value, long timestamp) {
+        System.out.println(formatter.format(new Date(timestamp)) + ":" + key + "->" + value);
+        ByteBuffer valueBuffer = wrap(value, timestamp);
+        update(ByteBuffer.wrap(key), valueBuffer);
+    }
+
 
 }

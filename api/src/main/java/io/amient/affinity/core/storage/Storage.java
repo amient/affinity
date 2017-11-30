@@ -23,7 +23,6 @@ import com.typesafe.config.Config;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
 public abstract class Storage {
@@ -57,10 +56,9 @@ public abstract class Storage {
      * The implementation should stop listening for updates on the underlying topic after it has
      * fully caught up with the state updates. This method must block until completed and can
      * be interrupted by a consequent tail() call.
-     *
+     * <p>
      * Once this method returns, the partition or service which owns it will become available
      * for serving requests and so the state must be in a fully consistent state.
-     *
      */
     abstract public void boot();
 
@@ -87,12 +85,13 @@ public abstract class Storage {
     abstract protected void stop();
 
     /**
-     * @param key   of the pair
-     * @param value of the pair
+     * @param key       record key
+     * @param value     record value
+     * @param timestamp logical event time
      * @return Future with metadata returned by the underlying implementation
      */
-    abstract public Future<?> write(ByteBuffer key, ByteBuffer value);
+    abstract public Future<?> write(byte[] key, byte[] value, long timestamp);
 
-    abstract public Future<?> delete(ByteBuffer key);
+    abstract public Future<?> delete(byte[] key);
 
 }
