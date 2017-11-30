@@ -204,7 +204,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   private def put(key: K, value: V): Future[Option[V]] = {
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
-      case e: EventTime => e.eventTimeMs()
+      case e: EventTime => e.eventTimeUtc()
       case _ => nowMs
     }
     val expires = recordTimestamp + recordTtlMs
