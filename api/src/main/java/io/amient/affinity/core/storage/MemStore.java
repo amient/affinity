@@ -109,9 +109,6 @@ public abstract class MemStore {
     }
 
     final public void load(byte[] key, byte[] value, long timestamp) {
-        //TODO remove formatter used for debugging
-        SimpleDateFormat formatter = new SimpleDateFormat("dd HH:mm:ss:SSS");
-        System.out.println(formatter.format(new Date(timestamp)) + ":" + key + "->" + value);
         ByteBuffer valueBuffer = wrap(value, timestamp);
         update(ByteBuffer.wrap(key), valueBuffer);
     }
