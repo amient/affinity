@@ -98,7 +98,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       })
     })
     Await.ready(updates, 10 seconds)
-    println(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
+    val spentMs = System.currentTimeMillis() - l
+    println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
     state.size should equal(numWrites.get)
 
     val consumerProps = Map(
