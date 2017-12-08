@@ -30,7 +30,6 @@ object AvroJsonConverter {
     val gen: JsonGenerator = jfactory.createJsonGenerator(out)
 
     def generate(datum: Any, schemas: List[Schema]): Unit = {
-      //      println(s"$datum -> ${schemas.mkString(",")}")
       require(schemas.size > 0, s"No schemas provided for datum: ${datum.getClass}")
 
       def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)

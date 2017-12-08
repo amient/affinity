@@ -90,4 +90,25 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     an[SchemaValidationException] should be thrownBy (newSerde.initialize())
 
   }
+
+  it should "have minimum read/write throughput" ignore {
+    val start = System.currentTimeMillis
+    val n = 100000
+    var r = System.currentTimeMillis()
+    var done = 0
+    for(i <- 1 to n) {
+      val rec = SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20)))
+      val bytes = newSerde.toBytes(rec)
+      newSerde.fromBytes(bytes)
+      done += 1
+      val now = System.currentTimeMillis()
+      if (now - r > 5000) {
+        r = now
+        println(done * 1000 / (System.currentTimeMillis() - start))
+      }
+    }
+    println(done * 1000 / (System.currentTimeMillis() - start))
+
+  }
+
 }

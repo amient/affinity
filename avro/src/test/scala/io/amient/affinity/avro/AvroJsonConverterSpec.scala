@@ -1,9 +1,6 @@
 package io.amient.affinity.avro
 
-import io.amient.affinity.avro.SimpleEnum.SimpleEnum
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.reflect.runtime.universe._
 
 class AvroJsonConverterSpec extends FlatSpec with Matchers {
 

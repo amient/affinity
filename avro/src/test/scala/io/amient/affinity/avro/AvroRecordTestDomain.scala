@@ -36,7 +36,6 @@ case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.V
   override def hashCode(): Int = id.hashCode()
 }
 
-
 case class Record_V1(val items: Seq[SimpleRecord] = Seq(), val removed: Int = 0) extends AvroRecord[Record_V1]
 
 case class Record(

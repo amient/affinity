@@ -23,7 +23,6 @@ class KafkaAvroSerializer extends Serializer[Any] {
     val subject = s"$topic-${if (isKey) "key" else "value"}"
     val (objSchema, schemaId) = serde.getOrRegisterSchema(data, subject)
     AvroRecord.write(data, objSchema, schemaId)
-    serde.toBytes(data)
   }
 
   override def close(): Unit = if (serde != null) serde.close()
