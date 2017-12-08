@@ -90,6 +90,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
+    state.size should be(0)
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
       try {
         state.update(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
@@ -104,6 +105,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     Await.ready(updates, 10 seconds)
     val spentMs = System.currentTimeMillis() - l
     println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
+    state.iterator.size should equal(numWrites.get)
     state.size should equal(numWrites.get)
 
     val consumerProps = Map(

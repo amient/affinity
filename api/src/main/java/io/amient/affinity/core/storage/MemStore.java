@@ -21,11 +21,10 @@ package io.amient.affinity.core.storage;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * The implementing class must provide either no-arg constructor or a constructor that takes two arguments:
@@ -33,6 +32,8 @@ import java.util.Optional;
  *  int partition
  */
 public abstract class MemStore {
+
+    private LongAdder size = new LongAdder();
 
     public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
@@ -44,17 +45,36 @@ public abstract class MemStore {
     public abstract Optional<ByteBuffer> apply(ByteBuffer key);
 
     /**
+     * @return accurate size
+     */
+    public final long size() {
+        return size.longValue();
+    }
+
+    /**
      * @param key ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return optional value held at the key position before the update
+     * @return optional value held at the key position before the updateImpl
      */
-    public abstract Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value);
+    public final Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value) {
+        Optional<ByteBuffer> prev = updateImpl(key, value);
+        if (!prev.isPresent()) size.add(1);
+        return prev;
+    }
+    protected abstract Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value);
 
     /**
      * @param key ByteBuffer representation whose value will be removed
-     * @return optional value held at the key position before the update, None if the key doesn't exist
+     * @return optional value held at the key position before the updateImpl, None if the key doesn't exist
      */
-    public abstract Optional<ByteBuffer> remove(ByteBuffer key);
+    public final Optional<ByteBuffer> remove(ByteBuffer key) {
+        Optional<ByteBuffer> prev = removeImpl(key);
+        if (prev.isPresent()) size.add(-1);
+        return prev;
+    }
+
+    protected abstract Optional<ByteBuffer> removeImpl(ByteBuffer key);
+
 
     /**
      * close() will be called whenever the owning storage is closing

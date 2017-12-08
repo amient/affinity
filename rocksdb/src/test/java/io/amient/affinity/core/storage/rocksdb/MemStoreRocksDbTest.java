@@ -60,6 +60,7 @@ public class MemStoreRocksDbTest {
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertTrue(!it.hasNext());
+            assertEquals(2, instance.size());
         } finally {
             //instance.close();
         }

@@ -39,11 +39,11 @@ class MemStoreSimpleMap extends MemStore {
     Optional.ofNullable(internal.get(key))
   }
 
-  override def update(key: ByteBuffer, value: ByteBuffer): Optional[ByteBuffer] = {
+  override def updateImpl(key: ByteBuffer, value: ByteBuffer): Optional[ByteBuffer] = {
     Optional.ofNullable(internal.put(key, value))
   }
 
-  override def remove(key: ByteBuffer): Optional[ByteBuffer] = {
+  override def removeImpl(key: ByteBuffer): Optional[ByteBuffer] = {
     Optional.ofNullable(internal.remove(key))
   }
 }

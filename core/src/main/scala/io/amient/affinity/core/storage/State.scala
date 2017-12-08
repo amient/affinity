@@ -111,18 +111,10 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     }
   }
 
-  def size: Long = {
-    val it = storage.memstore.iterator
-    var count = 0
-    while (it.hasNext) {
-      count += 1
-      it.next()
-    }
-    count
-  }
+  def size: Long = storage.memstore.size()
 
   /**
-    * insert is a syntactic sugar for update where the value is overriden if it doesn't exist
+    * insert is a syntactic sugar for updateImpl where the value is overriden if it doesn't exist
     * and the command is the value itself
     *
     * @param key to insert
@@ -135,9 +127,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /**
-    * update is a syntactic sugar for update where the value is always overriden
+    * updateImpl is a syntactic sugar for updateImpl where the value is always overriden
     *
-    * @param key to update
+    * @param key to updateImpl
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
@@ -148,9 +140,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /**
-    * remove is a is a syntactic sugar for update where None is used as Value
+    * removeImpl is a is a syntactic sugar for updateImpl where None is used as Value
     *
-    * @param key to remove
+    * @param key to removeImpl
     * @param command is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */
@@ -160,12 +152,12 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /**
-    * update enables per-key observer pattern for incremental updates
+    * updateImpl enables per-key observer pattern for incremental updates
     *
     * @param key  key which is going to be updated
-    * @param pf   update function which maps the current value Option[V] at the given key to 3 values:
-    *             1. Option[Any] is the incremental update event
-    *             2. Option[V] is the new state for the given key as a result of the incremntal update
+    * @param pf   updateImpl function which maps the current value Option[V] at the given key to 3 values:
+    *             1. Option[Any] is the incremental updateImpl event
+    *             2. Option[V] is the new state for the given key as a result of the incremntal updateImpl
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
@@ -255,7 +247,6 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         Future.Failure(Throwable) if the failure occurs
     */
   private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
-
     def commit(success: Any): Option[V] = prev
       .flatMap(cell => option(storage.memstore.unwrap(k, cell, recordTtlMs)))
       .map(valueSerde.fromBytes)

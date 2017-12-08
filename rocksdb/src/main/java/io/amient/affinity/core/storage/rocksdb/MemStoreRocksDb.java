@@ -118,7 +118,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value) {
+    public Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         Optional<ByteBuffer> prev = get(keyBytes);
         try {
@@ -130,7 +130,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> remove(ByteBuffer key) {
+    public Optional<ByteBuffer> removeImpl(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         Optional<ByteBuffer> prev = get(keyBytes);
         try {

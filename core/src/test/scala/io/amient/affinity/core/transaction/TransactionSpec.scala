@@ -94,7 +94,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
           case prev => HttpResponse(OK, entity = prev.toString)
         }
 
-      case http@HTTP(GET, PATH("remove", INT(id)), QUERY(("items", items)), response) =>
+      case http@HTTP(GET, PATH("removeImpl", INT(id)), QUERY(("items", items)), response) =>
         val t = Transaction(regionService) { transaction =>
           def recAddItem(itemsToRemove: List[Int]): Future[TestValue] = {
             transaction execute RemoveItem(TestKey(id), itemsToRemove.head) flatMap {
@@ -129,10 +129,10 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
       //item 106 will simulate an error while 103,104,105 where already successful they should be reverted
       http_get(s"/add/1?items=103,104,105,106,107")
       http_get(s"/get/1") should be("TestValue(List(100, 101, 102))")
-      http_get(s"/remove/1?items=101,102")
+      http_get(s"/removeImpl/1?items=101,102")
       //item 102 will simulate an error while 101 was already successfully removed so it should be added back by revert
       http_get(s"/get/1") should be("TestValue(List(100, 102, 101))")
-      http_get(s"/remove/1?items=100")
+      http_get(s"/removeImpl/1?items=100")
       http_get(s"/get/1") should be("TestValue(List(102, 101))")
     }
   }

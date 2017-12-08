@@ -91,7 +91,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   }
 
-  it should "have minimum read/write throughput" ignore {
+  it should "have minimum read/write throughput" in {
     val start = System.currentTimeMillis
     val n = 100000
     var r = System.currentTimeMillis()

@@ -60,6 +60,7 @@ public class MemStoreMapDbSpec {
             Iterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
+            assertEquals(2, instance.size());
         } finally {
             instance.close();
         }

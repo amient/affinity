@@ -97,13 +97,13 @@ public class MemStoreMapDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value) {
+    public Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value) {
         byte[] prev = internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value));
         return Optional.ofNullable(prev == null ? null : ByteBuffer.wrap(prev));
     }
 
     @Override
-    public Optional<ByteBuffer> remove(ByteBuffer key) {
+    public Optional<ByteBuffer> removeImpl(ByteBuffer key) {
         byte[] prev = internal.remove(ByteUtils.bufToArray(key));
         return Optional.ofNullable(prev == null ? null : ByteBuffer.wrap(prev));
     }
