@@ -150,9 +150,10 @@ object AvroRecord {
       case Some(writerSchema) =>
         schemaRegistry.getCurrentSchema(writerSchema.getFullName) match {
           case None =>
+            //case classes are not present in this runtime, just use GenericRecord
             val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
             reader.read(null, decoder)
-          case Some((readerSchemaId: Int, readerSchema)) =>
+          case Some((_, readerSchema)) =>
             //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
             val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
             val record = reader.read(null, decoder)

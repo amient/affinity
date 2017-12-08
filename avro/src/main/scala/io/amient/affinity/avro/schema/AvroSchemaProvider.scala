@@ -141,7 +141,16 @@ trait AvroSchemaProvider {
     cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
       try {
         val schema = AvroRecord.inferSchema(fqn)
-        cacheBySchema.get(schema).foreach(schemaId => cacheByFqn += fqn -> (schemaId, schema))
+        cacheBySchema.get(schema) match {
+          case Some(schemaId) => cacheByFqn += fqn -> (schemaId, schema)
+          case None =>
+            val versions = cacheBySubject.get(fqn).getOrElse(List.empty)
+            val schemaId = registerSchema(fqn, schema, versions.map(_._2))
+            cacheById += schemaId -> schema
+            cacheBySchema += schema -> schemaId
+            cacheBySubject += fqn -> (versions :+ (schemaId, schema))
+            cacheByFqn += fqn -> (schemaId, schema)
+        }
       } catch {
         case _: java.lang.ClassNotFoundException => //class doesn't exist in the current runtime - not a problem, we'll use generic records
       }
