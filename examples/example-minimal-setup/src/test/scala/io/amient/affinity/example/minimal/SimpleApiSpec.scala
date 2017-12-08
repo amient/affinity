@@ -42,12 +42,12 @@ class SimpleApiSpec extends FlatSpec with SystemTestBase with Matchers {
         startContainer("simple-keyspace", List(0, 1), new MySimplePartition())
       }
       implicit val context = system.dispatcher
-      implicit val timeout = Timeout(1 second)
-      Await.result(gateway ack GetData("key1"), 1 second) should be (None)
-      Await.result(gateway ack PutData("key1", "value1"), 1 second) should be(None)
-      Await.result(gateway ack GetData("key1"), 1 second) should be(Some("value1"))
-      Await.result(gateway ack PutData("key1", "value2"), 1 second) should be(Some("value1"))
-      Await.result(gateway ack GetData("key1"), 1 second) should be(Some("value2"))
+      implicit val timeout = Timeout(3 seconds)
+      Await.result(gateway ack GetData("key1"), 3 seconds) should be (None)
+      Await.result(gateway ack PutData("key1", "value1"), 3 seconds) should be(None)
+      Await.result(gateway ack GetData("key1"), 3 seconds) should be(Some("value1"))
+      Await.result(gateway ack PutData("key1", "value2"), 3 seconds) should be(Some("value1"))
+      Await.result(gateway ack GetData("key1"), 3 seconds) should be(Some("value2"))
       shutdown()
     }
   }
