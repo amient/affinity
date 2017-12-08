@@ -236,7 +236,7 @@ object AvroRecord {
           case null => None
           case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
         }
-      case UNION => throw new NotImplementedError("Only Option-like Avro Unions are supported, e.g. union(null, X)")
+      case UNION => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $tpe")
       case FIXED => throw new NotImplementedError("Avro Fixed are not supported")
     }
   }
