@@ -85,9 +85,9 @@ public abstract class MemStore {
 
     /**
      * Wraps record value with metadata into a storable cell
-     * @param value
-     * @param timestamp
-     * @return
+     * @param value record value
+     * @param timestamp record event time
+     * @return byte buffer with metadata and record value
      */
     final public ByteBuffer wrap(byte[] value, long timestamp) {
         ByteBuffer memStoreValue = ByteBuffer.allocate(8 + value.length);
@@ -101,9 +101,10 @@ public abstract class MemStore {
     /**
      * Unwraps stored cell into metadata and value bytes, returning the underlying value only if it hasn't expired
      * with respect to the provided ttl ms parameter and system time
-     * @param valueAndMetadata
-     * @param ttlMs
-     * @return
+     * @param key record key
+     * @param valueAndMetadata wrapped value and event time metadata
+     * @param ttlMs time to live of the owner State
+     * @return unwrapped byte array of the raw value without metadata if not expired, otherwise none
      */
     final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
         if (ttlMs < Long.MAX_VALUE && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
@@ -121,13 +122,19 @@ public abstract class MemStore {
 
 
     /**
-     * boostrapping methods: load(), unload()
+     * boostrapping methods: load()
+     * @param key record key
      */
-
     final public void unload(byte[] key) {
         remove(ByteBuffer.wrap(key));
     }
 
+    /**
+     * boostrapping methods: unload()
+     * @param key record key to be loaded
+     * @param value record value to be wrapped
+     * @param timestamp event time to be wrapped
+     */
     final public void load(byte[] key, byte[] value, long timestamp) {
         ByteBuffer valueBuffer = wrap(value, timestamp);
         update(ByteBuffer.wrap(key), valueBuffer);

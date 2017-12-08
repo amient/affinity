@@ -7,8 +7,8 @@ import java.time.ZoneId;
 public interface EventTime {
 
     /**
-     * event time in milliseconds since the epoch
-     * @return
+     * event time since the epoch
+     * @return long milliseconds
      */
     long eventTimeUtc();
 
