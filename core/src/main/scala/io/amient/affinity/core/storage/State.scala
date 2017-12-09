@@ -206,6 +206,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       val keyBytes = keySerde.toBytes(key)
       val k = ByteBuffer.wrap(keyBytes)
       val valueBytes = valueSerde.toBytes(value)
+
       val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
       option(storage.memstore.update(k, memStoreValue)) match {
         case Some(prev) if prev == memStoreValue => Future.successful(Some(value))

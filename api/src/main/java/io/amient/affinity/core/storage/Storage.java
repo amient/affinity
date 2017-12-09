@@ -88,10 +88,10 @@ public abstract class Storage {
      * @param key       record key
      * @param value     record value
      * @param timestamp logical event time
-     * @return Future with metadata returned by the underlying implementation
+     * @return Future with long offset/audit increment
      */
-    abstract public Future<?> write(byte[] key, byte[] value, long timestamp);
+    abstract public Future<Long> write(byte[] key, byte[] value, long timestamp);
 
-    abstract public Future<?> delete(byte[] key);
+    abstract public Future<Long> delete(byte[] key);
 
 }

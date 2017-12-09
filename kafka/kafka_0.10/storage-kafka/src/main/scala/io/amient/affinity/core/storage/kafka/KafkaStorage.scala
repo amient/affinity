@@ -21,8 +21,9 @@ package io.amient.affinity.core.storage.kafka
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.Future
+import java.util.concurrent.{CompletableFuture, Future}
 import java.util.concurrent.atomic.AtomicReference
+import java.util.function.Supplier
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.storage.Storage
@@ -33,6 +34,7 @@ import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.java8.FuturesConvertersImpl
 import scala.language.reflectiveCalls
 
 
@@ -188,12 +190,18 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     }
   }
 
-  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
+  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
+    val jf = kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
+    CompletableFuture.supplyAsync(new Supplier[java.lang.Long] {
+      override def get() = jf.get.offset()
+    })
   }
 
-  def delete(key: Array[Byte]): Future[RecordMetadata] = {
-    write(key, null, 0L)
+  def delete(key: Array[Byte]): Future[java.lang.Long] = {
+    val jf = kafkaProducer.send(new ProducerRecord(topic, partition, key, null))
+    CompletableFuture.supplyAsync(new Supplier[java.lang.Long] {
+      override def get() = jf.get.offset()
+    })
   }
 
 }

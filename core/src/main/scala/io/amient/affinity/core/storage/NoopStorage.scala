@@ -32,7 +32,7 @@ class NoopStorage(config: Config, partition:Int) extends Storage(config, partiti
 
   override def stop(): Unit = ()
 
-  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[_] = CompletableFuture.completedFuture(())
+  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = CompletableFuture.completedFuture((-1L))
 
-  override def delete(key: Array[Byte]): Future[_] = CompletableFuture.completedFuture(())
+  override def delete(key: Array[Byte]): Future[java.lang.Long] = CompletableFuture.completedFuture((-1L))
 }
