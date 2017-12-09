@@ -64,7 +64,7 @@ trait Admin extends ExampleGatewayRoot {
           case Some(existinKey) => Encoder.json(BadRequest, "That key already exists" -> key)
           case None =>
             val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
-            settings.update(key, ConfigEntry(key, salt))
+            settings.replace(key, ConfigEntry(key, salt))
             Encoder.json(OK, salt)
         }
       }
@@ -107,7 +107,7 @@ trait Admin extends ExampleGatewayRoot {
         case None =>
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
-              settings.update("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes)))
+              settings.replace("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes)))
               fulfillAndHandleErrors(response) {
                 executeCode(username)
               }

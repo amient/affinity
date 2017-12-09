@@ -86,7 +86,7 @@ public class MemStoreMapDb extends MemStore {
     public Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
         return internal.entrySet().stream().map(entry ->
                 (Map.Entry<ByteBuffer, ByteBuffer>)
-                        new AbstractMap.SimpleEntry<ByteBuffer, ByteBuffer>(
+                        new AbstractMap.SimpleEntry<>(
                                 ByteBuffer.wrap(entry.getKey()), ByteBuffer.wrap(entry.getValue()))).iterator();
     }
 
@@ -97,15 +97,13 @@ public class MemStoreMapDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value) {
-        byte[] prev = internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value));
-        return Optional.ofNullable(prev == null ? null : ByteBuffer.wrap(prev));
+    public boolean putImpl(ByteBuffer key, ByteBuffer value) {
+        return internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value)) == null;
     }
 
     @Override
-    public Optional<ByteBuffer> removeImpl(ByteBuffer key) {
-        byte[] prev = internal.remove(ByteUtils.bufToArray(key));
-        return Optional.ofNullable(prev == null ? null : ByteBuffer.wrap(prev));
+    public boolean removeImpl(ByteBuffer key) {
+        return internal.remove(ByteUtils.bufToArray(key)) != null;
     }
 
     @Override

@@ -17,7 +17,11 @@ class FailingKafkaStorage(config: Config, partition: Int) extends KafkaStorage(c
   override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
     val javaFuture: Future[RecordMetadata] = kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
     CompletableFuture.supplyAsync(new Supplier[java.lang.Long] {
-      override def get() = javaFuture.get.offset()
+      override def get() = if (System.currentTimeMillis() % 10 == 0) {
+        throw new RuntimeException("Simulated Exception in FailingKafkaStorage")
+      } else {
+        javaFuture.get.offset()
+      }
     })
   }
 

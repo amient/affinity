@@ -50,12 +50,12 @@ public class MemStoreRocksDbTest {
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());
-            instance.update(key1, ByteBuffer.wrap("value1".getBytes()));
+            instance.put(key1, ByteBuffer.wrap("value1".getBytes()));
             assertTrue(instance.apply(key1).isPresent());
             assertEquals("value1", new String(ByteUtils.bufToArray(instance.apply(key1).get())));
             assertTrue(!instance.apply(key2).isPresent());
-            instance.update(key1, ByteBuffer.wrap("value1000".getBytes()));
-            instance.update(key2, ByteBuffer.wrap("value2000".getBytes()));
+            instance.put(key1, ByteBuffer.wrap("value1000".getBytes()));
+            instance.put(key2, ByteBuffer.wrap("value2000".getBytes()));
             Iterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));

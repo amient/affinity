@@ -93,7 +93,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     state.size should be(0)
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
       try {
-        state.update(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+        state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
           (s) => s, (e: Throwable) => {
           numWrites.decrementAndGet()
           e

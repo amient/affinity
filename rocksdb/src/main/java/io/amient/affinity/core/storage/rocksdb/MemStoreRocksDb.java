@@ -105,7 +105,7 @@ public class MemStoreRocksDb extends MemStore {
                     if (!hasNext()) throw new NoSuchElementException("End of iterator");
                 }
                 checked = false;
-                return new AbstractMap.SimpleEntry<ByteBuffer, ByteBuffer>(
+                return new AbstractMap.SimpleEntry<>(
                         ByteBuffer.wrap(rocksIterator.key()), ByteBuffer.wrap(rocksIterator.value())
                 );
             }
@@ -118,24 +118,24 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value) {
+    synchronized public boolean putImpl(ByteBuffer key, ByteBuffer value) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
-        Optional<ByteBuffer> prev = get(keyBytes);
+        boolean added = !internal.keyMayExist(keyBytes, new StringBuffer());
         try {
             internal.put(keyBytes, ByteUtils.bufToArray(value));
-            return prev;
+            return added;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public Optional<ByteBuffer> removeImpl(ByteBuffer key) {
+    synchronized public boolean removeImpl(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
-        Optional<ByteBuffer> prev = get(keyBytes);
+        boolean removed = internal.keyMayExist(keyBytes, new StringBuffer());
         try {
             internal.remove(keyBytes);
-            return prev;
+            return removed;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }

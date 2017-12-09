@@ -127,7 +127,7 @@ trait SystemTestBase {
       }
 
       case request@PutValue(key, value) => sender.replyWith(request) {
-        data.update(key, value)
+        data.replace(key, value)
       }
     }
   }
@@ -237,7 +237,7 @@ object MyTestPartition {
     override def hashCode(): Int = key.hashCode
   }
 
-  case class PutValue(key: String, value: String) extends Reply[Option[String]] {
+  case class PutValue(key: String, value: String) extends Reply[Unit] {
     override def hashCode(): Int = key.hashCode
   }
 

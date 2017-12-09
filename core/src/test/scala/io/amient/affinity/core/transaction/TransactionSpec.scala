@@ -47,7 +47,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
 
     override def handle: Receive = {
       case request@TestKey(id) => sender.reply(request) {
-        data(request)
+        data.get(request)
       }
 
       case request@AddItem(key, item) => sender.replyWith(request) {

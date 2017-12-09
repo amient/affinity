@@ -26,17 +26,20 @@ public class ByteKey implements Serializable {
 
     public final byte[] bytes;
 
+    private final int hashCode;
+
     public ByteKey(byte[] bytes) {
         this.bytes = bytes;
+        this.hashCode = Arrays.hashCode(bytes);
     }
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(bytes);
+        return hashCode;
     }
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof ByteKey && Arrays.equals(bytes, ((ByteKey) o).bytes);
+        return o instanceof ByteKey && hashCode == (((ByteKey) o).hashCode) && Arrays.equals(bytes, ((ByteKey) o).bytes);
     }
 }

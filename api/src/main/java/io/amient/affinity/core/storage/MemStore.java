@@ -21,10 +21,12 @@ package io.amient.affinity.core.storage;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The implementing class must provide either no-arg constructor or a constructor that takes two arguments:
@@ -33,7 +35,7 @@ import java.util.concurrent.atomic.LongAdder;
  */
 public abstract class MemStore {
 
-    private LongAdder size = new LongAdder();
+    private AtomicLong size = new AtomicLong(); //can't use LongAdder because we need atomic size snapshot after addition
 
     public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
@@ -45,7 +47,7 @@ public abstract class MemStore {
     public abstract Optional<ByteBuffer> apply(ByteBuffer key);
 
     /**
-     * @return accurate size
+     * @return size hint - this may or may not be accurate, depending on the underlying backend's features
      */
     public final long size() {
         return size.longValue();
@@ -54,26 +56,32 @@ public abstract class MemStore {
     /**
      * @param key ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return optional value held at the key position before the updateImpl
+     * @return long size of the memstore (number of keys) after the operation
      */
-    public final Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value) {
-        Optional<ByteBuffer> prev = updateImpl(key, value);
-        if (!prev.isPresent()) size.add(1);
-        return prev;
+    public final long put(ByteBuffer key, ByteBuffer value) {
+        return putImpl(key, value) ? size.incrementAndGet() : size.get();
     }
-    protected abstract Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value);
+
+    /**
+     * @param key ByteBuffer representation
+     * @param value ByteBuffer which will be associated with the given key
+     * @return true if the key was newly inserted, false if an existing key was updated
+     */
+    protected abstract boolean putImpl(ByteBuffer key, ByteBuffer value);
 
     /**
      * @param key ByteBuffer representation whose value will be removed
-     * @return optional value held at the key position before the updateImpl, None if the key doesn't exist
+     * @return long size of the memstore (number of keys) after the operation
      */
-    public final Optional<ByteBuffer> remove(ByteBuffer key) {
-        Optional<ByteBuffer> prev = removeImpl(key);
-        if (prev.isPresent()) size.add(-1);
-        return prev;
+    public final long remove(ByteBuffer key) {
+        return removeImpl(key) ? size.decrementAndGet() : size.get();
     }
 
-    protected abstract Optional<ByteBuffer> removeImpl(ByteBuffer key);
+    /**
+     * @param key
+     * @return true if the key was removed, false if the key didn't exist
+     */
+    protected abstract boolean removeImpl(ByteBuffer key);
 
 
     /**
@@ -137,7 +145,7 @@ public abstract class MemStore {
      */
     final public void load(byte[] key, byte[] value, long timestamp) {
         ByteBuffer valueBuffer = wrap(value, timestamp);
-        update(ByteBuffer.wrap(key), valueBuffer);
+        put(ByteBuffer.wrap(key), valueBuffer);
     }
 
 
