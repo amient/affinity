@@ -109,16 +109,13 @@ trait SystemTestBase {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
-  class MyTestPartition(topic: String) extends Partition {
+  class MyTestPartition(state: String) extends Partition {
 
     import MyTestPartition._
     import context.dispatcher
 
-    private val stateConfig = context.system.settings.config.getConfig(State.CONFIG_STATE_STORE(topic))
-      .withValue("storage.kafka.topic", ConfigValueFactory.fromAnyRef(topic))
-
     val data = state {
-      new State[String, String](topic, context.system, stateConfig)
+      new State[String, String](state, context.system)
     }
 
     override def handle: Receive = {

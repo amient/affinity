@@ -24,7 +24,8 @@ import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.util.ByteUtils
 
@@ -48,16 +49,18 @@ object State {
   val CONFIG_LOCK_TIMEOUT_MS = "lock.timeout.ms"
 }
 
-class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, stateConfig: Config)
+class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
                                      (implicit val partition: Int) extends Observable {
 
   self =>
 
   import State._
 
-  private val config = stateConfig.withFallback(ConfigFactory.empty()
+  val nodeDataDir = system.settings.config.getString(Node.CONFIG_DATA_DIR)
+
+  private val config = system.settings.config.getConfig(CONFIG_STATE_STORE(name)).withFallback(ConfigFactory.empty()
     .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef(name))
-    .withValue(MemStore.CONFIG_DATA_PATH, ConfigValueFactory.fromAnyRef("./.data"))
+    .withValue(MemStore.CONFIG_DATA_PATH, ConfigValueFactory.fromAnyRef(nodeDataDir))
     .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
     .withValue(CONFIG_LOCK_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(10000))

@@ -67,9 +67,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val stateStoreName = "visibility-test"
-    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
-    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
+//    val topic = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName)).getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+    val state = createStateStoreForPartition(stateStoreName)(0)
     state.insert(1, TestRecord(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
     val testRecordSchemaId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
     registryClient.getByID(testRecordSchemaId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
@@ -84,9 +83,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
   }
 
   private def testExternalKafkaConsumer(stateStoreName: String) {
-    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
-    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
+    val topic = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName)).getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+    val state = createStateStoreForPartition(stateStoreName)(0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
@@ -141,8 +139,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   }
 
-  private def createStateStoreForPartition(name: String, stateStoreConfig: Config)(implicit partition: Int) = {
-    new State[Int, TestRecord](name, system, stateStoreConfig)
+  private def createStateStoreForPartition(name: String)(implicit partition: Int) = {
+    new State[Int, TestRecord](name, system)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
@@ -181,8 +179,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       producer.close()
     }
     //now bootstrap the state
-    val state0 = createStateStoreForPartition(topic, stateStoreConfig)(0)
-    val state1 = createStateStoreForPartition(topic, stateStoreConfig)(1)
+    val state0 = createStateStoreForPartition(topic)(0)
+    val state1 = createStateStoreForPartition(topic)(1)
     state0.storage.init()
     state1.storage.init()
     state0.storage.boot()
