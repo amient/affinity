@@ -74,7 +74,13 @@ public class MemStoreMapDb extends MemStore {
     private final Path containerPath;
     private final ConcurrentMap<byte[], byte[]> internal;
 
+    @Override
+    protected boolean isPersistent() {
+        return true;
+    }
+
     public MemStoreMapDb(Config config, int partition) throws IOException {
+        super(config, partition);
         pathToData = config.getString(CONFIG_MAPDB_DATA_PATH) + "/" + partition + "/";
         containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
         Boolean mmapEnabled = config.hasPath(CONFIG_MAPDB_MMAP_ENABLED) && config.getBoolean(CONFIG_MAPDB_MMAP_ENABLED);

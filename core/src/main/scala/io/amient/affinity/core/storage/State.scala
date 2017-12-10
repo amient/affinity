@@ -56,6 +56,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   import State._
 
   private val config = stateConfig.withFallback(ConfigFactory.empty()
+    .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef(name))
+    .withValue(MemStore.CONFIG_DATA_PATH, ConfigValueFactory.fromAnyRef("./.data"))
     .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
     .withValue(CONFIG_LOCK_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(10000))
@@ -174,7 +176,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * @return Future Optional of the value previously held at the key position
     */
   def update(key: K, value: V): Future[Option[V]] = update(key) {
-    case Some(prev) if prev == value => (None, Some(prev), Some(prev))
+    case Some(prev) if prev == value => (None , Some(prev), Some(prev))
     case Some(prev) => (Some(value), Some(value), Some(prev))
     case None => (Some(value), Some(value), None)
   }
@@ -278,8 +280,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
       val valueBytes = valueSerde.toBytes(value)
       storage.write(ByteUtils.bufToArray(key), valueBytes, recordTimestamp) map { offset =>
         val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
-        val newSize = storage.memstore.put(key, memStoreValue)
-        new Checkpoint(offset, newSize)
+        storage.memstore.put(key, memStoreValue, offset)
       }
     }
   }
@@ -296,8 +297,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     */
   private def delete(key: ByteBuffer): Future[Checkpoint] = {
     storage.delete(ByteUtils.bufToArray(key)) map { offset =>
-      val newSize = storage.memstore.remove(key)
-      new Checkpoint(offset, newSize)
+      storage.memstore.remove(key, offset)
     }
   }
 

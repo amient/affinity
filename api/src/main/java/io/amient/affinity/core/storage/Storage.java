@@ -36,13 +36,8 @@ public abstract class Storage {
         Class<? extends MemStore> memstoreClass
                 = Class.forName(config.getString(CONFIG_MEMSTORE_CLASS)).asSubclass(MemStore.class);
         MemStore tmp;
-        try {
-            Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
-            tmp = memstoreConstructor.newInstance(config, partition);
-        } catch (NoSuchMethodException e) {
-            Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor();
-            tmp = memstoreConstructor.newInstance();
-        }
+        Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
+        tmp = memstoreConstructor.newInstance(config, partition);
         memstore = tmp;
     }
 

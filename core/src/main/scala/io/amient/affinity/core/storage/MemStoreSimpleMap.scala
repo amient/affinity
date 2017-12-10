@@ -25,7 +25,9 @@ import java.util.Map.Entry
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
-class MemStoreSimpleMap extends MemStore {
+import com.typesafe.config.Config
+
+class MemStoreSimpleMap(config: Config, partition: Int) extends MemStore(config, partition) {
 
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 
@@ -46,4 +48,6 @@ class MemStoreSimpleMap extends MemStore {
   override def removeImpl(key: ByteBuffer):Boolean = {
     internal.remove(key) != null
   }
+
+  override protected def isPersistent = false
 }

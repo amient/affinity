@@ -19,23 +19,116 @@
 
 package io.amient.affinity.core.storage;
 
+import com.typesafe.config.Config;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.HashSet;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * The implementing class must provide either no-arg constructor or a constructor that takes two arguments:
- *  Config config
- *  int partition
+ * The implementing class must provide a constructor that takes two arguments:
+ * Config config
+ * int partition
  */
 public abstract class MemStore {
 
+    final public static String CONFIG_STORE_NAME = "name";
+    final public static String CONFIG_DATA_PATH = "data.dir";
+
+    private final static Logger log = LoggerFactory.getLogger(MemStore.class);
+
+    protected abstract boolean isPersistent();
+
+    private class Checkpointer extends Thread {
+
+        private Checkpoint checkpoint = new Checkpoint(-1L, 0);
+
+        volatile private boolean checkpointModified = false;
+
+        volatile private boolean stopped = true;
+
+        final private Path file;
+
+        final private boolean enabled;
+
+        public Checkpointer(Config config, int partition) throws IOException {
+            super();
+            enabled = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_PATH) && config.hasPath(CONFIG_STORE_NAME);
+            if (!enabled) {
+                file = null;
+            } else {
+                String dataPath = config.getString(MemStore.CONFIG_DATA_PATH);
+                file = Paths.get(dataPath, "checkpoints", config.getString(CONFIG_STORE_NAME) + "-" + partition + ".checkpoint");
+                if (!Files.exists(file)) {
+                    log.debug("Creating checkpoint file: " + file);
+                    Files.createDirectories(file.getParent());
+                    writeCheckpoint();
+                } else {
+                    log.debug("Reading checkpoint file: " + file);
+                    java.util.List<String> lines = Files.readAllLines(file);
+                    checkpoint = new Checkpoint(Long.valueOf(lines.get(0)), Long.valueOf(lines.get(1)));
+                }
+                log.info("Initialized checkpoint: " + checkpoint + " from file " + file);
+                start();
+            }
+        }
+
+        private void writeCheckpoint() throws IOException {
+            log.debug("Writing checkpoint " + checkpoint + " to file: " + file);
+            Files.write(file, Arrays.asList(String.valueOf(checkpoint.offset), String.valueOf(checkpoint.size)));
+            checkpointModified = false;
+        }
+
+        private Checkpoint updateCheckpoint(long offset, long sizeDelta) {
+            long newSize = sizeDelta == 0 ? checkpoint.size : size.addAndGet(sizeDelta);
+            if (offset > checkpoint.offset) {
+                checkpoint = new Checkpoint(offset, newSize);
+                if (enabled) checkpointModified = true;
+            } else if (sizeDelta != 0) {
+                checkpoint = checkpoint.withSize(newSize);
+                if (enabled) checkpointModified = true;
+            }
+            return checkpoint;
+        }
+
+        @Override
+        public void run() {
+            try {
+                stopped = false;
+                while(!stopped) {
+                    Thread.sleep(10000); //TODO make checkpoint interval configurable
+                    if (checkpointModified) {
+                        writeCheckpoint();
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in the checkpointer thread", e);
+                Thread.currentThread().getThreadGroup().interrupt();
+            }
+        }
+    }
+
+    public MemStore(Config config, int partition) throws IOException {
+        checkpointer = new Checkpointer(config, partition);
+    }
+
     private AtomicLong size = new AtomicLong(); //can't use LongAdder because we need atomic size snapshot after addition
+
+    public Checkpoint getCheckpoint() {
+        return checkpointer.checkpoint;
+    }
+
+    final private Checkpointer checkpointer;
 
     public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
@@ -54,18 +147,18 @@ public abstract class MemStore {
     }
 
     /**
-     * @param key ByteBuffer representation
+     * @param key   ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return long size of the memstore (number of keys) after the operation
+     * @return new Checkpoint after the operation
      */
-    public final long put(ByteBuffer key, ByteBuffer value) {
-        return putImpl(key, value) ? size.incrementAndGet() : size.get();
+    public final Checkpoint put(ByteBuffer key, ByteBuffer value, long offset) {
+        return checkpointer.updateCheckpoint(offset, putImpl(key, value) ? 1L : 0L);
     }
 
     /**
-     * @param key ByteBuffer representation
+     * @param key   ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return true if the key was newly inserted, false if an existing key was updated
+     * @return new Checkpoint after the operation
      */
     protected abstract boolean putImpl(ByteBuffer key, ByteBuffer value);
 
@@ -73,8 +166,8 @@ public abstract class MemStore {
      * @param key ByteBuffer representation whose value will be removed
      * @return long size of the memstore (number of keys) after the operation
      */
-    public final long remove(ByteBuffer key) {
-        return removeImpl(key) ? size.decrementAndGet() : size.get();
+    public final Checkpoint remove(ByteBuffer key, long offset) {
+        return checkpointer.updateCheckpoint(offset, removeImpl(key) ? -1L : 0);
     }
 
     /**
@@ -88,12 +181,15 @@ public abstract class MemStore {
      * close() will be called whenever the owning storage is closing
      * implementation should clean-up any resources here
      */
-    public abstract void close();
+    public void close() {
+        checkpointer.stopped = true;
+    }
 
 
     /**
      * Wraps record value with metadata into a storable cell
-     * @param value record value
+     *
+     * @param value     record value
      * @param timestamp record event time
      * @return byte buffer with metadata and record value
      */
@@ -109,15 +205,16 @@ public abstract class MemStore {
     /**
      * Unwraps stored cell into metadata and value bytes, returning the underlying value only if it hasn't expired
      * with respect to the provided ttl ms parameter and system time
-     * @param key record key
+     *
+     * @param key              record key
      * @param valueAndMetadata wrapped value and event time metadata
-     * @param ttlMs time to live of the owner State
+     * @param ttlMs            time to live of the owner State
      * @return unwrapped byte array of the raw value without metadata if not expired, otherwise none
      */
     final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
         if (ttlMs < Long.MAX_VALUE && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
             //TODO #65 this is the only place where expired records get actually cleaned from the memstore but we need also a regular full compaction process that will get the memstore iterator and call this method
-            remove(key);
+            removeImpl(key);
             return Optional.empty();
         } else {
             int len = valueAndMetadata.limit();
@@ -131,21 +228,25 @@ public abstract class MemStore {
 
     /**
      * boostrapping methods: load()
-     * @param key record key
+     *
+     * @param key    record key
+     * @param offset checkpoint offset
      */
-    final public void unload(byte[] key) {
-        remove(ByteBuffer.wrap(key));
+    final public void unload(byte[] key, long offset) {
+        remove(ByteBuffer.wrap(key), offset);
     }
 
     /**
      * boostrapping methods: unload()
-     * @param key record key to be loaded
-     * @param value record value to be wrapped
+     *
+     * @param key       record key to be loaded
+     * @param value     record value to be wrapped
+     * @param offset    checkpoint offset
      * @param timestamp event time to be wrapped
      */
-    final public void load(byte[] key, byte[] value, long timestamp) {
+    final public void load(byte[] key, byte[] value, long offset, long timestamp) {
         ByteBuffer valueBuffer = wrap(value, timestamp);
-        put(ByteBuffer.wrap(key), valueBuffer);
+        put(ByteBuffer.wrap(key), valueBuffer, offset);
     }
 
 

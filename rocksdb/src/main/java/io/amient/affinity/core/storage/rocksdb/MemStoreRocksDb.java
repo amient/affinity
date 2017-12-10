@@ -74,7 +74,13 @@ public class MemStoreRocksDb extends MemStore {
     private final Path containerPath;
     private final RocksDB internal;
 
+    @Override
+    protected boolean isPersistent() {
+        return true;
+    }
+
     public MemStoreRocksDb(Config config, int partition) throws IOException {
+        super(config, partition);
         pathToData = config.getString(ConfigRocksDbDataPath) + "/" + partition + "/";
         containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
         Files.createDirectories(containerPath);
