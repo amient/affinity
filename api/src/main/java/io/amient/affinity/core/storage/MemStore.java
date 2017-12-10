@@ -33,7 +33,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The implementing class must provide a constructor that takes two arguments:
@@ -51,7 +51,7 @@ public abstract class MemStore {
 
     private class Checkpointer extends Thread {
 
-        private Checkpoint checkpoint = new Checkpoint(-1L, 0);
+        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, 0));
 
         volatile private boolean checkpointModified = false;
 
@@ -76,7 +76,7 @@ public abstract class MemStore {
                 } else {
                     log.debug("Reading checkpoint file: " + file);
                     java.util.List<String> lines = Files.readAllLines(file);
-                    checkpoint = new Checkpoint(Long.valueOf(lines.get(0)), Long.valueOf(lines.get(1)));
+                    checkpoint.set(new Checkpoint(Long.valueOf(lines.get(0)), Long.valueOf(lines.get(1))));
                 }
                 log.info("Initialized checkpoint: " + checkpoint + " from file " + file);
                 start();
@@ -84,21 +84,27 @@ public abstract class MemStore {
         }
 
         private void writeCheckpoint() throws IOException {
-            log.debug("Writing checkpoint " + checkpoint + " to file: " + file);
-            Files.write(file, Arrays.asList(String.valueOf(checkpoint.offset), String.valueOf(checkpoint.size)));
+            Checkpoint chk = checkpoint.get();
+            log.debug("Writing checkpoint " + chk + " to file: " + file);
+            Files.write(file, Arrays.asList(String.valueOf(chk.offset), String.valueOf(chk.size)));
             checkpointModified = false;
         }
 
         private Checkpoint updateCheckpoint(long offset, long sizeDelta) {
-            long newSize = sizeDelta == 0 ? checkpoint.size : size.addAndGet(sizeDelta);
-            if (offset > checkpoint.offset) {
-                checkpoint = new Checkpoint(offset, newSize);
-                if (enabled) checkpointModified = true;
-            } else if (sizeDelta != 0) {
-                checkpoint = checkpoint.withSize(newSize);
-                if (enabled) checkpointModified = true;
-            }
-            return checkpoint;
+            return checkpoint.updateAndGet(chk -> {
+                if (log.isDebugEnabled()) {
+                    log.debug("updating checkpoint, offset: " + offset +", sizeDelta: " + sizeDelta);
+                }
+                if (offset > chk.offset) {
+                    if (enabled) checkpointModified = true;
+                    return new Checkpoint(offset, chk.size + sizeDelta);
+                } else if (sizeDelta != 0) {
+                    if (enabled) checkpointModified = true;
+                    return chk.withSizeDelta(sizeDelta);
+                } else {
+                    return chk;
+                }
+            });
         }
 
         @Override
@@ -122,10 +128,8 @@ public abstract class MemStore {
         checkpointer = new Checkpointer(config, partition);
     }
 
-    private AtomicLong size = new AtomicLong(); //can't use LongAdder because we need atomic size snapshot after addition
-
     public Checkpoint getCheckpoint() {
-        return checkpointer.checkpoint;
+        return checkpointer.checkpoint.get();
     }
 
     final private Checkpointer checkpointer;
@@ -143,7 +147,7 @@ public abstract class MemStore {
      * @return size hint - this may or may not be accurate, depending on the underlying backend's features
      */
     public final long size() {
-        return size.longValue();
+        return checkpointer.checkpoint.get().size;
     }
 
     /**

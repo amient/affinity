@@ -63,7 +63,11 @@ trait ActorState extends Actor {
     storageRegistry.asScala.find(_.name == stateStoreName).get
   }
 
-  def bootState(): Unit = storageRegistry.asScala.foreach(_.storage.boot())
+  def bootState(): Unit = storageRegistry.asScala.foreach { s =>
+    log.info(s"${s.name} boot complteded, memstore size=${s.size}")
+    s.storage.boot()
+  }
+
 
   def tailState(): Unit = storageRegistry.asScala.foreach(_.storage.tail())
 

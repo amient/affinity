@@ -15,7 +15,7 @@ public class Checkpoint {
         return "Checkpoint(offset: " + offset +", size: " + size + ")";
     }
 
-    public Checkpoint withSize(long newSize) {
-        return new Checkpoint(offset, newSize);
+    public Checkpoint withSizeDelta(long sizeDelta) {
+        return new Checkpoint(offset, size + sizeDelta);
     }
 }
