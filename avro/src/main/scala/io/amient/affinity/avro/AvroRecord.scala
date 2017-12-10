@@ -20,6 +20,7 @@
 package io.amient.affinity.avro
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
+import java.lang.reflect.{Field, Parameter}
 import java.nio.ByteBuffer
 import java.util
 
@@ -197,15 +198,35 @@ object AvroRecord {
     })
   }
 
-  private object constructorCache extends LocalCache[String, (Seq[Symbol], MethodMirror)] {
-    def getOrInitialize(fqn: String): (Seq[Symbol], MethodMirror) = {
+  private object classFieldsCache extends LocalCache[Class[_], Map[Int, Field]] {
+    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field]= getOrInitialize(cls, {
+      val schemaFields = schema.getFields
+      val params: Array[Parameter] = cls.getConstructors()(0).getParameters
+      require(params.length == schemaFields.size,
+        s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
+
+      val declaredFields = cls.getDeclaredFields
+      val fields: Map[Int, Field] = params.zipWithIndex.map { case (param, pos) => {
+        val field = declaredFields(pos)
+        require(param.getType == field.getType,
+          s"field `${field.getType}` at position $pos doesn't match expected `$param`")
+        field.setAccessible(true)
+        pos -> field
+      }
+      }.toMap
+      fields
+    })
+  }
+
+  private object fqnConstructorCache extends LocalCache[String, (Seq[Type], MethodMirror)] {
+    def getOrInitialize(fqn: String): (Seq[Type], MethodMirror) = getOrInitialize(fqn, {
       val tpe = fqnTypeCache.getOrInitialize(fqn)
       val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
-      val params = constructor.paramLists(0)
+      val params = constructor.paramLists(0).map(_.typeSignature)
       val classMirror = fqnClassMirrorCache.getOrInitialize(fqn)
       val constructorMirror: MethodMirror = classMirror.reflectConstructor(constructor)
       (params, constructorMirror)
-    }
+    })
   }
 
   private object enumCache extends LocalCache[Type, MethodMirror] {
@@ -233,22 +254,6 @@ object AvroRecord {
         (iterable) => iterable.toSeq
       } else {
         (iterable) => iterable
-      }
-    })
-  }
-
-  private object iterableBuilderCache extends LocalCache[Type, () => mutable.Builder[Any, Iterable[Any]]] {
-    def getOrInitialize(tpe: Type): () => mutable.Builder[Any, Iterable[Any]] = getOrInitialize(tpe, {
-      if (tpe <:< typeOf[Set[_]]) {
-        () => Set.newBuilder[Any]
-      } else if (tpe <:< typeOf[List[_]]) {
-        () => List.newBuilder[Any]
-      } else if (tpe <:< typeOf[Vector[_]]) {
-        () => Vector.newBuilder[Any]
-      } else if (tpe <:< typeOf[IndexedSeq[_]]) {
-        () => IndexedSeq.newBuilder[Any]
-      } else {
-        () => Seq.newBuilder[Any]
       }
     })
   }
@@ -298,9 +303,9 @@ object AvroRecord {
       case RECORD if datum == null => null
       case RECORD =>
         val record = datum.asInstanceOf[IndexedRecord]
-        val (params, constructorMirror) = constructorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
+        val (params: Seq[Type], constructorMirror) = fqnConstructorCache.getOrInitialize(record.getSchema.getFullName)
         val arguments = record.getSchema.getFields.asScala.map { field =>
-          readDatum(record.get(field.pos), params(field.pos).typeSignature, field.schema)
+          readDatum(record.get(field.pos), params(field.pos), field.schema)
         }
         constructorMirror(arguments: _*)
       case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
@@ -309,16 +314,10 @@ object AvroRecord {
           readDatum(v, tpe.typeArgs(1), schema.getValueType))
         }
       case ARRAY =>
-        val builder = iterableBuilderCache.getOrInitialize(tpe)()
-        val iterator = datum.asInstanceOf[java.util.Collection[_]].iterator()
-        while (iterator.hasNext) {
-          builder += readDatum(iterator.next, tpe.typeArgs(0), schema.getElementType)
+        iterableCache.getOrInitialize(tpe) {
+          datum.asInstanceOf[java.util.Collection[_]].asScala.map(
+            item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
         }
-        builder.result()
-//        iterableCache.getOrInitialize(tpe) {
-//          datum.asInstanceOf[java.util.Collection[_]].asScala.map(
-//            item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
-//        }
       case FIXED => throw new NotImplementedError("Avro Fixed are not supported")
     }
   }
@@ -422,22 +421,9 @@ object AvroRecord {
 
 abstract class AvroRecord[X: TypeTag] extends SpecificRecord with java.io.Serializable {
 
-  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(typeOf[X])
-  private val schemaFields = schema.getFields
-  private val params = getClass.getConstructors()(0).getParameters
-  require(params.length == schemaFields.size,
-    s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
+  @JsonIgnore lazy val schema: Schema = AvroRecord.inferSchema(typeOf[X])
 
-  @transient private val declaredFields = getClass.getDeclaredFields
-  //TODO verify that when fields are not transient the java and kryo serialization is not excessive
-  private val fields = params.zipWithIndex.map { case (param, pos) => {
-    val field = declaredFields(pos)
-    require(param.getType == field.getType,
-      s"field `${field.getType}` at position $pos doesn't match expected `$param`")
-    field.setAccessible(true)
-    pos -> field
-  }
-  }.toMap
+  lazy private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
 
   override def getSchema: Schema = schema
 
