@@ -88,11 +88,13 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
   }
 
-  import system.dispatcher
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
-  implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
+  implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = {
+    Future(jf.get)
+  }
 
 
   /**
@@ -157,8 +159,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     * @param value new value to be associated with the key
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def replace(key: K, value: V): Future[Unit] = put(ByteBuffer.wrap(keySerde.toBytes(key)), value) map {
-    case _ => push(key, value)
+  def replace(key: K, value: V): Future[Unit] = {
+    put(ByteBuffer.wrap(keySerde.toBytes(key)), value).map(__ => push(key, value))
   }
 
   /**
@@ -167,8 +169,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     * @param key to delete
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def delete(key: K): Future[Unit] = delete(ByteBuffer.wrap(keySerde.toBytes(key))) map {
-    case _ => push(key, null)
+  def delete(key: K): Future[Unit] = {
+    delete(ByteBuffer.wrap(keySerde.toBytes(key))).map(_ => push(key, null))
   }
 
   /**
@@ -179,7 +181,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     * @return Future Optional of the value previously held at the key position
     */
   def update(key: K, value: V): Future[Option[V]] = update(key) {
-    case Some(prev) if prev == value => (None , Some(prev), Some(prev))
+    case Some(prev) if prev == value => (None, Some(prev), Some(prev))
     case Some(prev) => (Some(value), Some(value), Some(prev))
     case None => (Some(value), Some(value), None)
   }
@@ -222,6 +224,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
   def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     try {
       val k = ByteBuffer.wrap(keySerde.toBytes(key))
       val l = lock(key)
