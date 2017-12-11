@@ -22,7 +22,7 @@ package io.amient.affinity.model.graph.message
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.transaction.Instruction
 
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord[ModifyGraph] with Instruction[VertexProps] {
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Instruction[VertexProps] {
   override def hashCode(): Int = vertex.hashCode
 
   def reverse(props: VertexProps) = op match {

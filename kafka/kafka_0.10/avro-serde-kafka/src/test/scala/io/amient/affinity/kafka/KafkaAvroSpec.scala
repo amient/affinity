@@ -13,7 +13,7 @@ import org.scalatest.{FlatSpec, Matchers, Suite}
 
 import scala.collection.JavaConversions._
 
-case class TestRecord(key: Int, ts: Long = 0L, text: String = "") extends AvroRecord[TestRecord] {
+case class TestRecord(key: Int, ts: Long = 0L, text: String = "") extends AvroRecord {
   override def hashCode(): Int = key.hashCode()
 }
 

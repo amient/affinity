@@ -9,7 +9,7 @@ import io.amient.affinity.core.util.SystemTestBase
 import org.scalatest.FlatSpec
 
 
-case class ExampleType(val id: Int) extends AvroRecord[ExampleType] {
+case class ExampleType(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 

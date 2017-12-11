@@ -22,7 +22,7 @@ package io.amient.affinity.model.graph.message
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.transaction.Instruction
 
-final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord[UpdateVertexComponent] with Instruction[Int] {
+final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord with Instruction[Int] {
   override def hashCode(): Int = vertex.hashCode
 
   override def reverse(result: Int): Option[UpdateVertexComponent] = {

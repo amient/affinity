@@ -22,6 +22,6 @@ package io.amient.affinity.model.graph.message
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.Reply
 
-final case class GetComponent(cid: Int) extends AvroRecord[GetComponent] with Reply[Option[Component]] {
+final case class GetComponent(cid: Int) extends AvroRecord with Reply[Option[Component]] {
   override def hashCode(): Int = cid.hashCode
 }

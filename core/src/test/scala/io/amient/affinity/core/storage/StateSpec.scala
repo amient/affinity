@@ -8,7 +8,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConverters._
 
-case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord[ExpirableValue] with EventTime
+case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord with EventTime
 
 class StateSpec extends TestKit(ActorSystem.create("test",
   ConfigFactory.parseMap(Map(

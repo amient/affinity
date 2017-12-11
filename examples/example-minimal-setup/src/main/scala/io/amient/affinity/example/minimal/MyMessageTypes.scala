@@ -23,11 +23,11 @@ package io.amient.affinity.example.minimal
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.Reply
 
-case class GetValue(key: String) extends AvroRecord[GetValue] with Reply[Option[String]] {
+case class GetValue(key: String) extends AvroRecord with Reply[Option[String]] {
   override def hashCode(): Int = key.hashCode()
 }
 
-case class PutValue(key: String, value: String) extends AvroRecord[PutValue] with Reply[Option[String]] {
+case class PutValue(key: String, value: String) extends AvroRecord with Reply[Option[String]] {
   override def hashCode(): Int = key.hashCode()
 }
 

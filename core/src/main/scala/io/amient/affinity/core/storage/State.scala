@@ -88,14 +88,12 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
   }
 
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
-  implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = {
-    Future(jf.get)
-  }
-
+  implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
 
   /**
     * @return a weak iterator that doesn't block read and write methods
@@ -224,7 +222,6 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
   def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     try {
       val k = ByteBuffer.wrap(keySerde.toBytes(key))
       val l = lock(key)

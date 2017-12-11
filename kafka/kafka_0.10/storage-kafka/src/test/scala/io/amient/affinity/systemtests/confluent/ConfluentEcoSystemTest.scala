@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
@@ -89,22 +89,20 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     state.size should be(0)
-    val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-      try {
-        state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
-          (s) => s, (e: Throwable) => {
-          numWrites.decrementAndGet()
-          e
-        })
-      } catch {
-        case e: Throwable => e.printStackTrace(); throw e
-      }
-    })
-    Await.ready(updates, 10 seconds)
+    val updates = for (i <- (1 to numToWrite)) yield {
+      state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+        (s) => s
+        , (e: Throwable) => {
+        numWrites.decrementAndGet()
+        e
+      })
+    }
+    updates.size should be (numToWrite)
+    Await.result(Future.sequence(updates), 10 seconds)
     val spentMs = System.currentTimeMillis() - l
     println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
-    state.iterator.size should equal(numWrites.get)
     state.size should equal(numWrites.get)
+    state.iterator.size should equal(state.size)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,

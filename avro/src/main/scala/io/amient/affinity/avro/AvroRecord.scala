@@ -36,7 +36,6 @@ import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
 import org.codehaus.jackson.annotate.JsonIgnore
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
@@ -199,11 +198,11 @@ object AvroRecord {
   }
 
   private object classFieldsCache extends LocalCache[Class[_], Map[Int, Field]] {
-    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field]= getOrInitialize(cls, {
-      val schemaFields = schema.getFields
+    def getOrInitialize(cls: Class[_]/*, schema: Schema*/): Map[Int, Field]= getOrInitialize(cls, {
+//      val schemaFields = schema.getFields
       val params: Array[Parameter] = cls.getConstructors()(0).getParameters
-      require(params.length == schemaFields.size,
-        s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
+//      require(params.length == schemaFields.size,
+//        s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
 
       val declaredFields = cls.getDeclaredFields
       val fields: Map[Int, Field] = params.zipWithIndex.map { case (param, pos) => {
@@ -322,6 +321,10 @@ object AvroRecord {
     }
   }
 
+  def inferSchema(cls: Class[_]): Schema = {
+    inferSchema(classTypeCache.getOrInitialize(cls, fqnTypeCache.getOrInitialize(cls.getName)))
+  }
+
   def inferSchema(fqn: String): Schema = {
     fqn match {
       case "null" => NULL_SCHEMA
@@ -354,7 +357,7 @@ object AvroRecord {
     }
   }
 
-  def inferSchema[X: TypeTag, AnyRef <: X](cls: Class[X]): Schema = inferSchema(typeOf[X])
+  private object classTypeCache extends LocalCache[Class[_], Type]()
 
   private object typeSchemaCache extends LocalCache[Type, Schema]()
 
@@ -393,8 +396,8 @@ object AvroRecord {
         }
       } else if (tpe <:< typeOf[Option[_]]) {
         SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
-      } else if (tpe <:< typeOf[AvroRecord[_]]) {
-        val typeMirror = universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
+      } else if (tpe <:< typeOf[AvroRecord]) {
+        val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)//universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
         val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
         val companionMirror = typeMirror.reflect(moduleMirror.instance)
         val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
@@ -419,11 +422,11 @@ object AvroRecord {
   }
 }
 
-abstract class AvroRecord[X: TypeTag] extends SpecificRecord with java.io.Serializable {
+abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
-  @JsonIgnore lazy val schema: Schema = AvroRecord.inferSchema(typeOf[X])
+  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
 
-  lazy private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
+  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass)
 
   override def getSchema: Schema = schema
 

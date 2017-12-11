@@ -32,14 +32,14 @@ object UUID {
   def random: UUID = apply(java.util.UUID.randomUUID)
 }
 
-case class UUID(val data: ByteBuffer) extends AvroRecord[UUID] {
+case class UUID(val data: ByteBuffer) extends AvroRecord {
   def javaUUID: java.util.UUID = ByteUtils.uuid(data.array)
 }
 
-case class KEY(id: Int) extends AvroRecord[KEY] {
+case class KEY(id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord[TestRecord] {
+case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord {
   override def hashCode(): Int = key.hashCode()
 }
