@@ -49,12 +49,12 @@ public abstract class MemStore {
 
     final private MemStoreManager manager;
 
-    final public String name;
+    //final public String name;
 
     final private boolean checkpointsEnable;
 
     public MemStore(Config config, int partition) throws IOException {
-        name = config.getString(MemStore.CONFIG_STORE_NAME);
+        //name = config.getString(MemStore.CONFIG_STORE_NAME);
         checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_PATH) && config.hasPath(CONFIG_STORE_NAME);
         manager = new MemStoreManager(config, partition);
     }
@@ -121,9 +121,8 @@ public abstract class MemStore {
      * implementation should clean-up any resources here
      */
     public void close() {
-        log.info("Closing " + name);
         try {
-            manager.writeCheckpoint(true);
+            manager.close();
         } catch (IOException e) {
             log.error("Failed to write final checkpoint", e);
         }
@@ -207,7 +206,6 @@ public abstract class MemStore {
         public MemStoreManager(Config config, int partition) throws IOException {
             super();
             if (!checkpointsEnable) {
-                log.info("checkpoints not enabled for " + name);
                 file = null;
             } else {
                 String dataPath = config.getString(MemStore.CONFIG_DATA_PATH);
@@ -255,7 +253,7 @@ public abstract class MemStore {
                     }
                 }
                 checkpoint.set(new Checkpoint(offset, size));
-                log.info("Initialized for " + name + ": " + checkpoint );
+                log.info("Initialized " + checkpoint + " from " + file);
 
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -304,6 +302,9 @@ public abstract class MemStore {
         }
 
 
+        public void close() throws IOException {
+            if (checkpointsEnable) writeCheckpoint(true);
+        }
     }
 
 

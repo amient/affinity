@@ -67,7 +67,6 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val stateStoreName = "visibility-test"
-//    val topic = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName)).getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
     val state = createStateStoreForPartition(stateStoreName)(0)
     state.insert(1, TestRecord(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
     val testRecordSchemaId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
