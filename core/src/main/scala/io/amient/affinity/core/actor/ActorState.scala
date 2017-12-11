@@ -64,7 +64,7 @@ trait ActorState extends Actor {
   }
 
   def bootState(): Unit = storageRegistry.asScala.foreach { s =>
-    log.info(s"${s.name} boot complteded, memstore size=${s.size}")
+    log.info(s"'${s.name}' state booted, memstore size=${s.size}")
     s.storage.boot()
   }
 

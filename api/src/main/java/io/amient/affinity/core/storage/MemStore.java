@@ -92,8 +92,8 @@ public abstract class MemStore {
 
         private Checkpoint updateCheckpoint(long offset, long sizeDelta) {
             return checkpoint.updateAndGet(chk -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("updating checkpoint, offset: " + offset +", sizeDelta: " + sizeDelta);
+                if (log.isTraceEnabled()) {
+                    log.trace("updating checkpoint, offset: " + offset +", sizeDelta: " + sizeDelta);
                 }
                 if (offset > chk.offset) {
                     if (enabled) checkpointModified = true;
