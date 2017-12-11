@@ -47,92 +47,27 @@ public abstract class MemStore {
 
     private final static Logger log = LoggerFactory.getLogger(MemStore.class);
 
-    protected abstract boolean isPersistent();
+    final private MemStoreManager manager;
 
-    private class Checkpointer extends Thread {
+    final public String name;
 
-        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, 0));
-
-        volatile private boolean checkpointModified = false;
-
-        volatile private boolean stopped = true;
-
-        final private Path file;
-
-        final private boolean enabled;
-
-        public Checkpointer(Config config, int partition) throws IOException {
-            super();
-            enabled = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_PATH) && config.hasPath(CONFIG_STORE_NAME);
-            if (!enabled) {
-                file = null;
-            } else {
-                String dataPath = config.getString(MemStore.CONFIG_DATA_PATH);
-                file = Paths.get(dataPath, "checkpoints", config.getString(CONFIG_STORE_NAME) + "-" + partition + ".checkpoint");
-                if (!Files.exists(file)) {
-                    log.debug("Creating checkpoint file: " + file);
-                    Files.createDirectories(file.getParent());
-                    writeCheckpoint();
-                } else {
-                    log.debug("Reading checkpoint file: " + file);
-                    java.util.List<String> lines = Files.readAllLines(file);
-                    checkpoint.set(new Checkpoint(Long.valueOf(lines.get(0)), Long.valueOf(lines.get(1))));
-                }
-                log.info("Initialized checkpoint: " + checkpoint + " from file " + file);
-                start();
-            }
-        }
-
-        private void writeCheckpoint() throws IOException {
-            Checkpoint chk = checkpoint.get();
-            log.debug("Writing checkpoint " + chk + " to file: " + file);
-            Files.write(file, Arrays.asList(String.valueOf(chk.offset), String.valueOf(chk.size)));
-            checkpointModified = false;
-        }
-
-        private Checkpoint updateCheckpoint(long offset, long sizeDelta) {
-            return checkpoint.updateAndGet(chk -> {
-                if (log.isTraceEnabled()) {
-                    log.trace("updating checkpoint, offset: " + offset +", sizeDelta: " + sizeDelta);
-                }
-                if (offset > chk.offset) {
-                    if (enabled) checkpointModified = true;
-                    return new Checkpoint(offset, chk.size + sizeDelta);
-                } else if (sizeDelta != 0) {
-                    if (enabled) checkpointModified = true;
-                    return chk.withSizeDelta(sizeDelta);
-                } else {
-                    return chk;
-                }
-            });
-        }
-
-        @Override
-        public void run() {
-            try {
-                stopped = false;
-                while(!stopped) {
-                    Thread.sleep(10000); //TODO make checkpoint interval configurable
-                    if (checkpointModified) {
-                        writeCheckpoint();
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Error in the checkpointer thread", e);
-                Thread.currentThread().getThreadGroup().interrupt();
-            }
-        }
-    }
+    final private boolean checkpointsEnable;
 
     public MemStore(Config config, int partition) throws IOException {
-        checkpointer = new Checkpointer(config, partition);
+        name = config.getString(MemStore.CONFIG_STORE_NAME);
+        checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_PATH) && config.hasPath(CONFIG_STORE_NAME);
+        manager = new MemStoreManager(config, partition);
+    }
+
+    protected abstract boolean isPersistent();
+
+    final public void open() {
+        manager.start();
     }
 
     public Checkpoint getCheckpoint() {
-        return checkpointer.checkpoint.get();
+        return manager.checkpoint.get();
     }
-
-    final private Checkpointer checkpointer;
 
     public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
@@ -147,7 +82,7 @@ public abstract class MemStore {
      * @return size hint - this may or may not be accurate, depending on the underlying backend's features
      */
     public final long size() {
-        return checkpointer.checkpoint.get().size;
+        return manager.checkpoint.get().size;
     }
 
     /**
@@ -156,7 +91,7 @@ public abstract class MemStore {
      * @return new Checkpoint after the operation
      */
     public final Checkpoint put(ByteBuffer key, ByteBuffer value, long offset) {
-        return checkpointer.updateCheckpoint(offset, putImpl(key, value) ? 1L : 0L);
+        return manager.updateCheckpoint(offset, putImpl(key, value) ? 1L : 0L);
     }
 
     /**
@@ -171,7 +106,7 @@ public abstract class MemStore {
      * @return long size of the memstore (number of keys) after the operation
      */
     public final Checkpoint remove(ByteBuffer key, long offset) {
-        return checkpointer.updateCheckpoint(offset, removeImpl(key) ? -1L : 0);
+        return manager.updateCheckpoint(offset, removeImpl(key) ? -1L : 0);
     }
 
     /**
@@ -186,7 +121,13 @@ public abstract class MemStore {
      * implementation should clean-up any resources here
      */
     public void close() {
-        checkpointer.stopped = true;
+        log.info("Closing " + name);
+        try {
+            manager.writeCheckpoint(true);
+        } catch (IOException e) {
+            log.error("Failed to write final checkpoint", e);
+        }
+        manager.stopped = true;
     }
 
 
@@ -251,6 +192,118 @@ public abstract class MemStore {
     final public void load(byte[] key, byte[] value, long offset, long timestamp) {
         ByteBuffer valueBuffer = wrap(value, timestamp);
         put(ByteBuffer.wrap(key), valueBuffer, offset);
+    }
+
+    private class MemStoreManager extends Thread {
+
+        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, 0));
+
+        volatile private boolean checkpointModified = false;
+
+        volatile private boolean stopped = true;
+
+        final private Path file;
+
+        public MemStoreManager(Config config, int partition) throws IOException {
+            super();
+            if (!checkpointsEnable) {
+                log.info("checkpoints not enabled for " + name);
+                file = null;
+            } else {
+                String dataPath = config.getString(MemStore.CONFIG_DATA_PATH);
+                file = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition + ".checkpoint");
+            }
+        }
+
+        @Override
+        public synchronized void start() {
+
+            if (checkpointsEnable) try {
+                long offset = -1;
+                long size = 0;
+                boolean clean = false;
+                if (Files.exists(file)) {
+                    java.util.List<String> lines = Files.readAllLines(file);
+                    offset = Long.valueOf(lines.get(0));
+                    size =  Long.valueOf(lines.get(1));
+                    clean = lines.size() >= 3 && lines.get(2).equals("CLOSED");
+                }
+                if (!clean) {
+                    if (!Files.exists(file)) {
+                        log.info("MemStore checkpoint doesn't exits: " + file);
+                        Files.createDirectories(file.getParent());
+                    } else {
+                        log.info("MemStore was not closed cleanly, fixing it...");
+                    }
+                    int actualSize = 0;
+                    Iterator<Map.Entry<ByteBuffer, ByteBuffer>> i = iterator();
+                    log.info("Checking records...");
+                    while (i.hasNext()) {
+                        actualSize += 1;
+                        if (actualSize % 100000 == 0) {
+                            log.info("Checked num. records: " + actualSize / 10000 + "k");
+                        }
+                        i.next();
+                    }
+                    log.info("Total valid records: " + actualSize);
+                    if (actualSize < size) {
+                        log.info("MemStore was corrupt, need to rebuild it from storage, resetting checkpoint");
+                        offset = -1L;
+                        size = 0;
+                    } else {
+                        size = actualSize;
+                    }
+                }
+                checkpoint.set(new Checkpoint(offset, size));
+                log.info("Initialized for " + name + ": " + checkpoint );
+
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            super.start();
+        }
+
+        @Override
+        public void run() {
+            try {
+                stopped = false;
+                while (!stopped) {
+                    Thread.sleep(10000); //TODO make checkpoint interval configurable
+                    if (checkpointsEnable && checkpointModified) {
+                        writeCheckpoint(false);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in the manager thread", e);
+                Thread.currentThread().getThreadGroup().interrupt();
+            }
+        }
+
+        private void writeCheckpoint(boolean closing) throws IOException {
+            Checkpoint chk = checkpoint.get();
+            log.debug("Writing checkpoint " + chk + " to file: " + file + ", final: " + closing);
+            Files.write(file, Arrays.asList(String.valueOf(chk.offset), String.valueOf(chk.size), closing ? "CLOSED" : "OPEN"));
+            checkpointModified = false;
+        }
+
+        private Checkpoint updateCheckpoint(long offset, long sizeDelta) {
+            return checkpoint.updateAndGet(chk -> {
+                if (log.isTraceEnabled()) {
+                    log.trace("updating checkpoint, offset: " + offset + ", sizeDelta: " + sizeDelta);
+                }
+                if (offset > chk.offset) {
+                    if (checkpointsEnable) checkpointModified = true;
+                    return new Checkpoint(offset, chk.size + sizeDelta);
+                } else if (sizeDelta != 0) {
+                    if (checkpointsEnable) checkpointModified = true;
+                    return chk.withSizeDelta(sizeDelta);
+                } else {
+                    return chk;
+                }
+            });
+        }
+
+
     }
 
 

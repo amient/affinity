@@ -35,10 +35,9 @@ public abstract class Storage {
             throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         Class<? extends MemStore> memstoreClass
                 = Class.forName(config.getString(CONFIG_MEMSTORE_CLASS)).asSubclass(MemStore.class);
-        MemStore tmp;
         Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
-        tmp = memstoreConstructor.newInstance(config, partition);
-        memstore = tmp;
+        memstore = memstoreConstructor.newInstance(config, partition);
+        memstore.open();
     }
 
     /**

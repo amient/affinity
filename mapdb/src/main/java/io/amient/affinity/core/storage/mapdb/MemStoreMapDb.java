@@ -61,7 +61,7 @@ public class MemStoreMapDb extends MemStore {
     }
 
     synchronized private static final void releaseDbInstance(String pathToData) {
-        if (refs.get(pathToData) > 1) {
+        if (refs.getOrDefault(pathToData, 0L) > 1) {
             refs.put(pathToData, refs.get(pathToData) - 1);
         } else {
             refs.remove(pathToData);
@@ -114,6 +114,11 @@ public class MemStoreMapDb extends MemStore {
 
     @Override
     public void close() {
-        releaseDbInstance(pathToData);
+        try {
+            releaseDbInstance(pathToData);
+        } finally {
+            super.close();
+        }
+
     }
 }

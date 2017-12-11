@@ -31,7 +31,7 @@ class MemStoreSimpleMap(config: Config, partition: Int) extends MemStore(config,
 
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 
-  override def close(): Unit = internal.clear()
+  override def close(): Unit = try internal.clear() finally super.close()
 
   override def iterator(): util.Iterator[Entry[ByteBuffer, ByteBuffer]] = {
     internal.entrySet().iterator()
