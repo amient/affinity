@@ -87,9 +87,10 @@ public abstract class MemStore {
     public abstract long numKeys();
 
     /**
-     * @param key   ByteBuffer representation
-     * @param value ByteBuffer which will be associated with the given key
-     * @return new Checkpoint valid after the operation
+     * @param key       ByteBuffer representation
+     * @param value     ByteBuffer which will be associated with the given key
+     * @param offset    checkpoint offset
+     * @return new Checkpoint after the operation
      */
     public final Checkpoint put(ByteBuffer key, ByteBuffer value, long offset) {
         putImpl(key, value);
@@ -105,6 +106,7 @@ public abstract class MemStore {
     /**
      * @param key ByteBuffer representation whose value will be removed
      * @return new Checkpoint valid after the operation
+     * @param offset    checkpoint offset
      */
     public final Checkpoint remove(ByteBuffer key, long offset) {
         removeImpl(key);
