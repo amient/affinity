@@ -23,6 +23,7 @@ import akka.actor.Actor
 import akka.routing._
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.config.{Cfg, ConfigGroup, ConfigStruct}
 import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
 
 import scala.collection.mutable
@@ -32,6 +33,12 @@ object Service {
   final val CONFIG_NUM_PARTITIONS = s"num.partitions"
   final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
   final case class ServiceAvailability(group: String, suspended: Boolean)
+
+  class ServiceConfig extends ConfigStruct("service") {
+//    val ConfigPartitionClass = property("class", classOf[Class[_ <: Partition]])
+//    val ConfigNumPartitions = property("num.partitions", classOf[Int])
+  }
+
 }
 
 class Service(config: Config) extends Actor {
