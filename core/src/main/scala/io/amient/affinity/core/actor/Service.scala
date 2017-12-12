@@ -34,10 +34,13 @@ object Service {
   final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
   final case class ServiceAvailability(group: String, suspended: Boolean)
 
-  class ServiceConfig extends ConfigStruct("service") {
-//    val ConfigPartitionClass = property("class", classOf[Class[_ <: Partition]])
-//    val ConfigNumPartitions = property("num.partitions", classOf[Int])
+  class Config extends ConfigStruct() {
+
+    val PartitionClass = required(cls("class", classOf[Partition]))
+//    val NumPartitions = property("num.partitions", classOf[Int])
   }
+
+  object Config extends Config
 
 }
 

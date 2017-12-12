@@ -22,11 +22,10 @@ package io.amient.affinity.core.cluster
 
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
-import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigList}
+import com.typesafe.config.{Config, ConfigException, ConfigList}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
-import io.amient.affinity.core.actor.Service.ServiceConfig
-import io.amient.affinity.core.actor._
+import io.amient.affinity.core.actor.{Service, _}
 import io.amient.affinity.core.config._
 
 import scala.collection.JavaConverters._
@@ -47,15 +46,17 @@ object Node {
   final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
   final val CONFIG_DATA_DIR = "affinity.node.data.dir"
 
-  object Config extends ConfigStruct("affinity.node") {
-    val ConfigStartupTimeoutMs = required(new ConfigLong("startup.timeout.ms"))
-    val ConfigNodeShutdownTimeoutMs = required(new ConfigLong("shutdown.timeout.ms"))
-    val ConfigServices = optional(new ConfigGroup("service", classOf[ServiceConfig]))
+  class Config extends ConfigStruct("affinity.node") {
+    val StartupTimeoutMs = required(longint("startup.timeout.ms"))
+    val ShutdownTimeoutMs = required(longint("shutdown.timeout.ms"))
+    val Services = optional(group("service", classOf[Service.Config]))
     //property[Long]("", classOf[Long], false)
 //    property[String]("container", classOf[String])
 //    group("affinity.service", classOf[ServiceConfig])
     //group("affiniyt.container")
   }
+
+  object Config extends Config
 
 
 }
