@@ -56,38 +56,35 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
 
   import State._
 
-  val nodeDataDir = system.settings.config.getString(Node.CONFIG_DATA_DIR)
+  val config = system.settings.config
+  val nodeDataDir = config.getString(Node.CONFIG_DATA_DIR)
+  val stateConfig = system.settings.config.getConfig(CONFIG_STATE_STORE(name))
+  private val keySerde = Serde.of[K](system.settings.config)
+  private val valueSerde = Serde.of[V](system.settings.config)
+  private val ttlSec = if (stateConfig.hasPath(CONFIG_TTL_SECONDS)) stateConfig.getInt(CONFIG_TTL_SECONDS) else -1
+  private val ttlMs: Long = if (ttlSec < 0) -1L else ttlSec * 1000
 
-  private val config = system.settings.config.getConfig(CONFIG_STATE_STORE(name)).withFallback(ConfigFactory.empty()
+  private val cfg = stateConfig.withFallback(ConfigFactory.empty()
+    .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
     .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef(name))
     .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(nodeDataDir))
-    .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
+    .withValue(MemStore.CONFIG_TTL_SEC, ConfigValueFactory.fromAnyRef(ttlSec))
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
     .withValue(CONFIG_LOCK_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(10000))
   )
 
-  private val keySerde = Serde.of[K](system.settings.config)
-  private val valueSerde = Serde.of[V](system.settings.config)
 
-  private val LockTimeoutMs = config.getLong(CONFIG_LOCK_TIMEOUT_MS)
-
-  private val recordTtlMs = if (config.hasPath(CONFIG_TTL_SECONDS)) {
-    config.getLong(CONFIG_TTL_SECONDS) * 1000
-  } else {
-    Long.MaxValue
-  }
-  private val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
-
-  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
+  private val LockTimeoutMs = cfg.getLong(CONFIG_LOCK_TIMEOUT_MS)
+  private val readTimeout = cfg.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
+  private val storageClass = Class.forName(cfg.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
   private val storageClassSymbol = rootMirror.classSymbol(storageClass)
   private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage: Storage = try constructorMirror(config, partition).asInstanceOf[Storage] catch {
+  val storage: Storage = try constructorMirror(cfg, partition).asInstanceOf[Storage] catch {
     case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
   }
-
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -96,15 +93,21 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
 
   /**
-    * @return a weak iterator that doesn't block read and write methods
+    * @return a weak iterator that doesn't block read and write operations
     */
-  def iterator: Iterator[(K, V)] = {
-    storage.memstore.iterator.asScala.flatMap { entry =>
+  def iterator: CloseableIterator[(K, V)] = new CloseableIterator[(K, V)] {
+    val underlying = storage.memstore.iterator
+    val mapped = underlying.asScala.flatMap { entry =>
       val key = keySerde.fromBytes(entry.getKey.array())
-      option(storage.memstore.unwrap(entry.getKey(), entry.getValue, recordTtlMs)).map {
+      option(storage.memstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
         bytes => (key, valueSerde.fromBytes(bytes))
       }
     }
+    override def next(): (K, V) = mapped.next()
+
+    override def hasNext: Boolean = mapped.hasNext
+
+    override def close(): Unit = underlying.close()
   }
 
   /**
@@ -137,7 +140,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
   private def apply(key: ByteBuffer): Option[V] = {
     for (
       cell: ByteBuffer <- option(storage.memstore(key));
-      bytes: Array[Byte] <- option(storage.memstore.unwrap(key, cell, recordTtlMs))
+      bytes: Array[Byte] <- option(storage.memstore.unwrap(key, cell, ttlMs))
     ) yield valueSerde.fromBytes(bytes) match {
       case value: V => value
       case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
@@ -276,8 +279,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
       case e: EventTime => e.eventTimeUtc()
       case _ => nowMs
     }
-    val expires = recordTimestamp + recordTtlMs
-    if (recordTtlMs < Long.MaxValue && expires < nowMs) {
+    if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
       delete(key)
     } else {
       val valueBytes = valueSerde.toBytes(value)

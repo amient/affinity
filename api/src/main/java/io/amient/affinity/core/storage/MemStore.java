@@ -42,19 +42,21 @@ public abstract class MemStore {
 
     final public static String CONFIG_STORE_NAME = "name";
     final public static String CONFIG_DATA_DIR = "data.dir";
+    final public static String CONFIG_TTL_SEC = "memstore.ttl.sec";
 
     private final static Logger log = LoggerFactory.getLogger(MemStore.class);
 
     final private MemStoreManager manager;
 
     final private boolean checkpointsEnable;
-
+    final protected int ttlSecs;
     final protected Path dataDir;
 
     public MemStore(Config config, int partition) throws IOException {
         checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_DIR) && config.hasPath(CONFIG_STORE_NAME);
         String dataPath = config.getString(MemStore.CONFIG_DATA_DIR);
         dataDir = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition).toAbsolutePath();
+        ttlSecs = config.hasPath(CONFIG_TTL_SEC) ? config.getInt(CONFIG_TTL_SEC) : -1;
         if (Files.exists(dataDir)) Files.createDirectories(dataDir);
         manager = new MemStoreManager();
     }
@@ -155,8 +157,9 @@ public abstract class MemStore {
      * @return unwrapped byte array of the raw value without metadata if not expired, otherwise none
      */
     final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
-        if (ttlMs < Long.MAX_VALUE && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
-            //TODO #65 this is the only place where expired records get actually cleaned from the memstore but we need also a regular full compaction process that will get the memstore iterator and call this method
+        if (ttlMs > 0 && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
+            //this is the magic that expires key-value pairs based on their create timestamp
+            //State.iterator also invokes unwrap for each entry therefore simply iterating cleans up expired entries
             removeImpl(key);
             return Optional.empty();
         } else {

@@ -30,7 +30,7 @@ import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.util.TimeCryptoProof
 import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.rest.ExampleGatewayRoot
-
+import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal

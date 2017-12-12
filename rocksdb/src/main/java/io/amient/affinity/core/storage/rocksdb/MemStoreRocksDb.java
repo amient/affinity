@@ -23,10 +23,8 @@ import com.typesafe.config.Config;
 import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
+import org.rocksdb.*;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -37,10 +35,11 @@ import java.util.*;
 
 public class MemStoreRocksDb extends MemStore {
 
+    private final static org.slf4j.Logger log = LoggerFactory.getLogger(MemStoreRocksDb.class);
     private static Map<Path, Long> refs = new HashMap<>();
     private static Map<Path, RocksDB> instances = new HashMap<>();
 
-    synchronized private static final RocksDB createOrGetDbInstanceRef(Path pathToData, Options rocksOptions) {
+    synchronized private static final RocksDB createOrGetDbInstanceRef(Path pathToData, Options rocksOptions, int ttlSecs) {
         RocksDB.loadLibrary();
         if (refs.containsKey(pathToData) && refs.get(pathToData) > 0) {
             refs.put(pathToData, refs.get(pathToData) + 1);
@@ -48,7 +47,10 @@ public class MemStoreRocksDb extends MemStore {
         } else {
 
             try {
-                RocksDB instance = RocksDB.open(rocksOptions, pathToData.toString());
+                log.info("Opening RocksDb with TTL=" + ttlSecs);
+                RocksDB instance = ttlSecs > 0 ? TtlDB.open(rocksOptions, pathToData.toString(), ttlSecs, false)
+                        : TtlDB.open(rocksOptions, pathToData.toString());
+                //RocksDB instance = RocksDB.open(rocksOptions, pathToData.toString());
                 instances.put(pathToData, instance);
                 refs.put(pathToData, 1L);
                 return instance;
@@ -78,9 +80,10 @@ public class MemStoreRocksDb extends MemStore {
     public MemStoreRocksDb(Config config, int partition) throws IOException {
         super(config, partition);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
+
         Files.createDirectories(pathToData);
         Options rocksOptions = new Options().setCreateIfMissing(true);
-        internal = createOrGetDbInstanceRef(pathToData, rocksOptions);
+        internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
     }
 
     @Override
@@ -88,6 +91,7 @@ public class MemStoreRocksDb extends MemStore {
         return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
             private RocksIterator rocksIterator = null;
             private boolean checked = false;
+
             @Override
             public boolean hasNext() {
                 checked = true;
@@ -145,7 +149,6 @@ public class MemStoreRocksDb extends MemStore {
     @Override
     synchronized public void removeImpl(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
-        boolean removed = internal.keyMayExist(keyBytes, new StringBuffer());
         try {
             internal.remove(keyBytes);
         } catch (RocksDBException e) {

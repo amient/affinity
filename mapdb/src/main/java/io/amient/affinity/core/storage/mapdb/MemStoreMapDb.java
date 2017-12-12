@@ -46,14 +46,17 @@ public class MemStoreMapDb extends MemStore {
     private static Map<Path, DB> instances = new HashMap<>();
     private static Map<Path, ConcurrentMap<byte[], byte[]>> maps = new HashMap<>();
 
-    synchronized private static final ConcurrentMap<byte[], byte[]> createOrGetDbInstanceRef(Path pathToData, Boolean mmap) {
+    synchronized private static final ConcurrentMap<byte[], byte[]> createOrGetDbInstanceRef(
+            Path pathToData, Boolean mmap, int ttlMs) {
         if (refs.containsKey(pathToData) && refs.get(pathToData) > 0) {
             refs.put(pathToData, refs.get(pathToData) + 1);
             return maps.get(pathToData);
         } else {
             DBMaker.Maker dbMaker = DBMaker.fileDB(pathToData.toFile()).checksumHeaderBypass();
             DB instance = mmap ? dbMaker.fileMmapEnable().make() : dbMaker.make();
-            ConcurrentMap<byte[], byte[]> map = instance.hashMap("map", Serializer.BYTE_ARRAY, Serializer.BYTE_ARRAY)
+            ConcurrentMap<byte[], byte[]> map = instance
+                    .hashMap("map", Serializer.BYTE_ARRAY, Serializer.BYTE_ARRAY)
+                    .expireAfterCreate(ttlMs)
                     .createOrOpen();
             instances.put(pathToData, instance);
             maps.put(pathToData, map);
@@ -85,7 +88,7 @@ public class MemStoreMapDb extends MemStore {
         pathToData = dataDir.resolve(this.getClass().getSimpleName() + ".data");
         Files.createDirectories(pathToData.getParent());
         Boolean mmapEnabled = config.hasPath(CONFIG_MAPDB_MMAP_ENABLED) && config.getBoolean(CONFIG_MAPDB_MMAP_ENABLED);
-        this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled);
+        this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled, ttlSecs * 1000);
     }
 
     @Override

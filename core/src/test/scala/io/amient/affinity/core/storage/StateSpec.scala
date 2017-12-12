@@ -59,6 +59,7 @@ class StateSpec extends TestKit(ActorSystem.create("test",
     state(2L) should be (Some(ExpirableValue("two", nowMs - 3000)))
     state(3L) should be (Some(ExpirableValue("three", nowMs)))
     state.iterator.size should be (2L)
+    state.numKeys should be(2L)
   }
 
 

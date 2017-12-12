@@ -6,6 +6,15 @@ import java.util.Iterator;
 
 public interface CloseableIterator<T> extends Iterator<T>, Closeable {
 
+    default long size() {
+        long result = 0;
+        while (hasNext()) {
+            result++;
+            next();
+        }
+        return result;
+    }
+
     static <X> CloseableIterator<X> apply(Iterator<X> underlying) {
         return new CloseableIterator<X>() {
             @Override
