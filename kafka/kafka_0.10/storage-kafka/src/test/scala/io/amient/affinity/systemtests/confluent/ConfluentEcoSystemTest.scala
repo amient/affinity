@@ -87,7 +87,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
-    state.size should be(0)
+    state.numKeys should be(0)
     val updates = for (i <- (1 to numToWrite)) yield {
       state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
         (s) => s
@@ -100,8 +100,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     Await.result(Future.sequence(updates), 10 seconds)
     val spentMs = System.currentTimeMillis() - l
     println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
-    state.size should equal(numWrites.get)
-    state.iterator.size should equal(state.size)
+    state.numKeys should equal(numWrites.get)
+    state.iterator.size should equal(state.numKeys)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
@@ -182,7 +182,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     state1.storage.init()
     state0.storage.boot()
     state1.storage.boot()
-    (state0.size + state1.size) should equal(numWrites.get)
+    (state0.numKeys + state1.numKeys) should equal(numWrites.get)
   }
 
 }

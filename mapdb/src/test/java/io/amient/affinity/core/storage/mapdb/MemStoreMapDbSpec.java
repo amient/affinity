@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class MemStoreMapDbSpec {
@@ -44,7 +45,8 @@ public class MemStoreMapDbSpec {
     public void testMemStoreMapDb() throws IOException {
         String tmp = folder.newFolder().toString();
         Config config = ConfigFactory.empty()
-                .withValue(MemStoreMapDb.CONFIG_MAPDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp))
+                .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef("test"))
+                .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(tmp))
                 .withValue(MemStoreMapDb.CONFIG_MAPDB_MMAP_ENABLED, ConfigValueFactory.fromAnyRef(false));
 
         MemStore instance = new MemStoreMapDb(config, 0);
@@ -60,7 +62,8 @@ public class MemStoreMapDbSpec {
             Iterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
-            assertEquals(2, instance.size());
+            assertFalse(it.hasNext());
+            assertEquals(2, instance.numKeys());
         } finally {
             instance.close();
         }

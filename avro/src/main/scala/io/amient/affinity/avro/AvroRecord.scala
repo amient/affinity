@@ -198,11 +198,11 @@ object AvroRecord {
   }
 
   private object classFieldsCache extends LocalCache[Class[_], Map[Int, Field]] {
-    def getOrInitialize(cls: Class[_]/*, schema: Schema*/): Map[Int, Field]= getOrInitialize(cls, {
-//      val schemaFields = schema.getFields
+    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field]= getOrInitialize(cls, {
+      val schemaFields = schema.getFields
       val params: Array[Parameter] = cls.getConstructors()(0).getParameters
-//      require(params.length == schemaFields.size,
-//        s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
+      require(params.length == schemaFields.size,
+        s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
 
       val declaredFields = cls.getDeclaredFields
       val fields: Map[Int, Field] = params.zipWithIndex.map { case (param, pos) => {
@@ -426,7 +426,7 @@ abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
   @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
 
-  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass)
+  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
 
   override def getSchema: Schema = schema
 

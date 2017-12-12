@@ -32,8 +32,7 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class MemStoreRocksDbTest {
 
@@ -44,7 +43,8 @@ public class MemStoreRocksDbTest {
     public void testRocksDb() throws IOException, InterruptedException {
         String tmp = folder.newFolder().toString();
         Config config = ConfigFactory.empty()
-                .withValue(MemStoreRocksDb.ConfigRocksDbDataPath, ConfigValueFactory.fromAnyRef(tmp));
+                .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef( "test"))
+                .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(tmp));
 
         MemStore instance = new MemStoreRocksDb(config, 0);
         try {
@@ -59,10 +59,11 @@ public class MemStoreRocksDbTest {
             Iterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
+            assertFalse(it.hasNext());
             assertTrue(!it.hasNext());
-            assertEquals(2, instance.size());
+            assertEquals(3, instance.numKeys());
         } finally {
-            //instance.close();
+            instance.close();
         }
     }
 

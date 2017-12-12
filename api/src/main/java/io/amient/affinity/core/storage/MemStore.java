@@ -29,8 +29,6 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -43,20 +41,22 @@ import java.util.concurrent.atomic.AtomicReference;
 public abstract class MemStore {
 
     final public static String CONFIG_STORE_NAME = "name";
-    final public static String CONFIG_DATA_PATH = "data.dir";
+    final public static String CONFIG_DATA_DIR = "data.dir";
 
     private final static Logger log = LoggerFactory.getLogger(MemStore.class);
 
     final private MemStoreManager manager;
 
-    //final public String name;
-
     final private boolean checkpointsEnable;
 
+    final protected Path dataDir;
+
     public MemStore(Config config, int partition) throws IOException {
-        //name = config.getString(MemStore.CONFIG_STORE_NAME);
-        checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_PATH) && config.hasPath(CONFIG_STORE_NAME);
-        manager = new MemStoreManager(config, partition);
+        checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_DIR) && config.hasPath(CONFIG_STORE_NAME);
+        String dataPath = config.getString(MemStore.CONFIG_DATA_DIR);
+        dataDir = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition).toAbsolutePath();
+        if (Files.exists(dataDir)) Files.createDirectories(dataDir);
+        manager = new MemStoreManager();
     }
 
     protected abstract boolean isPersistent();
@@ -69,7 +69,7 @@ public abstract class MemStore {
         return manager.checkpoint.get();
     }
 
-    public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
+    public abstract CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
     /**
      * @param key ByteBuffer representation of the key
@@ -79,41 +79,40 @@ public abstract class MemStore {
     public abstract Optional<ByteBuffer> apply(ByteBuffer key);
 
     /**
-     * @return size hint - this may or may not be accurate, depending on the underlying backend's features
+     * This may or may not be accurate, depending on the underlying backend's features
+     * @return number of keys in the store
      */
-    public final long size() {
-        return manager.checkpoint.get().size;
-    }
+    public abstract long numKeys();
 
     /**
      * @param key   ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return new Checkpoint after the operation
+     * @return new Checkpoint valid after the operation
      */
     public final Checkpoint put(ByteBuffer key, ByteBuffer value, long offset) {
-        return manager.updateCheckpoint(offset, putImpl(key, value) ? 1L : 0L);
+        putImpl(key, value);
+        return manager.updateCheckpoint(offset);
     }
 
     /**
      * @param key   ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return new Checkpoint after the operation
      */
-    protected abstract boolean putImpl(ByteBuffer key, ByteBuffer value);
+    protected abstract void putImpl(ByteBuffer key, ByteBuffer value);
 
     /**
      * @param key ByteBuffer representation whose value will be removed
-     * @return long size of the memstore (number of keys) after the operation
+     * @return new Checkpoint valid after the operation
      */
     public final Checkpoint remove(ByteBuffer key, long offset) {
-        return manager.updateCheckpoint(offset, removeImpl(key) ? -1L : 0);
+        removeImpl(key);
+        return manager.updateCheckpoint(offset);
     }
 
     /**
-     * @param key
-     * @return true if the key was removed, false if the key didn't exist
+     * @param key key to remove
      */
-    protected abstract boolean removeImpl(ByteBuffer key);
+    protected abstract void removeImpl(ByteBuffer key);
 
 
     /**
@@ -195,7 +194,7 @@ public abstract class MemStore {
 
     private class MemStoreManager extends Thread {
 
-        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, 0));
+        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, false));
 
         volatile private boolean checkpointModified = false;
 
@@ -203,56 +202,37 @@ public abstract class MemStore {
 
         final private Path file;
 
-        public MemStoreManager(Config config, int partition) throws IOException {
+        public MemStoreManager() {
             super();
-            if (!checkpointsEnable) {
-                file = null;
-            } else {
-                String dataPath = config.getString(MemStore.CONFIG_DATA_PATH);
-                file = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition + ".checkpoint");
-            }
+            file = dataDir.resolve(MemStore.this.getClass().getSimpleName() + ".checkpoint");
         }
 
         @Override
         public synchronized void start() {
 
             if (checkpointsEnable) try {
-                long offset = -1;
-                long size = 0;
-                boolean clean = false;
-                if (Files.exists(file)) {
-                    java.util.List<String> lines = Files.readAllLines(file);
-                    offset = Long.valueOf(lines.get(0));
-                    size =  Long.valueOf(lines.get(1));
-                    clean = lines.size() >= 3 && lines.get(2).equals("CLOSED");
-                }
-                if (!clean) {
-                    if (!Files.exists(file)) {
-                        log.info("MemStore checkpoint doesn't exits: " + file);
-                        Files.createDirectories(file.getParent());
-                    } else {
-                        log.info("MemStore was not closed cleanly, fixing it...");
-                    }
-                    int actualSize = 0;
-                    Iterator<Map.Entry<ByteBuffer, ByteBuffer>> i = iterator();
-                    log.info("Checking records...");
-                    while (i.hasNext()) {
-                        actualSize += 1;
-                        if (actualSize % 100000 == 0) {
-                            log.info("Checked num. records: " + actualSize / 10000 + "k");
-                        }
-                        i.next();
-                    }
-                    log.info("Total valid records: " + actualSize);
-                    if (actualSize < size) {
-                        log.info("MemStore was corrupt, need to rebuild it from storage, resetting checkpoint");
-                        offset = -1L;
-                        size = 0;
-                    } else {
-                        size = actualSize;
-                    }
-                }
-                checkpoint.set(new Checkpoint(offset, size));
+                if (Files.exists(file)) checkpoint.set(Checkpoint.readFromFile(file));
+//TODO #80 use something similar as below to implement the cleaner, but as part of the run() method
+//                if (!checkpoint.get().closed) {
+//                    if (!Files.exists(file)) {
+//                        log.info("MemStore checkpoint doesn't exits: " + file);
+//                        Files.createDirectories(file.getParent());
+//                    } else {
+//                        log.info("MemStore was not closed cleanly, fixing it...");
+//                    }
+//                    int actualSize = 0;
+//                    Iterator<Map.Entry<ByteBuffer, ByteBuffer>> i = iterator();
+//                    log.info("Checking records...");
+//                    while (i.hasNext()) {
+//                        actualSize += 1;
+//                        if (actualSize % 100000 == 0) {
+//                            log.info("Checked num. records: " + actualSize / 10000 + "k");
+//                        }
+//                        i.next();
+//                    }
+//                    log.info("Actual num. records: " + actualSize);
+//                    log.info("Implementation num. records: " + numKeys());
+//                }
                 log.info("Initialized " + checkpoint + " from " + file);
 
             } catch (IOException e) {
@@ -278,23 +258,21 @@ public abstract class MemStore {
         }
 
         private void writeCheckpoint(boolean closing) throws IOException {
-            Checkpoint chk = checkpoint.get();
+            Checkpoint chk = (!closing) ? checkpoint.get()
+                    : checkpoint.updateAndGet(c -> new Checkpoint(c.offset, true));
             log.debug("Writing checkpoint " + chk + " to file: " + file + ", final: " + closing);
-            Files.write(file, Arrays.asList(String.valueOf(chk.offset), String.valueOf(chk.size), closing ? "CLOSED" : "OPEN"));
+            chk.writeToFile(file);
             checkpointModified = false;
         }
 
-        private Checkpoint updateCheckpoint(long offset, long sizeDelta) {
+        private Checkpoint updateCheckpoint(long offset) {
             return checkpoint.updateAndGet(chk -> {
                 if (log.isTraceEnabled()) {
-                    log.trace("updating checkpoint, offset: " + offset + ", sizeDelta: " + sizeDelta);
+                    log.trace("updating checkpoint, offset: " + offset);
                 }
                 if (offset > chk.offset) {
                     if (checkpointsEnable) checkpointModified = true;
-                    return new Checkpoint(offset, chk.size + sizeDelta);
-                } else if (sizeDelta != 0) {
-                    if (checkpointsEnable) checkpointModified = true;
-                    return chk.withSizeDelta(sizeDelta);
+                    return new Checkpoint(offset, false);
                 } else {
                     return chk;
                 }

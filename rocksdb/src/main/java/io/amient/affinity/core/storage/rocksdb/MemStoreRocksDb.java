@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage.rocksdb;
 
 import com.typesafe.config.Config;
+import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.rocksdb.Options;
@@ -31,19 +32,15 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 
 public class MemStoreRocksDb extends MemStore {
 
+    private static Map<Path, Long> refs = new HashMap<>();
+    private static Map<Path, RocksDB> instances = new HashMap<>();
 
-    public static final String ConfigRocksDbDataPath = "memstore.rocksdb.data.path";
-
-    private static Map<String, Long> refs = new HashMap<>();
-    private static Map<String, RocksDB> instances = new HashMap<>();
-
-    synchronized private static final RocksDB createOrGetDbInstanceRef(String pathToData, Options rocksOptions) {
+    synchronized private static final RocksDB createOrGetDbInstanceRef(Path pathToData, Options rocksOptions) {
         RocksDB.loadLibrary();
         if (refs.containsKey(pathToData) && refs.get(pathToData) > 0) {
             refs.put(pathToData, refs.get(pathToData) + 1);
@@ -51,7 +48,7 @@ public class MemStoreRocksDb extends MemStore {
         } else {
 
             try {
-                RocksDB instance = RocksDB.open(rocksOptions, pathToData);
+                RocksDB instance = RocksDB.open(rocksOptions, pathToData.toString());
                 instances.put(pathToData, instance);
                 refs.put(pathToData, 1L);
                 return instance;
@@ -61,7 +58,7 @@ public class MemStoreRocksDb extends MemStore {
         }
     }
 
-    synchronized private static final void releaseDbInstance(String pathToData) {
+    synchronized private static final void releaseDbInstance(Path pathToData) {
         if (refs.get(pathToData) > 1) {
             refs.put(pathToData, refs.get(pathToData) - 1);
         } else {
@@ -70,8 +67,7 @@ public class MemStoreRocksDb extends MemStore {
         }
     }
 
-    private final String pathToData;
-    private final Path containerPath;
+    private final Path pathToData;
     private final RocksDB internal;
 
     @Override
@@ -81,16 +77,15 @@ public class MemStoreRocksDb extends MemStore {
 
     public MemStoreRocksDb(Config config, int partition) throws IOException {
         super(config, partition);
-        pathToData = config.getString(ConfigRocksDbDataPath) + "/" + partition + "/";
-        containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
-        Files.createDirectories(containerPath);
+        pathToData = dataDir.resolve(this.getClass().getSimpleName());
+        Files.createDirectories(pathToData);
         Options rocksOptions = new Options().setCreateIfMissing(true);
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions);
     }
 
     @Override
-    public Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
-        return new java.util.Iterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
+    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
+        return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
             private RocksIterator rocksIterator = null;
             private boolean checked = false;
             @Override
@@ -115,6 +110,11 @@ public class MemStoreRocksDb extends MemStore {
                         ByteBuffer.wrap(rocksIterator.key()), ByteBuffer.wrap(rocksIterator.value())
                 );
             }
+
+            @Override
+            public void close() throws IOException {
+                if (rocksIterator != null) rocksIterator.close();
+            }
         };
     }
 
@@ -124,24 +124,30 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    synchronized public boolean putImpl(ByteBuffer key, ByteBuffer value) {
+    synchronized public void putImpl(ByteBuffer key, ByteBuffer value) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
-        boolean added = !internal.keyMayExist(keyBytes, new StringBuffer());
         try {
             internal.put(keyBytes, ByteUtils.bufToArray(value));
-            return added;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    synchronized public boolean removeImpl(ByteBuffer key) {
+    public long numKeys() {
+        try {
+            return internal.getLongProperty("rocksdb.estimate-num-keys");
+        } catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    synchronized public void removeImpl(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         boolean removed = internal.keyMayExist(keyBytes, new StringBuffer());
         try {
             internal.remove(keyBytes);
-            return removed;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
@@ -157,7 +163,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     private Optional<ByteBuffer> get(byte[] key) {
-        byte[] value = new byte[0];
+        byte[] value;
         try {
             value = internal.get(key);
             return Optional.ofNullable(value == null ? null : ByteBuffer.wrap(value));

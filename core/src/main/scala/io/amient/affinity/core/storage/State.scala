@@ -60,7 +60,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
 
   private val config = system.settings.config.getConfig(CONFIG_STATE_STORE(name)).withFallback(ConfigFactory.empty()
     .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef(name))
-    .withValue(MemStore.CONFIG_DATA_PATH, ConfigValueFactory.fromAnyRef(nodeDataDir))
+    .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(nodeDataDir))
     .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
     .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
     .withValue(CONFIG_LOCK_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(10000))
@@ -145,9 +145,9 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
   }
 
   /**
-    * @return size hint - this may or may not be accurate, depending on the underlying backend's features
+    * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
-  def size: Long = storage.memstore.size()
+  def numKeys: Long = storage.memstore.numKeys()
 
   /**
     * replace is a faster operation than update because it doesn't look at the existing value

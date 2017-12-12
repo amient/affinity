@@ -67,7 +67,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
     })
     Await.ready(updates, 10 seconds)
     println(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
-    state.size should equal(numWrites.get)
+    state.numKeys should equal(numWrites.get)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
