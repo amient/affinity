@@ -51,6 +51,7 @@ public class ConfigGroup<T, I extends Cfg<T>> extends Cfg<List<T>> {
     }
 
     public I apply(String entry) {
+        items.forEach((k,v) -> System.err.println(k + " -> " + v));
         if (!items.containsKey(entry)) throw new NoSuchElementException(entry  + " is not configured under " + path());
         return (I)items.get(entry).get();
     }

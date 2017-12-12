@@ -36,8 +36,8 @@ object Service {
 
   class Config extends ConfigStruct() {
 
-    val PartitionClass = required(cls("class", classOf[Partition]))
-//    val NumPartitions = property("num.partitions", classOf[Int])
+    val PartitionClass = cls("class", classOf[Partition], true)
+    val NumPartitions = integer("num.partitions", true)
   }
 
   object Config extends Config

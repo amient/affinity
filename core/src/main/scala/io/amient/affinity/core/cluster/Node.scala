@@ -42,22 +42,29 @@ object Node {
   final val CONFIG_NODE_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"
   final val CONFIG_NODE_SHUTDOWN_TIMEOUT_MS = "affinity.node.shutdown.timeout.ms"
   final val CONFIG_NODE_SYSTEM_NAME = "affinity.node.name"
+  final val CONFIG_DATA_DIR = "affinity.node.data.dir"
   final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.hostname"
   final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
-  final val CONFIG_DATA_DIR = "affinity.node.data.dir"
-
-  class Config extends ConfigStruct("affinity.node") {
-    val StartupTimeoutMs = required(longint("startup.timeout.ms"))
-    val ShutdownTimeoutMs = required(longint("shutdown.timeout.ms"))
-    val Services = optional(group("service", classOf[Service.Config]))
-    //property[Long]("", classOf[Long], false)
-//    property[String]("container", classOf[String])
-//    group("affinity.service", classOf[ServiceConfig])
-    //group("affiniyt.container")
-  }
 
   object Config extends Config
 
+  class Config extends ConfigStruct() {
+    val akkaConfig = struct("akka.remote", classOf[RemoteConfig], false)
+    val nodeConfig = struct("affinity.node", classOf[NodeConfig], true)
+  }
+
+  class RemoteConfig extends ConfigStruct {
+    val Hostname = string("netty.tcp.hostname", true)
+    val Port = integer("netty.tcp.port", true)
+  }
+
+  class NodeConfig extends ConfigStruct {
+//    val Containers = optional(group("container"), classOf[Container.Config])
+    val Services = group("service", classOf[Service.Config], false)
+    val StartupTimeoutMs = longint("startup.timeout.ms", true)
+    val ShutdownTimeoutMs = longint("shutdown.timeout.ms", true)
+    val DataDir = string("data.dir", true)
+  }
 
 }
 

@@ -22,20 +22,24 @@ public class ConfigStruct<T extends ConfigStruct> extends Cfg<T> {
         super(parent, path);
     }
 
-    protected <A extends Cfg> A struct(String _path, Class<A> structClass) throws IllegalAccessException, InstantiationException {
+    protected <A extends Cfg> A struct(String _path, Class<A> structClass, boolean required) throws IllegalAccessException, InstantiationException {
         A struct = structClass.newInstance();
         struct.parent = this;
+        properties.put(struct, !required);
         return struct;
     }
 
-    protected <A, I extends Cfg<A>> ConfigGroup<A, I> group(String _path, Class<I> itemClass) {
-        return new ConfigGroup(_path, itemClass, this);
+    protected <A, I extends Cfg<A>> ConfigGroup<A, I> group(String _path, Class<I> itemClass, boolean required) {
+        ConfigGroup cfg = new ConfigGroup(_path, itemClass, this);
+        properties.put(cfg, !required);
+        return cfg;
     }
 
-    protected <T> Cfg<Class<? extends T>> cls(String _path, Class<T> bound) {
-        return new Cfg<Class<? extends T>>(this, _path) {
 
-            private Class<? extends T> value  = null;
+    protected <T> Cfg<Class<? extends T>> cls(String _path, Class<T> bound, boolean required) {
+        Cfg<Class<? extends T>> cfg = new Cfg<Class<? extends T>>(this, _path) {
+
+            private Class<? extends T> value = null;
 
             @Override
             public List<String> validate() {
@@ -59,10 +63,12 @@ public class ConfigStruct<T extends ConfigStruct> extends Cfg<T> {
                 return value;
             }
         };
+        properties.put(cfg, !required);
+        return cfg;
     }
 
-    protected Cfg<String> str(String _path) {
-        return new Cfg<String>(this, _path) {
+    protected Cfg<String> string(String _path, boolean required) {
+        Cfg<String> cfg = new Cfg<String>(this, _path) {
 
             @Override
             public List<String> validate() {
@@ -77,9 +83,11 @@ public class ConfigStruct<T extends ConfigStruct> extends Cfg<T> {
                 return config.getString(path);
             }
         };
+        properties.put(cfg, !required);
+        return cfg;
     }
-    protected Cfg<Integer> intProperty(String _path) {
-        return new Cfg<Integer>(this, _path) {
+    protected Cfg<Integer> integer(String _path, boolean required) {
+        Cfg<Integer> cfg = new Cfg<Integer>(this, _path) {
 
             @Override
             public List<String> validate() {
@@ -94,10 +102,12 @@ public class ConfigStruct<T extends ConfigStruct> extends Cfg<T> {
                 return config.getInt(path);
             }
         };
+        properties.put(cfg, !required);
+        return cfg;
     }
 
-    protected Cfg<Long> longint(String _path) {
-        return new Cfg<Long>(this, _path) {
+    protected Cfg<Long> longint(String _path , Boolean required) {
+        Cfg<Long> cfg = new Cfg<Long>(this, _path) {
 
             @Override
             public List<String> validate() {
@@ -112,15 +122,7 @@ public class ConfigStruct<T extends ConfigStruct> extends Cfg<T> {
                 return config.getLong(path);
             }
         };
-    }
-
-    protected <C extends Cfg<?>> C required(C cfg) {
-        properties.put(cfg, false);
-        return cfg;
-    }
-
-    protected <C extends Cfg<?>> C optional(C cfg) {
-        properties.put(cfg, true);
+        properties.put(cfg, !required);
         return cfg;
     }
 
