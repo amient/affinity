@@ -21,20 +21,22 @@ package io.amient.affinity.core.storage.kafka
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{Future, TimeUnit}
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.storage.Storage
+import io.amient.affinity.core.storage.{MemStore, Storage}
 import io.amient.affinity.core.util.MappedJavaFuture
+import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.config.TopicConfig
 import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.language.reflectiveCalls
 
 
@@ -56,14 +58,14 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
 
   final val brokers: String = config.getString(CONFIG_KAFKA_BOOTSTRAP_SERVERS)
   final val topic: String = config.getString(CONFIG_KAFKA_TOPIC)
-
+  final val ttlSec = if (config.hasPath(MemStore.CONFIG_TTL_SEC)) config.getInt(MemStore.CONFIG_TTL_SEC)  else -1
   private val producerProps = new Properties() {
     if (config.hasPath(CONFIG_KAFKA_PRODUCER)) {
       val producerConfig = config.getConfig(CONFIG_KAFKA_PRODUCER)
       if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
-      producerConfig.entrySet().asScala.foreach { case (entry) =>
+      producerConfig.entrySet().foreach { case (entry) =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
@@ -81,7 +83,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
       if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
-      consumerConfig.entrySet().asScala.foreach { case (entry) =>
+      consumerConfig.entrySet().foreach { case (entry) =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
@@ -90,6 +92,8 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)
   }
+
+  ensureCorrectTopicConfiguiration()
 
   protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
@@ -132,7 +136,7 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
               val records = kafkaConsumer.poll(500)
               consumerError.set(null)
               var fetchedNumRecrods = 0
-              for (r <- records.iterator().asScala) {
+              for (r <- records.iterator()) {
                 fetchedNumRecrods += 1
                 if (r.value == null) {
                   memstore.unload(r.key, r.offset())
@@ -210,6 +214,27 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
   def delete(key: Array[Byte]): Future[java.lang.Long] = {
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, key, null))) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
+    }
+  }
+
+  private def ensureCorrectTopicConfiguiration() {
+    val adminProps = new Properties() {
+      put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, producerProps.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
+    }
+    val admin = AdminClient.create(adminProps)
+    val adminTimeout = 5
+    val topicConfigs = Map(
+      //TODO #86 add all relevant configs described in the issue
+      TopicConfig.CLEANUP_POLICY_CONFIG -> (if (ttlSec > 0) "compact,delete" else "compact"))
+
+    //TODO #86 make sure that calling this from all partitions is synchronized on the broker
+    if (!admin.listTopics().names().get(adminTimeout, TimeUnit.SECONDS).contains(topic)) {
+      //TODO #86 number of partitions and repl. factor is defined for each state, not service!
+      val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
+      schemaTopicRequest.configs(topicConfigs)
+      admin.createTopics(List(schemaTopicRequest)).all.get(adminTimeout, TimeUnit.MILLISECONDS)
+    } else {
+      //TODO #86 describe topic and alter configs if different from topicConfigs
     }
   }
 
