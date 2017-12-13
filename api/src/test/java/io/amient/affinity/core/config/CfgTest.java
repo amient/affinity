@@ -17,7 +17,7 @@ public class CfgTest {
 
     public static class ServiceConfig extends CfgStruct<ServiceConfig> {
         private Cfg<Class<? extends TimeCryptoProof>> Class = cls("class", TimeCryptoProof.class, true);
-        private CfgList<CfgInt> IntList = list("intlist", CfgInt.class, false);
+        private CfgList IntList = list("intlist", CfgInt.class, false);
 
     }
 
@@ -87,6 +87,7 @@ public class CfgTest {
 
         NodeConfig v = new NodeConfig().apply(config);
         assertEquals(TimeCryptoProofSHA256.class, v.Services.apply("myservice").Class.apply());
+        assertEquals(Arrays.asList(1,2,3), v.Services.apply("myservice").IntList.apply());
     }
 
 }

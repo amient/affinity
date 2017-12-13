@@ -6,6 +6,6 @@ public class CfgString extends Cfg<String> {
 
     @Override
     public String apply(Config config) throws IllegalArgumentException {
-        return setValue(config.getString(relPath));
+        return setValue(listPos > -1 ? config.getStringList(relPath).get(listPos) : config.getString(relPath));
     }
 }

@@ -1,34 +1,40 @@
 package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
+import com.typesafe.config.ConfigValue;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-public class CfgList<L extends Cfg<?>> extends Cfg<List<L>> {
+public class CfgList<L, C extends Cfg<?>> extends Cfg<List<L>> {
 
-    private final Class<L> cls;
+    private final Class<C> cls;
 
-    public CfgList(Class<L> cls) {
+    public CfgList(Class<C> cls) {
         this.cls = cls;
     }
 
     @Override
     public List<L> apply(Config config) throws IllegalArgumentException {
         List<L> list = new LinkedList<>();
-        config.getList(relPath).forEach((itemValue) -> {
+        Iterator<ConfigValue> it = config.getList(relPath).iterator();
+        int i = 0;
+        while(it.hasNext()) {
             try {
-                L item = cls.newInstance();
-                //item.setRelPath(i);
-                item.apply(config.getConfig(relPath));
-                list.add(item);
+                ConfigValue el = it.next();
+                C item = cls.newInstance();
+                item.setListPos(i);
+                item.setRelPath(relPath);
+                item.apply(config);
+                list.add((L)el.unwrapped());
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(e);
             } catch (IllegalAccessException e) {
                 throw new IllegalArgumentException(e);
             }
 
-        });
+        }
         return setValue(list);
     }
 

@@ -11,6 +11,7 @@ abstract public class Cfg<T> {
     protected T value;
 
     protected boolean required = true;
+    protected int listPos = -1;
 
     abstract public T apply(Config config) throws IllegalArgumentException;
 
@@ -30,12 +31,16 @@ abstract public class Cfg<T> {
     void setPath(String path) {
         this.path = path;
     }
-    
+
     final void setRelPath(String relPath) {
         this.relPath = relPath;
     }
 
     final String path() {
         return this.path == null ? "" : this.path;
+    }
+
+    public void setListPos(int listPos) {
+        this.listPos = listPos;
     }
 }

@@ -17,7 +17,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> {
 
     @Override
     public T apply(Config config) throws IllegalArgumentException {
-        Config c = path().isEmpty() ? config : config.getConfig(relPath);
+        Config c = path().isEmpty() ? config : listPos > -1
+                ? config.getConfigList(relPath).get(listPos) : config.getConfig(relPath);
         final StringBuilder errors = new StringBuilder();
         properties.forEach((propPath, cfg) -> {
             try {
@@ -71,8 +72,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> {
         return add(path, new CfgGroup<>(c), required);
     }
 
-    public <X extends Cfg<?>> CfgList<X> list(String path, Class<X> c, boolean required) {
-        return add(path, new CfgList<>(c), required);
+    public <X, Y extends Cfg<X>> CfgList<X, Y> list(String path, Class<X> c, boolean required) {
+        return add(path, new CfgList(c), required);
     }
 
     private <X extends Cfg<?>> X add(String path, X cfg, boolean required) {

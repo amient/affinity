@@ -1,6 +1,7 @@
 package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
+import com.typesafe.config.ConfigObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,8 +16,9 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> {
 
     @Override
     public Map<String, G> apply(Config config) throws IllegalArgumentException {
+        ConfigObject o = listPos > -1 ? config.getObjectList(relPath).get(listPos) : config.getObject(relPath);
         Map<String, G> map = new HashMap<>();
-        config.getObject(relPath).keySet().forEach((key) -> {
+        o.keySet().forEach((key) -> {
             try {
                 G item = cls.newInstance();
                 item.setRelPath(key);

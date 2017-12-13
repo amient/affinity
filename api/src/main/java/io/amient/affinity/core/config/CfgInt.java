@@ -6,6 +6,6 @@ public class CfgInt extends Cfg<Integer> {
 
     @Override
     public Integer apply(Config config) throws IllegalArgumentException {
-        return setValue(config.getInt(relPath));
+        return setValue(listPos > -1 ? config.getIntList(relPath).get(listPos) : config.getInt(relPath));
     }
 }
