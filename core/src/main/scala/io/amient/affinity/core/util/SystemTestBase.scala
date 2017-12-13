@@ -39,7 +39,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.ServicesApi.GatewayClusterStatus
-import io.amient.affinity.core.actor.{GatewayHttp, Partition, Service, ServicesApi}
+import io.amient.affinity.core.actor.{Partition, Service, ServicesApi}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.storage.State
@@ -68,11 +68,12 @@ trait SystemTestBase {
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
+    val template = new Node.Config()
     val layer1 = config
-      .withValue(Node.Config.Node.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
-      .withValue(Node.Config.Node.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
-      .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
-      .withValue(Node.Config.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
+      .withValue(template.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
+      .withValue(template.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
+      .withValue(template.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
+      .withValue(template.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
     val layer2 = zkConnect match {
       case None => layer1
@@ -89,7 +90,7 @@ trait SystemTestBase {
           case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
           case cfg =>
             cfg
-              .withValue(Service.Config.NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
+              .withValue(new Service.Config().NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
               .getConfig(State.CONFIG_STATE).entrySet().asScala
               .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
               .filter { case (p, c) => p.endsWith("storage.class") && c.toLowerCase.contains("kafka") }
@@ -130,11 +131,9 @@ trait SystemTestBase {
   }
 
   class TestGatewayNode(config: Config, gatewayCreator: => ServicesApi)
-    extends Node(config.withValue(Node.Config.Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
+    extends Node(config.withValue(new Node.Config().Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
 
-    def this(config: Config) = {
-      this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi]).newInstance())
-    }
+    def this(config: Config) = this(config, new Node.Config()(config).Affi.Gateway.Class().newInstance())
 
     import system.dispatcher
 

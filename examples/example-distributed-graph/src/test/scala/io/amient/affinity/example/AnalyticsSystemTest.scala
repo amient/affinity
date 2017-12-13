@@ -24,7 +24,7 @@ import java.util.Properties
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.actor.ServicesApi
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -42,9 +42,11 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
   override def numPartitions = 4
 
+  val template = new ServicesApi.Conf()
   val config: Config = ConfigFactory.load("example")
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(template.Gateway.Class.path, ConfigValueFactory.fromAnyRef(classOf[ServicesApi].getName))
+    .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
 
 
   val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))

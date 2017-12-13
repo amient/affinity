@@ -21,11 +21,20 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 object ServicesApi {
-  object Config extends Config
 
-  class Config extends CfgStruct[Config](Cfg.Options.IGNORE_UNKNOWN) {
-    val Services = group("affinity.service", classOf[Service.Config], false)
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Gateway = struct("affinity.node.gateway", new GatewayConf, false)
+    val Services = group("affinity.service", new ServicesConf, false)
   }
+
+  class ServicesConf extends CfgGroup(classOf[Service.Config])
+
+  class GatewayConf extends CfgStruct[GatewayConf] {
+    val Class = cls("class", classOf[ServicesApi], true)
+    val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
+    val Http = struct("http", new GatewayHttp.HttpConf, false)
+  }
+
 
   final case class GatewayClusterStatus(suspended: Boolean)
 }
@@ -36,7 +45,7 @@ trait ServicesApi extends ActorHandler {
 
   import ServicesApi._
 
-  private val config = ServicesApi.Config(context.system.settings.config)
+  private val conf = new ServicesApi.Conf()(context.system.settings.config)
 
   private implicit val scheduler = context.system.scheduler
 
@@ -52,7 +61,7 @@ trait ServicesApi extends ActorHandler {
       case Some(coordinatedService) => coordinatedService._2
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
-        val serviceConfig = config.Services(group).config()
+        val serviceConfig = conf.Services(group).config()
         val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(service)

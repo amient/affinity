@@ -57,8 +57,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
   import State._
 
   val config = system.settings.config
-  val appliedConfig = Node.Config(config)
-  val nodeDataDir = appliedConfig.Node.DataDir()
+  val appliedConfig = new Node.Config()(config)
+  val nodeDataDir = appliedConfig.Affi.DataDir()
   val stateConfig = system.settings.config.getConfig(CONFIG_STATE_STORE(name))
   private val keySerde = Serde.of[K](system.settings.config)
   private val valueSerde = Serde.of[V](system.settings.config)

@@ -12,6 +12,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class CfgTest {
 
@@ -19,6 +21,7 @@ public class CfgTest {
         private CfgCls<TimeCryptoProof> Class = cls("class", TimeCryptoProof.class, true);
         private CfgList IntList = list("intlist", CfgInt.class, false);
         private CfgGroup IntLists = group("lists", CfgIntList.class, false);
+        private Cfg Undefined = string("undefined", false);
     }
 
     public static class NodeConfig extends CfgStruct<NodeConfig> {
@@ -53,7 +56,7 @@ public class CfgTest {
                 put("something.we.dont.recognize", 20);
             }});
         }});
-        new NodeConfig().apply(config);
+        NodeConfig result = new NodeConfig().apply(config);
     }
 
     @Test
@@ -89,11 +92,15 @@ public class CfgTest {
             }});
         }});
 
-        NodeConfig v = new NodeConfig().apply(config);
-        assertEquals(TimeCryptoProofSHA256.class, v.Services.apply("myservice").Class.apply());
-        assertEquals(Arrays.asList(1,2,3), v.Services.apply("myservice").IntList.apply());
-        assertEquals(Arrays.asList(1,2,3), v.Services.apply("myservice").IntLists.apply("group1").apply());
-        assertEquals(Arrays.asList(4), v.Services.apply("myservice").IntLists.apply("group2").apply());
+        NodeConfig applied = new NodeConfig().apply(config);
+        assertEquals(TimeCryptoProofSHA256.class, applied.Services.apply("myservice").Class.apply());
+        assertEquals(Arrays.asList(1,2,3), applied.Services.apply("myservice").IntList.apply());
+        assertEquals(Arrays.asList(1,2,3), applied.Services.apply("myservice").IntLists.apply("group1").apply());
+        assertEquals(Arrays.asList(4), applied.Services.apply("myservice").IntLists.apply("group2").apply());
+        assertTrue(applied.Services.isDefined());
+        assertTrue(applied.Services.apply("myservice").Class.isDefined());
+        assertTrue(applied.Services.apply("myservice").IntList.isDefined());
+        assertFalse(applied.Services.apply("myservice").Undefined.isDefined());
     }
 
 }

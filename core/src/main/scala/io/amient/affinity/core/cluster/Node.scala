@@ -37,37 +37,43 @@ import scala.util.control.NonFatal
 
 object Node {
 
-  object Config extends Config
-
   class Config extends CfgStruct[Config](Cfg.Options.IGNORE_UNKNOWN) {
-    val Akka = struct("akka.remote", new RemoteConfig, false)
-    val Node = struct("affinity.node", new NodeConfig, true)
-    val Services = struct(new ServicesApi.Config, false)
+    val Akka = struct("akka", new AkkaConfig, false)
+    val Affi = struct("affinity", new AffinityConfig, true)
   }
 
-  class RemoteConfig extends CfgStruct[RemoteConfig](Cfg.Options.IGNORE_UNKNOWN) {
-    val Hostname = string("netty.tcp.hostname", true)
-    val Port = integer("netty.tcp.port", true)
+  class AkkaConfig extends CfgStruct[AkkaConfig](Cfg.Options.IGNORE_UNKNOWN) {
+    val Hostname = string("remote.netty.tcp.hostname", true)
+    val Port = integer("remote.netty.tcp.port", true)
   }
 
 
-  class NodeConfig extends CfgStruct[NodeConfig] {
-    val Containers = group("container", classOf[CfgIntList], false)
-    val Gateway = struct("gateway", new GatewayHttp.Conf, false)
-    val StartupTimeoutMs = longint("startup.timeout.ms", true)
-    val ShutdownTimeoutMs = longint("shutdown.timeout.ms", true)
-    val DataDir = string("data.dir", true)
-    val SystemName = string("name", true)
+  class AffinityConfig extends CfgStruct[AffinityConfig] {
+    val Avro = struct("avro", new AvroConf(), true)
+    val Coorinator = struct("coordinator", new Coordinator.CoorinatorConf, true)
+    val State = group("state", classOf[StateConf], true)
+    val Services = group("service", new ServicesApi.ServicesConf, false)
+    val Containers = group("node.container", classOf[CfgIntList], false)
+    val Gateway = struct("node.gateway", new ServicesApi.GatewayConf, false)
+    val StartupTimeoutMs = longint("node.startup.timeout.ms", true)
+    val ShutdownTimeoutMs = longint("node.shutdown.timeout.ms", true)
+    val DataDir = string("node.data.dir", true)
+    val SystemName = string("node.name", true)
   }
+
+  class AvroConf extends CfgStruct[AvroConf](Cfg.Options.IGNORE_UNKNOWN)  //TODO STRICT
+
+  class StateConf extends CfgStruct[StateConf](Cfg.Options.IGNORE_UNKNOWN) //TODO STRICT and move to State
+
 
 }
 
 class Node(config: Config) {
 
-  val appliedConfig = Node.Config(config)
-  private val actorSystemName: String = appliedConfig.Node.SystemName()
-  val startupTimeout = appliedConfig.Node.StartupTimeoutMs().toLong milliseconds
-  val shutdownTimeout = appliedConfig.Node.ShutdownTimeoutMs().toLong milliseconds
+  val conf = new Node.Config()(config)
+  private val actorSystemName: String = conf.Affi.SystemName()
+  val startupTimeout = conf.Affi.StartupTimeoutMs().toLong milliseconds
+  val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
@@ -92,20 +98,23 @@ class Node(config: Config) {
   }
 
   def start() = {
-    appliedConfig.Node.Containers().foreach {
+    conf.Affi.Containers().foreach {
       case (group: String, value: CfgIntList) =>
         val partitions = value().map(_.toInt).toList
         startContainer(group, partitions)
     }
-    if (config.hasPath(GatewayHttp.CONFIG_GATEWAY_CLASS)) {
-      val cls = Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi])
-      startGateway(cls.newInstance())
+    if (conf.Affi.Gateway.isDefined) {
+      if (conf.Affi.Gateway.Class() != classOf[ServicesApi]) {
+        startGateway(conf.Affi.Gateway.Class().newInstance())
+      } else {
+        //TODO warn about geberuc gateway being used (for tests)
+      }
     }
   }
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
     try {
-      val serviceClass = appliedConfig.Services.Services(group).PartitionClass()
+      val serviceClass = conf.Affi.Services(group).PartitionClass()
       implicit val timeout = Timeout(startupTimeout)
       startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
     } catch {

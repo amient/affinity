@@ -4,6 +4,8 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.actor.ServicesApi
+import io.amient.affinity.core.cluster.Node
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConverters._
@@ -11,7 +13,11 @@ import scala.collection.JavaConverters._
 case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord with EventTime
 
 class StateSpec extends TestKit(ActorSystem.create("test",
+
   ConfigFactory.parseMap(Map(
+    new Node.Config().Affi.Gateway.Class.path -> classOf[ServicesApi].getName(),
+    new Node.Config().Affi.Gateway.Http.Host.path -> "127.0.0.1",
+    new Node.Config().Affi.Gateway.Http.Port.path -> "0",
     State.CONFIG_STATE_STORE("test-state-1") -> Map(
       State.CONFIG_MEMSTORE_CLASS -> classOf[MemStoreSimpleMap].getName,
       State.CONFIG_STORAGE_CLASS -> classOf[NoopStorage].getName

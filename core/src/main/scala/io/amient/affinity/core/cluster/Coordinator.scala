@@ -19,14 +19,14 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
-import akka.actor.{ActorNotFound, ActorPath, ActorRef, ActorSystem}
+import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.Set
@@ -38,7 +38,13 @@ import scala.util.{Failure, Success}
 
 object Coordinator {
 
-  final val CONFIG_COORDINATOR_CLASS = "affinity.coordinator.class"
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Coordinator = struct("affinity.coordinator", new CoorinatorConf, true)
+  }
+
+  class CoorinatorConf extends CfgStruct[CoorinatorConf](Cfg.Options.IGNORE_UNKNOWN) { //TODO STRICT
+    val Class = cls("class", classOf[Coordinator], true)
+  }
 
   final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
     def localTo(actor: ActorRef): MasterStatusUpdate = {
@@ -52,8 +58,7 @@ object Coordinator {
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
-    val className = config.getString(CONFIG_COORDINATOR_CLASS)
-    val cls = Class.forName(className).asSubclass(classOf[Coordinator])
+    val cls = new Coordinator.Conf()(config).Coordinator.Class()
     val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Config])
     constructor.newInstance(system, group, config)
   }

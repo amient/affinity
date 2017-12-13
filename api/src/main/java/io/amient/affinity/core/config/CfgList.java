@@ -39,7 +39,7 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
     }
 
     public L apply(Integer entry) {
-        return value.get(entry);
+        return apply().get(entry);
     }
 
     public String path(String entry) {

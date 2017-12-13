@@ -2,6 +2,8 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 
+import java.util.Optional;
+
 abstract public class Cfg<T> {
 
     public enum Options {
@@ -12,7 +14,8 @@ abstract public class Cfg<T> {
 
     protected String relPath;
 
-    protected T value;
+    private Optional<T> value = Optional.empty();
+    private Optional<T> defaultValue = Optional.empty();
 
     protected boolean required = true;
     protected int listPos = -1;
@@ -23,11 +26,11 @@ abstract public class Cfg<T> {
         return (path == null ? "" : path + ".") + thatPath;
     }
     final protected <C extends Cfg<T>> C setValue(T value) {
-        this.value = value;
+        this.value = Optional.of(value);
         return (C)this;
     }
     final public T apply() {
-        return value;
+        return value.isPresent() ? value.get() : defaultValue.get();
     }
     void setOptional() {
         this.required = false;
@@ -40,11 +43,19 @@ abstract public class Cfg<T> {
         this.relPath = relPath;
     }
 
+    final void setDefaultValue(T value) {
+        defaultValue = Optional.of(value);
+    }
+
     final public String path() {
         return this.path == null ? "" : this.path;
     }
 
     public void setListPos(int listPos) {
         this.listPos = listPos;
+    }
+
+    public boolean isDefined() {
+        return value.isPresent() || defaultValue.isPresent();
     }
 }

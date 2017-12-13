@@ -46,7 +46,7 @@ class Container(group: String) extends Actor {
 
   private val config = context.system.settings.config
 
-  private val appliedConfig = Node.Config(config)
+  private val appliedConfig = new Node.Config()(config)
 
   final private val akkaAddress = if (appliedConfig.Akka.Hostname() > "") {
     s"akka.tcp://${context.system.name}@${appliedConfig.Akka.Hostname()}:${appliedConfig.Akka.Port()}"

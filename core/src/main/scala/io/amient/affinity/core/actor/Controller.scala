@@ -24,6 +24,7 @@ import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
@@ -51,6 +52,8 @@ class Controller extends Actor {
   private val log = Logging.getLogger(context.system, this)
 
   private val config = context.system.settings.config
+
+  private val conf = new Node.Config()(config)
 
   import Controller._
 
@@ -114,7 +117,7 @@ class Controller extends Actor {
       gatewayPromise.success(httpPort)
     }
 
-    case ServicesStarted() => if (!gatewayPromise.isCompleted && !config.hasPath(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST)) {
+    case ServicesStarted() => if (!gatewayPromise.isCompleted && !conf.Affi.Gateway.Http.isDefined()) {
       log.info("Gateway online (without http)")
       gatewayPromise.success(-1)
     }

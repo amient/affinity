@@ -39,7 +39,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
                     cfg.apply(this.config);
                 } else if (this.config.hasPath(propPath)) {
                     cfg.apply(this.config);
-                } else if (cfg.required) {
+                }
+                if (cfg.required && !cfg.isDefined()) {
                     throw new IllegalArgumentException(propPath + " is required" + (path().isEmpty() ? "" : " in " + path()));
                 }
             } catch (IllegalArgumentException e) {
@@ -69,29 +70,41 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public CfgString string(String path, boolean required) {
         return add(path, new CfgString(), required);
     }
+    public CfgString string(String path, String defaultValue) {
+        return add(path, new CfgString(), defaultValue);
+    }
 
     public CfgLong longint(String path, boolean required) {
         return add(path, new CfgLong(), required);
+    }
+    public CfgLong longint(String path, long defaultValue) {
+        return add(path, new CfgLong(), defaultValue);
     }
 
     public CfgBool bool(String path, boolean required) {
         return add(path, new CfgBool(), required);
     }
+    public CfgBool bool(String path, Boolean defaultValue) {
+        return add(path, new CfgBool(), defaultValue);
+    }
 
     public CfgInt integer(String path, boolean required) {
         return add(path, new CfgInt(), required);
     }
+    public CfgInt integer(String path, Integer defaultValue) { return add(path, new CfgInt(), defaultValue); }
+
+
+    public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) { return add(path, new CfgCls<>(c), required); }
+    public <X> CfgCls<X> cls(String path, Class<X> c, Class<X> defaultVal) { return add(path, new CfgCls<>(c), defaultVal); }
 
     public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
         return add(path, obj, required);
     }
-    public <X extends CfgStruct<X>> X struct(X obj, boolean required) {
+
+    public <X extends CfgStruct<X>> X ref(X obj, boolean required) {
         return add(null, obj, required);
     }
 
-    public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) {
-        return add(path, new CfgCls<>(c), required);
-    }
 
     public <X extends Cfg<?>> CfgGroup<X> group(String path, Class<X> c, boolean required) {
         return add(path, new CfgGroup<>(c), required);
@@ -105,12 +118,20 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return add(path, new CfgList(c), required);
     }
 
-    private <X extends Cfg<?>> X add(String path, X cfg, boolean required) {
+    private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required) {
+        return add(path, cfg, required, Optional.empty());
+    }
+    private <Y, X extends Cfg<Y>> X add(String path, X cfg, Y defaultValue) {
+        return add(path, cfg, true, Optional.of(defaultValue));
+    }
+    private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required, Optional<Y> defaultValue) {
         cfg.setRelPath(path);
         cfg.setPath(path);
+        if (defaultValue.isPresent()) cfg.setDefaultValue(defaultValue.get());
         if (!required) cfg.setOptional();
         properties.add(new AbstractMap.SimpleEntry<>(path, cfg));
         return cfg;
+
     }
 
 }

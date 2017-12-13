@@ -36,7 +36,12 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
     }
 
     public G apply(String entry) {
-        return value.get(entry);
+        Map<String, G> group = apply();
+        if (group.containsKey(entry)) {
+            return group.get(entry);
+        } else {
+            throw new IllegalArgumentException(entry + " doesn't exit");
+        }
     }
 
     public String path(String entry) {
