@@ -42,7 +42,4 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
         return apply().get(entry);
     }
 
-    public String path(String entry) {
-        return extend(entry);
-    }
 }

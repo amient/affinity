@@ -54,7 +54,6 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
   val config = ConfigFactory.load("example")
     .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(template.Gateway.Class.path, ConfigValueFactory.fromAnyRef(classOf[ServicesApi].getName))
     .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
 
 

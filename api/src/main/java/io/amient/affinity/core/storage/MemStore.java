@@ -19,7 +19,10 @@
 
 package io.amient.affinity.core.storage;
 
-import com.typesafe.config.Config;
+import io.amient.affinity.core.config.CfgCls;
+import io.amient.affinity.core.config.CfgInt;
+import io.amient.affinity.core.config.CfgString;
+import io.amient.affinity.core.config.CfgStruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +32,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -40,10 +42,15 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public abstract class MemStore {
 
-    final public static String CONFIG_STORE_NAME = "name";
-    final public static String CONFIG_DATA_DIR = "data.dir";
-    final public static String CONFIG_TTL_SEC = "memstore.ttl.sec";
-
+    public static class MemStoreConf extends CfgStruct<MemStoreConf> {
+        public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
+        public CfgString DataDir = string("data.dir", false);
+        //TODO public CfgInt MemReadTimeoutMs = integer("memstore.read.timeout.ms", 1000);
+        @Override
+        protected Set<String> specializations() {
+            return new HashSet(Arrays.asList("mapdb", "rocksdb"));
+        }
+    }
     private final static Logger log = LoggerFactory.getLogger(MemStore.class);
 
     final private MemStoreManager manager;
@@ -52,11 +59,11 @@ public abstract class MemStore {
     final protected int ttlSecs;
     final protected Path dataDir;
 
-    public MemStore(Config config, int partition) throws IOException {
-        checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_DIR) && config.hasPath(CONFIG_STORE_NAME);
-        String dataPath = config.getString(MemStore.CONFIG_DATA_DIR);
-        dataDir = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition).toAbsolutePath();
-        ttlSecs = config.hasPath(CONFIG_TTL_SEC) ? config.getInt(CONFIG_TTL_SEC) : -1;
+    public MemStore(StateConf conf, int partition) throws IOException {
+        checkpointsEnable = isPersistent() && conf.Name.isDefined();
+        String dataPath = conf.MemStore.DataDir.apply();
+        dataDir = Paths.get(dataPath, conf.Name.apply() + "-" + partition).toAbsolutePath();
+        ttlSecs = conf.TtlSeconds.apply();
         if (Files.exists(dataDir)) Files.createDirectories(dataDir);
         manager = new MemStoreManager();
     }

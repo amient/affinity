@@ -72,6 +72,7 @@ trait SystemTestBase {
     val layer1 = config
       .withValue(template.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
       .withValue(template.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
+      .withValue(template.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
       .withValue(template.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
       .withValue(template.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
@@ -86,15 +87,16 @@ trait SystemTestBase {
     kafkaBootstrap match {
       case None => layer2
       case Some(kafkaBootstrapString) =>
+        val template = new State.Conf();
         layer2 match {
-          case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
+          case cfg if (!cfg.hasPath(template.State.path())) => cfg
           case cfg =>
             cfg
               .withValue(new Service.Config().NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
-              .getConfig(State.CONFIG_STATE).entrySet().asScala
+              .getConfig(template.State.path()).entrySet().asScala
               .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
               .filter { case (p, c) => p.endsWith("storage.class") && c.toLowerCase.contains("kafka") }
-              .map { case (p, c) => (State.CONFIG_STATE + "." + p.split("\\.")(0), c) }
+              .map { case (p, c) => (template.State.path()+ "." + p.split("\\.")(0), c) }
               .foldLeft(cfg) { case (cfg, (p, c)) =>
                 cfg.withValue(p + ".storage.kafka.bootstrap.servers", ConfigValueFactory.fromAnyRef(kafkaBootstrapString))
               }

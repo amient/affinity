@@ -27,6 +27,7 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
+import io.amient.affinity.core.storage.StateConf
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -62,8 +63,6 @@ object Node {
   }
 
   class AvroConf extends CfgStruct[AvroConf](Cfg.Options.IGNORE_UNKNOWN)  //TODO STRICT
-
-  class StateConf extends CfgStruct[StateConf](Cfg.Options.IGNORE_UNKNOWN) //TODO STRICT and move to State
 
 
 }
@@ -103,12 +102,9 @@ class Node(config: Config) {
         val partitions = value().map(_.toInt).toList
         startContainer(group, partitions)
     }
-    if (conf.Affi.Gateway.isDefined) {
-      if (conf.Affi.Gateway.Class() != classOf[ServicesApi]) {
-        startGateway(conf.Affi.Gateway.Class().newInstance())
-      } else {
-        //TODO warn about geberuc gateway being used (for tests)
-      }
+    if (conf.Affi.Gateway.Class.isDefined) {
+      //the gateway could be started programatically but in this case it is by config
+      startGateway(conf.Affi.Gateway.Class().newInstance())
     }
   }
 
@@ -138,7 +134,11 @@ class Node(config: Config) {
   def startGateway[T <: ServicesApi](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     startupFutureWithShutdownFuse {
-      controller ack CreateGateway(Props(creator))
+      try {
+        controller ack CreateGateway(Props(creator))
+      } catch {
+        case NonFatal(e) => e.printStackTrace(); throw e;
+      }
     }
   }
 

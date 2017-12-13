@@ -5,6 +5,7 @@ import com.typesafe.config.ConfigObject;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements CfgNested {
 
@@ -22,7 +23,7 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
             try {
                 G item = cls.newInstance();
                 item.setRelPath(key);
-                item.setPath(extend(key));
+                item.setPath(path(key));
                 item.apply(config.getConfig(relPath));
                 map.put(key, item);
             } catch (InstantiationException e) {
@@ -36,15 +37,26 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
     }
 
     public G apply(String entry) {
-        Map<String, G> group = apply();
+        Map<String, G> group;
+        try {
+            group = apply();
+        } catch (NoSuchElementException e) {
+            setValue(new HashMap<>());
+            group = apply();
+        }
         if (group.containsKey(entry)) {
             return group.get(entry);
         } else {
-            throw new IllegalArgumentException(entry + " doesn't exit");
+            try {
+                G template = cls.newInstance();
+                template.setRelPath(entry);
+                template.setPath(path(entry));
+                group.put(entry, template);
+                return template;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
-    public String path(String entry) {
-        return extend(entry);
-    }
 }

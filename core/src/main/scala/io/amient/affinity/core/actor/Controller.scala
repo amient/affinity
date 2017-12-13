@@ -30,6 +30,7 @@ import io.amient.affinity.core.util.Reply
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
 object Controller {
 
@@ -104,9 +105,10 @@ class Controller extends Actor {
         gatewayPromise.future
       }
     } catch {
-      case e: InvalidActorNameException => sender.replyWith(request) {
-        gatewayPromise.future
-      }
+      case _: InvalidActorNameException =>
+        sender.replyWith(request) {
+          gatewayPromise.future
+        }
     }
 
     case Terminated(child) if (child.path.name == "gateway") =>
@@ -117,9 +119,11 @@ class Controller extends Actor {
       gatewayPromise.success(httpPort)
     }
 
-    case ServicesStarted() => if (!gatewayPromise.isCompleted && !conf.Affi.Gateway.Http.isDefined()) {
-      log.info("Gateway online (without http)")
-      gatewayPromise.success(-1)
+    case ServicesStarted() => {
+      if (!gatewayPromise.isCompleted && !conf.Affi.Gateway.Http.isDefined()) {
+        log.info("Gateway online (without http)")
+        gatewayPromise.success(-1)
+      }
     }
 
     case request@GracefulShutdown() => sender.replyWith(request) {

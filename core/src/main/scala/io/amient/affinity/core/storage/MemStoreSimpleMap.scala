@@ -24,9 +24,7 @@ import java.util.Map.Entry
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
-import com.typesafe.config.Config
-
-class MemStoreSimpleMap(config: Config, partition: Int) extends MemStore(config, partition) {
+class MemStoreSimpleMap(conf: StateConf, partition: Int) extends MemStore(conf, partition) {
 
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 

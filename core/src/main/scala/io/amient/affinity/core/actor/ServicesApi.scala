@@ -30,7 +30,7 @@ object ServicesApi {
   class ServicesConf extends CfgGroup(classOf[Service.Config])
 
   class GatewayConf extends CfgStruct[GatewayConf] {
-    val Class = cls("class", classOf[ServicesApi], true)
+    val Class = cls("class", classOf[ServicesApi], false)
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
     val Http = struct("http", new GatewayHttp.HttpConf, false)
   }

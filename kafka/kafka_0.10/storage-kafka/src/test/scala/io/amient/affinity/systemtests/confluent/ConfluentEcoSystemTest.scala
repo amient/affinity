@@ -26,8 +26,9 @@ import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.storage.kafka.KafkaStorage.KafkaStorageConf
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer, KafkaObjectHashPartitioner}
 import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
@@ -82,7 +83,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
   }
 
   private def testExternalKafkaConsumer(stateStoreName: String) {
-    val topic = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName)).getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+    val topic = new KafkaStorageConf()(new Node.Config()(config).Affi.State(stateStoreName).Storage).Topic()
     val state = createStateStoreForPartition(stateStoreName)(0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
@@ -96,7 +97,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
         e
       })
     }
-    updates.size should be (numToWrite)
+    updates.size should be(numToWrite)
     Await.result(Future.sequence(updates), 10 seconds)
     val spentMs = System.currentTimeMillis() - l
     println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
@@ -141,10 +142,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
-
-    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE("consistency-test"))
-    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-
+    val topic = new KafkaStorageConf()(new Node.Config()(config).Affi.State("consistency-test").Storage).Topic()
     val producerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
       "acks" -> "all",

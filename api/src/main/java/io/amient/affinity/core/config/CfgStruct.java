@@ -12,6 +12,26 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     private Config config;
 
+    Set<String> extensions = new HashSet<String>() {{
+        addAll(specializations());
+    }};
+
+    protected Set<String> specializations() {
+        return Collections.emptySet();
+    }
+
+    public CfgStruct(Class<? extends CfgStruct<?>> inheritFrom, Options... options) {
+        this.options = Arrays.asList(options);
+        try {
+            CfgStruct<?> inheritedCfg = inheritFrom.newInstance();
+            inheritedCfg.properties.forEach(p -> extensions.add(p.getKey()));
+            inheritedCfg.extensions.forEach(e -> extensions.add(e));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
     public CfgStruct(Options... options) {
         this.options = Arrays.asList(options);
     }
@@ -23,7 +43,11 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     @Override
     void setPath(String path) {
         super.setPath(path);
-        properties.forEach(entry -> entry.getValue().setPath(extend(entry.getKey())));
+        properties.forEach(entry -> entry.getValue().setPath(path(entry.getKey())));
+    }
+
+    public final T apply(CfgStruct<?> conf) throws IllegalArgumentException {
+        return apply(conf.config());
     }
 
     @Override
@@ -49,11 +73,15 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         });
         if (!options.contains(Options.IGNORE_UNKNOWN)) {
             this.config.entrySet().forEach(entry -> {
-                if (properties.stream().filter((p) ->
+                boolean existingProperty = properties.stream().filter((p) ->
                         p.getKey().equals(entry.getKey())
-                                || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey()))
-                ).count() == 0) {
-                    errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()));
+                                || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey() + "."))
+                ).count() > 0;
+                boolean allowedViaExtensions = extensions.stream().filter( (s) ->
+                        s.equals(entry.getKey()) || entry.getKey().startsWith(s + ".")
+                ).count() > 0;
+                if (!existingProperty && !allowedViaExtensions) {
+                    errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()) + "\n");
                 }
             });
         }
@@ -64,12 +92,13 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     public Config config() {
-        return  config;
+        return config;
     }
 
     public CfgString string(String path, boolean required) {
         return add(path, new CfgString(), required);
     }
+
     public CfgString string(String path, String defaultValue) {
         return add(path, new CfgString(), defaultValue);
     }
@@ -77,6 +106,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public CfgLong longint(String path, boolean required) {
         return add(path, new CfgLong(), required);
     }
+
     public CfgLong longint(String path, long defaultValue) {
         return add(path, new CfgLong(), defaultValue);
     }
@@ -84,6 +114,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public CfgBool bool(String path, boolean required) {
         return add(path, new CfgBool(), required);
     }
+
     public CfgBool bool(String path, Boolean defaultValue) {
         return add(path, new CfgBool(), defaultValue);
     }
@@ -91,11 +122,19 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public CfgInt integer(String path, boolean required) {
         return add(path, new CfgInt(), required);
     }
-    public CfgInt integer(String path, Integer defaultValue) { return add(path, new CfgInt(), defaultValue); }
+
+    public CfgInt integer(String path, Integer defaultValue) {
+        return add(path, new CfgInt(), defaultValue);
+    }
 
 
-    public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) { return add(path, new CfgCls<>(c), required); }
-    public <X> CfgCls<X> cls(String path, Class<X> c, Class<X> defaultVal) { return add(path, new CfgCls<>(c), defaultVal); }
+    public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) {
+        return add(path, new CfgCls<>(c), required);
+    }
+
+    public <X> CfgCls<X> cls(String path, Class<X> c, Class<? extends X> defaultVal) {
+        return add(path, new CfgCls<>(c), defaultVal);
+    }
 
     public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
         return add(path, obj, required);
@@ -121,9 +160,11 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required) {
         return add(path, cfg, required, Optional.empty());
     }
+
     private <Y, X extends Cfg<Y>> X add(String path, X cfg, Y defaultValue) {
         return add(path, cfg, true, Optional.of(defaultValue));
     }
+
     private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required, Optional<Y> defaultValue) {
         cfg.setRelPath(path);
         cfg.setPath(path);

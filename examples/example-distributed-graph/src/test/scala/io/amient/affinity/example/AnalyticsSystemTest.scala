@@ -45,7 +45,6 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
   val template = new ServicesApi.Conf()
   val config: Config = ConfigFactory.load("example")
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(template.Gateway.Class.path, ConfigValueFactory.fromAnyRef(classOf[ServicesApi].getName))
     .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
 
 
