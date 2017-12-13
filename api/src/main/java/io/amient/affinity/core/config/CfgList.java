@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-public class CfgList<L, C extends Cfg<?>> extends Cfg<List<L>> {
+public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
 
     private final Class<C> cls;
 

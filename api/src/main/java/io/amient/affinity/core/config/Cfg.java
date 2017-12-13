@@ -36,7 +36,7 @@ abstract public class Cfg<T> {
         this.relPath = relPath;
     }
 
-    final String path() {
+    final public String path() {
         return this.path == null ? "" : this.path;
     }
 
