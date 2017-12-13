@@ -18,7 +18,7 @@ public class CfgTest {
     public static class ServiceConfig extends CfgStruct<ServiceConfig> {
         private Cfg<Class<? extends TimeCryptoProof>> Class = cls("class", TimeCryptoProof.class, true);
         private CfgList IntList = list("intlist", CfgInt.class, false);
-
+        private CfgGroup IntLists = group("lists", CfgIntList.class, false);
     }
 
     public static class NodeConfig extends CfgStruct<NodeConfig> {
@@ -82,12 +82,18 @@ public class CfgTest {
             put(nodeTemplate.Services.path("myservice"), new HashMap<String, Object>() {{
                 put(serviceTemplate.Class.path(), TimeCryptoProofSHA256.class.getName());
                 put(serviceTemplate.IntList.path(), Arrays.asList(1,2,3));
+                put(serviceTemplate.IntLists.path(), new HashMap<String, Object>() {{
+                    put("group1", Arrays.asList(1, 2, 3));
+                    put("group2", Arrays.asList(4));
+                }});
             }});
         }});
 
         NodeConfig v = new NodeConfig().apply(config);
         assertEquals(TimeCryptoProofSHA256.class, v.Services.apply("myservice").Class.apply());
         assertEquals(Arrays.asList(1,2,3), v.Services.apply("myservice").IntList.apply());
+        assertEquals(Arrays.asList(1,2,3), v.Services.apply("myservice").IntLists.apply("group1").apply());
+        assertEquals(Arrays.asList(4), v.Services.apply("myservice").IntLists.apply("group2").apply());
     }
 
 }
