@@ -69,10 +69,10 @@ trait SystemTestBase {
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
     val layer1 = config
-      .withValue(Node.CONFIG_NODE_SYSTEM_NAME, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
-      .withValue(Node.CONFIG_NODE_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
+      .withValue(Node.Config.Node.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
+      .withValue(Node.Config.Node.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
       .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
-      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
+      .withValue(Node.Config.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
     val layer2 = zkConnect match {
       case None => layer1
@@ -130,7 +130,7 @@ trait SystemTestBase {
   }
 
   class TestGatewayNode(config: Config, gatewayCreator: => ServicesApi)
-    extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
+    extends Node(config.withValue(Node.Config.Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
 
     def this(config: Config) = {
       this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi]).newInstance())

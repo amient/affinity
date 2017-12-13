@@ -46,8 +46,10 @@ class Container(group: String) extends Actor {
 
   private val config = context.system.settings.config
 
-  final private val akkaAddress = if (config.hasPath(Node.CONFIG_AKKA_HOST) && config.getString(Node.CONFIG_AKKA_HOST) > "") {
-    s"akka.tcp://${context.system.name}@${config.getString(Node.CONFIG_AKKA_HOST)}:${config.getInt(Node.CONFIG_AKKA_PORT)}"
+  private val appliedConfig = Node.Config(config)
+
+  final private val akkaAddress = if (appliedConfig.Akka.Hostname() > "") {
+    s"akka.tcp://${context.system.name}@${appliedConfig.Akka.Hostname()}:${appliedConfig.Akka.Port()}"
   } else {
     s"akka://${context.system.name}"
   }

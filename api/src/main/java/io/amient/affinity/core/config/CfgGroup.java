@@ -6,7 +6,7 @@ import com.typesafe.config.ConfigObject;
 import java.util.HashMap;
 import java.util.Map;
 
-public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> {
+public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements CfgNested {
 
     private final Class<G> cls;
 

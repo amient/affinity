@@ -20,7 +20,6 @@
 package io.amient.affinity.core.actor
 
 import java.io.FileInputStream
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.{KeyStore, SecureRandom}
 import java.util
@@ -41,20 +40,17 @@ import akka.stream.actor.ActorPublisherMessage.Request
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.util.ByteUtils
-import org.apache.avro.util.ByteBufferInputStream
-import org.codehaus.jackson.JsonNode
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.postfixOps
-import scala.util.Try
 import scala.util.control.NonFatal
 
 object GatewayHttp {
@@ -69,6 +65,10 @@ object GatewayHttp {
   final val CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD = "affinity.node.gateway.tls.keystore.password"
   final val CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE = "affinity.node.gateway.tls.keystore.resource"
   final val CONFIG_GATEWAY_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
+
+  class Conf extends CfgStruct[Conf](CfgStruct.Options.IGNORE_UNKNOWN) { // TODO STRICT
+    val HttpHost = string("http.host", false)
+  }
 }
 
 trait GatewayHttp extends ServicesApi {

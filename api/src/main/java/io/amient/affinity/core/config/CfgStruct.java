@@ -2,12 +2,28 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-public class CfgStruct<T extends CfgStruct> extends Cfg<T> {
+public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested {
+
+    private final List<Options> options;
 
     private Map<String, Cfg<?>> properties = new LinkedHashMap<>();
+
+    public enum Options {
+        STRICT, IGNORE_UNKNOWN
+    }
+
+    public CfgStruct(Options... options) {
+        this.options = Arrays.asList(options);
+    }
+
+    public CfgStruct() {
+        this(Options.STRICT);
+    }
 
     @Override
     void setPath(String path) {
@@ -31,17 +47,19 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> {
                 errors.append(e.getMessage() + "\n");
             }
         });
-        c.entrySet().forEach(entry -> {
-            if (properties.entrySet().stream().filter( (p) ->
-                p.getKey().equals(entry.getKey())
-                        || (p.getValue() instanceof CfgGroup<?> && entry.getKey().startsWith(p.getKey()))
-            ).count() == 0) {
-                errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()));
-            }
-        });
+        if (!options.contains(Options.IGNORE_UNKNOWN)) {
+            c.entrySet().forEach(entry -> {
+                if (properties.entrySet().stream().filter((p) ->
+                        p.getKey().equals(entry.getKey())
+                                || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey()))
+                ).count() == 0) {
+                    errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()));
+                }
+            });
+        }
         String errorMessage = errors.toString();
         if (!errorMessage.isEmpty()) throw new IllegalArgumentException(errorMessage);
-        return setValue((T)this);
+        return setValue((T) this);
     }
 
     public CfgString string(String path, boolean required) {
