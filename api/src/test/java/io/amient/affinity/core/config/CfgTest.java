@@ -16,14 +16,14 @@ import static org.junit.Assert.assertEquals;
 public class CfgTest {
 
     public static class ServiceConfig extends CfgStruct<ServiceConfig> {
-        private Cfg<Class<? extends TimeCryptoProof>> Class = cls("class", TimeCryptoProof.class, true);
+        private CfgCls<TimeCryptoProof> Class = cls("class", TimeCryptoProof.class, true);
         private CfgList IntList = list("intlist", CfgInt.class, false);
         private CfgGroup IntLists = group("lists", CfgIntList.class, false);
     }
 
     public static class NodeConfig extends CfgStruct<NodeConfig> {
-        private Cfg<Long> StartupTimeoutMs = longint("startup.timeout.ms", true);
-        private Cfg<Long> ShutdownTimeoutMs = longint("shutdown.timeout.ms", true);
+        private CfgLong StartupTimeoutMs = longint("startup.timeout.ms", true);
+        private CfgLong ShutdownTimeoutMs = longint("shutdown.timeout.ms", true);
         private CfgGroup<ServiceConfig> Services = group("service", ServiceConfig.class, false);
 
     }

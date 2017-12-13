@@ -89,7 +89,7 @@ trait SystemTestBase {
           case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
           case cfg =>
             cfg
-              .withValue(Service.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2))
+              .withValue(Service.Config.NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
               .getConfig(State.CONFIG_STATE).entrySet().asScala
               .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
               .filter { case (p, c) => p.endsWith("storage.class") && c.toLowerCase.contains("kafka") }

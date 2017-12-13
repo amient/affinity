@@ -29,15 +29,16 @@ import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
 import scala.collection.mutable
 
 object Service {
-  final val CONFIG_SERVICE_CLASS = s"class"
-  final val CONFIG_NUM_PARTITIONS = s"num.partitions"
-  final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
-  final case class ServiceAvailability(group: String, suspended: Boolean)
+
+  object Config extends Config
 
   class Config extends CfgStruct[Config] {
     val PartitionClass = cls("class", classOf[Partition], true)
     val NumPartitions = integer("num.partitions", true)
   }
+
+  final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
+  final case class ServiceAvailability(group: String, suspended: Boolean)
 
 }
 
@@ -45,7 +46,9 @@ class Service(config: Config) extends Actor {
 
   import Service._
 
-  private val numPartitions = config.getInt(CONFIG_NUM_PARTITIONS)
+  val appliedConfig = Service.Config(config)
+
+  private val numPartitions = appliedConfig.NumPartitions()
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 

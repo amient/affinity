@@ -5,7 +5,7 @@ import com.typesafe.config.Config;
 public class CfgInt extends Cfg<Integer> {
 
     @Override
-    public Integer apply(Config config) throws IllegalArgumentException {
+    public CfgInt apply(Config config) throws IllegalArgumentException {
         return setValue(listPos > -1 ? config.getIntList(relPath).get(listPos) : config.getInt(relPath));
     }
 }

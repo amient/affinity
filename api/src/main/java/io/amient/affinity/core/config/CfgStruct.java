@@ -2,20 +2,15 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested {
 
     private final List<Options> options;
 
-    private Map<String, Cfg<?>> properties = new LinkedHashMap<>();
+    private List<Map.Entry<String, Cfg<?>>> properties = new LinkedList<>();
 
-    public enum Options {
-        STRICT, IGNORE_UNKNOWN
-    }
+    private Config config;
 
     public CfgStruct(Options... options) {
         this.options = Arrays.asList(options);
@@ -28,18 +23,22 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     @Override
     void setPath(String path) {
         super.setPath(path);
-        properties.forEach((prop, cfg) -> cfg.setPath(extend(prop)));
+        properties.forEach(entry -> entry.getValue().setPath(extend(entry.getKey())));
     }
 
     @Override
     public T apply(Config config) throws IllegalArgumentException {
-        Config c = path().isEmpty() ? config : listPos > -1
+        this.config = path().isEmpty() ? config : listPos > -1
                 ? config.getConfigList(relPath).get(listPos) : config.getConfig(relPath);
         final StringBuilder errors = new StringBuilder();
-        properties.forEach((propPath, cfg) -> {
+        properties.forEach(entry -> {
+            String propPath = entry.getKey();
+            Cfg<?> cfg = entry.getValue();
             try {
-                if (c.hasPath(propPath)) {
-                    cfg.apply(c);
+                if (propPath == null || propPath.isEmpty()) {
+                    cfg.apply(this.config);
+                } else if (this.config.hasPath(propPath)) {
+                    cfg.apply(this.config);
                 } else if (cfg.required) {
                     throw new IllegalArgumentException(propPath + " is required" + (path().isEmpty() ? "" : " in " + path()));
                 }
@@ -48,8 +47,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             }
         });
         if (!options.contains(Options.IGNORE_UNKNOWN)) {
-            c.entrySet().forEach(entry -> {
-                if (properties.entrySet().stream().filter((p) ->
+            this.config.entrySet().forEach(entry -> {
+                if (properties.stream().filter((p) ->
                         p.getKey().equals(entry.getKey())
                                 || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey()))
                 ).count() == 0) {
@@ -59,7 +58,12 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         }
         String errorMessage = errors.toString();
         if (!errorMessage.isEmpty()) throw new IllegalArgumentException(errorMessage);
-        return setValue((T) this);
+        return (T) setValue((T) this);
+
+    }
+
+    public Config config() {
+        return  config;
     }
 
     public CfgString string(String path, boolean required) {
@@ -81,6 +85,9 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
         return add(path, obj, required);
     }
+    public <X extends CfgStruct<X>> X struct(X obj, boolean required) {
+        return add(null, obj, required);
+    }
 
     public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) {
         return add(path, new CfgCls<>(c), required);
@@ -88,6 +95,10 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     public <X extends Cfg<?>> CfgGroup<X> group(String path, Class<X> c, boolean required) {
         return add(path, new CfgGroup<>(c), required);
+    }
+
+    public <X extends Cfg<?>> CfgGroup<X> group(String path, CfgGroup<X> obj, boolean required) {
+        return add(path, obj, required);
     }
 
     public <X, Y extends Cfg<X>> CfgList<X, Y> list(String path, Class<X> c, boolean required) {
@@ -98,7 +109,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         cfg.setRelPath(path);
         cfg.setPath(path);
         if (!required) cfg.setOptional();
-        properties.put(path, cfg);
+        properties.add(new AbstractMap.SimpleEntry<>(path, cfg));
         return cfg;
     }
 

@@ -11,7 +11,7 @@ public class CfgCls<B> extends Cfg<Class<? extends B>> {
     }
 
     @Override
-    public Class<? extends B> apply(Config config) {
+    public CfgCls<B> apply(Config config) {
         String fqn = listPos > -1 ? config.getStringList(relPath).get(listPos) : config.getString(relPath);
         try {
             return setValue(Class.forName(fqn).asSubclass(cls));

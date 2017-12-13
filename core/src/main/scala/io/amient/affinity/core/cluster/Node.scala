@@ -25,7 +25,7 @@ import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigException}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
-import io.amient.affinity.core.actor.{Service, _}
+import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 
 import scala.collection.JavaConversions._
@@ -39,13 +39,13 @@ object Node {
 
   object Config extends Config
 
-  class Config extends CfgStruct[Config](CfgStruct.Options.IGNORE_UNKNOWN) {
+  class Config extends CfgStruct[Config](Cfg.Options.IGNORE_UNKNOWN) {
     val Akka = struct("akka.remote", new RemoteConfig, false)
     val Node = struct("affinity.node", new NodeConfig, true)
-    val Services = group("affinity.service", classOf[Service.Config], false)
+    val Services = struct(new ServicesApi.Config, false)
   }
 
-  class RemoteConfig extends CfgStruct[RemoteConfig](CfgStruct.Options.IGNORE_UNKNOWN) {
+  class RemoteConfig extends CfgStruct[RemoteConfig](Cfg.Options.IGNORE_UNKNOWN) {
     val Hostname = string("netty.tcp.hostname", true)
     val Port = integer("netty.tcp.port", true)
   }
@@ -105,7 +105,7 @@ class Node(config: Config) {
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
     try {
-      val serviceClass = appliedConfig.Services(group).PartitionClass()
+      val serviceClass = appliedConfig.Services.Services(group).PartitionClass()
       implicit val timeout = Timeout(startupTimeout)
       startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
     } catch {

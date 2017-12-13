@@ -43,7 +43,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.util.ByteUtils
@@ -66,7 +66,7 @@ object GatewayHttp {
   final val CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE = "affinity.node.gateway.tls.keystore.resource"
   final val CONFIG_GATEWAY_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
 
-  class Conf extends CfgStruct[Conf](CfgStruct.Options.IGNORE_UNKNOWN) { // TODO STRICT
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) { // TODO STRICT
     val HttpHost = string("http.host", false)
   }
 }

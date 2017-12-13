@@ -16,7 +16,7 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
     }
 
     @Override
-    public List<L> apply(Config config) throws IllegalArgumentException {
+    public Cfg<List<L>> apply(Config config) throws IllegalArgumentException {
         List<L> list = new LinkedList<>();
         Iterator<ConfigValue> it = config.getList(relPath).iterator();
         int i = 0;

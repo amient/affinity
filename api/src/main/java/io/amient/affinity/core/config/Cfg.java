@@ -4,6 +4,10 @@ import com.typesafe.config.Config;
 
 abstract public class Cfg<T> {
 
+    public enum Options {
+        STRICT, IGNORE_UNKNOWN
+    }
+
     private String path;
 
     protected String relPath;
@@ -13,14 +17,14 @@ abstract public class Cfg<T> {
     protected boolean required = true;
     protected int listPos = -1;
 
-    abstract public T apply(Config config) throws IllegalArgumentException;
+    abstract public Cfg<T> apply(Config config) throws IllegalArgumentException;
 
     protected String extend(String thatPath) {
         return (path == null ? "" : path + ".") + thatPath;
     }
-    final protected T setValue(T value) {
+    final protected <C extends Cfg<T>> C setValue(T value) {
         this.value = value;
-        return value;
+        return (C)this;
     }
     final public T apply() {
         return value;
