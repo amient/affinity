@@ -48,18 +48,20 @@ object Node {
 
   object Config extends Config
 
-  class Config extends ConfigStruct() {
-    val akkaConfig = struct("akka.remote", classOf[RemoteConfig], false)
-    val nodeConfig = struct("affinity.node", classOf[NodeConfig], true)
+  class Config extends CfgStruct[Config] {
+    val akkaConfig = struct("akka.remote", new RemoteConfig, false)
+    val nodeConfig = struct("affinity.node", new NodeConfig, true)
   }
 
-  class RemoteConfig extends ConfigStruct {
+  class RemoteConfig extends CfgStruct[RemoteConfig] {
     val Hostname = string("netty.tcp.hostname", true)
     val Port = integer("netty.tcp.port", true)
   }
 
-  class NodeConfig extends ConfigStruct {
-//    val Containers = optional(group("container"), classOf[Container.Config])
+  class ContainerConfig extends CfgList(classOf[CfgInt])
+
+  class NodeConfig extends CfgStruct[NodeConfig] {
+    val Containers = group("container", classOf[ContainerConfig], false)
     val Services = group("service", classOf[Service.Config], false)
     val StartupTimeoutMs = longint("startup.timeout.ms", true)
     val ShutdownTimeoutMs = longint("shutdown.timeout.ms", true)

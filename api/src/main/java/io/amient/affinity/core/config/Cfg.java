@@ -1,44 +1,41 @@
 package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
 
-import java.util.LinkedList;
-import java.util.List;
+abstract public class Cfg<T> {
 
-public abstract class Cfg<T> {
+    private String path;
 
-    final protected String path;
-    protected Cfg<?> parent;
-    protected Config config = null;
+    protected String relPath;
 
-    public Cfg(Cfg<?> parent, String path) {
+    protected T value;
+
+    protected boolean required = true;
+
+    abstract public T apply(Config config) throws IllegalArgumentException;
+
+    protected String extend(String thatPath) {
+        return (path == null ? "" : path + ".") + thatPath;
+    }
+    final protected T setValue(T value) {
+        this.value = value;
+        return value;
+    }
+    final public T apply() {
+        return value;
+    }
+    void setOptional() {
+        this.required = false;
+    }
+    void setPath(String path) {
         this.path = path;
-        this.parent = parent;
+    }
+    
+    final void setRelPath(String relPath) {
+        this.relPath = relPath;
     }
 
-    public String path() {
-        return ((parent == null || parent.path().isEmpty()) ? "" : parent.path() + (path.isEmpty() ? "" : ".")) + path;
+    final String path() {
+        return this.path == null ? "" : this.path;
     }
-
-    public void apply(Config config) {
-        this.config = config;
-    }
-
-    protected List<String> validate() {
-        if (config == null) throw new IllegalStateException();
-        return new LinkedList<>();
-    }
-
-    abstract public T get();
-
-    static public <C extends Cfg<?>> C apply(Config config, C cfg) {
-        cfg.apply(config);
-
-        List<String> errors = cfg.validate();
-        if (errors.size() > 0) throw new IllegalArgumentException(
-                errors.stream().reduce("", (i, s) -> s + "\n" + i));
-        return cfg;
-    }
-
 }
