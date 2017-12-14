@@ -25,7 +25,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
   override def numPartitions: Int = 2
 
   val config = configure(ConfigFactory.load("systemtests")
-    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName))
+    .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = ActorSystem.create("ConfluentEcoSystem", config)
@@ -49,8 +49,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
   behavior of "KafkaDeserializer"
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
-    config.getString(AvroSerde.CONFIG_PROVIDER_CLASS) should be (classOf[ZkAvroSchemaRegistry].getName)
-    system.settings.config.getString(AvroSerde.CONFIG_PROVIDER_CLASS) should be (classOf[ZkAvroSchemaRegistry].getName)
+    config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZkAvroSchemaRegistry].getName)
+    system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZkAvroSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
     val topic = new KafkaStorageConf()(new Node.Config()(config).Affi.State(stateStoreName).Storage).Topic()
@@ -76,8 +76,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[ZkAvroSchemaRegistry].getName,
-      ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT -> zkConnect
+      new AvroSerde.Conf().Avro.Class.path -> classOf[ZkAvroSchemaRegistry].getName,
+      new ZkAvroSchemaRegistry.Conf().ZooKeeper.Connect.path -> zkConnect
     )
 
     val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))

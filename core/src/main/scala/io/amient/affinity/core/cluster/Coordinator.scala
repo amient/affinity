@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.cluster
 
+import java.util
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{ActorPath, ActorRef, ActorSystem}
@@ -35,6 +36,7 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+import scala.collection.JavaConversions._
 
 object Coordinator {
 
@@ -42,8 +44,10 @@ object Coordinator {
     val Coordinator = struct("affinity.coordinator", new CoorinatorConf, true)
   }
 
-  class CoorinatorConf extends CfgStruct[CoorinatorConf](Cfg.Options.IGNORE_UNKNOWN) { //TODO STRICT
+  class CoorinatorConf extends CfgStruct[CoorinatorConf] {
     val Class = cls("class", classOf[Coordinator], true)
+
+    override protected def specializations(): util.Set[String] = Set("zookeeper", "embedded")
   }
 
   final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {

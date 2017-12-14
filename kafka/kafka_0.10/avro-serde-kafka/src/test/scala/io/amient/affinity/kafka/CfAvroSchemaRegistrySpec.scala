@@ -34,7 +34,7 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
   it should "reject incompatible schema registration" in {
 
     val serde = new CfAvroSchemaRegistry(ConfigFactory.defaultReference.withValue(
-      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl)
+      new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path, ConfigValueFactory.fromAnyRef(registryUrl)
     ))
 
     serde.register[SimpleKey]

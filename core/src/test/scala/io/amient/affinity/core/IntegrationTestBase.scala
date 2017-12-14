@@ -40,8 +40,8 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
 
   def this() = this(ActorSystem.create("IntegrationTestSystem",
     ConfigFactory.load("integrationtests").withValue(
-      CoordinatorEmbedded.CONFIG_TEST_COORDINATOR_ID,
-      ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AUTO_COORDINATOR_ID.incrementAndGet()))
+      new CoordinatorEmbedded.Conf().Embedded.ID.path,
+      ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet()))
   ))
 
   implicit val materializer = ActorMaterializer.create(system)

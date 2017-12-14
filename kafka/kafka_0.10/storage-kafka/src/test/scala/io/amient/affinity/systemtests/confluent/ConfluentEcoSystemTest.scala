@@ -48,9 +48,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   val config = configure(
     ConfigFactory.load("systemtests")
-      .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))
-      .withValue(AvroSerde.CONFIG_PROVIDER_CLASS,
-        ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
+      .withValue(new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path, ConfigValueFactory.fromAnyRef(registryUrl))
+      .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = ActorSystem.create("ConfluentEcoSystem", config)
@@ -109,8 +108,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       "group.id" -> "group2",
       "auto.offset.reset" -> "earliest",
       "max.poll.records" -> 1000,
-      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[CfAvroSchemaRegistry].getName,
-      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl,
+      new AvroSerde.Conf().Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path -> registryUrl,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName
     )

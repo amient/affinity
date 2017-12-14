@@ -13,7 +13,7 @@ final class AvroSerdeProxy(tools: Serdes) extends Serde[Any] {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
 
-  val internal = AvroSerde.create(tools.config)
+  val internal = AvroSerde.create(tools.config) //TODO tools.config.getConfig(AvroSerde.Conf.Avro.path)
 
   override def fromBytes(bytes: Array[Byte]): Any = internal.fromBytes(bytes)
 

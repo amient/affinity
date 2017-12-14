@@ -24,35 +24,43 @@ import java.nio.file.attribute.BasicFileAttributes
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
+
 import scala.collection.JavaConversions._
 
 object LocalAvroSchemaRegistry {
-  final val CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH = "affinity.avro.local-schema-registry.data.path"
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val LocalAvro = struct("affinity.avro.local-schema-registry", new LocalAvroConf, false)
+  }
+
+  class LocalAvroConf extends CfgStruct[LocalAvroConf] {
+    val DataPath = filepath("data.path", true)
+  }
+
 }
 
 class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
 
-  import LocalAvroSchemaRegistry._
+  val conf = new LocalAvroSchemaRegistry.Conf()(config).LocalAvro
 
   private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
 
-  val dataPath = Paths.get(config.getString(CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH))
-  if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
+  if (!Files.exists(conf.DataPath())) Files.createDirectories(conf.DataPath())
 
   override def close(): Unit = ()
 
   override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
     validator.validate(schema, existing)
-    val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
-    val schemaPath = dataPath.resolve(s"$id.avsc")
+    val id = (0 until Int.MaxValue).find(i => !Files.exists(conf.DataPath().resolve(s"$i.avsc"))).max
+    val schemaPath = conf.DataPath().resolve(s"$id.avsc")
     Files.createFile(schemaPath)
     Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
     id
   }
 
   override private[schema] def hypersynchronized[X](f: => X) = synchronized {
-    val file = dataPath.resolve(".lock").toFile
+    val file = conf.DataPath().resolve(".lock").toFile
     def getLock(countDown: Int = 30): Unit = {
       if (!file.createNewFile()) if (countDown > 0) {
         Thread.sleep(1000)
@@ -70,7 +78,7 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
 
   override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
     val builder = List.newBuilder[(Int, String, Schema)]
-    Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
+    Files.walkFileTree(conf.DataPath(), new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         val filename = file.getFileName.toString
         if (filename.matches("^[0-9]+\\.avsc$")) {

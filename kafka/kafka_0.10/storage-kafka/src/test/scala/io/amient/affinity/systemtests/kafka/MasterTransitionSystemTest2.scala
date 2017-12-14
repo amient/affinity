@@ -49,7 +49,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with Embe
   override def numPartitions = 2
 
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
-    .withValue(AvroSerde.CONFIG_PROVIDER_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
+    .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
   val gateway = new TestGatewayNode(config, new GatewayHttp {
 

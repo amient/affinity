@@ -23,6 +23,7 @@ package io.amient.affinity.core.cluster
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigException}
+import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
@@ -58,11 +59,9 @@ object Node {
     val Gateway = struct("node.gateway", new ServicesApi.GatewayConf, false)
     val StartupTimeoutMs = longint("node.startup.timeout.ms", true)
     val ShutdownTimeoutMs = longint("node.shutdown.timeout.ms", true)
-    val DataDir = string("node.data.dir", true)
+    val DataDir = filepath("node.data.dir", true)
     val SystemName = string("node.name", true)
   }
-
-  class AvroConf extends CfgStruct[AvroConf](Cfg.Options.IGNORE_UNKNOWN)  //TODO STRICT
 
 
 }

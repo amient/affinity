@@ -54,11 +54,11 @@ class AvroMessageFormatter extends MessageFormatter {
     }
     if (props.containsKey("schema.registry.url")) {
       serde = new CfAvroSchemaRegistry(ConfigFactory.defaultReference()
-        .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE,
+        .withValue(new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
     } else if (props.containsKey("schema.zookeeper.connect")) {
       serde = new ZkAvroSchemaRegistry(ConfigFactory.defaultReference()
-        .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT,
+        .withValue(new ZkAvroSchemaRegistry.Conf().ZooKeeper.Connect.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.zookeeper.connect"))))
     } else {
       throw new IllegalArgumentException("Required --property schema.registry.url OR --property schema.zookeeper.connect")

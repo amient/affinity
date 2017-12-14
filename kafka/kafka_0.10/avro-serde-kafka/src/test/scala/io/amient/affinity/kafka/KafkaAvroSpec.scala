@@ -32,8 +32,8 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "bootstrap.servers" -> kafkaBootstrap,
       "key.serializer" -> classOf[KafkaAvroSerializer].getName,
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
-      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[CfAvroSchemaRegistry].getName,
-      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl
+      new AvroSerde.Conf().Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path -> registryUrl
     )
 
     val consumerProps = Map(
@@ -79,8 +79,8 @@ class KafkaAvroSpec extends FlatSpec with Suite
 
   it should "write case classes via pre-configured confluent registry and read with affinity deserializer" in {
 
-    object TestRegistry extends CfAvroSchemaRegistry(ConfigFactory
-      .defaultReference.withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl))) {
+    object TestRegistry extends CfAvroSchemaRegistry(ConfigFactory.defaultReference
+      .withValue(new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path, ConfigValueFactory.fromAnyRef(registryUrl))) {
       register[TestRecord]
       initialize()
     }
@@ -89,11 +89,11 @@ class KafkaAvroSpec extends FlatSpec with Suite
     val numWrites = new AtomicInteger(0)
 
     val producer = new KafkaProducer[Int, TestRecord](Map(
-        "bootstrap.servers" -> kafkaBootstrap,
-        "key.serializer" -> classOf[KafkaAvroSerializer].getName,
-        "value.serializer" -> classOf[KafkaAvroSerializer].getName,
-        AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[CfAvroSchemaRegistry].getName,
-        CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl
+      "bootstrap.servers" -> kafkaBootstrap,
+      "key.serializer" -> classOf[KafkaAvroSerializer].getName,
+      "value.serializer" -> classOf[KafkaAvroSerializer].getName,
+      new AvroSerde.Conf().Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path -> registryUrl
     ).mapValues(_.toString.asInstanceOf[AnyRef]))
 
     val updates = for (i <- (1 to 10)) yield {
@@ -109,8 +109,8 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      AvroSerde.CONFIG_PROVIDER_CLASS -> classOf[CfAvroSchemaRegistry].getName,
-      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE -> registryUrl
+      new AvroSerde.Conf().Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path -> registryUrl
 
     )
 

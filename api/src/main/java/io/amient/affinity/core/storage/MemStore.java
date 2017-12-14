@@ -19,10 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
-import io.amient.affinity.core.config.CfgCls;
-import io.amient.affinity.core.config.CfgInt;
-import io.amient.affinity.core.config.CfgString;
-import io.amient.affinity.core.config.CfgStruct;
+import io.amient.affinity.core.config.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +41,7 @@ public abstract class MemStore {
 
     public static class MemStoreConf extends CfgStruct<MemStoreConf> {
         public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
-        public CfgString DataDir = string("data.dir", false);
+        public CfgPath DataDir = filepath("data.dir", false);
         //TODO public CfgInt MemReadTimeoutMs = integer("memstore.read.timeout.ms", 1000);
         @Override
         protected Set<String> specializations() {
@@ -61,8 +58,7 @@ public abstract class MemStore {
 
     public MemStore(StateConf conf, int partition) throws IOException {
         checkpointsEnable = isPersistent() && conf.Name.isDefined();
-        String dataPath = conf.MemStore.DataDir.apply();
-        dataDir = Paths.get(dataPath, conf.Name.apply() + "-" + partition).toAbsolutePath();
+        dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply() + "-" + partition));
         ttlSecs = conf.TtlSeconds.apply();
         if (Files.exists(dataDir)) Files.createDirectories(dataDir);
         manager = new MemStoreManager();

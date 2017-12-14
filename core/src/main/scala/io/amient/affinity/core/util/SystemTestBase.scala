@@ -79,9 +79,9 @@ trait SystemTestBase {
     val layer2 = zkConnect match {
       case None => layer1
       case Some(zkConnectString) =>
-        layer1.
-          withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnectString))
+        layer1
+          .withValue(new CoordinatorZk.Conf().ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(new ZkAvroSchemaRegistry.Conf().ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {

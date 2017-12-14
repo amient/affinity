@@ -30,8 +30,8 @@ class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
 
   "CoordinatorEmbedded instances" should "share the underlying space for the same id and group" in {
     val config = ConfigFactory.empty()
-      .withValue("affinity.coordinator.class", ConfigValueFactory.fromAnyRef(classOf[CoordinatorEmbedded].getName))
-      .withValue("affinity.coordinator.id", ConfigValueFactory.fromAnyRef("101"))
+      .withValue(new Coordinator.Conf().Coordinator.Class.path, ConfigValueFactory.fromAnyRef(classOf[CoordinatorEmbedded].getName))
+      .withValue(new CoordinatorEmbedded.Conf().Embedded.ID.path, ConfigValueFactory.fromAnyRef("101"))
     val system = ActorSystem.create("test", config)
     try {
       val coordinator1 = Coordinator.create(system, "group1")

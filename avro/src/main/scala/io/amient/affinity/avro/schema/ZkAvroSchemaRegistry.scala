@@ -23,9 +23,10 @@ import java.util
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSerde
-import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.zookeeper.CreateMode
 
@@ -33,24 +34,30 @@ import scala.collection.JavaConversions._
 import scala.collection.immutable
 
 object ZkAvroSchemaRegistry {
-  final val CONFIG_ZOOKEEPER_ROOT = "affinity.avro.zookeeper-schema-registry.zookeeper.root"
-  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.avro.zookeeper-schema-registry.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.avro.zookeeper-schema-registry.zookeeper.timeout.connect.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.avro.zookeeper-schema-registry.zookeeper.timeout.session.ms"
+
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val ZooKeeper = struct("affinity.avro.zookeeper-schema-registry", new ZkAvroConf, false)
+  }
+
+  class ZkAvroConf extends CfgStruct[ZkAvroConf] {
+    val Connect = string("connect", true)
+    val Root = string("root", true)
+    val ConnectTimeoutMs = integer("timeout.connect.ms", true)
+    val SessionTimeoutMs = integer("timeout.session.ms", true)
+  }
+
 }
 
 class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
 
-  val zkConnect = config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT)
-  val zkSessionTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
-  val zkConnectTimeout = config.getInt(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
+  val conf = new ZkAvroSchemaRegistry.Conf()(config).ZooKeeper
+  private val zkRoot = conf.Root()
 
-  private val zkRoot = config.getString(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_ROOT)
+  private val zk = new ZkClient(conf.Connect(), conf.SessionTimeoutMs(), conf.ConnectTimeoutMs(), new ZkSerializer {
+      def serialize(o: Object): Array[Byte] = o.toString.getBytes
 
-  private val zk = new ZkClient(zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
-    def serialize(o: Object): Array[Byte] = o.toString.getBytes
-    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
-  })
+      override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+    })
 
 
   private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()

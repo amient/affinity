@@ -23,6 +23,8 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
+import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
 import org.apache.zookeeper.CreateMode
@@ -30,23 +32,29 @@ import org.apache.zookeeper.CreateMode
 import scala.collection.JavaConverters._
 
 object CoordinatorZk {
-  final val CONFIG_ZOOKEEPER_ROOT = "affinity.coordinator.zookeeper.root"
-  final val CONFIG_ZOOKEEPER_CONNECT = "affinity.coordinator.zookeeper.connect"
-  final val CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS = "affinity.coordinator.zookeeper.timeout.connect.ms"
-  final val CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS = "affinity.coordinator.zookeeper.timeout.session.ms"
+
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val ZooKeeper = struct("affinity.coordinator.zookeeper", new ZkConf, false)
+  }
+
+  class ZkConf extends CfgStruct[ZkConf](classOf[CoorinatorConf]) {
+    val Connect = string("connect", true)
+    val Root = string("root", true)
+    val ConnectTimeoutMs = integer("timeout.connect.ms", true)
+    val SessionTimeoutMs = integer("timeout.session.ms", true)
+  }
+
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  import CoordinatorZk._
+  val conf = new CoordinatorZk.Conf()(system.settings.config).ZooKeeper
 
-  val zkConnect = config.getString(CONFIG_ZOOKEEPER_CONNECT)
-  val zkConnectTimeout = config.getInt(CONFIG_ZOOKEEPER_CONNECT_TIMEOUT_MS)
-  val zkSessionTimeout = config.getInt(CONFIG_ZOOKEEPER_SESSION_TIMEOUT_MS)
-  val zkRoot = config.getString(CONFIG_ZOOKEEPER_ROOT)
+  val zkRoot = conf.Root()
+
   val groupRoot = s"$zkRoot/$group"
 
-  private val zk = new ZkClient(zkConnect, zkSessionTimeout, zkConnectTimeout, new ZkSerializer {
+  private val zk = new ZkClient(conf.Connect(), conf.SessionTimeoutMs(), conf.ConnectTimeoutMs(), new ZkSerializer {
     def serialize(o: Object): Array[Byte] = o.toString.getBytes
     override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
   })

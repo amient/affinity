@@ -2,6 +2,8 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 
+import java.net.URL;
+import java.nio.file.Path;
 import java.util.*;
 
 public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested {
@@ -127,6 +129,15 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return add(path, new CfgInt(), defaultValue);
     }
 
+    public CfgUrl url(String path, boolean required) {
+        return add(path, new CfgUrl(), required);
+    }
+
+    public CfgUrl url(String path, URL defaultVal) { return add(path, new CfgUrl(), defaultVal); }
+
+    public CfgPath filepath(String path, boolean required) { return add(path, new CfgPath(), required); }
+
+    public CfgPath filepath(String path, Path defaultVal) { return add(path, new CfgPath(), defaultVal); }
 
     public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) {
         return add(path, new CfgCls<>(c), required);
