@@ -249,7 +249,7 @@ trait WebSocketSupport extends GatewayHttp {
 
   private val serializers = SerializationExtension(context.system).serializerByIdentity
 
-  private val avroSerde = AvroSerde.create(config.getConfig(AvroSerde.Conf.Avro.path))
+  private val avroSerde = AvroSerde.create(config)
 
   abstract override def handle: Receive = super.handle orElse {
     case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.plain(OK, afjs.get))

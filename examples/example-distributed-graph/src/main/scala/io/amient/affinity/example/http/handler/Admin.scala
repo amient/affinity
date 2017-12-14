@@ -107,9 +107,10 @@ trait Admin extends ExampleGatewayRoot {
         case None =>
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
-              settings.replace("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes)))
               fulfillAndHandleErrors(response) {
-                executeCode(username)
+                settings.replace("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))) flatMap {
+                  _ => executeCode(username)
+                }
               }
             case _ => response.success(HttpResponse(
               Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))

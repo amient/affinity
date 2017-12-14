@@ -40,7 +40,7 @@ object LocalAvroSchemaRegistry {
   }
 
   class LocalAvroConf extends CfgStruct[LocalAvroConf](classOf[AvroConf]) {
-    val DataPath = filepath("data.path", true)
+    val DataPath = filepath("schema.registry.path", true)
   }
 
 }

@@ -85,7 +85,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val serializedConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+    val serdeConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
     val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
       put("bootstrap.servers", kafkaBootstrap)
@@ -96,7 +96,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     })
 
     val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
-      AvroSerde.create(serializedConfig.value), compacted = true)
+      AvroSerde.create(serdeConfig.value), compacted = true)
       .repartition(1)
       .sortByKey()
 
@@ -109,7 +109,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     }
 
     val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
-      AvroSerde.create(serializedConfig.value), compacted = true)
+      AvroSerde.create(serdeConfig.value), compacted = true)
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>

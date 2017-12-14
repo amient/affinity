@@ -43,10 +43,13 @@ object AvroSerde {
   }
 
   def create(config: Config): AvroSerde = {
-    val conf = new AvroConf()(config)
+    create(new AvroSerde.Conf()(config).Avro)
+  }
+
+  def create(conf: AvroConf): AvroSerde = {
     val providerClass: Class[_ <: AvroSerde] = conf.Class()
     val instance = try {
-      providerClass.getConstructor(classOf[Config]).newInstance(config)
+      providerClass.getConstructor(classOf[Config]).newInstance(conf.config())
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }
