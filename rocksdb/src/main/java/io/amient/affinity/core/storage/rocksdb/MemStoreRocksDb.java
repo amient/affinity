@@ -80,7 +80,7 @@ public class MemStoreRocksDb extends MemStore {
     public MemStoreRocksDb(StateConf conf, int partition) throws IOException {
         super(conf, partition);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
-
+        log.info("Opening RocksDb MemStore: " + pathToData);
         Files.createDirectories(pathToData);
         Options rocksOptions = new Options().setCreateIfMissing(true);
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);

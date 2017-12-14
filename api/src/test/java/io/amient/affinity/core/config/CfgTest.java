@@ -17,18 +17,25 @@ import static org.junit.Assert.assertTrue;
 
 public class CfgTest {
 
-    public static class ServiceConfig extends CfgStruct<ServiceConfig> {
-        private CfgCls<TimeCryptoProof> Class = cls("class", TimeCryptoProof.class, true);
-        private CfgList IntList = list("intlist", CfgInt.class, false);
-        private CfgGroup IntLists = group("lists", CfgIntList.class, false);
-        private Cfg Undefined = string("undefined", false);
-    }
-
     public static class NodeConfig extends CfgStruct<NodeConfig> {
         private CfgLong StartupTimeoutMs = longint("startup.timeout.ms", true);
         private CfgLong ShutdownTimeoutMs = longint("shutdown.timeout.ms", true);
         private CfgGroup<ServiceConfig> Services = group("service", ServiceConfig.class, false);
 
+    }
+
+    public static class ServiceConfig extends CfgStruct<ServiceConfig> {
+        private CfgCls<TimeCryptoProof> Class = cls("class", TimeCryptoProof.class, true);
+        private CfgList IntList = list("intlist", CfgInt.class, false);
+        private CfgGroup IntLists = group("lists", CfgIntList.class, false);
+        private Cfg Undefined = string("undefined", false);
+        private CfgGroup UndefinedGroup = group("undefined-group", UndefinedGroupConfig.class, false);
+    }
+
+    public static class UndefinedGroupConfig extends CfgStruct<UndefinedGroupConfig> {
+        public UndefinedGroupConfig() {
+            super(Options.IGNORE_UNKNOWN);
+        }
     }
 
     @Rule
@@ -89,6 +96,7 @@ public class CfgTest {
                     put("group1", Arrays.asList(1, 2, 3));
                     put("group2", Arrays.asList(4));
                 }});
+                put(serviceTemplate.UndefinedGroup.path("some.group.member.attribute"), "x");
             }});
         }});
 

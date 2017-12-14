@@ -61,8 +61,10 @@ object Node {
     val ShutdownTimeoutMs = longint("node.shutdown.timeout.ms", true)
     val DataDir = filepath("node.data.dir", true)
     val SystemName = string("node.name", true)
+    val Streams = group("node.stream", classOf[InputStreamConf], false)
   }
 
+  class InputStreamConf extends CfgStruct[InputStreamConf](Cfg.Options.IGNORE_UNKNOWN)
 
 }
 

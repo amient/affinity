@@ -28,6 +28,7 @@ import io.amient.affinity.core.util.ByteUtils;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Serializer;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -37,6 +38,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 
 public class MemStoreMapDb extends MemStore {
+
+    private final static org.slf4j.Logger log = LoggerFactory.getLogger(MemStoreMapDb.class);
 
     public static class MemStoreMapDbConf extends CfgStruct<MemStoreMapDbConf> {
 
@@ -93,6 +96,7 @@ public class MemStoreMapDb extends MemStore {
         super(conf, partition);
         MemStoreMapDbConf config = new MemStoreMapDbConf().apply(conf.MemStore);
         pathToData = dataDir.resolve(this.getClass().getSimpleName() + ".data");
+        log.info("Opening MapDb MemStore: " + pathToData);
         Files.createDirectories(pathToData.getParent());
         Boolean mmapEnabled = config.MemoryMapEnabled.isDefined() && config.MemoryMapEnabled.apply();
         this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled, ttlSecs * 1000);
