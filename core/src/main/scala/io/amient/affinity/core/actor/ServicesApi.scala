@@ -9,7 +9,7 @@ import akka.routing._
 import akka.serialization.SerializationExtension
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Controller.GracefulShutdown
+import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Service.{CheckServiceAvailability, ServiceAvailability}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
@@ -46,6 +46,11 @@ trait ServicesApi extends ActorHandler {
   import ServicesApi._
 
   private val conf = new ServicesApi.Conf()(context.system.settings.config)
+
+  if (conf.Gateway.Http.isDefined && !classOf[GatewayHttp].isAssignableFrom(this.getClass)) {
+    log.warning("affinity.gateway.http interface is configured but the node is trying " +
+      "to instantiate a non-http gateway. This may lead to uncertainity in the Controller.")
+  }
 
   private implicit val scheduler = context.system.scheduler
 
@@ -87,10 +92,8 @@ trait ServicesApi extends ActorHandler {
     super.preStart()
     checkClusterStatus()
     services.foreach {
-      case(group, (coordinator, _, _)) =>
-        coordinator.watch(self, global = true)
+      case(_, (coordinator, _, _)) => coordinator.watch(self, global = true)
     }
-    context.parent ! Controller.ServicesStarted()
   }
 
   abstract override def postStop(): Unit = {
@@ -99,6 +102,10 @@ trait ServicesApi extends ActorHandler {
   }
 
   abstract override def manage = super.manage orElse {
+
+    case msg@CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
+      context.parent ! Controller.GatewayCreated(-1)
+
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
       val service: ActorRef = services(group)._2
       remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))

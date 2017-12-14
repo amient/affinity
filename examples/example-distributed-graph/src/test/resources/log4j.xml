@@ -12,6 +12,7 @@
         <level value="ERROR"/>
     </logger>
 
+
     <logger name="org.apache.zookeeper" additivity="false">
         <level value="ERROR" />
     </logger>

@@ -30,15 +30,12 @@ import io.amient.affinity.core.util.Reply
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 object Controller {
 
   final case class CreateContainer(group: String, partitions: List[Int], partitionProps: Props) extends Reply[Unit]
 
   final case class ContainerOnline(group: String)
-
-  final case class ServicesStarted()
 
   final case class CreateGateway(handlerProps: Props) extends Reply[Int]
 
@@ -99,11 +96,13 @@ class Controller extends Actor {
     }
 
     case request@CreateGateway(gatewayProps) => try {
-      context.watch(context.actorOf(gatewayProps, name = "gateway"))
+      val gatewayRef = context.actorOf(gatewayProps, name = "gateway")
+      context.watch(gatewayRef)
       gatewayPromise = Promise[Int]()
       sender.replyWith(request) {
         gatewayPromise.future
       }
+      gatewayRef ! CreateGateway
     } catch {
       case _: InvalidActorNameException =>
         sender.replyWith(request) {
@@ -117,13 +116,6 @@ class Controller extends Actor {
     case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) {
       log.info("Gateway online (with http)")
       gatewayPromise.success(httpPort)
-    }
-
-    case ServicesStarted() => {
-      if (!gatewayPromise.isCompleted && !conf.Affi.Gateway.Http.isDefined()) {
-        log.info("Gateway online (without http)")
-        gatewayPromise.success(-1)
-      }
     }
 
     case request@GracefulShutdown() => sender.replyWith(request) {

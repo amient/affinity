@@ -41,10 +41,9 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.{ack, actor}
-import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.actor.GatewayHttp.Conf
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.util.ByteUtils
@@ -145,6 +144,7 @@ trait GatewayHttp extends ServicesApi {
   }
 
   abstract override def manage: Receive = super.manage orElse {
+    case msg@CreateGateway => context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)

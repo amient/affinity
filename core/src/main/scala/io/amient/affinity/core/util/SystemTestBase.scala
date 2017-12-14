@@ -72,8 +72,6 @@ trait SystemTestBase {
     val layer1 = config
       .withValue(template.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
       .withValue(template.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
-      .withValue(template.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
-      .withValue(template.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
       .withValue(template.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
     val layer2 = zkConnect match {

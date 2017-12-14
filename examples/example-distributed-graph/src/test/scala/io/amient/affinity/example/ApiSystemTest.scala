@@ -55,6 +55,7 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
     .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
     .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(template.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
 
   val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
