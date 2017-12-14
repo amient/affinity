@@ -52,7 +52,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
   val conf = new Node.Config()(system.settings.config)
   val stateConf = conf.Affi.State(name)
   stateConf.Name.setValue(name)
-  stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
+  if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
 
   private val keySerde = Serde.of[K](system.settings.config)
   private val valueSerde = Serde.of[V](system.settings.config)

@@ -58,9 +58,16 @@ public abstract class MemStore {
 
     public MemStore(StateConf conf, int partition) throws IOException {
         checkpointsEnable = isPersistent() && conf.Name.isDefined();
-        dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply() + "-" + partition));
         ttlSecs = conf.TtlSeconds.apply();
-        if (Files.exists(dataDir)) Files.createDirectories(dataDir);
+        if (!checkpointsEnable) {
+            dataDir = null;
+        } else {
+            if (!conf.MemStore.DataDir.isDefined()) {
+              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via Node config");
+            }
+            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply() + "-" + partition));
+            if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
+        }
         manager = new MemStoreManager();
     }
 
@@ -208,17 +215,15 @@ public abstract class MemStore {
 
         volatile private boolean stopped = true;
 
-        final private Path file;
-
-        public MemStoreManager() {
-            super();
-            file = dataDir.resolve(MemStore.this.getClass().getSimpleName() + ".checkpoint");
+        private Path getFile() {
+            return dataDir.resolve(MemStore.this.getClass().getSimpleName() + ".checkpoint");
         }
 
         @Override
         public synchronized void start() {
 
             if (checkpointsEnable) try {
+                Path file = getFile();
                 if (Files.exists(file)) checkpoint.set(Checkpoint.readFromFile(file));
 //TODO #80 use something similar as below to implement the cleaner, but as part of the run() method
 //                if (!checkpoint.get().closed) {
@@ -266,6 +271,7 @@ public abstract class MemStore {
         }
 
         private void writeCheckpoint(boolean closing) throws IOException {
+            Path file = getFile();
             Checkpoint chk = (!closing) ? checkpoint.get()
                     : checkpoint.updateAndGet(c -> new Checkpoint(c.offset, true));
             log.debug("Writing checkpoint " + chk + " to file: " + file + ", final: " + closing);

@@ -45,8 +45,8 @@ object Node {
   }
 
   class AkkaConfig extends CfgStruct[AkkaConfig](Cfg.Options.IGNORE_UNKNOWN) {
-    val Hostname = string("remote.netty.tcp.hostname", true)
-    val Port = integer("remote.netty.tcp.port", true)
+    val Hostname = string("remote.netty.tcp.hostname", false)
+    val Port = integer("remote.netty.tcp.port", false)
   }
 
 
@@ -59,7 +59,7 @@ object Node {
     val Gateway = struct("node.gateway", new ServicesApi.GatewayConf, false)
     val StartupTimeoutMs = longint("node.startup.timeout.ms", true)
     val ShutdownTimeoutMs = longint("node.shutdown.timeout.ms", true)
-    val DataDir = filepath("node.data.dir", true)
+    val DataDir = filepath("node.data.dir", false)
     val SystemName = string("node.name", true)
     val Streams = group("node.stream", classOf[InputStreamConf], false)
   }
