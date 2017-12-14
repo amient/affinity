@@ -21,8 +21,10 @@ package io.amient.affinity.avro.schema
 
 import java.util
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.AvroSerde.AvroConf
+import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry.ZkAvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.I0Itec.zkclient.serialize.ZkSerializer
@@ -35,22 +37,24 @@ import scala.collection.immutable
 
 object ZkAvroSchemaRegistry {
 
+  object Conf extends Conf
+
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val ZooKeeper = struct("affinity.avro.zookeeper-schema-registry", new ZkAvroConf, false)
+    val Avro = struct("affinity.avro", new ZkAvroConf, false)
   }
 
-  class ZkAvroConf extends CfgStruct[ZkAvroConf] {
-    val Connect = string("connect", true)
-    val Root = string("root", true)
-    val ConnectTimeoutMs = integer("timeout.connect.ms", true)
-    val SessionTimeoutMs = integer("timeout.session.ms", true)
+  class ZkAvroConf extends CfgStruct[ZkAvroConf](classOf[AvroConf]) {
+    val Connect = string("schema.registry.zookeeper.connect", true)
+    val Root = string("schema.registry.zookeeper.root", true)
+    val ConnectTimeoutMs = integer("schema.registry.zookeeper.timeout.connect.ms", true)
+    val SessionTimeoutMs = integer("schema.registry.zookeeper.timeout.session.ms", true)
   }
 
 }
 
 class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
-
-  val conf = new ZkAvroSchemaRegistry.Conf()(config).ZooKeeper
+  val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
+  val conf = new ZkAvroConf()(merged)
   private val zkRoot = conf.Root()
 
   private val zk = new ZkClient(conf.Connect(), conf.SessionTimeoutMs(), conf.ConnectTimeoutMs(), new ZkSerializer {

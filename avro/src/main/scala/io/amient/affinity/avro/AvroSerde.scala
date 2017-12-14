@@ -21,7 +21,7 @@ package io.amient.affinity.avro
 
 import java.util
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import io.amient.affinity.avro.schema.AvroSchemaProvider
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
@@ -37,18 +37,16 @@ object AvroSerde {
   }
   class AvroConf extends CfgStruct[AvroConf] {
     val Class = cls("schema.provider.class", classOf[AvroSerde], true)
-
     override protected def specializations(): util.Set[String] = {
-      Set("confluent-schema-registry", "zookeeper-schema-registry", "local-schema-registry")
+      Set("schema.registry")
     }
   }
 
   def create(config: Config): AvroSerde = {
-    val conf = new AvroSerde.Conf()(config)
-    val providerClass: Class[_ <: AvroSerde] = conf.Avro.Class()
-
+    val conf = new AvroConf()(config)
+    val providerClass: Class[_ <: AvroSerde] = conf.Class()
     val instance = try {
-      providerClass.getConstructor(classOf[Config]).newInstance(config.withFallback(ConfigFactory.defaultReference()))
+      providerClass.getConstructor(classOf[Config]).newInstance(config)
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }

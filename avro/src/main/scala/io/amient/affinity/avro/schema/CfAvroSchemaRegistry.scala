@@ -23,8 +23,10 @@ package io.amient.affinity.avro.schema
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.AvroSerde.AvroConf
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.apache.avro.Schema
 import org.codehaus.jackson.JsonNode
@@ -34,13 +36,16 @@ import scala.collection.JavaConverters._
 
 object CfAvroSchemaRegistry {
 
+  object Conf extends Conf
+
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Confluent = struct("affinity.avro.confluent-schema-registry", new CfAvroConf, false)
+    val Avro = struct("affinity.avro", new CfAvroConf, false)
   }
 
-  class CfAvroConf extends CfgStruct[CfAvroConf] {
-    val UrlBase = url("schema.registry.url", true)
+  class CfAvroConf extends CfgStruct[CfAvroConf](classOf[AvroConf]) {
+    val ConfluentSchemaRegistryUrl= url("schema.registry.url", true)
   }
+
 }
 
 /**
@@ -49,10 +54,9 @@ object CfAvroSchemaRegistry {
   * Instead a fully-qualified name of the class is the subject.
   */
 class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
-
-
-  val conf = new CfAvroSchemaRegistry.Conf()(config).Confluent
-  val client = new ConfluentSchemaRegistryClient(conf.UrlBase())
+  val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
+  val conf = new CfAvroConf()(merged)
+  val client = new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
 
   override def close(): Unit = ()
 

@@ -33,6 +33,8 @@ import scala.collection.JavaConverters._
 
 object CoordinatorZk {
 
+  object Conf extends Conf
+
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val ZooKeeper = struct("affinity.coordinator.zookeeper", new ZkConf, false)
   }

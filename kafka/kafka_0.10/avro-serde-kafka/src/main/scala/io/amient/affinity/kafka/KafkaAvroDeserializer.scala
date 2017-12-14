@@ -12,7 +12,7 @@ class KafkaAvroDeserializer extends Deserializer[Any] {
   var serde: AvroSerde = null
 
   override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
-    val config = ConfigFactory.parseMap(configs)
+    val config = ConfigFactory.parseMap(configs).getConfig("schema").atKey("schema")
     this.serde = AvroSerde.create(config)
     this.isKey = isKey
   }

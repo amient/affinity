@@ -80,8 +80,8 @@ trait SystemTestBase {
       case None => layer1
       case Some(zkConnectString) =>
         layer1
-          .withValue(new CoordinatorZk.Conf().ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(new ZkAvroSchemaRegistry.Conf().ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(CoordinatorZk.Conf.ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(ZkAvroSchemaRegistry.Conf.Avro.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {

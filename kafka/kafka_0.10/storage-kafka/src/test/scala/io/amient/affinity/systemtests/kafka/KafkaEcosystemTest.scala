@@ -6,7 +6,9 @@ import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry.ZkAvroConf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage.KafkaStorageConf
@@ -76,8 +78,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroSerde.Conf().Avro.Class.path -> classOf[ZkAvroSchemaRegistry].getName,
-      new ZkAvroSchemaRegistry.Conf().ZooKeeper.Connect.path -> zkConnect
+      new AvroConf().Class.path -> classOf[ZkAvroSchemaRegistry].getName,
+      new ZkAvroConf().Connect.path -> zkConnect
     )
 
     val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))

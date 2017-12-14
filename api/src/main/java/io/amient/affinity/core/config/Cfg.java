@@ -30,8 +30,10 @@ abstract public class Cfg<T> {
         return value.isPresent() ? value.get() : defaultValue.get();
     }
 
+    final public String relativePath() { return relPath == null ? "" : relPath; }
+
     final public String path() {
-        return this.path == null ? "" : this.path;
+        return path == null ? "" : path;
     }
 
     final public String path(String relativePathToRsolve) { return (path == null ? "" : path + ".") + relativePathToRsolve; }

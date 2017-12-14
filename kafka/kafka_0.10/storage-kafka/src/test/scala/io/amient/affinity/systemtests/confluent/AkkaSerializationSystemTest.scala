@@ -16,10 +16,10 @@ case class ExampleType(val id: Int) extends AvroRecord {
 class AkkaSerializationSystemTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
 
   val config = configure(ConfigFactory.defaultReference)
-    .withValue(new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path, ConfigValueFactory.fromAnyRef(registryUrl))
+    .withValue(new CfAvroSchemaRegistry.Conf().Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
     .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
 
-  assert(config.getString(new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path) == registryUrl)
+  assert(config.getString(new CfAvroSchemaRegistry.Conf().Avro.ConfluentSchemaRegistryUrl.path) == registryUrl)
 
   override def numPartitions = 2
 

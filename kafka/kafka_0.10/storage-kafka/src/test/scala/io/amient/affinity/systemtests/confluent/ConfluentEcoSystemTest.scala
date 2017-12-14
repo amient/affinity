@@ -24,7 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
@@ -48,8 +50,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   val config = configure(
     ConfigFactory.load("systemtests")
-      .withValue(new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path, ConfigValueFactory.fromAnyRef(registryUrl))
-      .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
+      .withValue(CfAvroSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
+      .withValue(AvroSerde.Conf.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = ActorSystem.create("ConfluentEcoSystem", config)
@@ -108,10 +110,10 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       "group.id" -> "group2",
       "auto.offset.reset" -> "earliest",
       "max.poll.records" -> 1000,
-      new AvroSerde.Conf().Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName,
-      new CfAvroSchemaRegistry.Conf().Confluent.UrlBase.path -> registryUrl,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      "value.deserializer" -> classOf[KafkaAvroDeserializer].getName
+      "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
+      new AvroConf().Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 
     val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
