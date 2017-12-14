@@ -16,6 +16,14 @@ public interface EventTime {
      * @return event time translated into LocalDate instance
      */
     default LocalDateTime eventTimeLocal() {
-        return Instant.ofEpochMilli(eventTimeUtc()).atZone(ZoneId.systemDefault()).toLocalDateTime();
+        return localTime(eventTimeUtc());
+    }
+
+    /**
+     * @param utc milliseconds since the epoch
+     * @return LocalDate instance for the given utc timestamp
+     */
+    static LocalDateTime localTime(long utc) {
+        return Instant.ofEpochMilli(utc).atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 }

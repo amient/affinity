@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage.mapdb;
 
 import com.typesafe.config.Config;
+import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.mapdb.DB;
@@ -30,28 +31,32 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 
 public class MemStoreMapDb extends MemStore {
 
-    public static final String CONFIG_MAPDB_DATA_PATH = "memstore.mapdb.data.path";
     public static final String CONFIG_MAPDB_MMAP_ENABLED = "memstore.mapdb.mmap.enabled";
     //on 64-bit systems memory mapped files can be enabled
 
-    private static Map<String, Long> refs = new HashMap<>();
-    private static Map<String, DB> instances = new HashMap<>();
-    private static Map<String, ConcurrentMap<byte[], byte[]>> maps = new HashMap<>();
+    private static Map<Path, Long> refs = new HashMap<>();
+    private static Map<Path, DB> instances = new HashMap<>();
+    private static Map<Path, ConcurrentMap<byte[], byte[]>> maps = new HashMap<>();
 
-    synchronized private static final ConcurrentMap<byte[], byte[]> createOrGetDbInstanceRef(String pathToData, Boolean mmap) {
+    synchronized private static final ConcurrentMap<byte[], byte[]> createOrGetDbInstanceRef(
+            Path pathToData, Boolean mmap, int ttlMs) {
         if (refs.containsKey(pathToData) && refs.get(pathToData) > 0) {
             refs.put(pathToData, refs.get(pathToData) + 1);
             return maps.get(pathToData);
         } else {
-            DBMaker.Maker dbMaker = DBMaker.fileDB(pathToData).checksumHeaderBypass();
+            DBMaker.Maker dbMaker = DBMaker.fileDB(pathToData.toFile()).checksumHeaderBypass();
             DB instance = mmap ? dbMaker.fileMmapEnable().make() : dbMaker.make();
-            ConcurrentMap<byte[], byte[]> map = instance.hashMap("map", Serializer.BYTE_ARRAY, Serializer.BYTE_ARRAY)
+            ConcurrentMap<byte[], byte[]> map = instance
+                    .hashMap("map", Serializer.BYTE_ARRAY, Serializer.BYTE_ARRAY)
+                    .expireAfterCreate(ttlMs)
                     .createOrOpen();
             instances.put(pathToData, instance);
             maps.put(pathToData, map);
@@ -60,8 +65,8 @@ public class MemStoreMapDb extends MemStore {
         }
     }
 
-    synchronized private static final void releaseDbInstance(String pathToData) {
-        if (refs.get(pathToData) > 1) {
+    synchronized private static final void releaseDbInstance(Path pathToData) {
+        if (refs.getOrDefault(pathToData, 0L) > 1) {
             refs.put(pathToData, refs.get(pathToData) - 1);
         } else {
             refs.remove(pathToData);
@@ -70,24 +75,33 @@ public class MemStoreMapDb extends MemStore {
         }
     }
 
-    private final String pathToData;
-    private final Path containerPath;
+    private final Path pathToData;
     private final ConcurrentMap<byte[], byte[]> internal;
 
+    @Override
+    protected boolean isPersistent() {
+        return true;
+    }
+
     public MemStoreMapDb(Config config, int partition) throws IOException {
-        pathToData = config.getString(CONFIG_MAPDB_DATA_PATH) + "/" + partition + "/";
-        containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
+        super(config, partition);
+        pathToData = dataDir.resolve(this.getClass().getSimpleName() + ".data");
+        Files.createDirectories(pathToData.getParent());
         Boolean mmapEnabled = config.hasPath(CONFIG_MAPDB_MMAP_ENABLED) && config.getBoolean(CONFIG_MAPDB_MMAP_ENABLED);
-        Files.createDirectories(containerPath);
-        this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled);
+        this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled, ttlSecs * 1000);
     }
 
     @Override
-    public Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
-        return internal.entrySet().stream().map(entry ->
+    public long numKeys() {
+        return internal.size();
+    }
+
+    @Override
+    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
+        return CloseableIterator.apply(internal.entrySet().stream().map(entry ->
                 (Map.Entry<ByteBuffer, ByteBuffer>)
-                        new AbstractMap.SimpleEntry<ByteBuffer, ByteBuffer>(
-                                ByteBuffer.wrap(entry.getKey()), ByteBuffer.wrap(entry.getValue()))).iterator();
+                        new AbstractMap.SimpleEntry<>(
+                                ByteBuffer.wrap(entry.getKey()), ByteBuffer.wrap(entry.getValue()))).iterator());
     }
 
     @Override
@@ -97,19 +111,22 @@ public class MemStoreMapDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value) {
-        byte[] prev = internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value));
-        return Optional.ofNullable(prev == null ? null : ByteBuffer.wrap(prev));
+    public void putImpl(ByteBuffer key, ByteBuffer value) {
+        internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value));
     }
 
     @Override
-    public Optional<ByteBuffer> removeImpl(ByteBuffer key) {
-        byte[] prev = internal.remove(ByteUtils.bufToArray(key));
-        return Optional.ofNullable(prev == null ? null : ByteBuffer.wrap(prev));
+    public void removeImpl(ByteBuffer key) {
+        internal.remove(ByteUtils.bufToArray(key));
     }
 
     @Override
     public void close() {
-        releaseDbInstance(pathToData);
+        try {
+            releaseDbInstance(pathToData);
+        } finally {
+            super.close();
+        }
+
     }
 }

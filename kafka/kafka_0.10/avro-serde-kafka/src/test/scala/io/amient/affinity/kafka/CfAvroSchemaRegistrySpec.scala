@@ -11,18 +11,18 @@ object SimpleEnum extends Enumeration {
   val A, B, C = Value
 }
 
-case class SimpleKey(val id: Int) extends AvroRecord[SimpleKey] {
+case class SimpleKey(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord[SimpleRecord] {
+case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord{
   override def hashCode(): Int = id.hashCode()
 }
 
 case class Record(
                    val items: Seq[SimpleRecord] = Seq(),
                    val index: Map[String, SimpleRecord] = Map(),
-                   val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord[Record]
+                   val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord
 
 
 class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfRegistry {

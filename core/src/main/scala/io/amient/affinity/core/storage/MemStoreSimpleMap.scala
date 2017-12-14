@@ -20,30 +20,40 @@
 package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
-import java.util
 import java.util.Map.Entry
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
-class MemStoreSimpleMap extends MemStore {
+import com.typesafe.config.Config
+
+class MemStoreSimpleMap(config: Config, partition: Int) extends MemStore(config, partition) {
 
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 
-  override def close(): Unit = internal.clear()
+  override def close(): Unit = try internal.clear() finally super.close()
 
-  override def iterator(): util.Iterator[Entry[ByteBuffer, ByteBuffer]] = {
-    internal.entrySet().iterator()
+  override def iterator(): CloseableIterator[Entry[ByteBuffer, ByteBuffer]] = {
+    CloseableIterator.apply(internal.entrySet().iterator())
   }
 
   override def apply(key: ByteBuffer): Optional[ByteBuffer] = {
     Optional.ofNullable(internal.get(key))
   }
 
-  override def updateImpl(key: ByteBuffer, value: ByteBuffer): Optional[ByteBuffer] = {
-    Optional.ofNullable(internal.put(key, value))
+  override def putImpl(key: ByteBuffer, value: ByteBuffer) {
+    internal.put(key, value)
   }
 
-  override def removeImpl(key: ByteBuffer): Optional[ByteBuffer] = {
-    Optional.ofNullable(internal.remove(key))
+  override def removeImpl(key: ByteBuffer) {
+    internal.remove(key)
   }
+
+  override protected def isPersistent = false
+
+  /**
+    * This may or may not be accurate, depending on the underlying backend's features
+    *
+    * @return number of keys in the store
+    */
+  override def numKeys(): Long = internal.size()
 }

@@ -21,7 +21,7 @@ package io.amient.affinity.model.graph.message
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.transaction.Instruction
 
-final case class DeleteComponent(cid: Int) extends AvroRecord[DeleteComponent] with Instruction[Option[Component]] {
+final case class DeleteComponent(cid: Int) extends AvroRecord with Instruction[Option[Component]] {
   override def hashCode(): Int = cid.hashCode
 
   override def reverse(c: Option[Component]) = c match {

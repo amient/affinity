@@ -302,7 +302,7 @@ trait WebSocketSupport extends GatewayHttp {
       * 123 Is a schema request - binary buffer contains only BIG ENDIAN 32INT Schema and the client expects json schema to be sent back
       *       - thre response must also strat with 123 magic byte, followed by 32INT Schema ID and then schema json bytes
       *
-      * upstream Option[Any] is expected to be an AvroRecord[_] and will be sent as binary message to the client
+      * upstream Option[Any] is expected to be an AvroRecord and will be sent as binary message to the client
       * upstream ByteString will be sent as raw binary message to the client (used internally for schema request)
       * upstream any other type handling is not defined and will throw scala.MatchError
       */
@@ -326,7 +326,7 @@ trait WebSocketSupport extends GatewayHttp {
             case 0 => try {
               val record = AvroRecord.read(buf, avroSerde)
               val handleAvroClientMessage: PartialFunction[Any, Unit] = pfCustomHandle.orElse {
-                case forwardToBackend: AvroRecord[_] => service ! forwardToBackend
+                case forwardToBackend: AvroRecord => service ! forwardToBackend
               }
               handleAvroClientMessage(record)
             } catch {
@@ -339,8 +339,8 @@ trait WebSocketSupport extends GatewayHttp {
     } {
       case direct: ByteString => BinaryMessage.Strict(direct) //ByteString as the direct response from above
       case None => BinaryMessage.Strict(ByteString()) //FIXME what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
-      case Some(value: AvroRecord[_]) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
-      case value: AvroRecord[_] => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
+      case Some(value: AvroRecord) => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
+      case value: AvroRecord => BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))
     }
   }
 

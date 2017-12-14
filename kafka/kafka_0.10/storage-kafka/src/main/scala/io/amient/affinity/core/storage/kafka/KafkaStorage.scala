@@ -26,11 +26,13 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.storage.Storage
+import io.amient.affinity.core.util.MappedJavaFuture
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
@@ -44,6 +46,8 @@ object KafkaStorage {
   def CONFIG_KAFKA_PRODUCER = s"storage.kafka.producer"
 
   def CONFIG_KAFKA_CONSUMER = s"storage.kafka.consumer"
+
+  val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 }
 
 class KafkaStorage(config: Config, partition: Int) extends Storage(config, partition) {
@@ -67,6 +71,8 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     put("key.serializer", classOf[ByteArraySerializer].getName)
     put("value.serializer", classOf[ByteArraySerializer].getName)
   }
+
+  require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
 
   val consumerProps = new Properties() {
     if (config.hasPath(CONFIG_KAFKA_CONSUMER)) {
@@ -100,7 +106,14 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
     kafkaConsumer.assign(consumerPartitions)
-    kafkaConsumer.seekToBeginning(consumerPartitions)
+    memstore.getCheckpoint match {
+      case checkpoint if checkpoint.offset <= 0 =>
+        log.info(s"Rewinding into $tp")
+        kafkaConsumer.seekToBeginning(consumerPartitions)
+      case checkpoint =>
+        log.info(s"Seeking ${checkpoint.offset} into $tp")
+        kafkaConsumer.seek(tp, checkpoint.offset)
+    }
 
     override def run(): Unit = {
 
@@ -122,9 +135,9 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
               for (r <- records.iterator().asScala) {
                 fetchedNumRecrods += 1
                 if (r.value == null) {
-                  memstore.unload(r.key)
+                  memstore.unload(r.key, r.offset())
                 } else {
-                  memstore.load(r.key, r.value, r.timestamp())
+                  memstore.load(r.key, r.value, r.offset(), r.timestamp())
                 }
               }
               if (!tailing && fetchedNumRecrods == 0) {
@@ -188,12 +201,16 @@ class KafkaStorage(config: Config, partition: Int) extends Storage(config, parti
     }
   }
 
-  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[RecordMetadata] = {
-    kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
+  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))) {
+      override def map(result: RecordMetadata): java.lang.Long = result.offset()
+    }
   }
 
-  def delete(key: Array[Byte]): Future[RecordMetadata] = {
-    write(key, null, 0L)
+  def delete(key: Array[Byte]): Future[java.lang.Long] = {
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, key, null))) {
+      override def map(result: RecordMetadata): java.lang.Long = result.offset()
+    }
   }
 
 }

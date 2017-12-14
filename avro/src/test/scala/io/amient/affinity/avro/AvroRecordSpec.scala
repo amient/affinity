@@ -4,6 +4,8 @@ import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.collection.immutable.Seq
+
 class AvroRecordSpec extends FlatSpec with Matchers {
 
   val recordV2Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_V1\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}},{\"name\":\"setOfPrimitives\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}")
@@ -92,22 +94,24 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
   it should "have minimum read/write throughput" in {
+    val n = 200000
+    val x: Seq[Array[Byte]] = for(i <- 1 to n) yield {
+      val rec = SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20)))
+      newSerde.toBytes(rec)
+    }
     val start = System.currentTimeMillis
-    val n = 100000
     var r = System.currentTimeMillis()
     var done = 0
-    for(i <- 1 to n) {
-      val rec = SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20)))
-      val bytes = newSerde.toBytes(rec)
+    x.foreach{ bytes =>
       newSerde.fromBytes(bytes)
       done += 1
       val now = System.currentTimeMillis()
       if (now - r > 5000) {
         r = now
-        println(done * 1000 / (System.currentTimeMillis() - start))
+        println(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
       }
     }
-    println(done * 1000 / (System.currentTimeMillis() - start))
+    println(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
 
   }
 

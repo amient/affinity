@@ -21,6 +21,7 @@ package io.amient.affinity.core.storage.mapdb;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
+import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
 import org.junit.Rule;
@@ -29,11 +30,9 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class MemStoreMapDbSpec {
 
@@ -44,23 +43,26 @@ public class MemStoreMapDbSpec {
     public void testMemStoreMapDb() throws IOException {
         String tmp = folder.newFolder().toString();
         Config config = ConfigFactory.empty()
-                .withValue(MemStoreMapDb.CONFIG_MAPDB_DATA_PATH, ConfigValueFactory.fromAnyRef(tmp))
+                .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef("test"))
+                .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(tmp))
                 .withValue(MemStoreMapDb.CONFIG_MAPDB_MMAP_ENABLED, ConfigValueFactory.fromAnyRef(false));
 
         MemStore instance = new MemStoreMapDb(config, 0);
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());
-            instance.update(key1, ByteBuffer.wrap("value1".getBytes()));
+            instance.put(key1, ByteBuffer.wrap("value1".getBytes()), 1);
             assertTrue(instance.apply(key1).isPresent());
             assertEquals("value1", new String(ByteUtils.bufToArray(instance.apply(key1).get())));
             assertTrue(!instance.apply(key2).isPresent());
-            instance.update(key1, ByteBuffer.wrap("value1000".getBytes()));
-            instance.update(key2, ByteBuffer.wrap("value2000".getBytes()));
-            Iterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
+            instance.put(key1, ByteBuffer.wrap("value1000".getBytes()), 2);
+            instance.put(key2, ByteBuffer.wrap("value2000".getBytes()), 3);
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
-            assertEquals(2, instance.size());
+            assertFalse(it.hasNext());
+            assertEquals(2, instance.numKeys());
+            it.close();
         } finally {
             instance.close();
         }

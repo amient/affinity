@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.storage.State
@@ -67,9 +67,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val stateStoreName = "visibility-test"
-    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
-    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
+    val state = createStateStoreForPartition(stateStoreName)(0)
     state.insert(1, TestRecord(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
     val testRecordSchemaId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
     registryClient.getByID(testRecordSchemaId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
@@ -84,29 +82,26 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
   }
 
   private def testExternalKafkaConsumer(stateStoreName: String) {
-    val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
-    val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
+    val topic = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName)).getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
+    val state = createStateStoreForPartition(stateStoreName)(0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
-    state.size should be(0)
-    val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-      try {
-        state.update(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
-          (s) => s, (e: Throwable) => {
-          numWrites.decrementAndGet()
-          e
-        })
-      } catch {
-        case e: Throwable => e.printStackTrace(); throw e
-      }
-    })
-    Await.ready(updates, 10 seconds)
+    state.numKeys should be(0)
+    val updates = for (i <- (1 to numToWrite)) yield {
+      state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+        (s) => s
+        , (e: Throwable) => {
+        numWrites.decrementAndGet()
+        e
+      })
+    }
+    updates.size should be (numToWrite)
+    Await.result(Future.sequence(updates), 10 seconds)
     val spentMs = System.currentTimeMillis() - l
     println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
-    state.iterator.size should equal(numWrites.get)
-    state.size should equal(numWrites.get)
+    state.numKeys should equal(numWrites.get)
+    state.iterator.size should equal(state.numKeys)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
@@ -141,8 +136,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   }
 
-  private def createStateStoreForPartition(name: String, stateStoreConfig: Config)(implicit partition: Int) = {
-    new State[Int, TestRecord](name, system, stateStoreConfig)
+  private def createStateStoreForPartition(name: String)(implicit partition: Int) = {
+    new State[Int, TestRecord](name, system)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
@@ -181,13 +176,13 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       producer.close()
     }
     //now bootstrap the state
-    val state0 = createStateStoreForPartition(topic, stateStoreConfig)(0)
-    val state1 = createStateStoreForPartition(topic, stateStoreConfig)(1)
+    val state0 = createStateStoreForPartition(topic)(0)
+    val state1 = createStateStoreForPartition(topic)(1)
     state0.storage.init()
     state1.storage.init()
     state0.storage.boot()
     state1.storage.boot()
-    (state0.size + state1.size) should equal(numWrites.get)
+    (state0.numKeys + state1.numKeys) should equal(numWrites.get)
   }
 
 }

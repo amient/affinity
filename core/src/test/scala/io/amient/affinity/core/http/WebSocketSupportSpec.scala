@@ -52,7 +52,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     val data = state[Int, Base]("test")
 
     override def handle: Receive = {
-      case base: Base => data.update(base.id.id, base)
+      case base: Base => data.replace(base.id.id, base)
     }
   }))
 

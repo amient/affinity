@@ -19,23 +19,59 @@
 
 package io.amient.affinity.core.storage;
 
+import com.typesafe.config.Config;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Iterator;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * The implementing class must provide either no-arg constructor or a constructor that takes two arguments:
- *  Config config
- *  int partition
+ * The implementing class must provide a constructor that takes two arguments:
+ * Config config
+ * int partition
  */
 public abstract class MemStore {
 
-    private LongAdder size = new LongAdder();
+    final public static String CONFIG_STORE_NAME = "name";
+    final public static String CONFIG_DATA_DIR = "data.dir";
+    final public static String CONFIG_TTL_SEC = "memstore.ttl.sec";
 
-    public abstract Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
+    private final static Logger log = LoggerFactory.getLogger(MemStore.class);
+
+    final private MemStoreManager manager;
+
+    final private boolean checkpointsEnable;
+    final protected int ttlSecs;
+    final protected Path dataDir;
+
+    public MemStore(Config config, int partition) throws IOException {
+        checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_DIR) && config.hasPath(CONFIG_STORE_NAME);
+        String dataPath = config.getString(MemStore.CONFIG_DATA_DIR);
+        dataDir = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition).toAbsolutePath();
+        ttlSecs = config.hasPath(CONFIG_TTL_SEC) ? config.getInt(CONFIG_TTL_SEC) : -1;
+        if (Files.exists(dataDir)) Files.createDirectories(dataDir);
+        manager = new MemStoreManager();
+    }
+
+    protected abstract boolean isPersistent();
+
+    final public void open() {
+        manager.start();
+    }
+
+    public Checkpoint getCheckpoint() {
+        return manager.checkpoint.get();
+    }
+
+    public abstract CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
 
     /**
      * @param key ByteBuffer representation of the key
@@ -45,47 +81,62 @@ public abstract class MemStore {
     public abstract Optional<ByteBuffer> apply(ByteBuffer key);
 
     /**
-     * @return accurate size
+     * This may or may not be accurate, depending on the underlying backend's features
+     * @return number of keys in the store
      */
-    public final long size() {
-        return size.longValue();
+    public abstract long numKeys();
+
+    /**
+     * @param key       ByteBuffer representation
+     * @param value     ByteBuffer which will be associated with the given key
+     * @param offset    checkpoint offset
+     * @return new Checkpoint after the operation
+     */
+    public final Checkpoint put(ByteBuffer key, ByteBuffer value, long offset) {
+        putImpl(key, value);
+        return manager.updateCheckpoint(offset);
     }
 
     /**
-     * @param key ByteBuffer representation
+     * @param key   ByteBuffer representation
      * @param value ByteBuffer which will be associated with the given key
-     * @return optional value held at the key position before the updateImpl
      */
-    public final Optional<ByteBuffer> update(ByteBuffer key, ByteBuffer value) {
-        Optional<ByteBuffer> prev = updateImpl(key, value);
-        if (!prev.isPresent()) size.add(1);
-        return prev;
-    }
-    protected abstract Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value);
+    protected abstract void putImpl(ByteBuffer key, ByteBuffer value);
 
     /**
      * @param key ByteBuffer representation whose value will be removed
-     * @return optional value held at the key position before the updateImpl, None if the key doesn't exist
+     * @return new Checkpoint valid after the operation
+     * @param offset    checkpoint offset
      */
-    public final Optional<ByteBuffer> remove(ByteBuffer key) {
-        Optional<ByteBuffer> prev = removeImpl(key);
-        if (prev.isPresent()) size.add(-1);
-        return prev;
+    public final Checkpoint remove(ByteBuffer key, long offset) {
+        removeImpl(key);
+        return manager.updateCheckpoint(offset);
     }
 
-    protected abstract Optional<ByteBuffer> removeImpl(ByteBuffer key);
+    /**
+     * @param key key to remove
+     */
+    protected abstract void removeImpl(ByteBuffer key);
 
 
     /**
      * close() will be called whenever the owning storage is closing
      * implementation should clean-up any resources here
      */
-    public abstract void close();
+    public void close() {
+        try {
+            manager.close();
+        } catch (IOException e) {
+            log.error("Failed to write final checkpoint", e);
+        }
+        manager.stopped = true;
+    }
 
 
     /**
      * Wraps record value with metadata into a storable cell
-     * @param value record value
+     *
+     * @param value     record value
      * @param timestamp record event time
      * @return byte buffer with metadata and record value
      */
@@ -101,15 +152,17 @@ public abstract class MemStore {
     /**
      * Unwraps stored cell into metadata and value bytes, returning the underlying value only if it hasn't expired
      * with respect to the provided ttl ms parameter and system time
-     * @param key record key
+     *
+     * @param key              record key
      * @param valueAndMetadata wrapped value and event time metadata
-     * @param ttlMs time to live of the owner State
+     * @param ttlMs            time to live of the owner State
      * @return unwrapped byte array of the raw value without metadata if not expired, otherwise none
      */
     final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
-        if (ttlMs < Long.MAX_VALUE && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
-            //TODO #65 this is the only place where expired records get actually cleaned from the memstore but we need also a regular full compaction process that will get the memstore iterator and call this method
-            remove(key);
+        if (ttlMs > 0 && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
+            //this is the magic that expires key-value pairs based on their create timestamp
+            //State.iterator also invokes unwrap for each entry therefore simply iterating cleans up expired entries
+            removeImpl(key);
             return Optional.empty();
         } else {
             int len = valueAndMetadata.limit();
@@ -123,21 +176,118 @@ public abstract class MemStore {
 
     /**
      * boostrapping methods: load()
-     * @param key record key
+     *
+     * @param key    record key
+     * @param offset checkpoint offset
      */
-    final public void unload(byte[] key) {
-        remove(ByteBuffer.wrap(key));
+    final public void unload(byte[] key, long offset) {
+        remove(ByteBuffer.wrap(key), offset);
     }
 
     /**
      * boostrapping methods: unload()
-     * @param key record key to be loaded
-     * @param value record value to be wrapped
+     *
+     * @param key       record key to be loaded
+     * @param value     record value to be wrapped
+     * @param offset    checkpoint offset
      * @param timestamp event time to be wrapped
      */
-    final public void load(byte[] key, byte[] value, long timestamp) {
+    final public void load(byte[] key, byte[] value, long offset, long timestamp) {
         ByteBuffer valueBuffer = wrap(value, timestamp);
-        update(ByteBuffer.wrap(key), valueBuffer);
+        put(ByteBuffer.wrap(key), valueBuffer, offset);
+    }
+
+    private class MemStoreManager extends Thread {
+
+        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, false));
+
+        volatile private boolean checkpointModified = false;
+
+        volatile private boolean stopped = true;
+
+        final private Path file;
+
+        public MemStoreManager() {
+            super();
+            file = dataDir.resolve(MemStore.this.getClass().getSimpleName() + ".checkpoint");
+        }
+
+        @Override
+        public synchronized void start() {
+
+            if (checkpointsEnable) try {
+                if (Files.exists(file)) checkpoint.set(Checkpoint.readFromFile(file));
+//TODO #80 use something similar as below to implement the cleaner, but as part of the run() method
+//                if (!checkpoint.get().closed) {
+//                    if (!Files.exists(file)) {
+//                        log.info("MemStore checkpoint doesn't exits: " + file);
+//                        Files.createDirectories(file.getParent());
+//                    } else {
+//                        log.info("MemStore was not closed cleanly, fixing it...");
+//                    }
+//                    int actualSize = 0;
+//                    Iterator<Map.Entry<ByteBuffer, ByteBuffer>> i = iterator();
+//                    log.info("Checking records...");
+//                    while (i.hasNext()) {
+//                        actualSize += 1;
+//                        if (actualSize % 100000 == 0) {
+//                            log.info("Checked num. records: " + actualSize / 10000 + "k");
+//                        }
+//                        i.next();
+//                    }
+//                    log.info("Actual num. records: " + actualSize);
+//                    log.info("Implementation num. records: " + numKeys());
+//                }
+                log.info("Initialized " + checkpoint + " from " + file);
+
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            super.start();
+        }
+
+        @Override
+        public void run() {
+            try {
+                stopped = false;
+                while (!stopped) {
+                    Thread.sleep(10000); //TODO make checkpoint interval configurable
+                    if (checkpointsEnable && checkpointModified) {
+                        writeCheckpoint(false);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in the manager thread", e);
+                Thread.currentThread().getThreadGroup().interrupt();
+            }
+        }
+
+        private void writeCheckpoint(boolean closing) throws IOException {
+            Checkpoint chk = (!closing) ? checkpoint.get()
+                    : checkpoint.updateAndGet(c -> new Checkpoint(c.offset, true));
+            log.debug("Writing checkpoint " + chk + " to file: " + file + ", final: " + closing);
+            chk.writeToFile(file);
+            checkpointModified = false;
+        }
+
+        private Checkpoint updateCheckpoint(long offset) {
+            return checkpoint.updateAndGet(chk -> {
+                if (log.isTraceEnabled()) {
+                    log.trace("updating checkpoint, offset: " + offset);
+                }
+                if (offset > chk.offset) {
+                    if (checkpointsEnable) checkpointModified = true;
+                    return new Checkpoint(offset, false);
+                } else {
+                    return chk;
+                }
+            });
+        }
+
+
+        public void close() throws IOException {
+            if (checkpointsEnable) writeCheckpoint(true);
+        }
     }
 
 

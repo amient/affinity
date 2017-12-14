@@ -20,30 +20,26 @@
 package io.amient.affinity.core.storage.rocksdb;
 
 import com.typesafe.config.Config;
+import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
+import org.rocksdb.*;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 
 public class MemStoreRocksDb extends MemStore {
 
+    private final static org.slf4j.Logger log = LoggerFactory.getLogger(MemStoreRocksDb.class);
+    private static Map<Path, Long> refs = new HashMap<>();
+    private static Map<Path, RocksDB> instances = new HashMap<>();
 
-    public static final String ConfigRocksDbDataPath = "memstore.rocksdb.data.path";
-
-    private static Map<String, Long> refs = new HashMap<>();
-    private static Map<String, RocksDB> instances = new HashMap<>();
-
-    synchronized private static final RocksDB createOrGetDbInstanceRef(String pathToData, Options rocksOptions) {
+    synchronized private static final RocksDB createOrGetDbInstanceRef(Path pathToData, Options rocksOptions, int ttlSecs) {
         RocksDB.loadLibrary();
         if (refs.containsKey(pathToData) && refs.get(pathToData) > 0) {
             refs.put(pathToData, refs.get(pathToData) + 1);
@@ -51,7 +47,10 @@ public class MemStoreRocksDb extends MemStore {
         } else {
 
             try {
-                RocksDB instance = RocksDB.open(rocksOptions, pathToData);
+                log.info("Opening RocksDb with TTL=" + ttlSecs);
+                RocksDB instance = ttlSecs > 0 ? TtlDB.open(rocksOptions, pathToData.toString(), ttlSecs, false)
+                        : TtlDB.open(rocksOptions, pathToData.toString());
+                //RocksDB instance = RocksDB.open(rocksOptions, pathToData.toString());
                 instances.put(pathToData, instance);
                 refs.put(pathToData, 1L);
                 return instance;
@@ -61,7 +60,7 @@ public class MemStoreRocksDb extends MemStore {
         }
     }
 
-    synchronized private static final void releaseDbInstance(String pathToData) {
+    synchronized private static final void releaseDbInstance(Path pathToData) {
         if (refs.get(pathToData) > 1) {
             refs.put(pathToData, refs.get(pathToData) - 1);
         } else {
@@ -70,23 +69,29 @@ public class MemStoreRocksDb extends MemStore {
         }
     }
 
-    private final String pathToData;
-    private final Path containerPath;
+    private final Path pathToData;
     private final RocksDB internal;
 
+    @Override
+    protected boolean isPersistent() {
+        return true;
+    }
+
     public MemStoreRocksDb(Config config, int partition) throws IOException {
-        pathToData = config.getString(ConfigRocksDbDataPath) + "/" + partition + "/";
-        containerPath = Paths.get(pathToData).getParent().toAbsolutePath();
-        Files.createDirectories(containerPath);
+        super(config, partition);
+        pathToData = dataDir.resolve(this.getClass().getSimpleName());
+
+        Files.createDirectories(pathToData);
         Options rocksOptions = new Options().setCreateIfMissing(true);
-        internal = createOrGetDbInstanceRef(pathToData, rocksOptions);
+        internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
     }
 
     @Override
-    public Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
-        return new java.util.Iterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
+    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
+        return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
             private RocksIterator rocksIterator = null;
             private boolean checked = false;
+
             @Override
             public boolean hasNext() {
                 checked = true;
@@ -105,9 +110,14 @@ public class MemStoreRocksDb extends MemStore {
                     if (!hasNext()) throw new NoSuchElementException("End of iterator");
                 }
                 checked = false;
-                return new AbstractMap.SimpleEntry<ByteBuffer, ByteBuffer>(
+                return new AbstractMap.SimpleEntry<>(
                         ByteBuffer.wrap(rocksIterator.key()), ByteBuffer.wrap(rocksIterator.value())
                 );
+            }
+
+            @Override
+            public void close() throws IOException {
+                if (rocksIterator != null) rocksIterator.close();
             }
         };
     }
@@ -118,24 +128,29 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    public Optional<ByteBuffer> updateImpl(ByteBuffer key, ByteBuffer value) {
+    synchronized public void putImpl(ByteBuffer key, ByteBuffer value) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
-        Optional<ByteBuffer> prev = get(keyBytes);
         try {
             internal.put(keyBytes, ByteUtils.bufToArray(value));
-            return prev;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public Optional<ByteBuffer> removeImpl(ByteBuffer key) {
+    public long numKeys() {
+        try {
+            return internal.getLongProperty("rocksdb.estimate-num-keys");
+        } catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    synchronized public void removeImpl(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
-        Optional<ByteBuffer> prev = get(keyBytes);
         try {
             internal.remove(keyBytes);
-            return prev;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
@@ -143,11 +158,15 @@ public class MemStoreRocksDb extends MemStore {
 
     @Override
     public void close() {
-        releaseDbInstance(pathToData);
+        try {
+            releaseDbInstance(pathToData);
+        } finally {
+            super.close();
+        }
     }
 
     private Optional<ByteBuffer> get(byte[] key) {
-        byte[] value = new byte[0];
+        byte[] value;
         try {
             value = internal.get(key);
             return Optional.ofNullable(value == null ? null : ByteBuffer.wrap(value));

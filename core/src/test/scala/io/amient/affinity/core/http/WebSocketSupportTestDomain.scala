@@ -27,11 +27,11 @@ object Side extends Enumeration {
   val LEFT, RIGHT = Value
 }
 
-case class ID(val id: Int) extends AvroRecord[ID] {
+case class ID(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord[Base] {
+case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 

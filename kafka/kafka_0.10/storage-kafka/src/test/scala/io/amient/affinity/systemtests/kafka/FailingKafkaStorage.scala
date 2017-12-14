@@ -1,10 +1,10 @@
 package io.amient.affinity.systemtests.kafka
 
-import java.nio.ByteBuffer
-import java.util.concurrent.{Callable, Executors, Future}
+import java.util.concurrent.Future
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.util.MappedJavaFuture
 import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
 
 /**
@@ -14,20 +14,10 @@ import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
   */
 class FailingKafkaStorage(config: Config, partition: Int) extends KafkaStorage(config, partition) {
 
-  val executor = Executors.newFixedThreadPool(1)
-
-  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[RecordMetadata] = {
-
-    val javaFuture: Future[RecordMetadata] = kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))
-    return executor.submit(new Callable[RecordMetadata]() {
-      override def call(): RecordMetadata = {
-        if (System.currentTimeMillis() % 10 == 0) {
-          throw new RuntimeException("Simulated Exception in FailingKafkaStorage")
-        } else {
-          javaFuture.get
-        }
-      }
-    })
+  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))) {
+      override def map(result: RecordMetadata): java.lang.Long = result.offset()
+    }
   }
 
 }

@@ -20,11 +20,14 @@
 package io.amient.affinity.core.storage
 
 import java.nio.ByteBuffer
+import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.util.ByteUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -43,45 +46,69 @@ object State {
   val CONFIG_STORAGE_CLASS = "storage.class"
   val CONFIG_MEMSTORE_CLASS = "memstore.class"
   val CONFIG_MEMSTORE_READ_TIMEOUT_MS = "memstore.read.timeout.ms"
+  val CONFIG_LOCK_TIMEOUT_MS = "lock.timeout.ms"
 }
 
-class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, stateConfig: Config)
+class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
                                      (implicit val partition: Int) extends Observable {
 
   self =>
 
   import State._
 
-  private val config = stateConfig.withFallback(ConfigFactory.empty()
-    .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
-    .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
-  )
-
+  val config = system.settings.config
+  val nodeDataDir = config.getString(Node.CONFIG_DATA_DIR)
+  val stateConfig = system.settings.config.getConfig(CONFIG_STATE_STORE(name))
   private val keySerde = Serde.of[K](system.settings.config)
   private val valueSerde = Serde.of[V](system.settings.config)
+  private val ttlSec = if (stateConfig.hasPath(CONFIG_TTL_SECONDS)) stateConfig.getInt(CONFIG_TTL_SECONDS) else -1
+  private val ttlMs: Long = if (ttlSec < 0) -1L else ttlSec * 1000
 
-  private val recordTtlMs = if (config.hasPath(CONFIG_TTL_SECONDS)) {
-    config.getLong(CONFIG_TTL_SECONDS) * 1000
-  } else {
-    Long.MaxValue
-  }
-  private val readTimeout = config.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
+  private val cfg = stateConfig.withFallback(ConfigFactory.empty()
+    .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
+    .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef(name))
+    .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(nodeDataDir))
+    .withValue(MemStore.CONFIG_TTL_SEC, ConfigValueFactory.fromAnyRef(ttlSec))
+    .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
+    .withValue(CONFIG_LOCK_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(10000))
+  )
 
-  private val storageClass = Class.forName(config.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
+
+  private val LockTimeoutMs = cfg.getLong(CONFIG_LOCK_TIMEOUT_MS)
+  private val readTimeout = cfg.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
+  private val storageClass = Class.forName(cfg.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
   private val storageClassSymbol = rootMirror.classSymbol(storageClass)
   private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
   private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
   private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
 
-  val storage: Storage = try constructorMirror(config, partition).asInstanceOf[Storage] catch {
+  val storage: Storage = try constructorMirror(cfg, partition).asInstanceOf[Storage] catch {
     case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
   }
 
-  import system.dispatcher
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
+
+  /**
+    * @return a weak iterator that doesn't block read and write operations
+    */
+  def iterator: CloseableIterator[(K, V)] = new CloseableIterator[(K, V)] {
+    val underlying = storage.memstore.iterator
+    val mapped = underlying.asScala.flatMap { entry =>
+      val key = keySerde.fromBytes(entry.getKey.array())
+      option(storage.memstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
+        bytes => (key, valueSerde.fromBytes(bytes))
+      }
+    }
+    override def next(): (K, V) = mapped.next()
+
+    override def hasNext: Boolean = mapped.hasNext
+
+    override def close(): Unit = underlying.close()
+  }
 
   /**
     * Retrieve a value from the store asynchronously
@@ -91,45 +118,66 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     *         Future.Success(None) if the key doesn't exist
     *         Future.Failed(Throwable) if a non-fatal exception occurs
     */
-  def apply(key: K): Option[V] = {
-    val k: ByteBuffer = ByteBuffer.wrap(keySerde.toBytes(key))
+  def apply(key: K): Option[V] = apply(ByteBuffer.wrap(keySerde.toBytes(key)))
+
+  /**
+    * This is similar to apply(key) except it also applies row lock which is useful if the client
+    * wants to make sure that the returned value incorporates all changes applied to it in update operations
+    * with in the same sequence.
+    *
+    * @param key
+    * @return
+    */
+  def get(key: K): Option[V] = {
+    val l = lock(key)
+    try {
+      apply(key)
+    } finally {
+      unlock(key, l)
+    }
+  }
+
+  private def apply(key: ByteBuffer): Option[V] = {
     for (
-      cell: ByteBuffer <- option(storage.memstore(k));
-      bytes: Array[Byte] <- option(storage.memstore.unwrap(k, cell, recordTtlMs))
+      cell: ByteBuffer <- option(storage.memstore(key));
+      bytes: Array[Byte] <- option(storage.memstore.unwrap(key, cell, ttlMs))
     ) yield valueSerde.fromBytes(bytes) match {
       case value: V => value
       case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
     }
   }
 
-  def iterator: Iterator[(K, V)] = {
-    storage.memstore.iterator.asScala.flatMap { entry =>
-      val key = keySerde.fromBytes(entry.getKey.array())
-      option(storage.memstore.unwrap(entry.getKey(), entry.getValue, recordTtlMs)).map {
-        bytes => (key, valueSerde.fromBytes(bytes))
-      }
-    }
-  }
-
-  def size: Long = storage.memstore.size()
-
   /**
-    * insert is a syntactic sugar for updateImpl where the value is overriden if it doesn't exist
-    * and the command is the value itself
-    *
-    * @param key to insert
-    * @param value new value to be associated with the key
-    * @return Future Optional of the value previously held at the key position
+    * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
-  def insert(key: K, value: V): Future[V] = update(key) {
-    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store `$name`")
-    case None => (Some(value), Some(value), value)
+  def numKeys: Long = storage.memstore.numKeys()
+
+  /**
+    * replace is a faster operation than update because it doesn't look at the existing value
+    * associated with the given key
+    *
+    * @param key   to update
+    * @param value new value to be associated with the key
+    * @return Unit Future which may be failed if the operation didn't succeed
+    */
+  def replace(key: K, value: V): Future[Unit] = {
+    put(ByteBuffer.wrap(keySerde.toBytes(key)), value).map(__ => push(key, value))
   }
 
   /**
-    * updateImpl is a syntactic sugar for updateImpl where the value is always overriden
+    * delete the given key
     *
-    * @param key to updateImpl
+    * @param key to delete
+    * @return Unit Future which may be failed if the operation didn't succeed
+    */
+  def delete(key: K): Future[Unit] = {
+    delete(ByteBuffer.wrap(keySerde.toBytes(key))).map(_ => push(key, null))
+  }
+
+  /**
+    * update is a syntactic sugar for update where the value is always overriden
+    *
+    * @param key   to updateImpl
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
@@ -140,9 +188,11 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /**
-    * removeImpl is a is a syntactic sugar for updateImpl where None is used as Value
+    * remove is a is a syntactic sugar for update where None is used as Value
+    * it is different from delete in that it returns the removed value
+    * which is more costly.
     *
-    * @param key to removeImpl
+    * @param key     to remove
     * @param command is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */
@@ -152,29 +202,60 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
   }
 
   /**
-    * updateImpl enables per-key observer pattern for incremental updates
+    * insert is a syntactic sugar for putImpl where the value is overriden if it doesn't exist
+    * and the command is the value itself
+    *
+    * @param key   to insert
+    * @param value new value to be associated with the key
+    * @return Future Optional of the value previously held at the key position
+    */
+  def insert(key: K, value: V): Future[V] = update(key) {
+    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store `$name`")
+    case None => (Some(value), Some(value), value)
+  }
+
+  /**
+    * update enables per-key observer pattern for incremental updates.
     *
     * @param key  key which is going to be updated
-    * @param pf   updateImpl function which maps the current value Option[V] at the given key to 3 values:
-    *             1. Option[Any] is the incremental updateImpl event
-    *             2. Option[V] is the new state for the given key as a result of the incremntal updateImpl
+    * @param pf   putImpl function which maps the current value Option[V] at the given key to 3 values:
+    *             1. Option[Any] is the incremental putImpl event
+    *             2. Option[V] is the new state for the given key as a result of the incremntal putImpl
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
   def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
-      pf(apply(key)) match {
-        case (None, _, result) => Future.successful(result)
-        case (Some(increment), changed, result) => changed match {
-          case Some(updatedValue) =>
-            put(key, updatedValue) andThen {
-              case _ => push(key, increment)
-            } map (_ => result)
-          case None =>
-            delete(key) andThen {
-              case _ => push(key, increment)
-            } map (_ => result)
+      val k = ByteBuffer.wrap(keySerde.toBytes(key))
+      val l = lock(key)
+      try {
+        pf(apply(k)) match {
+          case (None, _, result) =>
+            unlock(key, l)
+            Future.successful(result)
+          case (Some(increment), changed, result) => changed match {
+            case Some(updatedValue) =>
+              put(k, updatedValue) transform( {
+                s => unlock(key, l); s
+              }, {
+                e => unlock(key, l); e
+              }) andThen {
+                case _ => push(key, increment)
+              } map (_ => result)
+            case None =>
+              delete(k) transform( {
+                s => unlock(key, l); s
+              }, {
+                e => unlock(key, l); e
+              }) andThen {
+                case _ => push(key, increment)
+              } map (_ => result)
+          }
         }
+      } catch {
+        case e: Throwable =>
+          unlock(key, l)
+          throw e
       }
     } catch {
       case NonFatal(e) => Future.failed(e)
@@ -188,30 +269,23 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * the previous value is rolled back in the memstore and the failure is propagated into
     * the result future.
     *
-    * @param key to replace
+    * @param key   serielized key wrapped in a ByteBuffer
     * @param value new value for the key
-    * @return A a future optional value previously held at the key position
-    *         the future option will be equal to None if new a value was inserted
+    * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def put(key: K, value: V): Future[Option[V]] = {
+  private def put(key: ByteBuffer, value: V): Future[Checkpoint] = {
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
       case e: EventTime => e.eventTimeUtc()
       case _ => nowMs
     }
-    val expires = recordTimestamp + recordTtlMs
-    if (recordTtlMs < Long.MaxValue && expires < nowMs) {
+    if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
       delete(key)
     } else {
-      val keyBytes = keySerde.toBytes(key)
-      val k = ByteBuffer.wrap(keyBytes)
       val valueBytes = valueSerde.toBytes(value)
-      val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
-      option(storage.memstore.update(k, memStoreValue)) match {
-        case Some(prev) if prev == memStoreValue => Future.successful(Some(value))
-        case differentOrNone =>
-          val writeOperation: Future[_] = storage.write(keyBytes, valueBytes, recordTimestamp)
-          writeWithMemstoreRollback(k, differentOrNone, writeOperation)
+      storage.write(ByteUtils.bufToArray(key), valueBytes, recordTimestamp) map { offset =>
+        val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
+        storage.memstore.put(key, memStoreValue, offset)
       }
     }
   }
@@ -223,45 +297,13 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
     * the previous value is rolled back in the memstore and the failure is propagated into
     * the result future.
     *
-    * @param key to delete
-    * @return A a future optional value previously held at the key position
-    *         the future option will be equal to None if new a value was inserted
+    * @param key serialized key to delete
+    * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def delete(key: K): Future[Option[V]] = {
-    val keyBytes = keySerde.toBytes(key)
-    val k = ByteBuffer.wrap(keyBytes)
-    option(storage.memstore.remove(k)) match {
-      case None => Future.successful(None)
-      case some =>
-        val deleteOperation: Future[_] = storage.delete(keyBytes)
-        writeWithMemstoreRollback(k, some, deleteOperation)
+  private def delete(key: ByteBuffer): Future[Checkpoint] = {
+    storage.delete(ByteUtils.bufToArray(key)) map { offset =>
+      storage.memstore.remove(key, offset)
     }
-  }
-
-  /**
-    *
-    * @param k     serialized key
-    * @param prev  serialized bytes held at the given key before the write operation was invoked
-    * @param write write operation which is expected to succeed otherwise the memstore will be reverted to the prev value
-    * @return Future.Success(Option[ByteBuffer]) deserialized value previously held at the given key
-    *         Future.Failure(Throwable) if the failure occurs
-    */
-  private def writeWithMemstoreRollback(k: ByteBuffer, prev: Option[ByteBuffer], write: Future[_]): Future[Option[V]] = {
-    def commit(success: Any): Option[V] = prev
-      .flatMap(cell => option(storage.memstore.unwrap(k, cell, recordTtlMs)))
-      .map(valueSerde.fromBytes)
-
-    def revert(failure: Throwable) = {
-      //write to storage failed - reverting the memstore modification
-      //TODO use cell versioning to cancel revert if another write succeeded after the one being reverted
-      prev match {
-        case None => storage.memstore.remove(k)
-        case Some(rollback) => storage.memstore.update(k, rollback)
-      }
-      failure
-    }
-
-    write transform(commit, revert)
   }
 
   /*
@@ -322,6 +364,36 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem, sta
         observable.deleteObserver(observer)
         if (observable.countObservers() == 0) observables -= k
     }
+  }
+
+  /**
+    * row locking functionality
+    */
+
+  private val locks = new ConcurrentHashMap[K, java.lang.Long]
+
+  private def unlock(key: K, l: java.lang.Long): Unit = {
+    if (!locks.remove(key, l)) {
+      throw new IllegalMonitorStateException(s"$key is locked by another Thread")
+    }
+  }
+
+  private def lock(key: K): java.lang.Long = {
+    val l = Thread.currentThread.getId
+    var counter = 0
+    val start = System.currentTimeMillis
+    while (locks.putIfAbsent(key, l) != null) {
+      counter += 1
+      val sleepTime = math.log(counter).round
+      if (sleepTime > 0) {
+        if (System.currentTimeMillis - start > LockTimeoutMs) {
+          throw new TimeoutException(s"Could not acquire lock for $key in $LockTimeoutMs ms")
+        } else {
+          Thread.sleep(sleepTime)
+        }
+      }
+    }
+    l
   }
 
 }

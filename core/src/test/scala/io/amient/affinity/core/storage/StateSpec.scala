@@ -2,13 +2,26 @@ package io.amient.affinity.core.storage
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroRecord
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
-case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord[ExpirableValue] with EventTime
+import scala.collection.JavaConverters._
 
-class StateSpec extends TestKit(ActorSystem.create("test", ConfigFactory.defaultReference()))
+case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord with EventTime
+
+class StateSpec extends TestKit(ActorSystem.create("test",
+  ConfigFactory.parseMap(Map(
+    State.CONFIG_STATE_STORE("test-state-1") -> Map(
+      State.CONFIG_MEMSTORE_CLASS -> classOf[MemStoreSimpleMap].getName,
+      State.CONFIG_STORAGE_CLASS -> classOf[NoopStorage].getName
+    ).asJava,
+    State.CONFIG_STATE_STORE("test-state-2") -> Map(
+      State.CONFIG_MEMSTORE_CLASS -> classOf[MemStoreSimpleMap].getName,
+      State.CONFIG_STORAGE_CLASS -> classOf[NoopStorage].getName,
+      State.CONFIG_TTL_SECONDS -> 5
+    ).asJava
+  ).asJava).withFallback(ConfigFactory.defaultReference())))
   with ImplicitSender with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   override def afterAll {
@@ -18,12 +31,8 @@ class StateSpec extends TestKit(ActorSystem.create("test", ConfigFactory.default
   behavior of "State"
 
   it should "work without ttl" in {
-    val stateConfig = ConfigFactory.empty()
-      .withValue(State.CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
-      .withValue(State.CONFIG_STORAGE_CLASS, ConfigValueFactory.fromAnyRef(classOf[NoopStorage].getName))
-
     implicit val partition = 0
-    val state = new State[Long, ExpirableValue]("test-state-1", system, stateConfig)
+    val state = new State[Long, ExpirableValue]("test-state-1", system)
 
     val nowMs = System.currentTimeMillis()
 
@@ -38,13 +47,8 @@ class StateSpec extends TestKit(ActorSystem.create("test", ConfigFactory.default
 
   it should "clean expired entries when ttl set" in {
 
-    val stateConfig = ConfigFactory.empty()
-        .withValue(State.CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
-        .withValue(State.CONFIG_STORAGE_CLASS, ConfigValueFactory.fromAnyRef(classOf[NoopStorage].getName))
-        .withValue(State.CONFIG_TTL_SECONDS, ConfigValueFactory.fromAnyRef(5))
-
     implicit val partition = 0
-    val state = new State[Long, ExpirableValue]("test-state-2", system, stateConfig)
+    val state = new State[Long, ExpirableValue]("test-state-2", system)
 
     val nowMs = System.currentTimeMillis()
 
@@ -55,6 +59,7 @@ class StateSpec extends TestKit(ActorSystem.create("test", ConfigFactory.default
     state(2L) should be (Some(ExpirableValue("two", nowMs - 3000)))
     state(3L) should be (Some(ExpirableValue("three", nowMs)))
     state.iterator.size should be (2L)
+    state.numKeys should be(2L)
   }
 
 

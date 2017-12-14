@@ -22,23 +22,23 @@ package io.amient.affinity.core.transaction
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.util.Reply
 
-case class TestKey(val id: Int) extends AvroRecord[TestKey] with Reply[Option[TestValue]] {
+case class TestKey(val id: Int) extends AvroRecord with Reply[Option[TestValue]] {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class TestValue(items: List[Int]) extends AvroRecord[TestValue] {
+case class TestValue(items: List[Int]) extends AvroRecord {
   def withAddedItem(item: Int) = TestValue(items :+ item)
   def withRemovedItem(item: Int) = TestValue(items.filter(_ != item))
 }
 
-case class AddItem(key: TestKey, item: Int) extends AvroRecord[AddItem] with Instruction[TestValue] {
+case class AddItem(key: TestKey, item: Int) extends AvroRecord with Instruction[TestValue] {
   override def hashCode() = key.hashCode()
   override def reverse(result: TestValue): Option[Instruction[_]] = {
     if (result.items.contains(item)) None else Some(RemoveItem(key, item))
   }
 }
 
-case class RemoveItem(key: TestKey, item: Int) extends AvroRecord[RemoveItem] with Instruction[TestValue] {
+case class RemoveItem(key: TestKey, item: Int) extends AvroRecord with Instruction[TestValue] {
   override def hashCode() = key.hashCode()
   override def reverse(result: TestValue): Option[Instruction[_]] = {
     if (result.items.contains(item)) Some(AddItem(key, item)) else None

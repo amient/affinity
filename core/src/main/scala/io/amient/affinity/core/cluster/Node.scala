@@ -43,6 +43,7 @@ object Node {
   final val CONFIG_NODE_SYSTEM_NAME = "affinity.node.name"
   final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.hostname"
   final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
+  final val CONFIG_DATA_DIR = "affinity.node.data.dir"
 }
 
 class Node(config: Config) {

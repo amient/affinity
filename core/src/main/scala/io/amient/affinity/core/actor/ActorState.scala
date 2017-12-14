@@ -36,8 +36,6 @@ trait ActorState extends Actor {
 
   private val config = context.system.settings.config
 
-  import State._
-
   abstract override def postStop(): Unit = {
     super.postStop()
     closeState()
@@ -49,7 +47,7 @@ trait ActorState extends Actor {
   }
 
   def state[K: ClassTag, V: ClassTag](name: String)(implicit partition: Int): State[K, V] = state[K,V] {
-    new State[K, V](name, context.system, config.getConfig(CONFIG_STATE_STORE(name)))
+    new State[K, V](name, context.system)
   }
 
   def state[K, V](creator: => State[K, V]): State[K, V] = {
@@ -65,7 +63,11 @@ trait ActorState extends Actor {
     storageRegistry.asScala.find(_.name == stateStoreName).get
   }
 
-  def bootState(): Unit = storageRegistry.asScala.foreach(_.storage.boot())
+  def bootState(): Unit = storageRegistry.asScala.foreach { s =>
+    log.info(s"'${s.name}' state booted, memstore numKeys=${s.numKeys}")
+    s.storage.boot()
+  }
+
 
   def tailState(): Unit = storageRegistry.asScala.foreach(_.storage.tail())
 

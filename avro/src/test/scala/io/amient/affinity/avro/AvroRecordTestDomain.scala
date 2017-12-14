@@ -28,28 +28,28 @@ object SimpleEnum extends Enumeration {
   val A, B, C = Value
 }
 
-case class SimpleKey(val id: Int) extends AvroRecord[SimpleKey] {
+case class SimpleKey(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord[SimpleRecord] {
+case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-case class Record_V1(val items: Seq[SimpleRecord] = Seq(), val removed: Int = 0) extends AvroRecord[Record_V1]
+case class Record_V1(val items: Seq[SimpleRecord] = Seq(), val removed: Int = 0) extends AvroRecord
 
 case class Record(
                 val items: Seq[SimpleRecord] = Seq(),
                 val index: Map[String, SimpleRecord] = Map(),
-                val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord[Record]
+                val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord
 
-case class Record_V3(val items: Seq[SimpleRecord] = Seq(), val index: Map[String, SimpleRecord] = Map()) extends AvroRecord[Record_V3]
+case class Record_V3(val items: Seq[SimpleRecord] = Seq(), val index: Map[String, SimpleRecord] = Map()) extends AvroRecord
 
 object AvroUUID {
   def apply(uuid: UUID): AvroUUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
 }
 
-case class AvroUUID(val data: ByteBuffer) extends AvroRecord[AvroUUID] {
+case class AvroUUID(val data: ByteBuffer) extends AvroRecord {
   def uuid: UUID = ByteUtils.uuid(data.array)
   override def hashCode(): Int = data.hashCode()
 }
@@ -59,14 +59,14 @@ case class AvroEnums(raw: SimpleEnum.Value = SimpleEnum.A,
                      sd: Option[SimpleEnum.Value] = Some(SimpleEnum.A),
                      l: List[SimpleEnum.Value] = List(),
                      lo: List[Option[SimpleEnum.Value]] = List(Some(SimpleEnum.B))
-                    ) extends AvroRecord[AvroEnums]
+                    ) extends AvroRecord
 
 case class AvroNamedRecords(
                              e: SimpleKey = SimpleKey(0),
                              rn: Option[SimpleKey] = None,
                              rs: Option[SimpleKey] = Some(SimpleKey(0)),
                              l: List[SimpleKey] = List(SimpleKey(0)),
-                             lo: List[Option[SimpleKey]] = List()) extends AvroRecord[AvroNamedRecords]
+                             lo: List[Option[SimpleKey]] = List()) extends AvroRecord
 
 case class AvroPrmitives(
                         bn: Option[Boolean] = None,
@@ -81,4 +81,4 @@ case class AvroPrmitives(
                        ds: Option[Double] = Some(Double.MinValue),
                        sn: Option[String] = None,
                        ss: Option[String] = Some("Hello")
-                       ) extends AvroRecord[AvroPrmitives]
+                       ) extends AvroRecord

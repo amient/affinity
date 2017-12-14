@@ -41,8 +41,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
   }
 
 
-  private def createStateStoreForPartition(name: String, stateStoreConfig: Config)(implicit partition: Int) = {
-    new State[Int, TestRecord](name, system, stateStoreConfig)
+  private def createStateStoreForPartition(name: String)(implicit partition: Int) = {
+    new State[Int, TestRecord](name, system)
   }
 
   behavior of "KafkaDeserializer"
@@ -54,12 +54,12 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
     val stateStoreName = "throughput-test"
     val stateStoreConfig = config.getConfig(State.CONFIG_STATE_STORE(stateStoreName))
     val topic = stateStoreConfig.getString(KafkaStorage.CONFIG_KAFKA_TOPIC)
-    val state = createStateStoreForPartition(stateStoreName, stateStoreConfig)(0)
+    val state = createStateStoreForPartition(stateStoreName)(partition = 0)
     val numWrites = new AtomicInteger(10)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-      state.update(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+      state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
         (s) => s, (e: Throwable) => {
         numWrites.decrementAndGet()
         e
@@ -67,7 +67,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
     })
     Await.ready(updates, 10 seconds)
     println(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
-    state.size should equal(numWrites.get)
+    state.numKeys should equal(numWrites.get)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,

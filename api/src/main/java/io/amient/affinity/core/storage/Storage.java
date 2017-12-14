@@ -35,15 +35,9 @@ public abstract class Storage {
             throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         Class<? extends MemStore> memstoreClass
                 = Class.forName(config.getString(CONFIG_MEMSTORE_CLASS)).asSubclass(MemStore.class);
-        MemStore tmp;
-        try {
-            Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
-            tmp = memstoreConstructor.newInstance(config, partition);
-        } catch (NoSuchMethodException e) {
-            Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor();
-            tmp = memstoreConstructor.newInstance();
-        }
-        memstore = tmp;
+        Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
+        memstore = memstoreConstructor.newInstance(config, partition);
+        memstore.open();
     }
 
     /**
@@ -88,10 +82,10 @@ public abstract class Storage {
      * @param key       record key
      * @param value     record value
      * @param timestamp logical event time
-     * @return Future with metadata returned by the underlying implementation
+     * @return Future with long offset/audit increment
      */
-    abstract public Future<?> write(byte[] key, byte[] value, long timestamp);
+    abstract public Future<Long> write(byte[] key, byte[] value, long timestamp);
 
-    abstract public Future<?> delete(byte[] key);
+    abstract public Future<Long> delete(byte[] key);
 
 }
