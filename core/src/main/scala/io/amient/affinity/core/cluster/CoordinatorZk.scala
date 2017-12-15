@@ -50,7 +50,7 @@ object CoordinatorZk {
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  val conf = new CoordinatorZk.Conf()(system.settings.config).ZooKeeper
+  val conf = CoordinatorZk.Conf(system.settings.config).ZooKeeper
 
   val zkRoot = conf.Root()
 

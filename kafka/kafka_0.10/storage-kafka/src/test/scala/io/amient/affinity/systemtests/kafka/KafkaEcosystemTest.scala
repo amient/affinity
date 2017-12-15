@@ -55,7 +55,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
     system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZkAvroSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
-    val topic = new KafkaStorageConf()(new Node.Config()(config).Affi.State(stateStoreName).Storage).Topic()
+    val topic = KafkaStorageConf(Node.Conf(config).Affi.State(stateStoreName).Storage).Topic()
     val state = createStateStoreForPartition(stateStoreName)(partition = 0)
     val numWrites = new AtomicInteger(10)
     val numToWrite = numWrites.get

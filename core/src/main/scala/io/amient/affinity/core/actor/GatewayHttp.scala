@@ -80,7 +80,7 @@ trait GatewayHttp extends ServicesApi {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val conf = new ServicesApi.Conf()(context.system.settings.config)
+  private val conf = ServicesApi.Conf(context.system.settings.config)
 
   private val suspendedQueueMaxSize = conf.Gateway.SuspendQueueMaxSize()
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
@@ -393,7 +393,7 @@ trait WebSocketSupport extends GatewayHttp {
         //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
         val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
-          val conf = new ServicesApi.Conf()(context.system.settings.config)
+          val conf = ServicesApi.Conf(context.system.settings.config)
 
           final val maxBufferSize = conf.Gateway.Http.MaxWebSocketQueueSize()
 

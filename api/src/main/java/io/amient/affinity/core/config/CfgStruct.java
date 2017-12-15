@@ -89,7 +89,6 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         }
         String errorMessage = errors.toString();
         if (!errorMessage.isEmpty()) {
-            System.err.println(new IllegalArgumentException(errorMessage));
             throw new IllegalArgumentException(errorMessage);
         }
         return (T) setValue((T) this);

@@ -25,7 +25,7 @@ import java.net.{HttpURLConnection, URL}
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.AvroSerde.AvroConf
+import io.amient.affinity.avro.AvroSerde.{AvroConf, Conf}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.apache.avro.Schema
@@ -36,7 +36,9 @@ import scala.collection.JavaConverters._
 
 object CfAvroSchemaRegistry {
 
-  object Conf extends Conf
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val Avro = struct("affinity.avro", new CfAvroConf, false)
@@ -55,7 +57,7 @@ object CfAvroSchemaRegistry {
   */
 class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
   val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
-  val conf = new CfAvroConf()(merged)
+  val conf = new CfAvroConf().apply(merged)
   val client = new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
 
   override def close(): Unit = ()

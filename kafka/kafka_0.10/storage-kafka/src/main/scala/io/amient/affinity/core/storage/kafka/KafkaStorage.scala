@@ -24,15 +24,14 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Future, TimeUnit}
 
+import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.{StateConf, Storage}
 import io.amient.affinity.core.util.MappedJavaFuture
-import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.config.TopicConfig
 import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
@@ -42,6 +41,10 @@ import scala.language.reflectiveCalls
 
 
 object KafkaStorage {
+
+  object KafkaStorageConf extends KafkaStorageConf {
+    override def apply(config: Config): KafkaStorageConf = new KafkaStorageConf().apply(config)
+  }
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
@@ -58,18 +61,18 @@ object KafkaStorage {
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 }
 
-class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partition) {
+class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateConf, partition) {
 
   import KafkaStorage._
 
-  private val config = new KafkaStorageConf()(conf.Storage)
+  private val conf = KafkaStorageConf(stateConf.Storage)
 
-  final val topic = config.Topic()
-  final val ttlSec = conf.TtlSeconds()
+  final val topic = conf.Topic()
+  final val ttlSec = stateConf.TtlSeconds()
 
   private val producerProps = new Properties() {
-    if (config.Producer.isDefined) {
-      val producerConfig = config.Producer.config()
+    if (conf.Producer.isDefined) {
+      val producerConfig = conf.Producer.config()
       if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
@@ -77,7 +80,7 @@ class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partit
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
-    put("bootstrap.servers", config.BootstrapServers())
+    put("bootstrap.servers", conf.BootstrapServers())
     put("key.serializer", classOf[ByteArraySerializer].getName)
     put("value.serializer", classOf[ByteArraySerializer].getName)
   }
@@ -85,8 +88,8 @@ class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partit
   require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
 
   val consumerProps = new Properties() {
-    if (config.Consumer.isDefined) {
-      val consumerConfig = config.Consumer.config()
+    if (conf.Consumer.isDefined) {
+      val consumerConfig = conf.Consumer.config()
       if (consumerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
@@ -95,7 +98,7 @@ class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partit
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
-    put("bootstrap.servers", config.BootstrapServers())
+    put("bootstrap.servers", conf.BootstrapServers())
     put("enable.auto.commit", "false")
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)

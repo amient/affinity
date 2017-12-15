@@ -30,7 +30,9 @@ import scala.collection.JavaConversions._
 
 object AvroSerde {
 
-  object Conf extends Conf
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val Avro = struct("affinity.avro", new AvroConf, false)
@@ -42,9 +44,7 @@ object AvroSerde {
     }
   }
 
-  def create(config: Config): AvroSerde = {
-    create(new AvroSerde.Conf()(config).Avro)
-  }
+  def create(config: Config): AvroSerde = create(Conf(config).Avro)
 
   def create(conf: AvroConf): AvroSerde = {
     val providerClass: Class[_ <: AvroSerde] = conf.Class()

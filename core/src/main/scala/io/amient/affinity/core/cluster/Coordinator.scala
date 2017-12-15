@@ -30,15 +30,19 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.util.Reply
 
+import scala.collection.JavaConversions._
 import scala.collection.Set
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-import scala.collection.JavaConversions._
 
 object Coordinator {
+
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val Coordinator = struct("affinity.coordinator", new CoorinatorConf, true)
@@ -62,7 +66,7 @@ object Coordinator {
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
-    val cls = new Coordinator.Conf()(config).Coordinator.Class()
+    val cls = Conf(config).Coordinator.Class()
     val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Config])
     constructor.newInstance(system, group, config)
   }

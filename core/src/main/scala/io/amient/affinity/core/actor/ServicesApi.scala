@@ -8,12 +8,13 @@ import akka.pattern.ask
 import akka.routing._
 import akka.serialization.SerializationExtension
 import akka.util.Timeout
+import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Service.{CheckServiceAvailability, ServiceAvailability}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
-import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgStruct}
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 
 import scala.collection.mutable
@@ -22,12 +23,16 @@ import scala.concurrent.{Await, Future}
 
 object ServicesApi {
 
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Gateway = struct("affinity.node.gateway", new GatewayConf, false)
-    val Services = group("affinity.service", new ServicesConf, false)
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
   }
 
-  class ServicesConf extends CfgGroup(classOf[Service.Config])
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Gateway = struct("affinity.node.gateway", new GatewayConf, false)
+    val Services = group("affinity.service", classOf[Service.Conf], false)
+  }
+
+  //class ServicesConf extends CfgGroup(classOf[Service.Conf])
 
   class GatewayConf extends CfgStruct[GatewayConf] {
     val Class = cls("class", classOf[ServicesApi], false)
@@ -45,7 +50,7 @@ trait ServicesApi extends ActorHandler {
 
   import ServicesApi._
 
-  private val conf = new ServicesApi.Conf()(context.system.settings.config)
+  private val conf = ServicesApi.Conf(context.system.settings.config)
 
   if (conf.Gateway.Http.isDefined && !classOf[GatewayHttp].isAssignableFrom(this.getClass)) {
     log.warning("affinity.gateway.http interface is configured but the node is trying " +

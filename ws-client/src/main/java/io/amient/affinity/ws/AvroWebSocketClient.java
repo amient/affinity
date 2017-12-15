@@ -97,8 +97,10 @@ final public class AvroWebSocketClient {
     @OnMessage
     public void onMessage(byte[] message) throws IOException {
         if (message.length == 0) {
-            //FIXME #28 what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
-            avroMessageHandler.onMessage(null);
+            if (avroMessageHandler != null) {
+                //FIXME #28 what should really be sent is a typed empty record which comes back to the API design issue of representing a zero-value of an avro record
+                avroMessageHandler.onMessage(null);
+            }
             return;
         }
         ByteBuffer buf = ByteBuffer.wrap(message);

@@ -26,11 +26,10 @@ abstract public class Cfg<T> {
         this.value = Optional.of(value);
         return (C)this;
     }
+
     final public T apply() {
         return value.isPresent() ? value.get() : defaultValue.get();
     }
-
-    final public String relativePath() { return relPath == null ? "" : relPath; }
 
     final public String path() {
         return path == null ? "" : path;
