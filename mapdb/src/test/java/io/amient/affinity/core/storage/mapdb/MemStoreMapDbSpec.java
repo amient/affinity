@@ -23,6 +23,7 @@ import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
 import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
+import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -42,12 +43,14 @@ public class MemStoreMapDbSpec {
     @Test
     public void testMemStoreMapDb() throws IOException {
         String tmp = folder.newFolder().toString();
-        Config config = ConfigFactory.empty()
-                .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef("test"))
-                .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(tmp))
-                .withValue(MemStoreMapDb.CONFIG_MAPDB_MMAP_ENABLED, ConfigValueFactory.fromAnyRef(false));
 
-        MemStore instance = new MemStoreMapDb(config, 0);
+        StateConf template = new StateConf();
+        Config config = ConfigFactory.empty()
+                .withValue(template.Name.path(), ConfigValueFactory.fromAnyRef("test"))
+                .withValue(template.MemStore.DataDir.path(), ConfigValueFactory.fromAnyRef(tmp))
+                .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreMapDb.class.getName()))
+                .withValue(template.MemStore.path(new MemStoreMapDb.MemStoreMapDbConf().MemoryMapEnabled.path()), ConfigValueFactory.fromAnyRef(false));
+        MemStore instance = new MemStoreMapDb(new StateConf().apply(config), 0);
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

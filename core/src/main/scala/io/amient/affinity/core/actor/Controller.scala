@@ -24,6 +24,7 @@ import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
@@ -35,8 +36,6 @@ object Controller {
   final case class CreateContainer(group: String, partitions: List[Int], partitionProps: Props) extends Reply[Unit]
 
   final case class ContainerOnline(group: String)
-
-  final case class ServicesStarted()
 
   final case class CreateGateway(handlerProps: Props) extends Reply[Int]
 
@@ -51,6 +50,8 @@ class Controller extends Actor {
   private val log = Logging.getLogger(context.system, this)
 
   private val config = context.system.settings.config
+
+  private val conf = new Node.Config()(config)
 
   import Controller._
 
@@ -95,15 +96,18 @@ class Controller extends Actor {
     }
 
     case request@CreateGateway(gatewayProps) => try {
-      context.watch(context.actorOf(gatewayProps, name = "gateway"))
+      val gatewayRef = context.actorOf(gatewayProps, name = "gateway")
+      context.watch(gatewayRef)
       gatewayPromise = Promise[Int]()
       sender.replyWith(request) {
         gatewayPromise.future
       }
+      gatewayRef ! CreateGateway
     } catch {
-      case e: InvalidActorNameException => sender.replyWith(request) {
-        gatewayPromise.future
-      }
+      case _: InvalidActorNameException =>
+        sender.replyWith(request) {
+          gatewayPromise.future
+        }
     }
 
     case Terminated(child) if (child.path.name == "gateway") =>
@@ -112,11 +116,6 @@ class Controller extends Actor {
     case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) {
       log.info("Gateway online (with http)")
       gatewayPromise.success(httpPort)
-    }
-
-    case ServicesStarted() => if (!gatewayPromise.isCompleted && !config.hasPath(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST)) {
-      log.info("Gateway online (without http)")
-      gatewayPromise.success(-1)
     }
 
     case request@GracefulShutdown() => sender.replyWith(request) {

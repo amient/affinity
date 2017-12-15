@@ -19,9 +19,9 @@
 
 package io.amient.affinity.core.storage.rocksdb;
 
-import com.typesafe.config.Config;
 import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
+import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import org.rocksdb.*;
 import org.slf4j.LoggerFactory;
@@ -77,10 +77,10 @@ public class MemStoreRocksDb extends MemStore {
         return true;
     }
 
-    public MemStoreRocksDb(Config config, int partition) throws IOException {
-        super(config, partition);
+    public MemStoreRocksDb(StateConf conf, int partition) throws IOException {
+        super(conf, partition);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
-
+        log.info("Opening RocksDb MemStore: " + pathToData);
         Files.createDirectories(pathToData);
         Options rocksOptions = new Options().setCreateIfMissing(true);
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);

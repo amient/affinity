@@ -24,29 +24,24 @@ import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.util.ByteUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal
 
 object State {
-  val CONFIG_STATE = "affinity.state"
 
-  def CONFIG_STATE_STORE(name: String) = s"affinity.state.$name"
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val State = group("affinity.state", classOf[StateConf], false)
+  }
 
-  val CONFIG_TTL_SECONDS = "ttl.sec"
-  val CONFIG_STORAGE_CLASS = "storage.class"
-  val CONFIG_MEMSTORE_CLASS = "memstore.class"
-  val CONFIG_MEMSTORE_READ_TIMEOUT_MS = "memstore.read.timeout.ms"
-  val CONFIG_LOCK_TIMEOUT_MS = "lock.timeout.ms"
 }
 
 class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
@@ -54,35 +49,23 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
 
   self =>
 
-  import State._
+  val conf = new Node.Config()(system.settings.config)
+  val stateConf = conf.Affi.State(name)
+  stateConf.Name.setValue(name)
+  if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
 
-  val config = system.settings.config
-  val nodeDataDir = config.getString(Node.CONFIG_DATA_DIR)
-  val stateConfig = system.settings.config.getConfig(CONFIG_STATE_STORE(name))
   private val keySerde = Serde.of[K](system.settings.config)
   private val valueSerde = Serde.of[V](system.settings.config)
-  private val ttlSec = if (stateConfig.hasPath(CONFIG_TTL_SECONDS)) stateConfig.getInt(CONFIG_TTL_SECONDS) else -1
-  private val ttlMs: Long = if (ttlSec < 0) -1L else ttlSec * 1000
-
-  private val cfg = stateConfig.withFallback(ConfigFactory.empty()
-    .withValue(CONFIG_MEMSTORE_CLASS, ConfigValueFactory.fromAnyRef(classOf[MemStoreSimpleMap].getName))
-    .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef(name))
-    .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(nodeDataDir))
-    .withValue(MemStore.CONFIG_TTL_SEC, ConfigValueFactory.fromAnyRef(ttlSec))
-    .withValue(CONFIG_MEMSTORE_READ_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(1000))
-    .withValue(CONFIG_LOCK_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(10000))
-  )
-
-
-  private val LockTimeoutMs = cfg.getLong(CONFIG_LOCK_TIMEOUT_MS)
-  private val readTimeout = cfg.getInt(CONFIG_MEMSTORE_READ_TIMEOUT_MS) milliseconds
-  private val storageClass = Class.forName(cfg.getString(CONFIG_STORAGE_CLASS)).asSubclass(classOf[Storage])
-  private val storageClassSymbol = rootMirror.classSymbol(storageClass)
-  private val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
-  private val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
-  private val constructorMirror = storageClassMirror.reflectConstructor(constructor)
-
-  val storage: Storage = try constructorMirror(cfg, partition).asInstanceOf[Storage] catch {
+  private val ttlMs: Long = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000
+  private val lockTimeoutMs = stateConf.LockTimeoutMs();
+  val storage: Storage = try if (!stateConf.Storage.isDefined) new NoopStorage(stateConf, partition) else {
+    val storageClass = stateConf.Storage.Class()
+    val storageClassSymbol = rootMirror.classSymbol(storageClass)
+    val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
+    val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
+    val constructorMirror = storageClassMirror.reflectConstructor(constructor)
+    constructorMirror(stateConf, partition).asInstanceOf[Storage]
+  } catch {
     case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
   }
 
@@ -103,6 +86,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
         bytes => (key, valueSerde.fromBytes(bytes))
       }
     }
+
     override def next(): (K, V) = mapped.next()
 
     override def hasNext: Boolean = mapped.hasNext
@@ -386,8 +370,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
       counter += 1
       val sleepTime = math.log(counter).round
       if (sleepTime > 0) {
-        if (System.currentTimeMillis - start > LockTimeoutMs) {
-          throw new TimeoutException(s"Could not acquire lock for $key in $LockTimeoutMs ms")
+        if (System.currentTimeMillis - start > lockTimeoutMs) {
+          throw new TimeoutException(s"Could not acquire lock for $key in $lockTimeoutMs ms")
         } else {
           Thread.sleep(sleepTime)
         }

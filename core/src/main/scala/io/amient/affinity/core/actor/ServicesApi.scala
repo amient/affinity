@@ -8,12 +8,12 @@ import akka.pattern.ask
 import akka.routing._
 import akka.serialization.SerializationExtension
 import akka.util.Timeout
-import com.typesafe.config.Config
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Controller.GracefulShutdown
+import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Service.{CheckServiceAvailability, ServiceAvailability}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
+import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgStruct}
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 
 import scala.collection.mutable
@@ -21,8 +21,21 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 object ServicesApi {
-  final val CONFIG_SERVICES = "affinity.service"
-  final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
+
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Gateway = struct("affinity.node.gateway", new GatewayConf, false)
+    val Services = group("affinity.service", new ServicesConf, false)
+  }
+
+  class ServicesConf extends CfgGroup(classOf[Service.Config])
+
+  class GatewayConf extends CfgStruct[GatewayConf] {
+    val Class = cls("class", classOf[ServicesApi], false)
+    val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
+    val Http = struct("http", new GatewayHttp.HttpConf, false)
+  }
+
+
   final case class GatewayClusterStatus(suspended: Boolean)
 }
 
@@ -30,9 +43,14 @@ trait ServicesApi extends ActorHandler {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val config: Config = context.system.settings.config
-
   import ServicesApi._
+
+  private val conf = new ServicesApi.Conf()(context.system.settings.config)
+
+  if (conf.Gateway.Http.isDefined && !classOf[GatewayHttp].isAssignableFrom(this.getClass)) {
+    log.warning("affinity.gateway.http interface is configured but the node is trying " +
+      "to instantiate a non-http gateway. This may lead to uncertainity in the Controller.")
+  }
 
   private implicit val scheduler = context.system.scheduler
 
@@ -48,7 +66,7 @@ trait ServicesApi extends ActorHandler {
       case Some(coordinatedService) => coordinatedService._2
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
-        val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
+        val serviceConfig = conf.Services(group).config()
         val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(service)
@@ -74,10 +92,8 @@ trait ServicesApi extends ActorHandler {
     super.preStart()
     checkClusterStatus()
     services.foreach {
-      case(group, (coordinator, _, _)) =>
-        coordinator.watch(self, global = true)
+      case(_, (coordinator, _, _)) => coordinator.watch(self, global = true)
     }
-    context.parent ! Controller.ServicesStarted()
   }
 
   abstract override def postStop(): Unit = {
@@ -86,6 +102,10 @@ trait ServicesApi extends ActorHandler {
   }
 
   abstract override def manage = super.manage orElse {
+
+    case msg@CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
+      context.parent ! Controller.GatewayCreated(-1)
+
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
       val service: ActorRef = services(group)._2
       remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))

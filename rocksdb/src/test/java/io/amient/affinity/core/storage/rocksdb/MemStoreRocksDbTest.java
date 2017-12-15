@@ -23,6 +23,7 @@ import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
 import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
+import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -30,7 +31,6 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 
 import static org.junit.Assert.*;
@@ -43,11 +43,14 @@ public class MemStoreRocksDbTest {
     @Test
     public void testRocksDb() throws IOException, InterruptedException {
         String tmp = folder.newFolder().toString();
-        Config config = ConfigFactory.empty()
-                .withValue(MemStore.CONFIG_STORE_NAME, ConfigValueFactory.fromAnyRef( "test"))
-                .withValue(MemStore.CONFIG_DATA_DIR, ConfigValueFactory.fromAnyRef(tmp));
 
-        MemStore instance = new MemStoreRocksDb(config, 0);
+        StateConf template = new StateConf();
+        Config config = ConfigFactory.empty()
+                .withValue(template.Name.path(), ConfigValueFactory.fromAnyRef("test"))
+                .withValue(template.MemStore.DataDir.path(), ConfigValueFactory.fromAnyRef(tmp))
+                .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreRocksDb.class.getName()));
+
+        MemStore instance = new MemStoreRocksDb(new StateConf().apply(config), 0);
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

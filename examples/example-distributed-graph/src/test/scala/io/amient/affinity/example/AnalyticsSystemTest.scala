@@ -24,7 +24,7 @@ import java.util.Properties
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.actor.ServicesApi
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -42,9 +42,11 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
   override def numPartitions = 4
 
+  val template = new ServicesApi.Conf()
   val config: Config = ConfigFactory.load("example")
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(template.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
 
   val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
@@ -84,7 +86,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val serializedConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+    val serdeConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
     val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
       put("bootstrap.servers", kafkaBootstrap)
@@ -95,7 +97,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     })
 
     val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
-      AvroSerde.create(serializedConfig.value), compacted = true)
+      AvroSerde.create(serdeConfig.value), compacted = true)
       .repartition(1)
       .sortByKey()
 
@@ -108,7 +110,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     }
 
     val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
-      AvroSerde.create(serializedConfig.value), compacted = true)
+      AvroSerde.create(serdeConfig.value), compacted = true)
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>

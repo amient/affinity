@@ -19,26 +19,36 @@
 
 package io.amient.affinity.core.storage;
 
-import com.typesafe.config.Config;
+import io.amient.affinity.core.config.CfgCls;
+import io.amient.affinity.core.config.CfgStruct;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 public abstract class Storage {
 
-    final public static String CONFIG_MEMSTORE_CLASS = "memstore.class";
+    public static class StorageConf extends CfgStruct<StorageConf> {
+        public CfgCls<Storage> Class = cls("class", Storage.class, true);
+
+        @Override
+        protected Set<String> specializations() {
+            return new HashSet<>(Arrays.asList("kafka"));
+        }
+    }
 
     final public MemStore memstore;
 
-    public Storage(Config config, int partition)
-            throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
-        Class<? extends MemStore> memstoreClass
-                = Class.forName(config.getString(CONFIG_MEMSTORE_CLASS)).asSubclass(MemStore.class);
-        Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(Config.class, int.class);
-        memstore = memstoreConstructor.newInstance(config, partition);
+    public Storage(StateConf conf, int partition) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+        Class<? extends MemStore> memstoreClass = conf.MemStore.Class.apply();
+        Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(StateConf.class, int.class);
+        memstore = memstoreConstructor.newInstance(conf, partition);
         memstore.open();
     }
+
 
     /**
      * the contract of this method is that it should start a background process of restoring
