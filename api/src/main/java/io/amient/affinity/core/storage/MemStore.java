@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
-import com.typesafe.config.Config;
+import io.amient.affinity.core.config.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +29,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -40,10 +39,15 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public abstract class MemStore {
 
-    final public static String CONFIG_STORE_NAME = "name";
-    final public static String CONFIG_DATA_DIR = "data.dir";
-    final public static String CONFIG_TTL_SEC = "memstore.ttl.sec";
-
+    public static class MemStoreConf extends CfgStruct<MemStoreConf> {
+        public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
+        public CfgPath DataDir = filepath("data.dir", false);
+        //TODO public CfgInt MemReadTimeoutMs = integer("memstore.read.timeout.ms", 1000);
+        @Override
+        protected Set<String> specializations() {
+            return new HashSet(Arrays.asList("mapdb", "rocksdb"));
+        }
+    }
     private final static Logger log = LoggerFactory.getLogger(MemStore.class);
 
     final private MemStoreManager manager;
@@ -52,12 +56,18 @@ public abstract class MemStore {
     final protected int ttlSecs;
     final protected Path dataDir;
 
-    public MemStore(Config config, int partition) throws IOException {
-        checkpointsEnable = isPersistent() && config.hasPath(MemStore.CONFIG_DATA_DIR) && config.hasPath(CONFIG_STORE_NAME);
-        String dataPath = config.getString(MemStore.CONFIG_DATA_DIR);
-        dataDir = Paths.get(dataPath, config.getString(CONFIG_STORE_NAME) + "-" + partition).toAbsolutePath();
-        ttlSecs = config.hasPath(CONFIG_TTL_SEC) ? config.getInt(CONFIG_TTL_SEC) : -1;
-        if (Files.exists(dataDir)) Files.createDirectories(dataDir);
+    public MemStore(StateConf conf, int partition) throws IOException {
+        checkpointsEnable = isPersistent() && conf.Name.isDefined();
+        ttlSecs = conf.TtlSeconds.apply();
+        if (!checkpointsEnable) {
+            dataDir = null;
+        } else {
+            if (!conf.MemStore.DataDir.isDefined()) {
+              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via Node config");
+            }
+            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply() + "-" + partition));
+            if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
+        }
         manager = new MemStoreManager();
     }
 
@@ -205,17 +215,15 @@ public abstract class MemStore {
 
         volatile private boolean stopped = true;
 
-        final private Path file;
-
-        public MemStoreManager() {
-            super();
-            file = dataDir.resolve(MemStore.this.getClass().getSimpleName() + ".checkpoint");
+        private Path getFile() {
+            return dataDir.resolve(MemStore.this.getClass().getSimpleName() + ".checkpoint");
         }
 
         @Override
         public synchronized void start() {
 
             if (checkpointsEnable) try {
+                Path file = getFile();
                 if (Files.exists(file)) checkpoint.set(Checkpoint.readFromFile(file));
 //TODO #80 use something similar as below to implement the cleaner, but as part of the run() method
 //                if (!checkpoint.get().closed) {
@@ -263,6 +271,7 @@ public abstract class MemStore {
         }
 
         private void writeCheckpoint(boolean closing) throws IOException {
+            Path file = getFile();
             Checkpoint chk = (!closing) ? checkpoint.get()
                     : checkpoint.updateAndGet(c -> new Checkpoint(c.offset, true));
             log.debug("Writing checkpoint " + chk + " to file: " + file + ", final: " + closing);

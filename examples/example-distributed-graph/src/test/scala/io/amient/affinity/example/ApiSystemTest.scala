@@ -28,7 +28,7 @@ import akka.http.scaladsl.model.Uri
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.actor.{GatewayHttp, ServicesApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.{SystemTestBase, TimeCryptoProofSHA256}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -50,10 +50,12 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
 
   override def numPartitions = 2
 
+  val template = new ServicesApi.Conf()
   val config = ConfigFactory.load("example")
     .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_HOST, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(template.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
 
   val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))

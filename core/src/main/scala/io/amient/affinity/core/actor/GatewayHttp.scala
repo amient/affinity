@@ -20,7 +20,6 @@
 package io.amient.affinity.core.actor
 
 import java.io.FileInputStream
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.{KeyStore, SecureRandom}
 import java.util
@@ -41,45 +40,49 @@ import akka.stream.actor.ActorPublisherMessage.Request
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Controller.GracefulShutdown
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.http.{Decoder, Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.util.ByteUtils
-import org.apache.avro.util.ByteBufferInputStream
-import org.codehaus.jackson.JsonNode
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.postfixOps
-import scala.util.Try
 import scala.util.control.NonFatal
 
 object GatewayHttp {
 
-  final val CONFIG_GATEWAY_CLASS = "affinity.node.gateway.class"
-  final val CONFIG_GATEWAY_SUSPEND_QUEUE_MAX_SIZE = "affinity.node.gateway.suspend.queue.max.size"
-  final val CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE = "affinity.node.gateway.max.websocket.queue.size"
-  final val CONFIG_GATEWAY_HTTP_HOST = "affinity.node.gateway.http.host"
-  final val CONFIG_GATEWAY_HTTP_PORT = "affinity.node.gateway.http.port"
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Http = struct("affinity.node.gateway.http", new HttpConf, false)
+    val Tls = struct("affinity.node.gateway.tls", new TlsConf, false)
+  }
 
-  final val CONFIG_GATEWAY_TLS_KEYSTORE_PKCS = "affinity.node.gateway.tls.keystore.standard"
-  final val CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD = "affinity.node.gateway.tls.keystore.password"
-  final val CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE = "affinity.node.gateway.tls.keystore.resource"
-  final val CONFIG_GATEWAY_TLS_KEYSTORE_FILE = "affinity.node.gateway.tls.keystore.file"
+  class HttpConf extends CfgStruct[HttpConf] {
+
+    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100)
+    val Host = string("host", true)
+    val Port = integer("port", true)
+    val Tls = struct("tls", new TlsConf, false)
+  }
+
+  class TlsConf extends CfgStruct[TlsConf] {
+    val KeyStoreStandard = string("keystore.standard", "PKCS12")
+    val KeyStorePassword = string("keystore.password", true)
+    val KeyStoreResource = string("keystore.resource", false)
+    val KeyStoreFile = string("keystore.file", false)
+  }
 }
 
 trait GatewayHttp extends ServicesApi {
 
-  import GatewayHttp._
-
   private val log = Logging.getLogger(context.system, this)
 
-  private val config: Config = context.system.settings.config
+  private val conf = new ServicesApi.Conf()(context.system.settings.config)
 
-  private val suspendedQueueMaxSize = config.getInt(CONFIG_GATEWAY_SUSPEND_QUEUE_MAX_SIZE)
+  private val suspendedQueueMaxSize = conf.Gateway.SuspendQueueMaxSize()
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
 
   import context.{dispatcher, system}
@@ -88,17 +91,17 @@ trait GatewayHttp extends ServicesApi {
 
   private var isSuspended = true
 
-  val sslContext = if (!config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD)) None else Some(SSLContext.getInstance("TLS"))
+  val sslContext = if (!conf.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
     log.info("Configuring SSL Context")
-    val password = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PASSWORD).toCharArray
-    val ks = KeyStore.getInstance(config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_PKCS))
-    val is = if (config.hasPath(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)) {
-      val keystoreResource = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_RESOURCE)
+    val password = conf.Gateway.Http.Tls.KeyStorePassword().toCharArray
+    val ks = KeyStore.getInstance(conf.Gateway.Http.Tls.KeyStoreStandard())
+    val is = if (conf.Gateway.Http.Tls.KeyStoreResource.isDefined) {
+      val keystoreResource = conf.Gateway.Http.Tls.KeyStoreResource()
       log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
       getClass.getClassLoader.getResourceAsStream(keystoreResource)
     } else {
-      val keystoreFileName = config.getString(CONFIG_GATEWAY_TLS_KEYSTORE_FILE)
+      val keystoreFileName = conf.Gateway.Http.Tls.KeyStoreFile()
       log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
       new FileInputStream(keystoreFileName)
     }
@@ -113,7 +116,7 @@ trait GatewayHttp extends ServicesApi {
   }
 
   private val httpInterface: HttpInterface = new HttpInterface(
-    config.getString(CONFIG_GATEWAY_HTTP_HOST), config.getInt(CONFIG_GATEWAY_HTTP_PORT), sslContext)
+    conf.Gateway.Http.Host(), conf.Gateway.Http.Port(), sslContext)
 
   abstract override def preStart(): Unit = {
     super.preStart()
@@ -141,6 +144,7 @@ trait GatewayHttp extends ServicesApi {
   }
 
   abstract override def manage: Receive = super.manage orElse {
+    case msg@CreateGateway => context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)
@@ -389,7 +393,9 @@ trait WebSocketSupport extends GatewayHttp {
         //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
         val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
-          final val maxBufferSize = context.system.settings.config.getInt(GatewayHttp.CONFIG_GATEWAY_MAX_WEBSOCK_QUEUE_SIZE)
+          val conf = new ServicesApi.Conf()(context.system.settings.config)
+
+          final val maxBufferSize = conf.Gateway.Http.MaxWebSocketQueueSize()
 
           override def preStart(): Unit = {
             context.watch(keyValueMediator)

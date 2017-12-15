@@ -23,6 +23,8 @@ import java.io.PrintStream
 import java.util.Properties
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
 import io.amient.affinity.avro.{AvroJsonConverter, AvroSerde}
 import kafka.common.MessageFormatter
@@ -54,11 +56,11 @@ class AvroMessageFormatter extends MessageFormatter {
     }
     if (props.containsKey("schema.registry.url")) {
       serde = new CfAvroSchemaRegistry(ConfigFactory.defaultReference()
-        .withValue(CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE,
+        .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
     } else if (props.containsKey("schema.zookeeper.connect")) {
       serde = new ZkAvroSchemaRegistry(ConfigFactory.defaultReference()
-        .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT,
+        .withValue(new ZkAvroConf().Connect.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.zookeeper.connect"))))
     } else {
       throw new IllegalArgumentException("Required --property schema.registry.url OR --property schema.zookeeper.connect")

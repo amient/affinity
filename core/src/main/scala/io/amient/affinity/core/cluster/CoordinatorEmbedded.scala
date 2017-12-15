@@ -24,13 +24,22 @@ import java.util.{Observable, Observer}
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
+import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 
 import scala.collection.mutable
 
 object CoordinatorEmbedded extends Observable {
 
-  final val CONFIG_TEST_COORDINATOR_ID = "affinity.coordinator.id"
-  final val AUTO_COORDINATOR_ID = new AtomicInteger(1000000)
+  final val AutoCoordinatorId = new AtomicInteger(1000000)
+
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Embedded = struct("affinity.coordinator.embedded", new EmbedConf, false)
+  }
+
+  class EmbedConf extends CfgStruct[EmbedConf](classOf[CoorinatorConf]) {
+    val ID = integer("id", true)
+  }
 
   private val services = mutable.Map[String, mutable.Map[String, String]]()
 
@@ -67,7 +76,8 @@ object CoordinatorEmbedded extends Observable {
 
 class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
 
-  val id = system.settings.config.getInt(CoordinatorEmbedded.CONFIG_TEST_COORDINATOR_ID)
+  val conf = new CoordinatorEmbedded.Conf()(system.settings.config)
+  val id = conf.Embedded.ID()
   val space = s"$id:$group"
 
   CoordinatorEmbedded.addObserver(this)

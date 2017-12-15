@@ -19,22 +19,37 @@
 
 package io.amient.affinity.avro
 
-import com.typesafe.config.{Config, ConfigFactory}
+import java.util
+
+import com.typesafe.config.Config
 import io.amient.affinity.avro.schema.AvroSchemaProvider
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import org.apache.avro.Schema
+import scala.collection.JavaConversions._
 
 object AvroSerde {
-  final val CONFIG_PROVIDER_CLASS = "affinity.avro.schema.provider.class"
-  def create(config: Config): AvroSerde = {
-    require(config.hasPath(CONFIG_PROVIDER_CLASS), "missing configuration " + CONFIG_PROVIDER_CLASS)
-    val providerClass: Class[_ <: AvroSerde] = {
-      val providerClassName = config.getString(CONFIG_PROVIDER_CLASS)
-      Class.forName(providerClassName).asSubclass(classOf[AvroSerde])
-    }
 
+  object Conf extends Conf
+
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Avro = struct("affinity.avro", new AvroConf, false)
+  }
+  class AvroConf extends CfgStruct[AvroConf] {
+    val Class = cls("schema.provider.class", classOf[AvroSerde], true)
+    override protected def specializations(): util.Set[String] = {
+      Set("schema.registry")
+    }
+  }
+
+  def create(config: Config): AvroSerde = {
+    create(new AvroSerde.Conf()(config).Avro)
+  }
+
+  def create(conf: AvroConf): AvroSerde = {
+    val providerClass: Class[_ <: AvroSerde] = conf.Class()
     val instance = try {
-      providerClass.getConstructor(classOf[Config]).newInstance(config.withFallback(ConfigFactory.defaultReference()))
+      providerClass.getConstructor(classOf[Config]).newInstance(conf.config())
     } catch {
       case _: NoSuchMethodException => providerClass.newInstance()
     }

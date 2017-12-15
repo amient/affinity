@@ -19,28 +19,37 @@
 
 package io.amient.affinity.core.storage.mapdb;
 
-import com.typesafe.config.Config;
+import io.amient.affinity.core.config.CfgBool;
+import io.amient.affinity.core.config.CfgStruct;
 import io.amient.affinity.core.storage.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
+import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Serializer;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.AbstractMap;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 
 public class MemStoreMapDb extends MemStore {
 
-    public static final String CONFIG_MAPDB_MMAP_ENABLED = "memstore.mapdb.mmap.enabled";
-    //on 64-bit systems memory mapped files can be enabled
+    private final static org.slf4j.Logger log = LoggerFactory.getLogger(MemStoreMapDb.class);
+
+    public static class MemStoreMapDbConf extends CfgStruct<MemStoreMapDbConf> {
+
+        public MemStoreMapDbConf() {
+            super(MemStoreConf.class);
+        }
+        //on 64-bit systems memory mapped files can be enabled
+        public CfgBool MemoryMapEnabled = bool("mapdb.enabled", false);
+
+    }
 
     private static Map<Path, Long> refs = new HashMap<>();
     private static Map<Path, DB> instances = new HashMap<>();
@@ -83,11 +92,13 @@ public class MemStoreMapDb extends MemStore {
         return true;
     }
 
-    public MemStoreMapDb(Config config, int partition) throws IOException {
-        super(config, partition);
+    public MemStoreMapDb(StateConf conf, int partition) throws IOException {
+        super(conf, partition);
+        MemStoreMapDbConf config = new MemStoreMapDbConf().apply(conf.MemStore);
         pathToData = dataDir.resolve(this.getClass().getSimpleName() + ".data");
+        log.info("Opening MapDb MemStore: " + pathToData);
         Files.createDirectories(pathToData.getParent());
-        Boolean mmapEnabled = config.hasPath(CONFIG_MAPDB_MMAP_ENABLED) && config.getBoolean(CONFIG_MAPDB_MMAP_ENABLED);
+        Boolean mmapEnabled = config.MemoryMapEnabled.isDefined() && config.MemoryMapEnabled.apply();
         this.internal = createOrGetDbInstanceRef(pathToData, mmapEnabled, ttlSecs * 1000);
     }
 

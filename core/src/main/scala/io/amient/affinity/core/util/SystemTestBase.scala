@@ -39,7 +39,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.ServicesApi.GatewayClusterStatus
-import io.amient.affinity.core.actor.{GatewayHttp, Partition, Service, ServicesApi}
+import io.amient.affinity.core.actor.{Partition, Service, ServicesApi}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.storage.State
@@ -68,32 +68,33 @@ trait SystemTestBase {
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
+    val template = new Node.Config()
     val layer1 = config
-      .withValue(Node.CONFIG_NODE_SYSTEM_NAME, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
-      .withValue(Node.CONFIG_NODE_STARTUP_TIMEOUT_MS, ConfigValueFactory.fromAnyRef(15000))
-      .withValue(GatewayHttp.CONFIG_GATEWAY_HTTP_PORT, ConfigValueFactory.fromAnyRef(0))
-      .withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
+      .withValue(template.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
+      .withValue(template.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
+      .withValue(template.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
     val layer2 = zkConnect match {
       case None => layer1
       case Some(zkConnectString) =>
-        layer1.
-          withValue(CoordinatorZk.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(ZkAvroSchemaRegistry.CONFIG_ZOOKEEPER_CONNECT, ConfigValueFactory.fromAnyRef(zkConnectString))
+        layer1
+          .withValue(CoordinatorZk.Conf.ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(ZkAvroSchemaRegistry.Conf.Avro.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {
       case None => layer2
       case Some(kafkaBootstrapString) =>
+        val template = new State.Conf();
         layer2 match {
-          case cfg if (!cfg.hasPath(State.CONFIG_STATE)) => cfg
+          case cfg if (!cfg.hasPath(template.State.path())) => cfg
           case cfg =>
             cfg
-              .withValue(Service.CONFIG_NUM_PARTITIONS, ConfigValueFactory.fromAnyRef(2))
-              .getConfig(State.CONFIG_STATE).entrySet().asScala
+              .withValue(new Service.Config().NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
+              .getConfig(template.State.path()).entrySet().asScala
               .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
               .filter { case (p, c) => p.endsWith("storage.class") && c.toLowerCase.contains("kafka") }
-              .map { case (p, c) => (State.CONFIG_STATE + "." + p.split("\\.")(0), c) }
+              .map { case (p, c) => (template.State.path()+ "." + p.split("\\.")(0), c) }
               .foldLeft(cfg) { case (cfg, (p, c)) =>
                 cfg.withValue(p + ".storage.kafka.bootstrap.servers", ConfigValueFactory.fromAnyRef(kafkaBootstrapString))
               }
@@ -130,11 +131,9 @@ trait SystemTestBase {
   }
 
   class TestGatewayNode(config: Config, gatewayCreator: => ServicesApi)
-    extends Node(config.withValue(Node.CONFIG_AKKA_PORT, ConfigValueFactory.fromAnyRef(0))) {
+    extends Node(config.withValue(new Node.Config().Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
 
-    def this(config: Config) = {
-      this(config, Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi]).newInstance())
-    }
+    def this(config: Config) = this(config, new Node.Config()(config).Affi.Gateway.Class().newInstance())
 
     import system.dispatcher
 

@@ -1,6 +1,5 @@
 package io.amient.affinity.core.util;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;

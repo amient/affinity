@@ -1,10 +1,13 @@
 package io.amient.affinity.kafka
 
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
+import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
+
+import scala.collection.JavaConversions._
 
 object SimpleEnum extends Enumeration {
   type SimpleEnum = Value
@@ -33,9 +36,9 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
 
   it should "reject incompatible schema registration" in {
 
-    val serde = new CfAvroSchemaRegistry(ConfigFactory.defaultReference.withValue(
-      CfAvroSchemaRegistry.CONFIG_CF_REGISTRY_URL_BASE, ConfigValueFactory.fromAnyRef(registryUrl)
-    ))
+    val serde = new CfAvroSchemaRegistry(ConfigFactory.parseMap(Map(
+      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+    )))
 
     serde.register[SimpleKey]
     serde.register[SimpleRecord]

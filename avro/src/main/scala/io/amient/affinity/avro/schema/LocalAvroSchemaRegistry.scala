@@ -22,22 +22,36 @@ package io.amient.affinity.avro.schema
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.AvroSerde.AvroConf
+import io.amient.affinity.avro.schema.LocalAvroSchemaRegistry.LocalAvroConf
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
+
 import scala.collection.JavaConversions._
 
 object LocalAvroSchemaRegistry {
-  final val CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH = "affinity.avro.local-schema-registry.data.path"
+
+  object Conf extends Conf
+
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Avro = struct("affinity.avro", new LocalAvroConf, false)
+  }
+
+  class LocalAvroConf extends CfgStruct[LocalAvroConf](classOf[AvroConf]) {
+    val DataPath = filepath("schema.registry.path", true)
+  }
+
 }
 
 class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
-
-  import LocalAvroSchemaRegistry._
+  val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
+  val conf = new LocalAvroConf()(merged)
+  val dataPath = conf.DataPath()
 
   private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
 
-  val dataPath = Paths.get(config.getString(CONFIG_LOCAL_SCHEMA_PROVIDER_DATA_PATH))
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
 
   override def close(): Unit = ()

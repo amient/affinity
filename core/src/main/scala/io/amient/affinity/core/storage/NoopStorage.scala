@@ -20,9 +20,7 @@ package io.amient.affinity.core.storage
 
 import java.util.concurrent.{CompletableFuture, Future}
 
-import com.typesafe.config.Config
-
-class NoopStorage(config: Config, partition:Int) extends Storage(config, partition) {
+class NoopStorage(conf: StateConf, partition:Int) extends Storage(conf, partition) {
 
   override def init(): Unit = ()
 

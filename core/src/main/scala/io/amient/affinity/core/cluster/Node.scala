@@ -22,12 +22,15 @@ package io.amient.affinity.core.cluster
 
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
-import com.typesafe.config.{Config, ConfigException, ConfigList}
+import com.typesafe.config.{Config, ConfigException}
+import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor._
+import io.amient.affinity.core.config._
+import io.amient.affinity.core.storage.StateConf
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.{implicitConversions, postfixOps}
@@ -36,23 +39,41 @@ import scala.util.control.NonFatal
 
 object Node {
 
-  final val CONFIG_NODE_CONTAINERS = "affinity.node.container"
-  final def CONFIG_SERVICE(group: String) = s"affinity.service.$group"
-  final val CONFIG_NODE_STARTUP_TIMEOUT_MS = "affinity.node.startup.timeout.ms"
-  final val CONFIG_NODE_SHUTDOWN_TIMEOUT_MS = "affinity.node.shutdown.timeout.ms"
-  final val CONFIG_NODE_SYSTEM_NAME = "affinity.node.name"
-  final val CONFIG_AKKA_HOST = "akka.remote.netty.tcp.hostname"
-  final val CONFIG_AKKA_PORT = "akka.remote.netty.tcp.port"
-  final val CONFIG_DATA_DIR = "affinity.node.data.dir"
+  class Config extends CfgStruct[Config](Cfg.Options.IGNORE_UNKNOWN) {
+    val Akka = struct("akka", new AkkaConfig, false)
+    val Affi = struct("affinity", new AffinityConfig, true)
+  }
+
+  class AkkaConfig extends CfgStruct[AkkaConfig](Cfg.Options.IGNORE_UNKNOWN) {
+    val Hostname = string("remote.netty.tcp.hostname", false)
+    val Port = integer("remote.netty.tcp.port", false)
+  }
+
+
+  class AffinityConfig extends CfgStruct[AffinityConfig] {
+    val Avro = struct("avro", new AvroConf(), true)
+    val Coorinator = struct("coordinator", new Coordinator.CoorinatorConf, true)
+    val State = group("state", classOf[StateConf], true)
+    val Services = group("service", new ServicesApi.ServicesConf, false)
+    val Containers = group("node.container", classOf[CfgIntList], false)
+    val Gateway = struct("node.gateway", new ServicesApi.GatewayConf, false)
+    val StartupTimeoutMs = longint("node.startup.timeout.ms", true)
+    val ShutdownTimeoutMs = longint("node.shutdown.timeout.ms", true)
+    val DataDir = filepath("node.data.dir", false)
+    val SystemName = string("node.name", true)
+    val Streams = group("node.stream", classOf[InputStreamConf], false)
+  }
+
+  class InputStreamConf extends CfgStruct[InputStreamConf](Cfg.Options.IGNORE_UNKNOWN)
+
 }
 
 class Node(config: Config) {
 
-  import Node._
-
-  private val actorSystemName = config.getString(CONFIG_NODE_SYSTEM_NAME)
-  val startupTimeout = config.getInt(CONFIG_NODE_STARTUP_TIMEOUT_MS) milliseconds
-  val shutdownTimeout = config.getInt(CONFIG_NODE_SHUTDOWN_TIMEOUT_MS) milliseconds
+  val conf = new Node.Config()(config)
+  private val actorSystemName: String = conf.Affi.SystemName()
+  val startupTimeout = conf.Affi.StartupTimeoutMs().toLong milliseconds
+  val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
@@ -77,23 +98,20 @@ class Node(config: Config) {
   }
 
   def start() = {
-    if (config.hasPath(CONFIG_NODE_CONTAINERS)) {
-      config.getObject(CONFIG_NODE_CONTAINERS).asScala.foreach { case (group, value) =>
-        val partitions = value.asInstanceOf[ConfigList].asScala.map(_.unwrapped().asInstanceOf[Int]).toList
+    conf.Affi.Containers().foreach {
+      case (group: String, value: CfgIntList) =>
+        val partitions = value().map(_.toInt).toList
         startContainer(group, partitions)
-      }
     }
-
-    if (config.hasPath(GatewayHttp.CONFIG_GATEWAY_CLASS)) {
-      val cls = Class.forName(config.getString(GatewayHttp.CONFIG_GATEWAY_CLASS)).asSubclass(classOf[ServicesApi])
-      startGateway(cls.newInstance())
+    if (conf.Affi.Gateway.Class.isDefined) {
+      //the gateway could be started programatically but in this case it is by config
+      startGateway(conf.Affi.Gateway.Class().newInstance())
     }
   }
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
     try {
-      val serviceConfig = config.getConfig(CONFIG_SERVICE(group))
-      val serviceClass = Class.forName(serviceConfig.getString(Service.CONFIG_SERVICE_CLASS)).asSubclass(classOf[Partition])
+      val serviceClass = conf.Affi.Services(group).PartitionClass()
       implicit val timeout = Timeout(startupTimeout)
       startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
     } catch {
@@ -117,7 +135,11 @@ class Node(config: Config) {
   def startGateway[T <: ServicesApi](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     startupFutureWithShutdownFuse {
-      controller ack CreateGateway(Props(creator))
+      try {
+        controller ack CreateGateway(Props(creator))
+      } catch {
+        case NonFatal(e) => e.printStackTrace(); throw e;
+      }
     }
   }
 
