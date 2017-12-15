@@ -43,7 +43,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
 import io.amient.affinity.core.util.ByteUtils
@@ -55,7 +55,7 @@ import scala.util.control.NonFatal
 
 object GatewayHttp {
 
-  class Conf extends CfgStruct[Conf] {
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val Http = struct("affinity.node.gateway.http", new HttpConf, false)
     val Tls = struct("affinity.node.gateway.tls", new TlsConf, false)
   }
