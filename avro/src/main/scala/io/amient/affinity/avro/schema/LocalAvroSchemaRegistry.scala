@@ -33,7 +33,9 @@ import scala.collection.JavaConversions._
 
 object LocalAvroSchemaRegistry {
 
-  object Conf extends Conf
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val Avro = struct("affinity.avro", new LocalAvroConf, false)
@@ -47,7 +49,7 @@ object LocalAvroSchemaRegistry {
 
 class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
   val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
-  val conf = new LocalAvroConf()(merged)
+  val conf = new LocalAvroConf().apply(merged)
   val dataPath = conf.DataPath()
 
   private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()

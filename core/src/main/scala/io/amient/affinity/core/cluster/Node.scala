@@ -39,22 +39,26 @@ import scala.util.control.NonFatal
 
 object Node {
 
-  class Config extends CfgStruct[Config](Cfg.Options.IGNORE_UNKNOWN) {
-    val Akka = struct("akka", new AkkaConfig, false)
-    val Affi = struct("affinity", new AffinityConfig, true)
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
   }
 
-  class AkkaConfig extends CfgStruct[AkkaConfig](Cfg.Options.IGNORE_UNKNOWN) {
+  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+    val Akka = struct("akka", new AkkaConf, false)
+    val Affi = struct("affinity", new AffinityConf, true)
+  }
+
+  class AkkaConf extends CfgStruct[AkkaConf](Cfg.Options.IGNORE_UNKNOWN) {
     val Hostname = string("remote.netty.tcp.hostname", false)
     val Port = integer("remote.netty.tcp.port", false)
   }
 
 
-  class AffinityConfig extends CfgStruct[AffinityConfig] {
+  class AffinityConf extends CfgStruct[AffinityConf] {
     val Avro = struct("avro", new AvroConf(), true)
     val Coorinator = struct("coordinator", new Coordinator.CoorinatorConf, true)
     val State = group("state", classOf[StateConf], true)
-    val Services = group("service", new ServicesApi.ServicesConf, false)
+    val Services = group("service", classOf[Service.Conf], false)
     val Containers = group("node.container", classOf[CfgIntList], false)
     val Gateway = struct("node.gateway", new ServicesApi.GatewayConf, false)
     val StartupTimeoutMs = longint("node.startup.timeout.ms", true)
@@ -70,7 +74,7 @@ object Node {
 
 class Node(config: Config) {
 
-  val conf = new Node.Config()(config)
+  val conf = Node.Conf(config)
   private val actorSystemName: String = conf.Affi.SystemName()
   val startupTimeout = conf.Affi.StartupTimeoutMs().toLong milliseconds
   val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds

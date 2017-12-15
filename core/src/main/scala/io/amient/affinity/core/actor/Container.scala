@@ -44,12 +44,10 @@ class Container(group: String) extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val config = context.system.settings.config
+  private val conf = Node.Conf(context.system.settings.config)
 
-  private val appliedConfig = new Node.Config()(config)
-
-  final private val akkaAddress = if (appliedConfig.Akka.Hostname() > "") {
-    s"akka.tcp://${context.system.name}@${appliedConfig.Akka.Hostname()}:${appliedConfig.Akka.Port()}"
+  final private val akkaAddress = if (conf.Akka.Hostname() > "") {
+    s"akka.tcp://${context.system.name}@${conf.Akka.Hostname()}:${conf.Akka.Port()}"
   } else {
     s"akka://${context.system.name}"
   }

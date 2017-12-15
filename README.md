@@ -66,9 +66,10 @@ The codebase is split into several modules:
  
 The following core features are already in place:
 
+ - Config validation layer on top of typesafe.Config
  - HTTP Interface is completely async done with Akka Http. 
  - HTTP Handlers participate in handling the incoming HTTP Requests
-    by chaining the receive: Receive method of the Gateway Actor
+    by chaining the handle: Receive method of the GatewayHttp Actor
  - Handlers translate requests into Akka Messages - they can either ? Ask
     and get response which they turn into HTTP Response or just ! Tell
     and respond with No Content or Accepted, etc.
@@ -150,7 +151,16 @@ When doing a lot of work on the javascript watchify can be used
 
     npm install -g watchify
     watchify core/src/main/resources/affinity_node.js -v -o core/src/main/resources/affinity.js -d
- 
+
+## Logging
+
+Affinity uses SLF4j and it also redirects alla Akka loggin to SLF4J.
+It doesn't provide any binding for compile configuration, that is left to applications - in one of the example,
+logback is used, in another log4j.
+
+For all testing slf4j-jdk14 (Java Logging) binding is used and is configured for all modules in:
+api/src/test/resources/logging.properties
+
 ## Avro Schemas
 
 ..

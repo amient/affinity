@@ -24,6 +24,7 @@ import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.ActorSystem
+import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.Serde
@@ -38,6 +39,10 @@ import scala.util.control.NonFatal
 
 object State {
 
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
+
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val State = group("affinity.state", classOf[StateConf], false)
   }
@@ -49,7 +54,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
 
   self =>
 
-  val conf = new Node.Config()(system.settings.config)
+  val conf = Node.Conf(system.settings.config)
   val stateConf = conf.Affi.State(name)
   stateConf.Name.setValue(name)
   if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())

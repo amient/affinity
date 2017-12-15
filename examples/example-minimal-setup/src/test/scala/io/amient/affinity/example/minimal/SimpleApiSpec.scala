@@ -38,7 +38,7 @@ class SimpleApiSpec extends FlatSpec with SystemTestBase with Matchers {
 
   it should "work without the http layer" in {
 
-    new TestGatewayNode(configure(config, None, None).withoutPath(new Node.Config().Affi.Gateway.Http.path)) {
+    new TestGatewayNode(configure(config, None, None).withoutPath(Node.Conf.Affi.Gateway.Http.path)) {
       awaitClusterReady {
         startContainer("simple-keyspace", List(0, 1), new MySimplePartition())
       }

@@ -33,6 +33,10 @@ object CoordinatorEmbedded extends Observable {
 
   final val AutoCoordinatorId = new AtomicInteger(1000000)
 
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
+
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
     val Embedded = struct("affinity.coordinator.embedded", new EmbedConf, false)
   }
@@ -76,7 +80,7 @@ object CoordinatorEmbedded extends Observable {
 
 class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
 
-  val conf = new CoordinatorEmbedded.Conf()(system.settings.config)
+  val conf = CoordinatorEmbedded.Conf(system.settings.config)
   val id = conf.Embedded.ID()
   val space = s"$id:$group"
 

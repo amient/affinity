@@ -49,9 +49,7 @@ class Controller extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val config = context.system.settings.config
-
-  private val conf = new Node.Config()(config)
+  private val conf = Node.Conf(context.system.settings.config)
 
   import Controller._
 

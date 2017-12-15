@@ -34,6 +34,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
       put("offsets.topic.replication.factor", "1")
     }
   })
+
   private val kafka = new KafkaServerStartable(kafkaConfig)
   kafka.startup()
 

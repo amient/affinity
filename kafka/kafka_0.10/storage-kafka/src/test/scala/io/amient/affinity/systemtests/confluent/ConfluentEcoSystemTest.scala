@@ -84,7 +84,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
   }
 
   private def testExternalKafkaConsumer(stateStoreName: String) {
-    val topic = new KafkaStorageConf()(new Node.Config()(config).Affi.State(stateStoreName).Storage).Topic()
+    val topic = KafkaStorageConf(Node.Conf(config).Affi.State(stateStoreName).Storage).Topic()
     val state = createStateStoreForPartition(stateStoreName)(0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
@@ -143,7 +143,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
-    val topic = new KafkaStorageConf()(new Node.Config()(config).Affi.State("consistency-test").Storage).Topic()
+    val topic = KafkaStorageConf(Node.Conf(config).Affi.State("consistency-test").Storage).Topic()
     val producerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
       "acks" -> "all",

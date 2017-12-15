@@ -4,29 +4,24 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.core.actor.ServicesApi
 import io.amient.affinity.core.cluster.Node
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 
 case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord with EventTime
 
 class StateSpec extends TestKit(ActorSystem.create("test",
 
   ConfigFactory.parseMap(Map(
-    new Node.Config().Affi.Gateway.Http.Host.path -> "127.0.0.1",
-    new Node.Config().Affi.Gateway.Http.Port.path -> "0",
-    new State.Conf().State("test-state-1").path -> Map(
-      new StateConf().MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      new StateConf().Storage.Class.path -> classOf[NoopStorage].getName
-    ).asJava,
-    new State.Conf().State("test-state-2").path -> Map(
-      new StateConf().MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      new StateConf().Storage.Class.path -> classOf[NoopStorage].getName,
-      new StateConf().TtlSeconds.path -> 5
-    ).asJava
-  ).asJava).withFallback(ConfigFactory.defaultReference())))
+    Node.Conf.Affi.Gateway.Http.Host.path -> "127.0.0.1",
+    Node.Conf.Affi.Gateway.Http.Port.path -> "0",
+    State.Conf.State("test-state-1").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+    State.Conf.State("test-state-1").Storage.Class.path -> classOf[NoopStorage].getName,
+    State.Conf.State("test-state-2").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+    State.Conf.State("test-state-2").Storage.Class.path -> classOf[NoopStorage].getName,
+    State.Conf.State("test-state-2").TtlSeconds.path -> 5
+  )).withFallback(ConfigFactory.defaultReference())))
   with ImplicitSender with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   override def afterAll {

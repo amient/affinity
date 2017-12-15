@@ -69,6 +69,11 @@ allprojects {
         dependencies {
             compile group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
             testCompile group: 'junit', name: 'junit', version: junitVersion
+            testCompile group: 'org.slf4j', name: 'slf4j-jdk14', version: slf4jVersion
+        }
+
+        configurations {
+            all*.exclude group: 'org.slf4j', module:'slf4j-log4j12'
         }
 
     }
@@ -77,7 +82,8 @@ allprojects {
 
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'
-            args = ['-R', 'build/classes/test', '-o']
+            jvmArgs = ['-Djava.util.logging.config.file=' + rootProject.projectDir + '/api/src/main/resources/logging.properties']
+            args = ['-R', 'build/classes/test', '-o' ]
             classpath = sourceSets.test.runtimeClasspath
         }
         test.dependsOn scalaTest

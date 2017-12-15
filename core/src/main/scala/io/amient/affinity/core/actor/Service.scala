@@ -30,7 +30,11 @@ import scala.collection.mutable
 
 object Service {
 
-  class Config extends CfgStruct[Config] {
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
+  }
+
+  class Conf extends CfgStruct[Conf] {
     val PartitionClass = cls("class", classOf[Partition], true)
     val NumPartitions = integer("num.partitions", true)
   }
@@ -44,7 +48,7 @@ class Service(config: Config) extends Actor {
 
   import Service._
 
-  val appliedConfig = new Service.Config()(config)
+  val appliedConfig = Service.Conf(config)
 
   private val numPartitions = appliedConfig.NumPartitions()
 

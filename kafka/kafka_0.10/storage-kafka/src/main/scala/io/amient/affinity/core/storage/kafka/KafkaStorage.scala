@@ -24,6 +24,7 @@ import java.util.Properties
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
 
+import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.{StateConf, Storage}
@@ -41,6 +42,10 @@ import scala.language.reflectiveCalls
 
 object KafkaStorage {
 
+  object KafkaStorageConf extends KafkaStorageConf {
+    override def apply(config: Config): KafkaStorageConf = new KafkaStorageConf().apply(config)
+  }
+
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
@@ -56,17 +61,17 @@ object KafkaStorage {
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 }
 
-class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partition) {
+class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateConf, partition) {
 
   import KafkaStorage._
 
-  private val config = new KafkaStorageConf()(conf.Storage)
+  private val conf = KafkaStorageConf(stateConf.Storage)
 
-  val topic = config.Topic()
+  val topic = conf.Topic()
 
   private val producerProps = new Properties() {
-    if (config.Producer.isDefined) {
-      val producerConfig = config.Producer.config()
+    if (conf.Producer.isDefined) {
+      val producerConfig = conf.Producer.config()
       if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
@@ -74,7 +79,7 @@ class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partit
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
-    put("bootstrap.servers", config.BootstrapServers())
+    put("bootstrap.servers", conf.BootstrapServers())
     put("key.serializer", classOf[ByteArraySerializer].getName)
     put("value.serializer", classOf[ByteArraySerializer].getName)
   }
@@ -82,8 +87,8 @@ class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partit
   require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
 
   val consumerProps = new Properties() {
-    if (config.Consumer.isDefined) {
-      val consumerConfig = config.Consumer.config()
+    if (conf.Consumer.isDefined) {
+      val consumerConfig = conf.Consumer.config()
       if (consumerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
@@ -92,7 +97,7 @@ class KafkaStorage(conf: StateConf, partition: Int) extends Storage(conf, partit
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
-    put("bootstrap.servers", config.BootstrapServers())
+    put("bootstrap.servers", conf.BootstrapServers())
     put("enable.auto.commit", "false")
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)

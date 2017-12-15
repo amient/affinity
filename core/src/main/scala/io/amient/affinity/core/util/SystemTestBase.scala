@@ -68,11 +68,10 @@ trait SystemTestBase {
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
-    val template = new Node.Config()
     val layer1 = config
-      .withValue(template.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
-      .withValue(template.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
-      .withValue(template.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
+      .withValue(Node.Conf.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
+      .withValue(Node.Conf.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
+      .withValue(Node.Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
     val layer2 = zkConnect match {
       case None => layer1
@@ -90,7 +89,7 @@ trait SystemTestBase {
           case cfg if (!cfg.hasPath(template.State.path())) => cfg
           case cfg =>
             cfg
-              .withValue(new Service.Config().NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
+              .withValue(Service.Conf.NumPartitions.path, ConfigValueFactory.fromAnyRef(2))
               .getConfig(template.State.path()).entrySet().asScala
               .map(entry => (entry.getKey, entry.getValue.unwrapped().toString))
               .filter { case (p, c) => p.endsWith("storage.class") && c.toLowerCase.contains("kafka") }
@@ -131,9 +130,9 @@ trait SystemTestBase {
   }
 
   class TestGatewayNode(config: Config, gatewayCreator: => ServicesApi)
-    extends Node(config.withValue(new Node.Config().Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
+    extends Node(config.withValue(Node.Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
 
-    def this(config: Config) = this(config, new Node.Config()(config).Affi.Gateway.Class().newInstance())
+    def this(config: Config) = this(config, Node.Conf(config).Affi.Gateway.Class().newInstance())
 
     import system.dispatcher
 
