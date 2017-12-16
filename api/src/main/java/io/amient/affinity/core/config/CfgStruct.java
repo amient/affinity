@@ -100,83 +100,83 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     public CfgString string(String path, boolean required) {
-        return add(path, new CfgString(), required);
+        return add(path, new CfgString(), required, Optional.empty());
     }
 
     public CfgString string(String path, String defaultValue) {
-        return add(path, new CfgString(), defaultValue);
+        return add(path, new CfgString(), true, Optional.of(defaultValue));
     }
 
     public CfgLong longint(String path, boolean required) {
-        return add(path, new CfgLong(), required);
+        return add(path, new CfgLong(), required, Optional.empty());
     }
 
     public CfgLong longint(String path, long defaultValue) {
-        return add(path, new CfgLong(), defaultValue);
+        return add(path, new CfgLong(), true, Optional.of(defaultValue));
     }
 
     public CfgBool bool(String path, boolean required) {
-        return add(path, new CfgBool(), required);
+        return add(path, new CfgBool(), required, Optional.empty());
     }
 
-    public CfgBool bool(String path, Boolean defaultValue) {
-        return add(path, new CfgBool(), defaultValue);
+    public CfgBool bool(String path, boolean required, boolean defaultValue) {
+        return add(path, new CfgBool(), required, Optional.of(defaultValue));
     }
+
 
     public CfgInt integer(String path, boolean required) {
-        return add(path, new CfgInt(), required);
+        return add(path, new CfgInt(), required, Optional.empty());
     }
 
     public CfgInt integer(String path, Integer defaultValue) {
-        return add(path, new CfgInt(), defaultValue);
+        return add(path, new CfgInt(), true, Optional.of(defaultValue));
     }
 
     public CfgUrl url(String path, boolean required) {
-        return add(path, new CfgUrl(), required);
+        return add(path, new CfgUrl(), required, Optional.empty());
     }
 
-    public CfgUrl url(String path, URL defaultVal) { return add(path, new CfgUrl(), defaultVal); }
+    public CfgUrl url(String path, URL defaultVal) {
+        return add(path, new CfgUrl(), true, Optional.of(defaultVal));
+    }
 
-    public CfgPath filepath(String path, boolean required) { return add(path, new CfgPath(), required); }
+    public CfgPath filepath(String path, boolean required) {
+        return add(path, new CfgPath(), required, Optional.empty());
+    }
 
-    public CfgPath filepath(String path, Path defaultVal) { return add(path, new CfgPath(), defaultVal); }
+    public CfgPath filepath(String path, Path defaultVal) {
+        return add(path, new CfgPath(), true, Optional.of(defaultVal));
+    }
 
     public <X> CfgCls<X> cls(String path, Class<X> c, boolean required) {
-        return add(path, new CfgCls<>(c), required);
+        return add(path, new CfgCls<>(c), required, Optional.empty());
     }
 
     public <X> CfgCls<X> cls(String path, Class<X> c, Class<? extends X> defaultVal) {
-        return add(path, new CfgCls<>(c), defaultVal);
+        return add(path, new CfgCls<>(c), true, Optional.of(defaultVal));
     }
 
     public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
-        return add(path, obj, required);
+        return add(path, obj, required, Optional.empty());
     }
 
     public <X extends CfgStruct<X>> X ref(X obj, boolean required) {
-        return add(null, obj, required);
+        return add(null, obj, required, Optional.empty());
     }
 
 
     public <X extends Cfg<?>> CfgGroup<X> group(String path, Class<X> c, boolean required) {
-        return add(path, new CfgGroup<>(c), required);
+        return add(path, new CfgGroup<>(c), required, Optional.empty());
     }
 
     public <X extends Cfg<?>> CfgGroup<X> group(String path, CfgGroup<X> obj, boolean required) {
-        return add(path, obj, required);
+        return add(path, obj, required, Optional.empty());
     }
 
     public <X, Y extends Cfg<X>> CfgList<X, Y> list(String path, Class<X> c, boolean required) {
-        return add(path, new CfgList(c), required);
+        return add(path, new CfgList(c), required, Optional.empty());
     }
 
-    private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required) {
-        return add(path, cfg, required, Optional.empty());
-    }
-
-    private <Y, X extends Cfg<Y>> X add(String path, X cfg, Y defaultValue) {
-        return add(path, cfg, true, Optional.of(defaultValue));
-    }
 
     private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required, Optional<Y> defaultValue) {
         cfg.setRelPath(path);
