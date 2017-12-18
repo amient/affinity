@@ -12,14 +12,13 @@
         <appender-ref ref="STDOUT" />
     </root>
 
+    <logger name="io.amient.affinity" level="DEBUG"/>
+    <logger name="org.I0Itec.zkclient" level="WARN" />
     <logger name="kafka" level="ERROR" />
-    <logger name="org.I0Itec.zkclient" level="ERROR" />
     <logger name="org.apache.kafka" level="ERROR" />
     <logger name="org.apache.spark" level="ERROR" />
     <logger name="org.apache.zookeeper" level="ERROR"/>
     <logger name="zookeeper.server" level="ERROR"/>
-
-    <logger name="io.amient.affinity" level="WARN"/>
     <logger name="akka" level="WARN"/>
 
 
