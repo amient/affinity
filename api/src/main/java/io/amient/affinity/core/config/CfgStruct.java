@@ -54,6 +54,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     @Override
     public T apply(Config config) throws IllegalArgumentException {
+        if (config == null) throw new IllegalArgumentException("null config passed (" + path() + ")");
         this.config = path().isEmpty() ? config : listPos > -1
                 ? config.getConfigList(relPath).get(listPos) : config.getConfig(relPath);
         final StringBuilder errors = new StringBuilder();

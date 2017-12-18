@@ -8,7 +8,7 @@ apply plugin: 'gradle-one-jar'
 ext {
     mainClass = "io.amient.affinity.example.ExampleGraphMain"
     mainScript = "example-graph-api"
-    kafkaMinorVersion = "0.10"
+    kafkaMinorVersion = "0.11"
     sparkVersion = '2.0.2'
     baseSparkVersion = sparkVersion.split("\\.\\d+\$")[0]
 }

@@ -72,6 +72,7 @@ trait Gateway extends ActorHandler with ActorState {
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
         val serviceConf = conf.Keyspace(group)
+        if (!serviceConf.isDefined) throw new IllegalArgumentException(s"Keypsace $group is not defined")
         val ks = context.actorOf(Props(new Keyspace(serviceConf.config())), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(ks)
@@ -108,7 +109,7 @@ trait Gateway extends ActorHandler with ActorState {
 
   abstract override def manage = super.manage orElse {
 
-    case msg@CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
+    case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
       context.parent ! Controller.GatewayCreated(-1)
 
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
