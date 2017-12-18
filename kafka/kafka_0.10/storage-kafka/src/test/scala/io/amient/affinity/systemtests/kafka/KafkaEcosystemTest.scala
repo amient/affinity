@@ -13,7 +13,7 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage.KafkaStorageConf
 import io.amient.affinity.core.util.SystemTestBase
-import io.amient.affinity.kafka.{EmbeddedCfRegistry, EmbeddedKafka, KafkaAvroDeserializer}
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer}
 import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
