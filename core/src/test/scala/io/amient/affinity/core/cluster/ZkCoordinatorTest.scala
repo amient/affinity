@@ -16,7 +16,7 @@ class ZkCoordinatorTest extends FlatSpec with SystemTestBase with EmbeddedZooKee
   val system = ActorSystem.create("test", config)
   val gatewayNode = new TestGatewayNode(config, new GatewayHttp {
 
-    val regionService = service("region")
+    val regionService = keyspace("region")
 
     //FIXME
 //    import MyTestPartition._

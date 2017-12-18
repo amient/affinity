@@ -2,6 +2,7 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 abstract public class Cfg<T> {
@@ -22,20 +23,24 @@ abstract public class Cfg<T> {
 
     abstract public Cfg<T> apply(Config config) throws IllegalArgumentException;
 
-    final public<C extends Cfg<T>> C setValue(T value) {
+    final public <C extends Cfg<T>> C setValue(T value) {
         this.value = Optional.of(value);
-        return (C)this;
+        return (C) this;
     }
 
     final public T apply() {
-        return value.isPresent() ? value.get() : defaultValue.get();
+        if (value.isPresent()) return value.get();
+        else if (defaultValue.isPresent()) return defaultValue.get();
+        else throw new NoSuchElementException(path + " is not defined");
     }
 
     final public String path() {
         return path == null ? "" : path;
     }
 
-    final public String path(String relativePathToRsolve) { return (path == null ? "" : path + ".") + relativePathToRsolve; }
+    final public String path(String relativePathToRsolve) {
+        return (path == null ? "" : path + ".") + relativePathToRsolve;
+    }
 
     final public boolean isDefined() {
         return value.isPresent() || defaultValue.isPresent();
@@ -49,7 +54,9 @@ abstract public class Cfg<T> {
         this.path = path;
     }
 
-    void setListPos(int listPos) { this.listPos = listPos; }
+    void setListPos(int listPos) {
+        this.listPos = listPos;
+    }
 
     final void setRelPath(String relPath) {
         this.relPath = relPath;
@@ -58,7 +65,6 @@ abstract public class Cfg<T> {
     final void setDefaultValue(T value) {
         defaultValue = Optional.of(value);
     }
-
 
 
 }

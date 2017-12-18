@@ -24,8 +24,10 @@ import java.util.Map.Entry
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
-class MemStoreSimpleMap(conf: StateConf, partition: Int) extends MemStore(conf, partition) {
 
+class MemStoreSimpleMap(conf: StateConf) extends MemStore(conf) {
+
+  //TODO implementation of ExpiringConcurrentHashMap or simply a cleaner Thread
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 
   override def close(): Unit = try internal.clear() finally super.close()

@@ -8,49 +8,38 @@ import akka.pattern.ask
 import akka.routing._
 import akka.serialization.SerializationExtension
 import akka.util.Timeout
-import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.actor.Service.{CheckServiceAvailability, ServiceAvailability}
-import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.actor.Keyspace.{CheckServiceAvailability, ServiceAvailability}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.cluster.{Coordinator, Node}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
+import io.amient.affinity.core.storage.State
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.reflect.ClassTag
 
-object ServicesApi {
-
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
-  }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Gateway = struct("affinity.node.gateway", new GatewayConf, false)
-    val Services = group("affinity.service", classOf[Service.Conf], false)
-  }
-
-  //class ServicesConf extends CfgGroup(classOf[Service.Conf])
+object Gateway {
 
   class GatewayConf extends CfgStruct[GatewayConf] {
-    val Class = cls("class", classOf[ServicesApi], false)
+    val Class = cls("class", classOf[Gateway], false)
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
     val Http = struct("http", new GatewayHttp.HttpConf, false)
   }
 
-
   final case class GatewayClusterStatus(suspended: Boolean)
 }
 
-trait ServicesApi extends ActorHandler {
+trait Gateway extends ActorHandler with ActorState {
 
   private val log = Logging.getLogger(context.system, this)
 
-  import ServicesApi._
+  import Gateway._
 
-  private val conf = ServicesApi.Conf(context.system.settings.config)
+  private val conf = Node.Conf(context.system.settings.config).Affi
 
   if (conf.Gateway.Http.isDefined && !classOf[GatewayHttp].isAssignableFrom(this.getClass)) {
     log.warning("affinity.gateway.http interface is configured but the node is trying " +
@@ -63,26 +52,36 @@ trait ServicesApi extends ActorHandler {
 
   def onClusterStatus(suspended: Boolean): Unit = ()
 
-  private val services = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
+  private val keyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
+  private val broadcasts = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def service(group: String): ActorRef = {
-    services.get(group) match {
-      case Some(coordinatedService) => coordinatedService._2
+  def broadcast[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = {
+    broadcasts.get(broadcastName) match {
+      case Some((broadcastState, _)) => broadcastState.asInstanceOf[State[K, V]]
+      case None =>
+        val bc = state[K,V](broadcastName, conf.Broadcast(broadcastName))
+        broadcasts += (broadcastName -> (bc, new AtomicBoolean(true)))
+        bc
+    }
+  }
+
+  def keyspace(group: String): ActorRef = {
+    keyspaces.get(group) match {
+      case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
-        val serviceConfig = conf.Services(group).config()
-        val service = context.actorOf(Props(new Service(serviceConfig)), name = group)
+        val serviceConf = conf.Keyspace(group)
+        val ks = context.actorOf(Props(new Keyspace(serviceConf.config())), name = group)
         val coordinator = Coordinator.create(context.system, group)
-        context.watch(service)
-        services += (group -> (coordinator, service, new AtomicBoolean(true)))
-        service
+        context.watch(ks)
+        keyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
+        ks
     }
-
   }
 
   private def checkClusterStatus(msg: Option[ServiceAvailability] = None): Unit = {
-    val gatewayShouldBeSuspended = services.exists(_._2._3.get)
+    val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
     if (gatewayShouldBeSuspended != handlingSuspended) {
       handlingSuspended = gatewayShouldBeSuspended
       onClusterStatus(gatewayShouldBeSuspended)
@@ -96,14 +95,15 @@ trait ServicesApi extends ActorHandler {
   abstract override def preStart(): Unit = {
     super.preStart()
     checkClusterStatus()
-    services.foreach {
+    tailState() // any state store registered in the gateway layer is broadcast, so all are tailing
+    keyspaces.foreach {
       case(_, (coordinator, _, _)) => coordinator.watch(self, global = true)
     }
   }
 
   abstract override def postStop(): Unit = {
     super.postStop()
-    services.values.foreach(_._1.unwatch(self))
+    keyspaces.values.foreach(_._1.unwatch(self))
   }
 
   abstract override def manage = super.manage orElse {
@@ -112,16 +112,16 @@ trait ServicesApi extends ActorHandler {
       context.parent ! Controller.GatewayCreated(-1)
 
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
-      val service: ActorRef = services(group)._2
+      val service: ActorRef = keyspaces(group)._2
       remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => service ! AddRoutee(ActorRefRoutee(ref)))
       service ! CheckServiceAvailability(group)
     }
 
     case msg@ServiceAvailability(group, suspended) =>
-      val (_, _, currentlySuspended) = services(group)
+      val (_, _, currentlySuspended) = keyspaces(group)
       if (currentlySuspended.get != suspended) {
-        services(group)._3.set(suspended)
+        keyspaces(group)._3.set(suspended)
         checkClusterStatus(Some(msg))
       }
 
@@ -139,20 +139,18 @@ trait ServicesApi extends ActorHandler {
   }
 
   def describeServices: scala.collection.immutable.Map[String, String] = {
-    services.toMap.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
+    keyspaces.toMap.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
   }
 
   def describeRegions: scala.collection.immutable.List[String] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
     val routeeSets = Future.sequence {
-      services.toMap.map { case (group, (_, actorRef, _)) =>
+      keyspaces.toMap.map { case (group, (_, actorRef, _)) =>
         actorRef ? GetRoutees map (_.asInstanceOf[Routees])
       }
     }
     Await.result(routeeSets, t).map(_.routees).flatten.map(_.toString).toList.sorted
   }
-
-
 
 }

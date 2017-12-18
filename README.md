@@ -6,12 +6,10 @@
  - fault-tolerance build on top of a distributed-log
  - horizontally scalable and fully asynchronous
  - zero-downtime possible
- 
+
 
 # Architecture
- 
 
-## Cluster Overview
 
  ![Cluster Architecture](doc/affinity.png)
 

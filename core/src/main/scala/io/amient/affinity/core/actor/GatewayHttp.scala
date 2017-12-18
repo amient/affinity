@@ -43,6 +43,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http.{Encoder, HttpExchange, HttpInterface}
@@ -76,11 +77,11 @@ object GatewayHttp {
   }
 }
 
-trait GatewayHttp extends ServicesApi {
+trait GatewayHttp extends Gateway {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val conf = ServicesApi.Conf(context.system.settings.config)
+  private val conf = Node.Conf(context.system.settings.config).Affi
 
   private val suspendedQueueMaxSize = conf.Gateway.SuspendQueueMaxSize()
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
@@ -393,7 +394,7 @@ trait WebSocketSupport extends GatewayHttp {
         //FIXME seen websockets on the client being closed with correlated server log: Message [scala.runtime.BoxedUnit] from Actor[akka://VPCAPI/user/StreamSupervisor-0/flow-3-1-actorPublisherSource#1580470647] to Actor[akka://VPCAPI/deadLetters] was not delivered.
         val pushMessageSource = Source.actorPublisher[Message](Props(new ActorPublisher[Message] {
 
-          val conf = ServicesApi.Conf(context.system.settings.config)
+          val conf = Node.Conf(context.system.settings.config).Affi
 
           final val maxBufferSize = conf.Gateway.Http.MaxWebSocketQueueSize()
 

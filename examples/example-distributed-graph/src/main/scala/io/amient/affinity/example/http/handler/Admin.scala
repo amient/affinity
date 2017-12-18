@@ -40,7 +40,7 @@ trait Admin extends ExampleGatewayRoot {
 
   import context.dispatcher
 
-  private val graphService = service("graph")
+  private val graphService = keyspace("graph")
 
   abstract override def handle: Receive = super.handle orElse {
 

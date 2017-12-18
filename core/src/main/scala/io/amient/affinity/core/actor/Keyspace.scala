@@ -24,19 +24,21 @@ import akka.routing._
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.storage.StateConf
 import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
 
 import scala.collection.mutable
 
-object Service {
+object Keyspace {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
+  object KeyspaceConf extends KeyspaceConf {
+    override def apply(config: Config): KeyspaceConf = new KeyspaceConf().apply(config)
   }
 
-  class Conf extends CfgStruct[Conf] {
+  class KeyspaceConf extends CfgStruct[KeyspaceConf] {
     val PartitionClass = cls("class", classOf[Partition], true)
     val NumPartitions = integer("num.partitions", true)
+    val State = group("state", classOf[StateConf], false)
   }
 
   final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
@@ -44,19 +46,17 @@ object Service {
 
 }
 
-class Service(config: Config) extends Actor {
+class Keyspace(config: Config) extends Actor {
 
-  import Service._
+  import Keyspace._
 
-  val appliedConfig = Service.Conf(config)
+  val appliedConfig = Keyspace.KeyspaceConf(config)
 
   private val numPartitions = appliedConfig.NumPartitions()
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
-  //TODO partitioner should be configurable via blackbox
   val partitioner = new ObjectHashPartitioner
-
 
   override def receive: Receive = {
 

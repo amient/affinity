@@ -73,7 +73,7 @@ class TransactionSpec extends IntegrationTestBase with Matchers {
   }))
 
   val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp {
-    val regionService = service("region")
+    val regionService = keyspace("region")
     override def handle: Receive = {
       case http@HTTP(GET, PATH("get", INT(id)), _, response) =>
         delegateAndHandleErrors(response, regionService ack TestKey(id)) {

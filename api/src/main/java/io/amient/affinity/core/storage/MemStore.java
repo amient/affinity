@@ -56,7 +56,7 @@ public abstract class MemStore {
     final protected int ttlSecs;
     final protected Path dataDir;
 
-    public MemStore(StateConf conf, int partition) throws IOException {
+    public MemStore(StateConf conf) throws IOException {
         checkpointsEnable = isPersistent() && conf.Name.isDefined();
         ttlSecs = conf.TtlSeconds.apply();
         if (!checkpointsEnable) {
@@ -65,7 +65,7 @@ public abstract class MemStore {
             if (!conf.MemStore.DataDir.isDefined()) {
               throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via Node config");
             }
-            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply() + "-" + partition));
+            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply()));
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
         }
         manager = new MemStoreManager();

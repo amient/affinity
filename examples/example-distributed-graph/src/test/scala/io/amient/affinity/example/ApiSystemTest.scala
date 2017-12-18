@@ -28,7 +28,6 @@ import akka.http.scaladsl.model.Uri
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{GatewayHttp, ServicesApi}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.{SystemTestBase, TimeCryptoProofSHA256}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -50,15 +49,15 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
 
   override def numPartitions = 2
 
-  val template = new ServicesApi.Conf()
   val config = ConfigFactory.load("example")
-    .withValue("affinity.service.graph.num.partitions", ConfigValueFactory.fromAnyRef(numPartitions))
-    .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
-    .withValue(template.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
+    .withValue(Node.Conf.Akka.path("loglevel"), ConfigValueFactory.fromAnyRef("ERROR"))
+    .withValue(Node.Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
+    .withValue(Node.Conf.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(Node.Conf.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
 
-  val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val nodeConfig = configure(config, Some(zkConnect), Some(kafkaBootstrap))
+  val dataNode = new Node(nodeConfig)
   val gatewayNode = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)), new ExampleGatewayRoot
     with Ping
     with Admin
@@ -66,7 +65,6 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
     with Graph) {
     awaitClusterReady {
       dataNode.startContainer("graph", List(0, 1))
-      dataNode.startContainer("user-mediator", List(0))
     }
   }
 

@@ -26,8 +26,7 @@ import java.util.{Observable, Observer, Optional}
 import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
-import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.ByteUtils
 
 import scala.collection.JavaConverters._
@@ -39,40 +38,53 @@ import scala.util.control.NonFatal
 
 object State {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
+  object StateConf extends StateConf {
+    override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val State = group("affinity.state", classOf[StateConf], false)
+  def create[K: ClassTag, V: ClassTag](keyspace: String, partition: Int, store: String, system: ActorSystem): State[K, V] = {
+    val conf = Node.Conf(system.settings.config)
+    val numPartitions = conf.Affi.Keyspace(keyspace).NumPartitions()
+    val stateConf = conf.Affi.Keyspace(keyspace).State(store)
+    stateConf.Name.setValue(if (partition < 0) store else s"$keyspace-$store-$partition")
+    if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
+    create(partition, stateConf, numPartitions, system)
+  }
+
+  def create[K: ClassTag, V: ClassTag](stateConf: StateConf, system: ActorSystem): State[K, V] = {
+    create(0, stateConf, 1, system)
+  }
+
+
+  private def create[K: ClassTag, V: ClassTag]
+  (partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
+    val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
+    val lockTimeoutMs = stateConf.LockTimeoutMs()
+    val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(stateConf, partition, 1) else {
+      val storageClass = stateConf.Storage.Class()
+      val storageClassSymbol = rootMirror.classSymbol(storageClass)
+      val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
+      val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
+      val constructorMirror = storageClassMirror.reflectConstructor(constructor)
+      constructorMirror(stateConf, partition, numPartitions).asInstanceOf[Storage]
+    } catch {
+      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State ${stateConf.Name()}", e)
+    }
+    val keySerde = Serde.of[K](system.settings.config)
+    val valueSerde = Serde.of[V](system.settings.config)
+    new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs)
   }
 
 }
 
-class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
-                                     (implicit val partition: Int) extends Observable {
+class State[K, V](val storage: Storage,
+                  keySerde: AbstractSerde[K],
+                  valueSerde: AbstractSerde[V],
+                  ttlMs: Long = -1,
+                  lockTimeoutMs: Int = 10000) extends Observable {
 
   self =>
 
-  val conf = Node.Conf(system.settings.config)
-  val stateConf = conf.Affi.State(name)
-  stateConf.Name.setValue(name)
-  if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
-
-  private val keySerde = Serde.of[K](system.settings.config)
-  private val valueSerde = Serde.of[V](system.settings.config)
-  private val ttlMs: Long = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000
-  private val lockTimeoutMs = stateConf.LockTimeoutMs();
-  val storage: Storage = try if (!stateConf.Storage.isDefined) new NoopStorage(stateConf, partition) else {
-    val storageClass = stateConf.Storage.Class()
-    val storageClassSymbol = rootMirror.classSymbol(storageClass)
-    val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
-    val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
-    val constructorMirror = storageClassMirror.reflectConstructor(constructor)
-    constructorMirror(stateConf, partition).asInstanceOf[Storage]
-  } catch {
-    case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $name", e)
-  }
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -130,10 +142,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     for (
       cell: ByteBuffer <- option(storage.memstore(key));
       bytes: Array[Byte] <- option(storage.memstore.unwrap(key, cell, ttlMs))
-    ) yield valueSerde.fromBytes(bytes) match {
-      case value: V => value
-      case other => throw new UnsupportedOperationException(key.toString + " " + other.getClass)
-    }
+    ) yield valueSerde.fromBytes(bytes)
   }
 
   /**
@@ -199,7 +208,7 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     * @return Future Optional of the value previously held at the key position
     */
   def insert(key: K, value: V): Future[V] = update(key) {
-    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store `$name`")
+    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
     case None => (Some(value), Some(value), value)
   }
 
@@ -305,8 +314,8 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
   def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
-        case (key: K, event: Any) => pf.lift((key, event))
-        case _ =>
+        case (key: Any, event: Any) => pf.lift((key.asInstanceOf[K], event))
+        case _ => //TODO issue warning
       }
     })
   }
@@ -333,25 +342,24 @@ class State[K: ClassTag, V: ClassTag](val name: String, system: ActorSystem)
     }
   }
 
-  def addKeyValueObserver(key: Any, observer: Observer): Observer = key match {
-    case k: K =>
-      val observable = observables.get(k) match {
-        case Some(o) => o
-        case None =>
-          val o: ObservableKeyValue = new ObservableKeyValue()
-          observables += k -> o
-          o
-      }
-      observable.addObserver(observer)
-      observer.update(observable, apply(k)) // send initial value on subscription
-      observer
+  def addKeyValueObserver(key: Any, observer: Observer): Observer = {
+    val observable = observables.get(key.asInstanceOf[K]) match {
+      case Some(o) => o
+      case None =>
+        val o: ObservableKeyValue = new ObservableKeyValue()
+        observables += key.asInstanceOf[K] -> o
+        o
+    }
+    observable.addObserver(observer)
+    observer.update(observable, apply(key.asInstanceOf[K])) // send initial value on subscription
+    observer
   }
 
-  def removeKeyValueObserver(key: Any, observer: Observer): Unit = key match {
-    case k: K => observables.get(k).foreach {
+  def removeKeyValueObserver(key: Any, observer: Observer): Unit = {
+    observables.get(key.asInstanceOf[K]).foreach {
       observable =>
         observable.deleteObserver(observer)
-        if (observable.countObservers() == 0) observables -= k
+        if (observable.countObservers() == 0) observables -= key.asInstanceOf[K]
     }
   }
 

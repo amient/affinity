@@ -56,7 +56,7 @@ ExampleApp starts several nodes in a pseudo-distributed mode:
 
 Each of the 4 data partitions will 2 online replicas:
   
-                    | Assigned Partitions   |
+    -               | Assigned Partitions   |
     ----------------+-----+-----+-----+-----+
     Data Partition: |  0  |  1  |  2  |  3  |
     ----------------+-----+-----+-----+-----+               

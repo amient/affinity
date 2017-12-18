@@ -12,7 +12,7 @@ import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
   * @param conf
   * @param partition
   */
-class FailingKafkaStorage(conf: StateConf, partition: Int) extends KafkaStorage(conf, partition) {
+class FailingKafkaStorage(conf: StateConf, partition: Int, numParts: Int) extends KafkaStorage(conf, partition, numParts) {
 
   override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))) {

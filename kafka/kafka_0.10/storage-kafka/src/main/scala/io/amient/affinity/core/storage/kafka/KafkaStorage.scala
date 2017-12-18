@@ -21,22 +21,24 @@ package io.amient.affinity.core.storage.kafka
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{ExecutionException, Future, TimeUnit}
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.{StateConf, Storage}
 import io.amient.affinity.core.util.MappedJavaFuture
+import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.errors.BrokerNotAvailableException
+import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
+import org.apache.kafka.common.errors.{BrokerNotAvailableException, TopicExistsException}
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.language.reflectiveCalls
 
 
@@ -48,6 +50,7 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
+    val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
     val Producer = struct("kafka.producer", new KafkaProducerConf, false)
     val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false)
@@ -61,13 +64,14 @@ object KafkaStorage {
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 }
 
-class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateConf, partition) {
+class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(stateConf) {
 
   import KafkaStorage._
 
   private val conf = KafkaStorageConf(stateConf.Storage)
 
-  val topic = conf.Topic()
+  final val topic = conf.Topic()
+  final val ttlSec = stateConf.TtlSeconds()
 
   private val producerProps = new Properties() {
     if (conf.Producer.isDefined) {
@@ -75,7 +79,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateCo
       if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
-      producerConfig.entrySet().asScala.foreach { case (entry) =>
+      producerConfig.entrySet().foreach { case (entry) =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
@@ -93,7 +97,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateCo
       if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
-      consumerConfig.entrySet().asScala.foreach { case (entry) =>
+      consumerConfig.entrySet().foreach { case (entry) =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
@@ -102,6 +106,8 @@ class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateCo
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)
   }
+
+  ensureCorrectTopicConfiguiration()
 
   protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
@@ -144,7 +150,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateCo
               val records = kafkaConsumer.poll(500)
               consumerError.set(null)
               var fetchedNumRecrods = 0
-              for (r <- records.iterator().asScala) {
+              for (r <- records.iterator()) {
                 fetchedNumRecrods += 1
                 if (r.value == null) {
                   memstore.unload(r.key, r.offset())
@@ -222,6 +228,70 @@ class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateCo
   def delete(key: Array[Byte]): Future[java.lang.Long] = {
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, key, null))) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
+    }
+  }
+
+  private def ensureCorrectTopicConfiguiration() {
+    val adminProps = new Properties() {
+      put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, producerProps.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
+    }
+    val admin = AdminClient.create(adminProps)
+    try {
+      val adminTimeoutMs = 15000
+      val replicationFactor = conf.ReplicationFactor().toShort
+      val compactionPolicy = (if (ttlSec > 0) "compact,delete" else "compact")
+      val topicConfigs = Map(
+        TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
+        TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
+        TopicConfig.MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS_CONFIG -> (if (ttlSec > 0) ttlSec * 1000 else Long.MaxValue).toString,
+        TopicConfig.RETENTION_MS_CONFIG -> (if (ttlSec > 0) ttlSec * 1000 else Long.MaxValue).toString,
+        TopicConfig.RETENTION_BYTES_CONFIG -> "-1"
+      )
+
+      var exists: Option[Boolean] = None
+      while (!exists.isDefined) {
+        if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.SECONDS).contains(topic)) {
+          exists = Some(true)
+        } else {
+          val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
+          schemaTopicRequest.configs(topicConfigs)
+          try {
+            admin.createTopics(List(schemaTopicRequest)).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+            log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor, configs: $topicConfigs")
+            exists = Some(false)
+          } catch {
+            case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
+          }
+        }
+      }
+
+      if (exists.get) {
+        log.debug(s"Checking that topic $topic has correct number of partitions: ${numPartitions}")
+        val description = admin.describeTopics(List(topic)).values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        if (description.partitions().size() != numPartitions) {
+          throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()}, expecting: $numPartitions")
+        }
+        log.debug(s"Checking that topic $topic has correct replication factor: ${replicationFactor}")
+        val actualReplFactor = description.partitions().get(0).replicas().size()
+        if ( actualReplFactor < replicationFactor) {
+          throw new IllegalStateException(s"Kafka topic $topic has $actualReplFactor, expecting: $replicationFactor")
+        }
+        log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
+        val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
+        val actualConfig = admin.describeConfigs(List(topicConfigResource))
+          .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        val requiredConfigChanges = topicConfigs.filter { case (k,v) => actualConfig.get(k).value() != v }
+        if (requiredConfigChanges.size > 0) {
+          val entries: util.Collection[ConfigEntry] = requiredConfigChanges.map { case (k,v) => new ConfigEntry(k,v) }
+          admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
+            .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+          log.info(s"Topic $topic configuration altered successfully: $requiredConfigChanges")
+        } else {
+          log.debug(s"Topic $topic configuration is up to date")
+        }
+      }
+    } finally {
+      admin.close()
     }
   }
 

@@ -21,7 +21,7 @@ package io.amient.affinity.model.graph
 
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.ServicesApi
+import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.transaction.Transaction
 import io.amient.affinity.model.graph.message._
 
@@ -30,13 +30,13 @@ import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait GraphLogic extends ServicesApi {
+trait GraphLogic extends Gateway {
 
   import context.dispatcher
 
   implicit val scheduler = context.system.scheduler
 
-  val graphService = service("graph")
+  val graphService = keyspace("graph")
 
   protected def getVertexProps(vid: Int): Future[Option[VertexProps]] = {
     implicit val timeout = Timeout(1 seconds)

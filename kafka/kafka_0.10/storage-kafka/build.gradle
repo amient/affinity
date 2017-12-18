@@ -41,7 +41,7 @@ assemble.dependsOn shadowJar
 dependencies {
     compile project(':core')
     compile project(':kafka:kafka_0.10:avro-serde-kafka')
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka:kafka_0.10').kafkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '0.11.0.2' //0.11 client is compatible with 0.10 brokers so not using instead of project(':kafka:kafka_0.10').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
     testCompile project(':kafka:kafka_0.10:test-util-kafka')
