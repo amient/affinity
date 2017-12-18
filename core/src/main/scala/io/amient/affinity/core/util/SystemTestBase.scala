@@ -68,12 +68,12 @@ trait SystemTestBase {
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
-    val layer1 = config
+    val layer1: Config = config
       .withValue(Node.Conf.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
       .withValue(Node.Conf.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
       .withValue(Node.Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
-    val layer2 = zkConnect match {
+    val layer2: Config = zkConnect match {
       case None => layer1
       case Some(zkConnectString) =>
         layer1
@@ -84,27 +84,26 @@ trait SystemTestBase {
     kafkaBootstrap match {
       case None => layer2
       case Some(kafkaBootstrapString) =>
-        layer2 match {
-          case cfg if (!cfg.hasPath(Node.Conf.Affi.Keyspace.path())) => cfg
-          case cfg =>
-            val stateStores = (cfg
-              .getObject(Node.Conf.Affi.Keyspace.path()).keySet().asScala
-              .flatMap { ks =>
-                cfg.getObject(Node.Conf.Affi.Keyspace(ks).State.path).keySet().asScala.map {
-                  case stateName => Node.Conf.Affi.Keyspace(ks).State(stateName).path()
-                }
-              }) ++ (cfg.getObject(Node.Conf.Affi.Broadcast.path()).keySet().asScala
-              .map { ks =>
-                Node.Conf.Affi.Broadcast(ks).path
-              })
+        val keySpaceStores = if (!layer2.hasPath(Node.Conf.Affi.Keyspace.path())) List.empty else layer2
+          .getObject(Node.Conf.Affi.Keyspace.path()).keySet().asScala
+          .flatMap { ks =>
+            layer2.getObject(Node.Conf.Affi.Keyspace(ks).State.path).keySet().asScala.map {
+              case stateName => Node.Conf.Affi.Keyspace(ks).State(stateName).path()
+            }
+          }
 
-            stateStores.foldLeft(cfg) {
-              case (c, stateStorePath) =>
-                val stateConfig = c.getConfig(stateStorePath)
-                if (!stateConfig.getString("storage.class").toLowerCase.contains("kafka")) c else {
-                  c.withValue(s"$stateStorePath.storage.kafka.bootstrap.servers",
-                    ConfigValueFactory.fromAnyRef(kafkaBootstrapString))
-                }
+        val broadcastStores = if (!layer2.hasPath(Node.Conf.Affi.Broadcast.path())) List.empty else layer2
+          .getObject(Node.Conf.Affi.Broadcast.path()).keySet().asScala
+          .map { ks =>
+            Node.Conf.Affi.Broadcast(ks).path
+          }
+
+        (keySpaceStores ++ broadcastStores).foldLeft(layer2) {
+          case (c, stateStorePath) =>
+            val stateConfig = c.getConfig(stateStorePath)
+            if (!stateConfig.getString("storage.class").toLowerCase.contains("kafka")) c else {
+              c.withValue(s"$stateStorePath.storage.kafka.bootstrap.servers",
+                ConfigValueFactory.fromAnyRef(kafkaBootstrapString))
             }
         }
     }
