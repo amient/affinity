@@ -22,17 +22,19 @@ package io.amient.affinity.core.storage.kafka
 import java.util
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{Future, TimeUnit}
+import java.util.concurrent.{ExecutionException, Future, TimeUnit}
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.{StateConf, Storage}
 import io.amient.affinity.core.util.MappedJavaFuture
+import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.errors.BrokerNotAvailableException
+import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
+import org.apache.kafka.common.errors.{BrokerNotAvailableException, TopicExistsException}
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
@@ -48,6 +50,7 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
+    val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
     val Producer = struct("kafka.producer", new KafkaProducerConf, false)
     val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false)
@@ -61,7 +64,7 @@ object KafkaStorage {
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 }
 
-class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateConf, partition) {
+class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(stateConf) {
 
   import KafkaStorage._
 
@@ -233,19 +236,62 @@ class KafkaStorage(stateConf: StateConf, partition: Int) extends Storage(stateCo
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, producerProps.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
     }
     val admin = AdminClient.create(adminProps)
-    val adminTimeout = 5
-    val topicConfigs = Map(
-      //TODO #86 add all relevant configs described in the issue
-      TopicConfig.CLEANUP_POLICY_CONFIG -> (if (ttlSec > 0) "compact,delete" else "compact"))
+    try {
+      val adminTimeoutMs = 15000
+      val replicationFactor = conf.ReplicationFactor().toShort
+      val compactionPolicy = (if (ttlSec > 0) "compact,delete" else "compact")
+      val topicConfigs = Map(
+        TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
+        TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
+        TopicConfig.MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS_CONFIG -> (if (ttlSec > 0) ttlSec * 1000 else Long.MaxValue).toString,
+        TopicConfig.RETENTION_MS_CONFIG -> (if (ttlSec > 0) ttlSec * 1000 else Long.MaxValue).toString,
+        TopicConfig.RETENTION_BYTES_CONFIG -> "-1"
+      )
 
-    //TODO #86 make sure that calling this from all partitions is synchronized on the broker
-    if (!admin.listTopics().names().get(adminTimeout, TimeUnit.SECONDS).contains(topic)) {
-      //TODO #86 number of partitions and repl. factor is defined for each state, not service!
-      val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
-      schemaTopicRequest.configs(topicConfigs)
-      admin.createTopics(List(schemaTopicRequest)).all.get(adminTimeout, TimeUnit.MILLISECONDS)
-    } else {
-      //TODO #86 describe topic and alter configs if different from topicConfigs
+      var exists: Option[Boolean] = None
+      while (!exists.isDefined) {
+        if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.SECONDS).contains(topic)) {
+          exists = Some(true)
+        } else {
+          val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
+          schemaTopicRequest.configs(topicConfigs)
+          try {
+            admin.createTopics(List(schemaTopicRequest)).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+            log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor, configs: $topicConfigs")
+            exists = Some(false)
+          } catch {
+            case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
+          }
+        }
+      }
+
+      if (exists.get) {
+        log.debug(s"Checking that topic $topic has correct number of partitions: ${numPartitions}")
+        val description = admin.describeTopics(List(topic)).values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        if (description.partitions().size() != numPartitions) {
+          throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()}, expecting: $numPartitions")
+        }
+        log.debug(s"Checking that topic $topic has correct replication factor: ${replicationFactor}")
+        val actualReplFactor = description.partitions().get(0).replicas().size()
+        if ( actualReplFactor < replicationFactor) {
+          throw new IllegalStateException(s"Kafka topic $topic has $actualReplFactor, expecting: $replicationFactor")
+        }
+        log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
+        val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
+        val actualConfig = admin.describeConfigs(List(topicConfigResource))
+          .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        val requiredConfigChanges = topicConfigs.filter { case (k,v) => actualConfig.get(k).value() != v }
+        if (requiredConfigChanges.size > 0) {
+          val entries: util.Collection[ConfigEntry] = requiredConfigChanges.map { case (k,v) => new ConfigEntry(k,v) }
+          admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
+            .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+          log.info(s"Topic $topic configuration altered successfully: $requiredConfigChanges")
+        } else {
+          log.debug(s"Topic $topic configuration is up to date")
+        }
+      }
+    } finally {
+      admin.close()
     }
   }
 

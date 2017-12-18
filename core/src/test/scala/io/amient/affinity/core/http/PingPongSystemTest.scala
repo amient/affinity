@@ -45,7 +45,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with BeforeAndAfte
 
     implicit val materializer = ActorMaterializer.create(context.system)
 
-    val regionService = service("region")
+    val regionService = keyspace("region")
 
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))

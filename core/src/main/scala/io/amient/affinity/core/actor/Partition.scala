@@ -48,7 +48,12 @@ trait Partition extends ActorHandler with ActorState {
   private val log = Logging.getLogger(context.system, this)
 
   /**
-    * physical partition id - this is read from the name of the Partition Actor;  assigned by the Region
+    * service container name
+    */
+  implicit val keyspace = self.path.parent.name
+
+  /**
+    * physical partition id
     */
   implicit val partition = self.path.name.toInt
 
@@ -59,7 +64,7 @@ trait Partition extends ActorHandler with ActorState {
     */
   protected def onBecomeMaster: Unit = {
     bootState()
-    log.debug(s"Became master for partition $partition")
+    log.debug(s"Became master for partition $keyspace/$partition")
   }
 
   /**
@@ -69,17 +74,17 @@ trait Partition extends ActorHandler with ActorState {
     */
   protected def onBecomeStandby: Unit = {
     tailState()
-    log.debug(s"Became standby for partition $partition")
+    log.debug(s"Became standby for partition $keyspace/$partition")
   }
 
   override def preStart(): Unit = {
-    log.debug("Starting partition: " + self.path.name)
+    log.debug(s"Starting partition: $keyspace/$partition")
     context.parent ! ServiceOnline(self)
     super.preStart()
   }
 
   override def postStop(): Unit = {
-    log.debug("Stopping partition: " + self.path.name)
+    log.debug(s"Stopping partition: $keyspace/$partition")
     context.parent ! ServiceOffline(self)
     super.postStop()
   }

@@ -77,8 +77,8 @@ public class MemStoreRocksDb extends MemStore {
         return true;
     }
 
-    public MemStoreRocksDb(StateConf conf, int partition) throws IOException {
-        super(conf, partition);
+    public MemStoreRocksDb(StateConf conf) throws IOException {
+        super(conf);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
         log.info("Opening RocksDb MemStore: " + pathToData);
         Files.createDirectories(pathToData);

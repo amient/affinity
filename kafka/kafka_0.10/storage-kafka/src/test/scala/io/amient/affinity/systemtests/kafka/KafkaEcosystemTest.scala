@@ -44,8 +44,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
   }
 
 
-  private def createStateStoreForPartition(name: String)(implicit partition: Int) = {
-    new State[Int, TestRecord](name, system)
+  private def createStateStoreForPartition(name: String)(implicit keyspace: String, partition: Int) = {
+    State.create[Int, TestRecord](keyspace, partition, name, system)
   }
 
   behavior of "KafkaDeserializer"
@@ -55,8 +55,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
     system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZkAvroSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
-    val topic = KafkaStorageConf(Node.Conf(config).Affi.State(stateStoreName).Storage).Topic()
-    val state = createStateStoreForPartition(stateStoreName)(partition = 0)
+    val topic = KafkaStorageConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName).Storage).Topic()
+    val state = createStateStoreForPartition(stateStoreName)("keyspace1", partition = 0)
     val numWrites = new AtomicInteger(10)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()

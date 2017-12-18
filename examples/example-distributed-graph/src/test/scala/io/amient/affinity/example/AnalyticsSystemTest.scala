@@ -24,7 +24,6 @@ import java.util.Properties
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.core.actor.ServicesApi
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -42,11 +41,10 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
   override def numPartitions = 4
 
-  val template = new ServicesApi.Conf()
   val config: Config = ConfigFactory.load("example")
     .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
-    .withValue(template.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
-    .withValue(template.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
+    .withValue(Node.Conf.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(Node.Conf.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
 
   val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
@@ -57,7 +55,6 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     with Graph) {
     awaitClusterReady {
       dataNode.startContainer("graph", List(0, 1, 2, 3))
-      dataNode.startContainer("user-mediator", List(0))
     }
   }
 

@@ -26,7 +26,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Service.ServiceAvailability
+import io.amient.affinity.core.actor.Keyspace.ServiceAvailability
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}

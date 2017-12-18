@@ -26,6 +26,8 @@ import com.typesafe.config.{Config, ConfigException}
 import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
+import io.amient.affinity.core.actor.Gateway.GatewayConf
+import io.amient.affinity.core.actor.Keyspace.KeyspaceConf
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 import io.amient.affinity.core.storage.StateConf
@@ -57,10 +59,10 @@ object Node {
   class AffinityConf extends CfgStruct[AffinityConf] {
     val Avro = struct("avro", new AvroConf(), true)
     val Coorinator = struct("coordinator", new Coordinator.CoorinatorConf, true)
-    val State = group("state", classOf[StateConf], true)
-    val Services = group("service", classOf[Service.Conf], false)
+    val Keyspace = group("keyspace", classOf[KeyspaceConf], false)
+    val Broadcast = group("broadcast", classOf[StateConf], false)
     val Containers = group("node.container", classOf[CfgIntList], false)
-    val Gateway = struct("node.gateway", new ServicesApi.GatewayConf, false)
+    val Gateway = struct("node.gateway", new GatewayConf, false)
     val StartupTimeoutMs = longint("node.startup.timeout.ms", true)
     val ShutdownTimeoutMs = longint("node.shutdown.timeout.ms", true)
     val DataDir = filepath("node.data.dir", false)
@@ -115,7 +117,7 @@ class Node(config: Config) {
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
     try {
-      val serviceClass = conf.Affi.Services(group).PartitionClass()
+      val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
       implicit val timeout = Timeout(startupTimeout)
       startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
     } catch {
@@ -136,7 +138,7 @@ class Node(config: Config) {
     * @tparam T
     * @return the httpPort on which the gateway is listening
     */
-  def startGateway[T <: ServicesApi](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     startupFutureWithShutdownFuse {
       try {

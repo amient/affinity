@@ -27,6 +27,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.{ActorState, GatewayHttp}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.storage.State
 import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.http.handler._
 import io.amient.affinity.example.rest.handler._
@@ -53,14 +54,12 @@ class ExampleGateway extends ExampleGatewayRoot
   with Ping
   with Fail
 
-class ExampleGatewayRoot extends GatewayHttp with ActorState {
+class ExampleGatewayRoot extends GatewayHttp {
 
   /**
-    * settings is a broadcast memstore which holds an example set of api keys for custom authentication
-    * unlike partitioned mem stores all nodes see the same settings because they are linked to the same
-    * partition 0.
+    * settings is a broadcast memstore which holds an example set of api keys for custom authentication.
     */
-  val settings = state[String, ConfigEntry]("settings", partition = 0)
+  val settings: State[String, ConfigEntry] = broadcast[String, ConfigEntry]("settings")
 
   override def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)

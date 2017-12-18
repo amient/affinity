@@ -21,21 +21,13 @@ package io.amient.affinity.example.rest.handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.pattern.ask
-import akka.util.Timeout
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.example.rest.ExampleGatewayRoot
-import io.amient.affinity.example.service.UserInputMediator
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 trait Ping extends ExampleGatewayRoot {
-
-  import context.dispatcher
-
-  val userMediator = service("user-mediator")
 
   abstract override def handle: Receive = super.handle orElse {
 
@@ -44,14 +36,6 @@ trait Ping extends ExampleGatewayRoot {
       */
     case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong"))
 
-    /**
-      * PUT /ping
-      */
-    case HTTP(PUT, PATH("ping"), query, response) =>
-      implicit val timeout = Timeout(1 minute)
-      userMediator ? "hello" onSuccess {
-        case userInput: String => response.success(Encoder.json(OK, Map("userInput" -> userInput)))
-      }
   }
 
 }
