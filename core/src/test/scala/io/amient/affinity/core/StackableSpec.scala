@@ -1,6 +1,7 @@
 package io.amient.affinity.core
 
 import akka.actor.Actor.Receive
+import org.slf4j.LoggerFactory
 
 
 object StackableSpec extends App {
@@ -20,16 +21,20 @@ trait Module1 extends Gate {
 
   val sharedData = "shared-data"
 
+  private val log = LoggerFactory.getLogger(classOf[Module1])
+
   abstract override def handle: Receive = super.handle orElse {
-    case in: Int => println(s"Handled by Module1: " + in)
+    case in: Int => log.info(s"Handled by Module1: " + in)
   }
 }
 
 trait Module2 extends Gate {
   self: Module1 => //this module requries another module
 
+  private val log = LoggerFactory.getLogger(classOf[Module2])
+
   abstract override def handle: Receive = super.handle orElse {
-    case in: String => println(s"Handled by Module2: " + in +s" using $sharedData")
+    case in: String => log.info(s"Handled by Module2: " + in +s" using $sharedData")
   }
 }
 

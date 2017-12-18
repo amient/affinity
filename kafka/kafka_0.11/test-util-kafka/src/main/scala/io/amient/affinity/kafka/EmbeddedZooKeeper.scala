@@ -6,10 +6,13 @@ import java.nio.file.Files
 
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.slf4j.LoggerFactory
 
 trait EmbeddedZooKeeper extends BeforeAndAfterAll {
 
   self: Suite =>
+
+  private val log = LoggerFactory.getLogger(classOf[EmbeddedZooKeeper])
 
   private val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
   testDir.mkdirs()
@@ -21,7 +24,7 @@ trait EmbeddedZooKeeper extends BeforeAndAfterAll {
   private val zkFactory = new NIOServerCnxnFactory
   zkFactory.configure(new InetSocketAddress(0), 10)
   val zkConnect = "localhost:" + zkFactory.getLocalPort
-  println(s"Embedded ZooKeeper $zkConnect, data directory: $testDir")
+  log.info(s"Embedded ZooKeeper $zkConnect, data directory: $testDir")
   zkFactory.startup(zookeeper)
 
   abstract override def afterAll(): Unit = {

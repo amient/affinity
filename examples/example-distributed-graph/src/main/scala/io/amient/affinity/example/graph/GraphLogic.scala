@@ -17,13 +17,13 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.model.graph
+package io.amient.affinity.example.graph
 
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway
 import io.amient.affinity.core.transaction.Transaction
-import io.amient.affinity.model.graph.message._
+import io.amient.affinity.example.graph.message._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}

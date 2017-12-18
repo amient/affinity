@@ -20,7 +20,7 @@
 package io.amient.affinity.example
 
 import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.model.graph.message.Component
+import io.amient.affinity.example.graph.message.Component
 import org.scalatest.{FlatSpec, Matchers}
 
 class DomainSpec extends FlatSpec with Matchers {

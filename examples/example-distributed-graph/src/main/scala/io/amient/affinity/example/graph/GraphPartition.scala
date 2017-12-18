@@ -17,16 +17,16 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.model.graph
+package io.amient.affinity.example.graph
 
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.model.graph.message._
+import io.amient.affinity.example.graph.message._
 
 import scala.collection.immutable.Set
 
-trait GraphPartition extends Partition {
+class GraphPartition extends Partition {
 
   val graph: State[Int, VertexProps] = state("graph")
 
@@ -34,7 +34,7 @@ trait GraphPartition extends Partition {
 
   import context.dispatcher
 
-  abstract override def handle: Receive = super.handle orElse {
+  override def handle: Receive = super.handle orElse {
 
     /**
       * getting Component object by the Component ID

@@ -17,6 +17,7 @@ import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer}
 import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -25,6 +26,8 @@ import scala.concurrent.{Await, Future}
 class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions: Int = 2
+
+  private val log = LoggerFactory.getLogger(classOf[KafkaEcosystemTest])
 
   val config = configure(ConfigFactory.load("systemtests")
     .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName))
@@ -68,7 +71,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
       })
     })
     Await.ready(updates, 10 seconds)
-    println(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
+    log.info(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
     state.numKeys should equal(numWrites.get)
 
     val consumerProps = Map(

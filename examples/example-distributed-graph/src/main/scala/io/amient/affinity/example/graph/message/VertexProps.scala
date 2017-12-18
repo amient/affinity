@@ -17,17 +17,11 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.core.util.TimeCryptoProofSHA256
-import org.codehaus.jackson.annotate.JsonIgnore
 
-
-final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord {
-  @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
-
-  override def hashCode(): Int = description.hashCode()
+final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord {
+  def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)
+  def withEdges(newEdges: Set[Edge]) = VertexProps(System.currentTimeMillis, component, newEdges)
 }
-
-

@@ -37,6 +37,7 @@ import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -47,6 +48,8 @@ import scala.language.postfixOps
 class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with EmbeddedCfRegistry with Matchers {
 
   override def numPartitions = 2
+
+  private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemTest])
 
   val config = configure(
     ConfigFactory.load("systemtests")
@@ -101,7 +104,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     updates.size should be(numToWrite)
     Await.result(Future.sequence(updates), 10 seconds)
     val spentMs = System.currentTimeMillis() - l
-    println(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
+    log.info(s"written ${numWrites.get} records of state data in ${spentMs} ms at ${numWrites.get * 1000 / spentMs} tps")
     state.numKeys should equal(numWrites.get)
     state.iterator.size should equal(state.numKeys)
 
@@ -169,7 +172,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
         })
       })
       Await.ready(updates, 10 seconds)
-      println(s"produced ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
+      log.info(s"produced ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
 
     } finally {
       producer.close()

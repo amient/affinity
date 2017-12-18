@@ -16,9 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package io.amient.affinity.model.graph.message
+package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
 
-final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord
+final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord

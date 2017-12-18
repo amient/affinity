@@ -21,6 +21,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 object Gateway {
 
@@ -56,7 +57,7 @@ trait Gateway extends ActorHandler with ActorState {
   private val broadcasts = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def broadcast[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = {
+  def broadcast[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = try {
     broadcasts.get(broadcastName) match {
       case Some((broadcastState, _)) => broadcastState.asInstanceOf[State[K, V]]
       case None =>
@@ -64,9 +65,15 @@ trait Gateway extends ActorHandler with ActorState {
         broadcasts += (broadcastName -> (bc, new AtomicBoolean(true)))
         bc
     }
+  } catch {
+    case NonFatal(e) =>
+      try closeState() catch {
+        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
+      }
+      throw e
   }
 
-  def keyspace(group: String): ActorRef = {
+  def keyspace(group: String): ActorRef = try {
     keyspaces.get(group) match {
       case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
@@ -79,6 +86,12 @@ trait Gateway extends ActorHandler with ActorState {
         keyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
         ks
     }
+  } catch {
+    case NonFatal(e) =>
+      try closeState() catch {
+        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
+      }
+      throw e
   }
 
   private def checkClusterStatus(msg: Option[ServiceAvailability] = None): Unit = {
@@ -104,7 +117,7 @@ trait Gateway extends ActorHandler with ActorState {
 
   abstract override def postStop(): Unit = {
     super.postStop()
-    keyspaces.values.foreach(_._1.unwatch(self))
+    try closeState() finally keyspaces.values.foreach(_._1.unwatch(self))
   }
 
   abstract override def manage = super.manage orElse {

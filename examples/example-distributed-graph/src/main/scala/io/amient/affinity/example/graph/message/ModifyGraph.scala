@@ -17,13 +17,16 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.model.graph.GraphPartition
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.transaction.Instruction
 
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Instruction[VertexProps] {
+  override def hashCode(): Int = vertex.hashCode
 
-class DataPartition extends Partition
-  with GraphPartition
-  with DebugPartition
-
+  def reverse(props: VertexProps) = op match {
+    case GOP.ADD => Some(ModifyGraph(vertex, edge, GOP.REMOVE))
+    case GOP.REMOVE => Some(ModifyGraph(vertex, edge, GOP.ADD))
+  }
+}

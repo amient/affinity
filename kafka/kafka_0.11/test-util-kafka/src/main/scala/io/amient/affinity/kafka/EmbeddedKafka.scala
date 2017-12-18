@@ -11,10 +11,13 @@ import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.protocol.SecurityProtocol
 import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.slf4j.LoggerFactory
 
 trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 
   self: Suite =>
+
+  private val log = LoggerFactory.getLogger(classOf[EmbeddedKafka])
 
   def numPartitions: Int
 
@@ -46,7 +49,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   val broker = Broker.createBroker(1, tmpZkClient.readData[String]("/brokers/ids/1"))
   val kafkaBootstrap = broker.getBrokerEndPoint(ListenerName.forSecurityProtocol(SecurityProtocol.PLAINTEXT)).connectionString()
   tmpZkClient.close
-  println(s"Embedded Kafka $kafkaBootstrap, data dir: $testDir")
+  log.info(s"Embedded Kafka $kafkaBootstrap, data dir: $testDir")
 
   abstract override def afterAll(): Unit = {
     try {

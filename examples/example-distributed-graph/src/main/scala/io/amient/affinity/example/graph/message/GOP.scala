@@ -17,11 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.model.graph.message
+package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.avro.AvroRecord
-
-final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord {
-  def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)
-  def withEdges(newEdges: Set[Edge]) = VertexProps(System.currentTimeMillis, component, newEdges)
+object GOP extends Enumeration {
+  type Side = Value
+  val ADD, REMOVE = Value
 }

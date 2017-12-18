@@ -17,23 +17,16 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.model.graph
+package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.avro.schema.AvroSchemaProvider
-import io.amient.affinity.model.graph.message._
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.transaction.Instruction
 
-object GraphData {
-
-  def registerMessages(serde: AvroSchemaProvider) = {
-    serde.register[Edge]
-    serde.register[VertexProps]
-    serde.register[GetVertexProps]
-    serde.register[ModifyGraph]
-    serde.register[UpdateVertexComponent]
-    serde.register[Component]
-    serde.register[GetComponent]
-    serde.register[UpdateComponent]
-    serde.register[DeleteComponent]
+final case class UpdateComponent(cid: Int, component: Component) extends AvroRecord with Instruction[Option[Component]] {
+  override def hashCode(): Int = cid.hashCode
+  override def reverse(c: Option[Component]) = c match {
+    case Some(result) if (result == component) => None
+    case None => Some(DeleteComponent(cid))
+    case Some(result) => Some(UpdateComponent(cid, result))
   }
-
 }

@@ -17,16 +17,11 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.model.graph.message
+package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.core.transaction.Instruction
+import io.amient.affinity.core.util.Reply
 
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Instruction[VertexProps] {
+final case class GetVertexProps(vertex: Int) extends AvroRecord with Reply[Option[VertexProps]] {
   override def hashCode(): Int = vertex.hashCode
-
-  def reverse(props: VertexProps) = op match {
-    case GOP.ADD => Some(ModifyGraph(vertex, edge, GOP.REMOVE))
-    case GOP.REMOVE => Some(ModifyGraph(vertex, edge, GOP.ADD))
-  }
 }

@@ -17,26 +17,15 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.data
+package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.core.actor.Partition
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.transaction.Instruction
 
-trait DebugPartition extends Partition {
+final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord with Instruction[Int] {
+  override def hashCode(): Int = vertex.hashCode
 
-  abstract override def handle: Receive = super.handle orElse {
-
-    /**
-      * Simulating Partition Failure - the default supervision should restart this actor
-      * after exeception is thrown
-      */
-    case (p: Int, stateError: IllegalStateException) =>
-      require(p == partition)
-      throw stateError
-
-    /**
-      * Describe partition and its stats
-      */
-    case (p: Int, "down") => context.system.terminate()
-
+  override def reverse(result: Int): Option[UpdateVertexComponent] = {
+    if (result == component) None else Some(UpdateVertexComponent(vertex, result))
   }
 }

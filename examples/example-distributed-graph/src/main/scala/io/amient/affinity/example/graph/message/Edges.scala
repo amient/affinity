@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.model.graph.message
+package io.amient.affinity.example.graph.message
 
 object Edges {
   def unapply(edges: Set[Edge]): Option[Set[Int]] = Some(edges.map(_.target))

@@ -16,16 +16,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package io.amient.affinity.model.graph.message
+package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.transaction.Instruction
 
-final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord with Instruction[Int] {
-  override def hashCode(): Int = vertex.hashCode
+final case class DeleteComponent(cid: Int) extends AvroRecord with Instruction[Option[Component]] {
+  override def hashCode(): Int = cid.hashCode
 
-  override def reverse(result: Int): Option[UpdateVertexComponent] = {
-    if (result == component) None else Some(UpdateVertexComponent(vertex, result))
+  override def reverse(c: Option[Component]) = c match {
+    case None => None
+    case Some(result) => Some(UpdateComponent(cid, result))
   }
 }
