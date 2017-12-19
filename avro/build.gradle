@@ -32,7 +32,7 @@ dependencies {
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
     testCompile project(':core')
-    testCompile project(':kafka:kafka_0.10:test-util-kafka')
+    testCompile project(':kafka:kafka_0.11:test-util-kafka')
     testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
 }
 

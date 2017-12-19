@@ -22,7 +22,6 @@ def installer = install.repositories.mavenInstaller
     pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro' }.artifactId = 'avro-scala_'+baseScalaVersion
 }
 
-
 dependencies {
 
     compile project(':api')
@@ -36,8 +35,8 @@ dependencies {
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
 
     testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
-    testCompile project(':kafka:kafka_0.10:storage-kafka')
-    testCompile project(':kafka:kafka_0.10:test-util-kafka')
+    testCompile project(':kafka:kafka_0.11:storage-kafka')
+    testCompile project(':kafka:kafka_0.11:test-util-kafka')
     testCompile project(':ws-client')
 
 }
