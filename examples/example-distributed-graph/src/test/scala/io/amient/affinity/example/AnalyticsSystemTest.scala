@@ -79,6 +79,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
     val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")
+      .set("spark.driver.host", "localhost")
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 

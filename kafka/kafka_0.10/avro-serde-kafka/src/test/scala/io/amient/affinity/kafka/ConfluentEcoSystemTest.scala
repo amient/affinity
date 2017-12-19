@@ -17,23 +17,20 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.confluent
+package io.amient.affinity.kafka
 
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.ActorSystem
-import akka.serialization.SerializationExtension
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.storage.kafka.KafkaStorage.KafkaStorageConf
-import io.amient.affinity.core.util.SystemTestBase
-import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer, KafkaObjectHashPartitioner}
-import io.amient.affinity.systemtests.{KEY, TestRecord, UUID}
+import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
+import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.util.ByteUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
@@ -43,39 +40,43 @@ import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
+import scala.concurrent.ExecutionContext.Implicits.global
 
+object UUID {
+  def apply(uuid: java.util.UUID): UUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
 
-class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with EmbeddedCfRegistry with Matchers {
+  def random: UUID = apply(java.util.UUID.randomUUID)
+}
+
+case class UUID(val data: ByteBuffer) extends AvroRecord {
+  def javaUUID: java.util.UUID = ByteUtils.uuid(data.array)
+}
+
+case class KEY(id: Int) extends AvroRecord {
+  override def hashCode(): Int = id.hashCode()
+}
+
+case class Test(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends AvroRecord {
+  override def hashCode(): Int = key.hashCode()
+}
+
+class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCfRegistry with Matchers {
 
   override def numPartitions = 2
 
   private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemTest])
 
-  val config = configure(
-    ConfigFactory.load("systemtests")
-      .withValue(CfAvroSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
-      .withValue(AvroSerde.Conf.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
-    , Some(zkConnect), Some(kafkaBootstrap))
-
-  val system = ActorSystem.create("ConfluentEcoSystem", config)
-
-  import system.dispatcher
-
-  override def beforeAll: Unit = {
-    SerializationExtension(system)
-  }
-
-  override def afterAll(): Unit = {
-    system.terminate()
-    super.afterAll()
-  }
+  val config = ConfigFactory.parseMap(Map(
+      CfAvroSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
+      AvroSerde.Conf.Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName))
+    .withFallback(ConfigFactory.defaultReference())
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
-    val stateStoreName = "visibility-test"
-    val state = createStateStoreForPartition(stateStoreName)("keyspace1", 0)
-    state.insert(1, TestRecord(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
-    val testRecordSchemaId = registryClient.getLatestSchemaMetadata(classOf[TestRecord].getName).getId
-    registryClient.getByID(testRecordSchemaId) should equal(AvroRecord.inferSchema(classOf[TestRecord]))
+    val topic = "visibility-test"
+    val state = createStateStoreForPartition(topic, 0)
+    state.insert(1, Test(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
+    val testSchemaId = registryClient.getLatestSchemaMetadata(classOf[Test].getName).getId
+    registryClient.getByID(testSchemaId) should equal(AvroRecord.inferSchema(classOf[Test]))
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (high throughput scenario)" in {
@@ -86,15 +87,14 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
     testExternalKafkaConsumer("failure-test")
   }
 
-  private def testExternalKafkaConsumer(stateStoreName: String) {
-    val topic = KafkaStorageConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName).Storage).Topic()
-    val state = createStateStoreForPartition(stateStoreName)("keyspace1", 0)
+  private def testExternalKafkaConsumer(topic: String) {
+    val state = createStateStoreForPartition(topic, 0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     state.numKeys should be(0)
     val updates = for (i <- (1 to numToWrite)) yield {
-      state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
+      state.replace(i, Test(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
         (s) => s
         , (e: Throwable) => {
         numWrites.decrementAndGet()
@@ -119,7 +119,7 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 
-    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+    val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
 
     consumer.subscribe(List(topic))
     try {
@@ -141,12 +141,20 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
 
   }
 
-  private def createStateStoreForPartition(name: String)(implicit keyspace: String, partition: Int) = {
-    State.create[Int, TestRecord](keyspace, partition, name, system)
+  private def createStateStoreForPartition(topic: String, partition: Int) = {
+    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
+      State.StateConf.Storage.Class.path -> classOf[KafkaStorage].getName,
+      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+      KafkaStorage.StateConf.Storage.Topic.path -> topic,
+      KafkaStorage.StateConf.Storage.BootstrapServers.path -> kafkaBootstrap
+    )))
+    val storage = new KafkaStorage(stateConf, partition, numPartitions)
+    val keySerde = Serde.of[Int](config)
+    val valueSerde = Serde.of[Test](config)
+    new State[Int, Test](storage, keySerde, valueSerde)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
-    val topic = KafkaStorageConf(Node.Conf(config).Affi.Keyspace("keyspace1").State("consistency-test").Storage).Topic()
     val producerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
       "acks" -> "all",
@@ -157,14 +165,15 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       "value.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
       "schema.registry.url" -> registryUrl
     )
+    val topic = "test"
     val numWrites = new AtomicInteger(1000)
-    val producer = new KafkaProducer[Int, TestRecord](producerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+    val producer = new KafkaProducer[Int, Test](producerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
     try {
       val numToWrite = numWrites.get
       val l = System.currentTimeMillis()
       val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-        val record = TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")
-        val f = producer.send(new ProducerRecord[Int, TestRecord](topic, i, record))
+        val record = Test(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")
+        val f = producer.send(new ProducerRecord[Int, Test](topic, i, record))
         Future(f.get) transform(
           (s) => s, (e: Throwable) => {
           numWrites.decrementAndGet()
@@ -178,8 +187,8 @@ class ConfluentEcoSystemTest extends FlatSpec with SystemTestBase with EmbeddedK
       producer.close()
     }
     //now bootstrap the state
-    val state0 = createStateStoreForPartition(topic)("keyspace1", 0)
-    val state1 = createStateStoreForPartition(topic)("keyspace1", 1)
+    val state0 = createStateStoreForPartition(topic, 0)
+    val state1 = createStateStoreForPartition(topic, 1)
     state0.storage.init()
     state1.storage.init()
     state0.storage.boot()

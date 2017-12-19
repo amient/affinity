@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.kafka
+package io.amient.affinity.core.cluster
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
@@ -30,7 +30,6 @@ import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
@@ -43,7 +42,8 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.Random
 
-class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+
+class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 2
 
@@ -62,10 +62,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
         delegateAndHandleErrors(response, keyspace1 ack GetValue(key)) {
-          _ match {
-            case None => HttpResponse(NotFound)
-            case Some(value) => Encoder.json(OK, value, gzip = false)
-          }
+          case value => Encoder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
@@ -76,42 +73,29 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
     }
   })
 
-  import gateway._
-
-  val region1 = new Node(config) {
-    startContainer("keyspace1", List(0, 1), new MyTestPartition("keyspace1", "consistency-test") {
-      override def preStart(): Unit = {
-        super.preStart()
-        if (partition == 0) data.replace("B", "initialValueB")
-        else if (partition == 1) data.replace("A", "initialValueA")
-      }
-    })
-  }
-
+  val region1 = new Node(config)
   val region2 = new Node(config)
   gateway.awaitClusterReady {
+    region1.startContainer("keyspace1", List(0, 1), new MyTestPartition("keyspace1", "consistency-test"))
     region2.startContainer("keyspace1", List(0, 1), new MyTestPartition("keyspace1", "consistency-test"))
   }
 
   override def afterAll(): Unit = {
     try {
       gateway.shutdown()
-      region2.shutdown()
       region1.shutdown()
+      region2.shutdown()
     } finally {
       super.afterAll()
     }
   }
 
-  "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
-
-    http_get(uri("/A")).entity should be(jsonStringEntity("initialValueA"))
-    http_get(uri("/B")).entity should be(jsonStringEntity("initialValueB"))
-    http_post(uri("/A/updatedValueA")).status.intValue should be(303)
-    http_get(uri("/A")).entity should be(jsonStringEntity("updatedValueA"))
-
+  "Master Transition" should "not lead to inconsistent state" in {
+    val requestCount = new AtomicLong(0L)
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
+    val expected = scala.collection.mutable.Map[String, String]()
+
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -121,33 +105,50 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
         val random = new Random()
         val requests = scala.collection.mutable.ListBuffer[Future[String]]()
         while (!stopSignal.get) {
-          Thread.sleep(1)
+          Thread.sleep(2)
           if (isInterrupted) throw new InterruptedException
-          val uri = gateway.uri(if (random.nextBoolean()) "/A" else "/B")
-          requests += http(GET, uri) map {
-            case response => response.status.value
+          val key = random.nextInt.toString
+          val value = random.nextInt.toString
+          requests += gateway.http(POST, gateway.uri(s"/$key/$value")) map {
+            case response =>
+              expected += key -> value
+              response.status.value
           } recover {
             case e: Throwable => e.getMessage
           }
         }
+        requestCount.set(requests.size)
         try {
           val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
             case (status, list) => (status, list.length)
           }
-          errorCount.set(requests.size - statuses("200 OK"))
+          errorCount.set(requestCount.get - statuses("303 See Other"))
         } catch {
-          case e: Throwable => errorCount.set(requests.size)
+          case e: Throwable =>
+            e.printStackTrace()
+            errorCount.set(requests.size)
         }
 
       }
     }
     client.start
-    Thread.sleep(100)
-    region1.shutdown()
-    stopSignal.set(true)
-    client.join()
-    errorCount.get should be(0L)
-  }
+    try {
+      Thread.sleep(100)
+      region1.shutdown()
+      stopSignal.set(true)
+      client.join()
+      Thread.sleep(100)
+      errorCount.get should be(0L)
+      val x = Await.result(Future.sequence(expected.map { case (key, value) =>
+        gateway.http(GET, gateway.uri(s"/$key")).map {
+          response => (response.entity, jsonStringEntity(value))
+        }
+      }), 10 seconds)
+      x.count { case (entity, expected) => entity != expected } should be(0)
+    } finally {
+      client.interrupt()
+    }
 
+  }
 
 }

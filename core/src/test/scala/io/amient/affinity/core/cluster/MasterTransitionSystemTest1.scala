@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.systemtests.kafka
+package io.amient.affinity.core.cluster
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
@@ -30,7 +30,6 @@ import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}

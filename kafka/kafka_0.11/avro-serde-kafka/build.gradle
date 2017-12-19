@@ -42,9 +42,10 @@ dependencies {
     compile project(':avro')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka:kafka_0.11').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
-    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
+    testCompile project(':kafka:kafka_0.11:storage-kafka')
     testCompile project(':kafka:kafka_0.11:test-util-kafka')
-    testCompile group: 'io.confluent', name: 'kafka-avro-serializer', version: project(':kafka:kafka_0.11').confluentVersion
+    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
+    testCompile (group: 'io.confluent', name: 'kafka-avro-serializer', version: project(':kafka:kafka_0.11').ext.confluentVersion)
 }
 
 

@@ -56,8 +56,7 @@ object State {
   }
 
 
-  private def create[K: ClassTag, V: ClassTag]
-  (partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
+  private def create[K: ClassTag, V: ClassTag](partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(stateConf, partition, 1) else {

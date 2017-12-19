@@ -44,8 +44,12 @@ import scala.language.reflectiveCalls
 
 object KafkaStorage {
 
-  object KafkaStorageConf extends KafkaStorageConf {
-    override def apply(config: Config): KafkaStorageConf = new KafkaStorageConf().apply(config)
+  object StateConf extends KafkaStateConf {
+    override def apply(config: Config): KafkaStateConf = new KafkaStateConf().apply(config)
+  }
+
+  class KafkaStateConf extends CfgStruct[KafkaStateConf](classOf[StateConf]) {
+    val Storage = struct("storage", new KafkaStorageConf, true)
   }
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
@@ -61,14 +65,13 @@ object KafkaStorage {
 
   class KafkaConsumerConf extends CfgStruct[KafkaConsumerConf](Cfg.Options.IGNORE_UNKNOWN)
 
-  val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 }
 
 class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(stateConf) {
 
-  import KafkaStorage._
+  val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 
-  private val conf = KafkaStorageConf(stateConf.Storage)
+  private val conf = KafkaStorage.StateConf(stateConf).Storage
 
   final val topic = conf.Topic()
   final val ttlSec = stateConf.TtlSeconds()

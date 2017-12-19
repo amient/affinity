@@ -1,4 +1,4 @@
-package io.amient.affinity.systemtests.confluent
+package io.amient.affinity.avro
 
 import java.nio.channels.ServerSocketChannel
 

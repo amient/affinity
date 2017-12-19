@@ -1,11 +1,9 @@
-package io.amient.affinity.systemtests.confluent
+package io.amient.affinity.avro
 
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.util.SystemTestBase
 import org.scalatest.FlatSpec
 
 
@@ -13,9 +11,9 @@ case class ExampleType(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-class AkkaSerializationSystemTest extends FlatSpec with SystemTestBase with EmbeddedCfRegistry {
+class AkkaSerializationSystemTest extends FlatSpec with EmbeddedCfRegistry {
 
-  val config = configure(ConfigFactory.defaultReference)
+  val config = ConfigFactory.defaultReference
     .withValue(CfAvroSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
     .withValue(AvroSerde.Conf.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[CfAvroSchemaRegistry].getName))
 
