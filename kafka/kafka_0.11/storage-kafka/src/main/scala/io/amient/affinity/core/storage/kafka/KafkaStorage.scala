@@ -67,7 +67,7 @@ object KafkaStorage {
 
 }
 
-class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(stateConf) {
+class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(stateConf, partition) {
 
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 
