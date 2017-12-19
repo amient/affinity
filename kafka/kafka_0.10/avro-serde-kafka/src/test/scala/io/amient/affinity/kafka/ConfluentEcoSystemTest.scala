@@ -37,6 +37,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -146,7 +147,9 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
       State.StateConf.Storage.Class.path -> classOf[KafkaStorage].getName,
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
       KafkaStorage.StateConf.Storage.Topic.path -> topic,
-      KafkaStorage.StateConf.Storage.BootstrapServers.path -> kafkaBootstrap
+      KafkaStorage.StateConf.Storage.BootstrapServers.path -> kafkaBootstrap,
+      KafkaStorage.StateConf.Storage.Producer.path -> Map().asJava,
+      KafkaStorage.StateConf.Storage.Consumer.path -> Map().asJava
     )))
     val storage = new KafkaStorage(stateConf, partition, numPartitions)
     val keySerde = Serde.of[Int](config)
