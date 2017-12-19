@@ -19,6 +19,11 @@ publishing {
     }
 }
 
+ext {
+    confluentVersion = '3.2.2'
+    //kafkaProject = project(':kafka:kafka_0.10').ext.confluentVersion
+}
+
 dependencies {
 
     compile project(':api')
@@ -26,6 +31,8 @@ dependencies {
     compile 'org.scala-lang:scala-reflect:' + scalaVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: avroVersion
+    testCompile project(':core')
     testCompile project(':kafka:kafka_0.10:test-util-kafka')
+    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
 }
 

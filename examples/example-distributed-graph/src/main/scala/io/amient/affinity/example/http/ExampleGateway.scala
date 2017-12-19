@@ -28,9 +28,9 @@ import io.amient.affinity.core.actor.{ActorState, GatewayHttp}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.example.data.ConfigEntry
 import io.amient.affinity.example.http.handler._
 import io.amient.affinity.example.rest.handler._
+import io.amient.affinity.example.graph.message.ConfigEntry
 
 import scala.util.control.NonFatal
 

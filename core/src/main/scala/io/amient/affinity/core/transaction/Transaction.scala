@@ -61,9 +61,7 @@ class Transaction(default: ActorRef) {
   def rollback: Unit = {
     stack.foreach { case (completed: CompletedInstruction[_]) =>
       completed.reverse.foreach {
-        case reversal =>
-          //System.err.println("REVERTING " + completed.instr + " WITH " + reversal)
-          completed.actor ! reversal
+        case reversal => completed.actor ! reversal
       }
     }
   }
@@ -75,12 +73,8 @@ class Transaction(default: ActorRef) {
       new TimeoutException(s"Transaction future timed out after ${timeout.duration}")))
 
     Future firstCompletedOf Seq(f, t) onComplete {
-      case Success(result) =>
-        //System.err.println(s"SUCCESS $result")
-        promise.success(result)
-      case Failure(e) =>
-        //System.err.println(s"FAILURE ${e.getMessage}")
-        promise.failure(e)
+      case Success(result) => promise.success(result)
+      case Failure(e) => promise.failure(e)
     }
     promise.future
   }
@@ -92,12 +86,8 @@ class Transaction(default: ActorRef) {
   def query[T: ClassTag](actor: ActorRef, q: Reply[T])(implicit timeout: Timeout, context: ExecutionContext, scheduler: Scheduler): Future[T] = {
     val promise = Promise[T]()
     actor ack q onComplete {
-      case Success(result) =>
-        //System.err.println(s"SUCCESS $result")
-        promise.success(result)
-      case Failure(e) =>
-        //System.err.println(s"FAILURE ${e.getMessage}")
-        promise.failure(e)
+      case Success(result) => promise.success(result)
+      case Failure(e) => promise.failure(e)
     }
     promise.future
   }
@@ -110,12 +100,9 @@ class Transaction(default: ActorRef) {
     val promise = Promise[T]()
     actor ack[T](cmd) onComplete {
       case Success(result: T) =>
-        //System.err.println(s"SUCCESS $instr")
         stack = stack :+ CompletedInstruction(actor, cmd, result)
         promise.success(result)
-      case Failure(e) =>
-        //System.err.println(s"FAILURE $instr: $e")
-        promise.failure(e)
+      case Failure(e) => promise.failure(e)
     }
     promise.future
   }

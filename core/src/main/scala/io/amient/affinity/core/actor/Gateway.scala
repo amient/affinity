@@ -21,6 +21,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 object Gateway {
 
@@ -56,7 +57,7 @@ trait Gateway extends ActorHandler with ActorState {
   private val broadcasts = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def broadcast[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = {
+  def broadcast[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = try {
     broadcasts.get(broadcastName) match {
       case Some((broadcastState, _)) => broadcastState.asInstanceOf[State[K, V]]
       case None =>
@@ -64,20 +65,33 @@ trait Gateway extends ActorHandler with ActorState {
         broadcasts += (broadcastName -> (bc, new AtomicBoolean(true)))
         bc
     }
+  } catch {
+    case NonFatal(e) =>
+      try closeState() catch {
+        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
+      }
+      throw e
   }
 
-  def keyspace(group: String): ActorRef = {
+  def keyspace(group: String): ActorRef = try {
     keyspaces.get(group) match {
       case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
         val serviceConf = conf.Keyspace(group)
+        if (!serviceConf.isDefined) throw new IllegalArgumentException(s"Keypsace $group is not defined")
         val ks = context.actorOf(Props(new Keyspace(serviceConf.config())), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(ks)
         keyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
         ks
     }
+  } catch {
+    case NonFatal(e) =>
+      try closeState() catch {
+        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
+      }
+      throw e
   }
 
   private def checkClusterStatus(msg: Option[ServiceAvailability] = None): Unit = {
@@ -103,12 +117,12 @@ trait Gateway extends ActorHandler with ActorState {
 
   abstract override def postStop(): Unit = {
     super.postStop()
-    keyspaces.values.foreach(_._1.unwatch(self))
+    try closeState() finally keyspaces.values.foreach(_._1.unwatch(self))
   }
 
   abstract override def manage = super.manage orElse {
 
-    case msg@CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
+    case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
       context.parent ! Controller.GatewayCreated(-1)
 
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {

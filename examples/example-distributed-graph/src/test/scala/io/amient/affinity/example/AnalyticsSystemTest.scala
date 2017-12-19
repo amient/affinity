@@ -30,7 +30,7 @@ import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.{EmbeddedKafka, KafkaClientImpl}
-import io.amient.affinity.model.graph.message.{Component, VertexProps}
+import io.amient.affinity.example.graph.message.{Component, VertexProps}
 import io.amient.util.spark.KafkaRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
@@ -42,7 +42,6 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
   override def numPartitions = 4
 
   val config: Config = ConfigFactory.load("example")
-    .withValue("akka.loglevel", ConfigValueFactory.fromAnyRef("ERROR"))
     .withValue(Node.Conf.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
     .withValue(Node.Conf.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
@@ -80,6 +79,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
     val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")
+      .set("spark.driver.host", "localhost")
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 

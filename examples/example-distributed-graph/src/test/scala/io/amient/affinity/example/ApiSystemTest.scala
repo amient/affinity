@@ -50,7 +50,6 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
   override def numPartitions = 2
 
   val config = ConfigFactory.load("example")
-    .withValue(Node.Conf.Akka.path("loglevel"), ConfigValueFactory.fromAnyRef("ERROR"))
     .withValue(Node.Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue(Node.Conf.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
     .withValue(Node.Conf.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))

@@ -3,10 +3,13 @@ package io.amient.affinity.avro
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Seq
 
 class AvroRecordSpec extends FlatSpec with Matchers {
+
+  private val log = LoggerFactory.getLogger(classOf[AvroRecordSpec])
 
   val recordV2Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_V1\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}},{\"name\":\"setOfPrimitives\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}")
 
@@ -108,10 +111,10 @@ class AvroRecordSpec extends FlatSpec with Matchers {
       val now = System.currentTimeMillis()
       if (now - r > 5000) {
         r = now
-        println(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+        log.info(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
       }
     }
-    println(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+    log.info(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
 
   }
 

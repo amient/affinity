@@ -30,7 +30,6 @@ object ExampleGraphMain extends App {
 
     val config = ConfigFactory.load("example")
     val node1config = ConfigFactory.parseResources("example-node1.conf").withFallback(config)
-    require(node1config.getString("akka.loglevel") == "INFO")
     require(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
     require(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
 
