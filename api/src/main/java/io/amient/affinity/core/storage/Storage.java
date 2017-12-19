@@ -42,7 +42,10 @@ public abstract class Storage {
 
     final public MemStore memstore;
 
-    public Storage(StateConf conf) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+    final public int partition;
+
+    public Storage(StateConf conf, int partition) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+        this.partition = partition;
         Class<? extends MemStore> memstoreClass = conf.MemStore.Class.apply();
         Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(StateConf.class);
         memstore = memstoreConstructor.newInstance(conf);

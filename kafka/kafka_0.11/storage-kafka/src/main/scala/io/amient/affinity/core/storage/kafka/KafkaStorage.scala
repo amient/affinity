@@ -148,10 +148,10 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
 
             if (isInterrupted) throw new InterruptedException
 
-            consumerError.set(new BrokerNotAvailableException("Could not connect to Kafka"))
+            //consumerError.set(new BrokerNotAvailableException("Could not connect to Kafka"))
             try {
               val records = kafkaConsumer.poll(500)
-              consumerError.set(null)
+              //consumerError.set(null)
               var fetchedNumRecrods = 0
               for (r <- records.iterator()) {
                 fetchedNumRecrods += 1
