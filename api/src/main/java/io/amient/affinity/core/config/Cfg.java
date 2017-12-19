@@ -24,6 +24,7 @@ abstract public class Cfg<T> {
     abstract public Cfg<T> apply(Config config) throws IllegalArgumentException;
 
     final public <C extends Cfg<T>> C setValue(T value) {
+        //TODO using setValue should modify the underlying config object
         this.value = Optional.of(value);
         return (C) this;
     }

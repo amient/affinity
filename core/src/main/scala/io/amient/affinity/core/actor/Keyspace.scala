@@ -19,15 +19,17 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.Actor
+import akka.actor.Actor.Receive
+import akka.actor.{Actor, Props}
 import akka.routing._
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.StateConf
-import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply}
+import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply, ScatterGather}
 
 import scala.collection.mutable
+import scala.concurrent.Future
 
 object Keyspace {
 
@@ -58,6 +60,8 @@ class Keyspace(config: Config) extends Actor {
 
   val partitioner = new ObjectHashPartitioner
 
+  import context.dispatcher
+
   override def receive: Receive = {
 
     /**
@@ -80,6 +84,13 @@ class Keyspace(config: Config) extends Actor {
     }
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
+
+    case req@ScatterGather(message: Reply[Any], t) => sender.replyWith(req) {
+      val recipients = routes.values
+      implicit val timeout = t
+      implicit val scheduler = context.system.scheduler
+      Future.sequence(recipients.map(x => x.ref ack message))
+    }
 
     case message => getRoutee(message).send(message, sender)
 

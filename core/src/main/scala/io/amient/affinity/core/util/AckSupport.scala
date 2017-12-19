@@ -59,7 +59,27 @@ trait AckSupport {
 
 trait Reply[+T]
 
+trait Scatter[T] extends Reply[T] {
+  def gather(r1: T, r2: T): T
+}
+
+case class ScatterGather[T](msg: Scatter[T], timeout: Timeout) extends Reply[Iterable[T]]
+
 final class AckableActorRef(val target: ActorRef, val maxRetries: Int = 3) extends AnyRef {
+
+  /**
+    *
+    * @param scatter
+    * @param timeout
+    * @param scheduler
+    * @param context
+    * @param tag
+    * @tparam T
+    * @return gathered and aggregated result T
+    */
+  def gather[T](scatter: Scatter[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
+    ack(ScatterGather(scatter, timeout)).map(_.reduce(scatter.gather))
+  }
 
   /**
     * initiator ack() which is used where the guaranteed processin of the message is required
