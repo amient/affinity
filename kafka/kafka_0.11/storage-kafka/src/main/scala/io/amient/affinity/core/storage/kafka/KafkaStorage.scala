@@ -74,7 +74,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
   private val conf = KafkaStorage.StateConf(stateConf).Storage
 
   final val topic = conf.Topic()
-  final val ttlSec = stateConf.TtlSeconds()
+  final val ttlMs = stateConf.TtlSeconds() * 1000L
 
   private val producerProps = new Properties() {
     if (conf.Producer.isDefined) {
@@ -242,12 +242,12 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
     try {
       val adminTimeoutMs = 15000
       val replicationFactor = conf.ReplicationFactor().toShort
-      val compactionPolicy = (if (ttlSec > 0) "compact,delete" else "compact")
+      val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
       val topicConfigs = Map(
         TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
         TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
-        TopicConfig.MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS_CONFIG -> (if (ttlSec > 0) ttlSec * 1000 else Long.MaxValue).toString,
-        TopicConfig.RETENTION_MS_CONFIG -> (if (ttlSec > 0) ttlSec * 1000 else Long.MaxValue).toString,
+        TopicConfig.MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
+        TopicConfig.RETENTION_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
         TopicConfig.RETENTION_BYTES_CONFIG -> "-1"
       )
 
