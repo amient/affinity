@@ -19,8 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.Actor.Receive
-import akka.actor.{Actor, Props}
+import akka.actor.Actor
 import akka.routing._
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack

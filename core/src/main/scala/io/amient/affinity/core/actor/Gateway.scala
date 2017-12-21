@@ -13,7 +13,7 @@ import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown
 import io.amient.affinity.core.actor.Keyspace.{CheckServiceAvailability, ServiceAvailability}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
-import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.storage.State
 
@@ -29,9 +29,12 @@ object Gateway {
     val Class = cls("class", classOf[Gateway], false)
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
     val Http = struct("http", new GatewayHttp.HttpConf, false)
+    val Streams = group("stream", classOf[InputStreamConf], false)
   }
 
   final case class GatewayClusterStatus(suspended: Boolean)
+
+  class InputStreamConf extends CfgStruct[InputStreamConf](Cfg.Options.IGNORE_UNKNOWN)
 }
 
 trait Gateway extends ActorHandler with ActorState {
