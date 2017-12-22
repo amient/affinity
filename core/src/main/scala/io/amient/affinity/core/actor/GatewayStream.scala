@@ -25,7 +25,7 @@ trait GatewayStream extends Gateway {
   @volatile private var running = true
 
   def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = config.getConfig("affinity.node.gateway.stream.r10-xml-input")
+    val streamConfig = config.getConfig(s"affinity.node.gateway.stream.$identifier")
     inputStreamProcessors += new Runnable {
       val inputTopics = streamConfig.getStringList("topics").toSet
       val minTimestamp = streamConfig.getLong("min.timestamp")
@@ -35,7 +35,7 @@ trait GatewayStream extends Gateway {
         val consumer: ManagedKafkaConsumer = Class.forName("io.amient.affinity.kafka.ManagedKafkaConsumerImpl")
           .asSubclass(classOf[ManagedKafkaConsumer]).newInstance()
         try {
-          consumer.subscribe(streamConfig.getConfig("consumer"), inputTopics)
+          consumer.initialize(streamConfig.getConfig("consumer"), inputTopics)
           log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topics: $inputTopics")
           while (running) {
             for (record: Record[Array[Byte], Array[Byte]] <- consumer.fetch(minTimestamp)) {
