@@ -46,7 +46,7 @@ class ManagedKafkaConsumerImpl extends ManagedKafkaConsumer {
 
   override def fetch(minTimestamp: Long): util.Iterator[Record[Array[Byte], Array[Byte]]] = {
     val records: Iterator[ConsumerRecord[Array[Byte], Array[Byte]]] = kafkaConsumer.poll(15000).iterator()
-    val it = if (minTimestamp < 0) records else {
+    val it = if (minTimestamp <= 0) records else {
       var fastForwarded = false
       records.filter {
         record =>

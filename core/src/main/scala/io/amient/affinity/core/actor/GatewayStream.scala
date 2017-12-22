@@ -28,7 +28,7 @@ trait GatewayStream extends Gateway {
     val streamConfig = config.getConfig(s"affinity.node.gateway.stream.$identifier")
     inputStreamProcessors += new Runnable {
       val inputTopics = streamConfig.getStringList("topics").toSet
-      val minTimestamp = streamConfig.getLong("min.timestamp")
+      val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
       val keySerde = Serde.of[K](config)
       val valSerde = Serde.of[V](config)
       override def run(): Unit = {
