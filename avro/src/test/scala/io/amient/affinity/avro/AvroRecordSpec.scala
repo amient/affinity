@@ -25,9 +25,9 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     * the previous V1 schema version now points to the newest case class.
     */
   val newSerde = new MemorySchemaRegistry {
-    val recordV1Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
-    register[Record](recordV1Schema) //in new serde, v1 is the previous version
-    register[Record] // current version the current compile-time version of the Record
+    val recordV1Schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_Current\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
+    register[Record_Current](recordV1Schema) //in new serde, v1 is the previous version
+    register[Record_Current] // current version the current compile-time version of the Record
     register[SimpleRecord]
     initialize()
   }
@@ -36,11 +36,11 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     val oldValue = oldSerde.toBytes(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 10))
     oldValue.mkString(".") should be ("0.0.0.0.7.2.2.0.0.0.20")
     val renderedValue = newSerde.fromBytes(oldValue)
-    renderedValue should be(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map()))
+    renderedValue should be(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map()))
   }
 
   "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
-    val newValue = newSerde.toBytes(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("1" -> SimpleRecord(SimpleKey(1), SimpleEnum.A))))
+    val newValue = newSerde.toBytes(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("1" -> SimpleRecord(SimpleKey(1), SimpleEnum.A))))
     newValue.mkString(",") should be ("0,0,0,0,8,2,2,0,0,0,2,2,49,2,0,0,0,0")
     val downgradedValue = oldSerde.fromBytes(newValue)
     downgradedValue should be(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 0))
@@ -91,7 +91,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "In-memory shema registry" should "reject backward-incompatible schema" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-    newSerde.register[Record](v4schema)
+    newSerde.register[Record_Current](v4schema)
     an[SchemaValidationException] should be thrownBy (newSerde.initialize())
 
   }

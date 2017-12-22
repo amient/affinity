@@ -17,17 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka;
+package io.amient.affinity.core;
 
-import java.io.Serializable;
+public class ObjectHashPartitioner {
 
-public class KeyPayloadAndOffset implements Serializable {
-    public final ByteKey key;
-    public final PayloadAndOffset payloadAndOffset;
-
-    public KeyPayloadAndOffset(ByteKey key, PayloadAndOffset payloadAndOffset) {
-        this.key = key;
-        this.payloadAndOffset = payloadAndOffset;
+  public int partition(Object key, int numPartitions) {
+    int absHashCode = Math.abs(key.hashCode());
+    if (absHashCode == Integer.MIN_VALUE) {
+      return 0 % numPartitions;
+    } else {
+      return absHashCode % numPartitions;
     }
+  }
 
 }

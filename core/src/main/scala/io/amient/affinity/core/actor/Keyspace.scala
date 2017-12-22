@@ -22,10 +22,10 @@ package io.amient.affinity.core.actor
 import akka.actor.Actor
 import akka.routing._
 import com.typesafe.config.Config
-import io.amient.affinity.core.ack
+import io.amient.affinity.core.{ObjectHashPartitioner, ack}
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.StateConf
-import io.amient.affinity.core.util.{ObjectHashPartitioner, Reply, ScatterGather}
+import io.amient.affinity.core.util.{Reply, ScatterGather}
 
 import scala.collection.mutable
 import scala.concurrent.Future

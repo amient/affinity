@@ -19,22 +19,30 @@
 
 package io.amient.affinity.kafka;
 
+import io.amient.affinity.core.ByteKey;
+import io.amient.affinity.core.PartitionedRecord;
+import io.amient.affinity.core.Record;
+
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * Implementations of KafkaClient interface are used in KafkaRDD and provide direct 1-1 mapping between
+ * kafka partitions to spark partitions.
+ */
 public interface KafkaClient extends Serializable {
 
     List<Integer> getPartitions();
 
     Map<Long, Long> getOffsets(int partition);
 
-    Iterator<KeyPayloadAndOffset> iterator(int partition, Long startOffset, Long stopOffset);
+    Iterator<Record<ByteKey, byte[]>> iterator(int partition, Long startOffset, Long stopOffset);
 
-    void publish(Iterator<KeyPayloadAndOffset> iter, Function<Long, Boolean> checker);
+    void publish(Iterator<PartitionedRecord<byte[], byte[]>> iter, Function<Long, Boolean> checker);
 
-    void release(Iterator<KeyPayloadAndOffset> iter);
+    void release(Iterator<Record<ByteKey, byte[]>> iter);
 
 }

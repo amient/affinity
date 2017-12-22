@@ -23,6 +23,7 @@ import java.lang.Long
 import java.util
 import java.util.Properties
 
+import io.amient.affinity.core.{ByteKey, PartitionedRecord, Record}
 import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
@@ -99,20 +100,20 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
     if (it.hasNext) it.next else throw new BrokerNotAvailableException("operation failed for all brokers")
   }
 
-  private val consumers = scala.collection.mutable.Map[util.Iterator[KeyPayloadAndOffset], KafkaConsumer[_, _]]()
+  private val consumers = scala.collection.mutable.Map[util.Iterator[Record[ByteKey, Array[Byte]]], KafkaConsumer[_, _]]()
 
-  override def release(iter: util.Iterator[KeyPayloadAndOffset]): Unit = {
+  override def release(iter: util.Iterator[Record[ByteKey, Array[Byte]]]): Unit = {
     consumers.get(iter).foreach(_.close())
   }
 
-  override def iterator(partition: Int, startOffset: Long, stopOffset: Long): util.Iterator[KeyPayloadAndOffset] = {
+  override def iterator(partition: Int, startOffset: Long, stopOffset: Long): util.Iterator[Record[ByteKey, Array[Byte]]] = {
 
     val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerConfig)
 
     val tp = new TopicPartition(topic, partition)
     consumer.assign(List(tp).asJava)
 
-    val result = new util.Iterator[KeyPayloadAndOffset] {
+    val result = new util.Iterator[Record[ByteKey, Array[Byte]]] {
       private var record: ConsumerRecord[Array[Byte], Array[Byte]] = null
       private var offset = startOffset
       private var setIter: util.Iterator[ConsumerRecord[Array[Byte], Array[Byte]]] = null
@@ -121,14 +122,13 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
 
       override def hasNext: Boolean = record != null
 
-      override def next(): KeyPayloadAndOffset = {
+      override def next(): Record[ByteKey, Array[Byte]] = {
         if (record == null) {
           throw new NoSuchElementException
         } else {
-          val k = new ByteKey(record.key)
-          val v = new PayloadAndOffset(record.offset, record.value)
+          val result = new Record(new ByteKey(record.key), record.value, record.timestamp)
           seek
-          new KeyPayloadAndOffset(k, v)
+          result
         }
       }
 
@@ -153,14 +153,14 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
     result
   }
 
-  override def publish(iter: util.Iterator[KeyPayloadAndOffset],
+  override def publish(iter: util.Iterator[PartitionedRecord[Array[Byte], Array[Byte]]],
                        checker: java.util.function.Function[java.lang.Long, java.lang.Boolean]): Unit = {
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
     try {
       var messages = 0L
       while (iter.hasNext) {
-        val kpo = iter.next()
-        producer.send(new ProducerRecord(topic, kpo.payloadAndOffset.offset.toInt, kpo.key.bytes, kpo.payloadAndOffset.bytes))
+        val kpr = iter.next()
+        producer.send(new ProducerRecord(topic, kpr.partition, kpr.record.key, kpr.record.value))
         messages += 1
       }
       if (!checker(messages)) sys.error("Kafka iterator producer interrupted")
