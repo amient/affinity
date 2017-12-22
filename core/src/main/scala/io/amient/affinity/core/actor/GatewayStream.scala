@@ -11,6 +11,7 @@ import io.amient.affinity.kafka.ManagedKafkaConsumer
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 trait GatewayStream extends Gateway {
 
@@ -44,8 +45,11 @@ trait GatewayStream extends Gateway {
               processor(new Record(key, value, record.timestamp))
             }
           }
+        } catch {
+          case NonFatal(e) => log.error(e, s"Input stream processor: $identifier")
         } finally {
           consumer.close()
+          log.info(s"Finished input stream processor: $identifier")
         }
       }
     }
