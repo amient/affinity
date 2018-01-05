@@ -23,6 +23,7 @@ import akka.AkkaException
 import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
 import akka.util.Timeout
+import akka.pattern.ask
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.Reply
@@ -117,15 +118,15 @@ class Controller extends Actor {
     }
 
     case request@GracefulShutdown() => sender.replyWith(request) {
-      implicit val timeout = Timeout(500 milliseconds)
+      implicit val timeout = Timeout(3000 milliseconds)
       Future.sequence(context.children map { child =>
         log.info("Requesting GracefulShutdown from " + child)
-        child.ack(GracefulShutdown())
-      }) map (_ => system.terminate()) recover {
-        case any =>
-          any.printStackTrace()
-          system.terminate()
-      } map (_ => ())
+        child ? GracefulShutdown() recover {
+          case any =>
+            log.warning(s"$child failed while executing GracefulShutdown request: ", any.getMessage)
+            context.stop(child)
+        }
+      }) map (_ => system.terminate())
     }
 
     case anyOther => log.warning("Unknown controller message " + anyOther)

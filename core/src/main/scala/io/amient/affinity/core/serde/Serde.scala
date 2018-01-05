@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.serialization._
 import com.typesafe.config.Config
+import io.amient.affinity.core.serde.primitive.ByteArraySerde
 
 import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
@@ -176,15 +177,19 @@ class Serdes(val config: Config) {
 
   def of[S: ClassTag](config: Config): Serde[S] = {
     val runtimeClass = implicitly[ClassTag[S]].runtimeClass
-    val ser = serializerMap.get(runtimeClass) match {
-      case null ⇒
-        val ser = forClass(serdeClass(runtimeClass))
-        serializerMap.putIfAbsent(runtimeClass, ser) match {
-          case null ⇒ ser
-          case some ⇒ some
-        }
+    val ser = if (runtimeClass == classOf[Array[Byte]]) {
+      new ByteArraySerde
+    } else {
+      serializerMap.get(runtimeClass) match {
+        case null ⇒
+          val ser = forClass(serdeClass(runtimeClass))
+          serializerMap.putIfAbsent(runtimeClass, ser) match {
+            case null ⇒ ser
+            case some ⇒ some
+          }
 
-      case ser ⇒ ser
+        case ser ⇒ ser
+      }
     }
     ser.asInstanceOf[Serde[S]]
   }

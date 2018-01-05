@@ -11,17 +11,17 @@ class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZooKe
 
   behavior of "ZkAvroRegistry"
 
-  val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
-  val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}}]}")
+  val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_Current\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
+  val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_Current\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}}]}")
 
   val serde = new ZkAvroSchemaRegistry(ConfigFactory.empty().withValue(
     new ZkAvroConf().Connect.path, ConfigValueFactory.fromAnyRef(zkConnect)
   ))
   serde.register[SimpleKey]
   serde.register[SimpleRecord]
-  serde.register[Record](v1schema)
-  serde.register[Record]
-  serde.register[Record](v3schema)
+  serde.register[Record_Current](v1schema)
+  serde.register[Record_Current]
+  serde.register[Record_Current](v3schema)
 
   val List(_, _, _, _, _, _, _, _, _, backwardSchemaId, currentSchemaId, forwardSchemaId) = serde.initialize()
 
@@ -30,19 +30,19 @@ class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZooKe
     val oldBytes = AvroRecord.write(oldValue, v1schema, backwardSchemaId)
     oldBytes.mkString(",") should be("0,0,0,0,9,2,2,4,0,0,20")
     val upgraded = serde.fromBytes(oldBytes)
-    upgraded should be(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.C)), Map()))
+    upgraded should be(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.C)), Map()))
   }
 
   it should "work in a forward-compatibility scenario" in {
     val forwardValue = Record_V3(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("X" -> SimpleRecord(SimpleKey(1), SimpleEnum.A)))
     val forwardBytes = AvroRecord.write(forwardValue, v3schema, forwardSchemaId)
     val downgraded = serde.fromBytes(forwardBytes)
-    downgraded should be(Record(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("X" -> SimpleRecord(SimpleKey(1), SimpleEnum.A)), Set()))
+    downgraded should be(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("X" -> SimpleRecord(SimpleKey(1), SimpleEnum.A)), Set()))
   }
 
   it should "reject incompatible schema registration" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-    serde.register[Record](v4schema)
+    serde.register[Record_Current](v4schema)
     an[SchemaValidationException] should be thrownBy (serde.initialize())
 
   }

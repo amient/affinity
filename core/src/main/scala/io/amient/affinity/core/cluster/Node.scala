@@ -21,6 +21,7 @@ package io.amient.affinity.core.cluster
 
 
 import akka.actor.{ActorSystem, Props}
+import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigException}
 import io.amient.affinity.avro.AvroSerde.AvroConf
@@ -67,10 +68,7 @@ object Node {
     val ShutdownTimeoutMs = integer("node.shutdown.timeout.ms", true)
     val DataDir = filepath("node.data.dir", false)
     val SystemName = string("node.name", true)
-    val Streams = group("node.stream", classOf[InputStreamConf], false)
   }
-
-  class InputStreamConf extends CfgStruct[InputStreamConf](Cfg.Options.IGNORE_UNKNOWN)
 
 }
 
@@ -82,6 +80,8 @@ class Node(config: Config) {
   val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
+
+  private val log = Logging.getLogger(system, this)
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
@@ -141,18 +141,14 @@ class Node(config: Config) {
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
     startupFutureWithShutdownFuse {
-      try {
-        controller ack CreateGateway(Props(creator))
-      } catch {
-        case NonFatal(e) => e.printStackTrace(); throw e;
-      }
+      controller ack CreateGateway(Props(creator))
     }
   }
 
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {
     eventual onFailure {
       case NonFatal(e) =>
-        e.printStackTrace()
+        log.error(e, "Could not execute startup command")
         shutdown()
     }
     eventual

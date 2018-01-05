@@ -63,7 +63,7 @@ public abstract class MemStore {
             dataDir = null;
         } else {
             if (!conf.MemStore.DataDir.isDefined()) {
-              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via Node config");
+              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via affinity.node config for store: " + conf.Name.apply());
             }
             dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply()));
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);

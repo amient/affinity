@@ -35,9 +35,9 @@ class AvroRecordPropSpec extends PropSpec with PropertyChecks with Matchers {
     val b = SimpleRecord()
     assert(b == SimpleRecord(SimpleKey(0), A, Seq()))
     AvroRecord.read(AvroRecord.write(b, b.schema), classOf[SimpleRecord], b.schema) should equal(SimpleRecord(SimpleKey(0), A, Seq()))
-    val c = Record()
-    assert(c == Record(Seq(), Map(), Set()))
-    AvroRecord.read(AvroRecord.write(c, c.schema), classOf[Record], c.schema) should equal(Record(Seq(), Map(), Set()))
+    val c = Record_Current()
+    assert(c == Record_Current(Seq(), Map(), Set()))
+    AvroRecord.read(AvroRecord.write(c, c.schema), classOf[Record_Current], c.schema) should equal(Record_Current(Seq(), Map(), Set()))
   }
 
   def uuids: Gen[UUID] = for {
@@ -59,17 +59,17 @@ class AvroRecordPropSpec extends PropSpec with PropertyChecks with Matchers {
     ints <- listOf(arbitrary[Int])
   } yield SimpleRecord(SimpleKey(id), side, ints.map(SimpleKey(_)))
 
-  def composites: Gen[Record] = for {
+  def composites: Gen[Record_Current] = for {
      nitems <- Gen.choose(1, 2)
      items <- listOfN(nitems, bases)
      keys <- listOfN(nitems, Gen.alphaStr)
      longs <- listOf(arbitrary[Long])
-  } yield Record(items, keys.zip(items).toMap, longs.toSet)
+  } yield Record_Current(items, keys.zip(items).toMap, longs.toSet)
 
   property("AvroRecord.write is fully reversible by AvroRecord.read") {
-    forAll(composites) { composite: Record =>
+    forAll(composites) { composite: Record_Current =>
       val bytes = AvroRecord.write(composite, composite.schema)
-      AvroRecord.read(bytes, classOf[Record], composite.schema) should equal(composite )
+      AvroRecord.read(bytes, classOf[Record_Current], composite.schema) should equal(composite )
     }
   }
 

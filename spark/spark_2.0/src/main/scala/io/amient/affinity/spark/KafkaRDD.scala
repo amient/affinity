@@ -19,8 +19,9 @@
 
 package io.amient.util.spark
 
+import io.amient.affinity.core.{ByteKey, ObjectHashPartitioner, PartitionedRecord, Record}
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.util.ObjectHashPartitioner
+import io.amient.affinity.core.storage.EventTime
 import io.amient.affinity.kafka._
 import io.amient.affinity.spark.KafkaSplit
 import org.apache.spark.rdd.RDD
@@ -41,7 +42,8 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
     this(sc, client, serde, serde, compacted)
 
 
-  val compactor = (m1: PayloadAndOffset, m2: PayloadAndOffset) => if (m1.offset > m2.offset) m1 else m2
+  val compactor = (m1: Record[ByteKey, Array[Byte]], m2: Record[ByteKey, Array[Byte]]) =>
+    if (m1.timestamp > m2.timestamp) m1 else m2
 
   val kafkaPartitions: List[Integer] = client.getPartitions().asScala.toList
 
@@ -71,16 +73,18 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       }
     }
 
-    val rawMessages = fetcher.asScala.map(x => (x.key, x.payloadAndOffset))
+    val rawMessages: Iterator[(ByteKey, Record[ByteKey, Array[Byte]])] = {
+      fetcher.asScala.map((record: Record[ByteKey, Array[Byte]]) => (record.key, record))
+    }
 
     val iterator = if (!compacted) rawMessages else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, PayloadAndOffset, PayloadAndOffset]((v) => v, compactor, compactor)
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, Record[ByteKey, Array[Byte]], Record[ByteKey, Array[Byte]]]((v) => v, compactor, compactor)
       spillMap.insertAll(rawMessages)
       spillMap.iterator
     }
 
-    iterator.map { case (key, payloadAndOffset) =>
-      (keySerdeInstance.fromBytes(key.bytes), valueSerdeInstance.fromBytes(payloadAndOffset.bytes))
+    iterator.map { case (key, record) =>
+      (keySerdeInstance.fromBytes(key.bytes), valueSerdeInstance.fromBytes(record.value))
     }.collect {
       case (k: K, v: V) => (k, v)
     }
@@ -99,9 +103,13 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
 
       try {
         val iterator = partition.map { case (k, v) =>
+          val ts = v match {
+            case e: EventTime => e.eventTimeUtc()
+            case _ => System.currentTimeMillis()
+          }
           val partition = partitioner.partition(k, kafkaPartitions.length)
-          val payloadAndOffset = new PayloadAndOffset(partition.toLong, valueSerdeInstance.toBytes(v))
-          new KeyPayloadAndOffset(new ByteKey(keySerdeInstance.toBytes(k)), payloadAndOffset)
+          val record = new Record(keySerdeInstance.toBytes(k), valueSerdeInstance.toBytes(v), ts)
+          new PartitionedRecord(partition, record)
         }.asJava
 
         val checker = new java.util.function.Function[java.lang.Long, java.lang.Boolean] {

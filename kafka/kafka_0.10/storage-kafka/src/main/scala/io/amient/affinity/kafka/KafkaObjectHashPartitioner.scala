@@ -19,7 +19,7 @@
 
 package io.amient.affinity.kafka
 
-import io.amient.affinity.core.util.ObjectHashPartitioner
+import io.amient.affinity.core.ObjectHashPartitioner
 import org.apache.kafka.clients.producer.Partitioner
 import org.apache.kafka.common.Cluster
 

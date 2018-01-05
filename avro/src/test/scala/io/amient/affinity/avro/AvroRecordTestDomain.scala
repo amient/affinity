@@ -38,7 +38,7 @@ case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.V
 
 case class Record_V1(val items: Seq[SimpleRecord] = Seq(), val removed: Int = 0) extends AvroRecord
 
-case class Record(
+case class Record_Current(
                 val items: Seq[SimpleRecord] = Seq(),
                 val index: Map[String, SimpleRecord] = Map(),
                 val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord

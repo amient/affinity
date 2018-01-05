@@ -22,7 +22,7 @@ case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.V
   override def hashCode(): Int = id.hashCode()
 }
 
-case class Record(
+case class CompositeRecord(
                    val items: Seq[SimpleRecord] = Seq(),
                    val index: Map[String, SimpleRecord] = Map(),
                    val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord
@@ -45,13 +45,13 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
     serde.initialize()
 
     val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
-    serde.register[Record](v1schema)
-    serde.register[Record]
+    serde.register[CompositeRecord](v1schema)
+    serde.register[CompositeRecord]
     serde.initialize()
 
     val thrown = intercept[RuntimeException]{
       val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-      serde.register[Record](v3schema)
+      serde.register[CompositeRecord](v3schema)
       serde.initialize()
     }
     thrown.getMessage should include("incompatible")

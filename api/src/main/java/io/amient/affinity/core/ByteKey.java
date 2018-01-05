@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka;
+package io.amient.affinity.core;
 
 import java.io.Serializable;
 import java.util.Arrays;
@@ -30,6 +30,7 @@ public class ByteKey implements Serializable {
 
     public ByteKey(byte[] bytes) {
         this.bytes = bytes;
+        //TODO #75 if the decision is to use serialized form of the key to hash, then the same could be applied here
         this.hashCode = Arrays.hashCode(bytes);
     }
 

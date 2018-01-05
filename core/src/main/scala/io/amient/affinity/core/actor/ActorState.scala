@@ -40,8 +40,7 @@ trait ActorState extends Actor {
   }
 
   def state[K: ClassTag, V: ClassTag](store: String, conf: StateConf): State[K, V] = state[K, V](store, {
-    conf.Name.setValue(store)
-    State.create[K, V](conf, context.system)
+    State.create[K, V](store, conf, context.system)
   })
 
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {

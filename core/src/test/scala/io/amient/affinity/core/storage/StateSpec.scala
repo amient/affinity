@@ -30,7 +30,7 @@ class StateSpec extends TestKit(ActorSystem.create("test",
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
       State.StateConf.Storage.Class.path -> classOf[NoopStorage].getName
     )))
-    val state = State.create[Long, ExpirableValue](stateConf, system)
+    val state = State.create[Long, ExpirableValue]("store-1", stateConf, system)
 
     val nowMs = System.currentTimeMillis()
 
@@ -50,7 +50,7 @@ class StateSpec extends TestKit(ActorSystem.create("test",
       State.StateConf.TtlSeconds.path -> 5
     )))
 
-    val state = State.create[Long, ExpirableValue](stateConf, system)
+    val state = State.create[Long, ExpirableValue]("store-2", stateConf, system)
 
     val nowMs = System.currentTimeMillis()
 
