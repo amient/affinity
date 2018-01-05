@@ -29,13 +29,14 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.BrokerNotAvailableException
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.util.Random
 
 class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient {
 
+  private val log = LoggerFactory.getLogger(this.getClass)
 
   val consumerConfig = new Properties() with Serializable {
     putAll(props)
@@ -92,7 +93,7 @@ class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient 
         }
       } catch {
         case e: Throwable => {
-          e.printStackTrace()
+          log.error(s"Error while fetching metadata from kafka broker: $broker", e)
           None
         }
       }

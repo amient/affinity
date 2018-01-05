@@ -25,6 +25,7 @@ import akka.AkkaException
 import akka.actor.{ActorRef, Scheduler, Status}
 import akka.pattern.{after, ask}
 import akka.util.Timeout
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -53,7 +54,7 @@ import scala.util.{Failure, Success}
   */
 trait AckSupport {
 
-  implicit def ack(actorRef: ActorRef): AckableActorRef = new AckableActorRef(actorRef, maxRetries = 3)
+  implicit def ack(actorRef: ActorRef): AckableActorRef = new AckableActorRef(actorRef)
 
 }
 
@@ -65,7 +66,9 @@ trait Scatter[T] extends Reply[T] {
 
 case class ScatterGather[T](msg: Scatter[T], timeout: Timeout) extends Reply[Iterable[T]]
 
-final class AckableActorRef(val target: ActorRef, val maxRetries: Int = 3) extends AnyRef {
+final class AckableActorRef(val target: ActorRef) extends AnyRef {
+
+  private val log = LoggerFactory.getLogger(this.getClass)
 
   /**
     *
@@ -103,12 +106,16 @@ final class AckableActorRef(val target: ActorRef, val maxRetries: Int = 3) exten
         case cause: AkkaException => promise.failure(cause)
         case cause: IllegalArgumentException => promise.failure(cause)
         case cause: NoSuchElementException => promise.failure(cause)
-        case cause if (retry == 0) => promise.failure(new RuntimeException(s"${target.path.name} failed ${maxRetries}x to respond to $message ", cause))
-        case _: TimeoutException => attempt(retry - 1)
-        case _ => attempt(retry - 1, timeout.duration)
+        case cause if (retry <= 0) => promise.failure(new RuntimeException(s"${target.path.name} failed to respond to $message ", cause))
+        case _: TimeoutException =>
+          log.warn(s"Retrying $target ack $message due to timeout $timeout")
+          attempt(retry - 1)
+        case cause =>
+          log.warn(s"Retrying $target ack $message due to: ", cause)
+          attempt(retry - 1, timeout.duration)
       }
     }
-    attempt(maxRetries)
+    attempt(2)
     promise.future
   }
 

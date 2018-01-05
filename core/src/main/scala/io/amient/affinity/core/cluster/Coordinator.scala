@@ -121,13 +121,12 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     synchronized {
       watchers += watcher -> global
 
-      //failing this ack means that the watcher would have inconsistent view of the cluster
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
       val update = MasterStatusUpdate(group, currentMasters, Set())
       implicit val timeout = Timeout(5 seconds)
       watcher ack (if (global) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
-          e.printStackTrace()
+          logger.error(e, "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, terminating the system.")
           system.terminate()
         }
       }

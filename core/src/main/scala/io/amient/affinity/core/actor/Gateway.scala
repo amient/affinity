@@ -35,6 +35,7 @@ object Gateway {
   final case class GatewayClusterStatus(suspended: Boolean)
 
   class InputStreamConf extends CfgStruct[InputStreamConf](Cfg.Options.IGNORE_UNKNOWN)
+
 }
 
 trait Gateway extends ActorHandler with ActorState {
@@ -44,11 +45,6 @@ trait Gateway extends ActorHandler with ActorState {
   import Gateway._
 
   private val conf = Node.Conf(context.system.settings.config).Affi
-
-  if (conf.Gateway.Http.isDefined && !classOf[GatewayHttp].isAssignableFrom(this.getClass)) {
-    log.warning("affinity.gateway.http interface is configured but the node is trying " +
-      "to instantiate a non-http gateway. This may lead to uncertainity in the Controller.")
-  }
 
   private implicit val scheduler = context.system.scheduler
 
@@ -64,7 +60,7 @@ trait Gateway extends ActorHandler with ActorState {
     broadcasts.get(broadcastName) match {
       case Some((broadcastState, _)) => broadcastState.asInstanceOf[State[K, V]]
       case None =>
-        val bc = state[K,V](broadcastName, conf.Broadcast(broadcastName))
+        val bc = state[K, V](broadcastName, conf.Broadcast(broadcastName))
         broadcasts += (broadcastName -> (bc, new AtomicBoolean(true)))
         bc
     }
@@ -114,7 +110,7 @@ trait Gateway extends ActorHandler with ActorState {
     checkClusterStatus()
     tailState() // any state store registered in the gateway layer is broadcast, so all are tailing
     keyspaces.foreach {
-      case(_, (coordinator, _, _)) => coordinator.watch(self, global = true)
+      case (_, (coordinator, _, _)) => coordinator.watch(self, global = true)
     }
   }
 
@@ -127,6 +123,10 @@ trait Gateway extends ActorHandler with ActorState {
 
     case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
       context.parent ! Controller.GatewayCreated(-1)
+      if (conf.Gateway.Http.isDefined) {
+        log.warning("affinity.gateway.http interface is configured but the node is trying " +
+          s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
+      }
 
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
       val service: ActorRef = keyspaces(group)._2

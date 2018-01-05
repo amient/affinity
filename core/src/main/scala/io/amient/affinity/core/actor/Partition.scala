@@ -26,7 +26,7 @@ import akka.event.Logging
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Container.{ServiceOffline, ServiceOnline}
+import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
@@ -79,13 +79,13 @@ trait Partition extends ActorHandler with ActorState {
 
   override def preStart(): Unit = {
     log.debug(s"Starting partition: $keyspace/$partition")
-    context.parent ! ServiceOnline(self)
+    context.parent ! PartitionOnline(self)
     super.preStart()
   }
 
   override def postStop(): Unit = {
     log.debug(s"Stopping partition: $keyspace/$partition")
-    context.parent ! ServiceOffline(self)
+    context.parent ! PartitionOffline(self)
     try closeState() finally super.postStop()
   }
 

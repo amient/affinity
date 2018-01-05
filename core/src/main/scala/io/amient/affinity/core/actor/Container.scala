@@ -34,9 +34,9 @@ import scala.language.postfixOps
 
 object Container {
 
-  case class ServiceOnline(partition: ActorRef)
+  case class PartitionOnline(partition: ActorRef)
 
-  case class ServiceOffline(partition: ActorRef)
+  case class PartitionOffline(partition: ActorRef)
 
 }
 
@@ -52,7 +52,7 @@ class Container(group: String) extends Actor {
     s"akka://${context.system.name}"
   }
 
-  private val services = scala.collection.mutable.Map[ActorRef, String]()
+  private val partitions = scala.collection.mutable.Map[ActorRef, String]()
 
   /**
     * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
@@ -61,16 +61,16 @@ class Container(group: String) extends Actor {
   coordinator.watch(self, global = false)
 
   override def preStart(): Unit = {
-    log.info(s"Starting container `$group` with ${context.children.size} services")
+    log.info(s"Starting container `$group` with ${context.children.size} partitions")
     super.preStart()
-    context.children.foreach(services += _ -> null)
+    context.children.foreach(partitions += _ -> null)
   }
 
   override def postStop(): Unit = {
     if (!coordinator.isClosed) {
       coordinator.unwatch(self)
-      services.filter(_._2 != null).foreach { case (ref, handle) =>
-        log.debug(s"Unregistering service: handle=${handle}, path=${ref.path}")
+      partitions.filter(_._2 != null).foreach { case (ref, handle) =>
+        log.debug(s"Unregistering partition: handle=${handle}, path=${ref.path}")
         coordinator.unregister(handle)
       }
     }
@@ -82,19 +82,19 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
-    case ServiceOnline(ref) =>
+    case PartitionOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
       val handle = coordinator.register(partitionActorPath)
-      log.debug(s"Service online: handle=$handle, path=${partitionActorPath}")
-      services += (ref -> handle)
-      if (services.values.forall(_ != null)) {
+      log.debug(s"Partition online: handle=$handle, path=${partitionActorPath}")
+      partitions += (ref -> handle)
+      if (partitions.values.forall(_ != null)) {
         context.parent ! ContainerOnline(group)
       }
 
-    case ServiceOffline(ref) =>
-      log.debug(s"Service offline: handle=${services(ref)}, path=${ref.path}")
-      coordinator.unregister(services(ref))
-      services -= ref
+    case PartitionOffline(ref) =>
+      log.debug(s"Partition offline: handle=${partitions(ref)}, path=${ref.path}")
+      coordinator.unregister(partitions(ref))
+      partitions -= ref
 
     case request @ MasterStatusUpdate(_, add, remove) => sender.reply(request) {
       implicit val timeout = Timeout(5 seconds)

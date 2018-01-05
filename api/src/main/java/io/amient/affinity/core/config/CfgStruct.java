@@ -29,7 +29,6 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             inheritedCfg.properties.forEach(p -> extensions.add(p.getKey()));
             inheritedCfg.extensions.forEach(e -> extensions.add(e));
         } catch (Exception e) {
-            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }

@@ -34,7 +34,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
-import org.apache.kafka.common.errors.{BrokerNotAvailableException, TopicExistsException}
+import org.apache.kafka.common.errors.{TopicExistsException, WakeupException}
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
@@ -110,7 +110,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)
   }
 
-  ensureCorrectTopicConfiguiration()
+  ensureCorrectTopicConfiguration()
 
   protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
@@ -126,43 +126,50 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
 
     val tp = new TopicPartition(topic, partition)
     val consumerPartitions = util.Arrays.asList(tp)
-    kafkaConsumer.assign(consumerPartitions)
-    memstore.getCheckpoint match {
-      case checkpoint if checkpoint.offset <= 0 =>
-        log.info(s"Rewinding into $tp")
-        kafkaConsumer.seekToBeginning(consumerPartitions)
-      case checkpoint =>
-        log.info(s"Seeking ${checkpoint.offset} into $tp")
-        kafkaConsumer.seek(tp, checkpoint.offset)
-    }
 
     override def run(): Unit = {
 
       try {
+
+        kafkaConsumer.assign(consumerPartitions)
+        val endOffset: Long = kafkaConsumer.endOffsets(consumerPartitions).get(tp) - 1
+
+        log.debug(s"End offset for $topic/$partition: $endOffset")
+
+        memstore.getCheckpoint match {
+          case checkpoint if checkpoint.offset <= 0 =>
+            log.info(s"Rewinding $tp")
+            kafkaConsumer.seekToBeginning(consumerPartitions)
+          case checkpoint =>
+            log.info(s"Seeking ${checkpoint.offset} into $tp")
+            kafkaConsumer.seek(tp, checkpoint.offset)
+        }
+
         while (true) {
 
           if (isInterrupted) throw new InterruptedException
 
           consuming = true
+          var lastProcessedOffset: Long = -1
           while (consuming) {
 
             if (isInterrupted) throw new InterruptedException
 
             try {
               val records = kafkaConsumer.poll(500)
-              var fetchedNumRecrods = 0
               for (r <- records.iterator()) {
-                fetchedNumRecrods += 1
+                lastProcessedOffset = r.offset()
                 if (r.value == null) {
                   memstore.unload(r.key, r.offset())
                 } else {
                   memstore.load(r.key, r.value, r.offset(), r.timestamp())
                 }
               }
-              if (!tailing && fetchedNumRecrods == 0) {
+              if (!tailing && lastProcessedOffset >= endOffset) {
                 consuming = false
               }
             } catch {
+              case _: WakeupException => throw new InterruptedException
               case e: Throwable =>
                 synchronized {
                   consumerError.set(e)
@@ -177,21 +184,24 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
           }
         }
       } catch {
-        case e: InterruptedException => return
+        case _: InterruptedException => return
+        case e: Throwable => consumerError.set(e)
       } finally {
         kafkaConsumer.close()
       }
     }
   }
 
-  private[affinity] def init(): Unit = consumer.start()
+  private[affinity] def init(): Unit = {
+    consumer.start()
+  }
 
   private[affinity] def boot(): Unit = {
     consumer.synchronized {
       if (tailing) {
         tailing = false
         while (true) {
-          consumer.wait(6000)
+          consumer.wait(1000)
           if (consumerError.get != null) {
             consumer.kafkaConsumer.wakeup()
             throw consumerError.get
@@ -215,6 +225,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
   override protected def stop(): Unit = {
     try {
       consumer.interrupt()
+      consumer.kafkaConsumer.wakeup()
     } finally {
       kafkaProducer.close()
     }
@@ -232,7 +243,7 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
     }
   }
 
-  private def ensureCorrectTopicConfiguiration() {
+  private def ensureCorrectTopicConfiguration() {
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, producerProps.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
     }

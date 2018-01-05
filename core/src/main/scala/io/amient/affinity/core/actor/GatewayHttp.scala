@@ -123,7 +123,6 @@ trait GatewayHttp extends Gateway {
     super.preStart()
     log.info("Gateway starting")
     httpInterface.bind(self)
-    //FIXME This probably causes the following akka warning: Message [java.lang.Integer] from Actor[akka://VPCAPI/deadLetters] to..
     context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
   }
 
@@ -295,7 +294,9 @@ trait WebSocketSupport extends GatewayHttp {
         Array.copy(schemaBytes, 0, echoBytes, 5, schemaBytes.length)
         ByteString(echoBytes) //ByteString is a direct response over the push channel
       } catch {
-        case e: Throwable => e.printStackTrace(); throw e
+        case e: Throwable =>
+          log.error(e, "Could not push schema object")
+          throw e
       }
     }
 
@@ -335,7 +336,7 @@ trait WebSocketSupport extends GatewayHttp {
               }
               handleAvroClientMessage(record)
             } catch {
-              case NonFatal(e) => e.printStackTrace()
+              case NonFatal(e) => log.error(e, "Invalid avro object received from the client")
             }
           }
         } catch {
