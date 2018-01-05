@@ -20,15 +20,13 @@ package io.amient.affinity.core.storage
 
 import java.util.concurrent.{CompletableFuture, Future}
 
-class NoopStorage(conf: StateConf, partition:Int, numParts: Int) extends Storage(conf, partition) {
+class NoopStorage(id: String, conf: StateConf, partition:Int, numParts: Int) extends Storage(id, conf, partition) {
 
   override def init(): Unit = ()
 
   override def boot(): Unit = ()
 
   override def tail(): Unit = ()
-
-  override def stop(): Unit = ()
 
   override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = CompletableFuture.completedFuture((-1L))
 

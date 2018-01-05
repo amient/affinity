@@ -23,6 +23,7 @@ import io.amient.affinity.core.config.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -34,10 +35,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The implementing class must provide a constructor that takes two arguments:
- * Config config
- * int partition
+ * String identifier
+ * StateConf conf
  */
-public abstract class MemStore {
+public abstract class MemStore implements Closeable {
 
     public static class MemStoreConf extends CfgStruct<MemStoreConf> {
         public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
@@ -56,16 +57,16 @@ public abstract class MemStore {
     final protected int ttlSecs;
     final protected Path dataDir;
 
-    public MemStore(StateConf conf) throws IOException {
-        checkpointsEnable = isPersistent() && conf.Name.isDefined();
+    public MemStore(String identifier, StateConf conf) throws IOException {
+        checkpointsEnable = isPersistent();
         ttlSecs = conf.TtlSeconds.apply();
         if (!checkpointsEnable) {
             dataDir = null;
         } else {
             if (!conf.MemStore.DataDir.isDefined()) {
-              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via affinity.node config for store: " + conf.Name.apply());
+              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via affinity.node config for store: " + identifier);
             }
-            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply()));
+            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(identifier));
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
         }
         manager = new MemStoreManager();
@@ -207,7 +208,7 @@ public abstract class MemStore {
         put(ByteBuffer.wrap(key), valueBuffer, offset);
     }
 
-    private class MemStoreManager extends Thread {
+    private class MemStoreManager extends Thread implements Closeable {
 
         final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L));
 

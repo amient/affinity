@@ -151,7 +151,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
       KafkaStorage.StateConf.Storage.Producer.path -> Map().asJava,
       KafkaStorage.StateConf.Storage.Consumer.path -> Map().asJava
     )))
-    val storage = new KafkaStorage(stateConf, partition, numPartitions)
+    val storage = new KafkaStorage(topic, stateConf, partition, numPartitions)
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
     new State[Int, Test](storage, keySerde, valueSerde)

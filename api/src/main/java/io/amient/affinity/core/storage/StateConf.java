@@ -8,7 +8,6 @@ import io.amient.affinity.core.storage.Storage.StorageConf;
 import io.amient.affinity.core.storage.MemStore.MemStoreConf;
 
 public class StateConf extends CfgStruct<StateConf> {
-    public CfgString Name = string("name", false);
     public CfgInt TtlSeconds = integer("ttl.sec", -1);
     public CfgLong MinTimestamp = longint("min.timestamp", 0L);
     public StorageConf Storage = struct("storage", new StorageConf(), false);
