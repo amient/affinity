@@ -21,7 +21,10 @@ package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.config.CfgCls;
 import io.amient.affinity.core.config.CfgStruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
@@ -29,7 +32,15 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Future;
 
-public abstract class Storage {
+/**
+ * All implementations must provide a single constructor with 3 parameters:
+ * String identifier
+ * StateConf conf
+ * Int partition
+ */
+public abstract class Storage implements Closeable {
+
+    private final static Logger log = LoggerFactory.getLogger(Storage.class);
 
     public static class StorageConf extends CfgStruct<StorageConf> {
         public CfgCls<Storage> Class = cls("class", Storage.class, true);
@@ -41,14 +52,15 @@ public abstract class Storage {
     }
 
     final public MemStore memstore;
-
+    final public String id;
     final public int partition;
 
-    public Storage(StateConf conf, int partition) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+    public Storage(String id, StateConf conf, int partition) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         this.partition = partition;
+        this.id = id;
         Class<? extends MemStore> memstoreClass = conf.MemStore.Class.apply();
-        Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(StateConf.class);
-        memstore = memstoreConstructor.newInstance(conf);
+        Constructor<? extends MemStore> memstoreConstructor = memstoreClass.getConstructor(String.class, StateConf.class);
+        memstore = memstoreConstructor.newInstance(id, conf);
         memstore.open();
     }
 
@@ -76,20 +88,17 @@ public abstract class Storage {
     abstract public void tail();
 
     /**
-     * close all resource and background processes used by the memstore and the storage implementation
+     * close all resource and background processes used by the memstore
+     * implementations of Storage should override this method and first close their specific resources
+     * and then call super.close()
      */
-    final public void close() {
+    public void close() {
         try {
-            stop();
-        } finally {
             memstore.close();
+        } finally {
+            log.debug("Closed storage " + id + ", partition: " + partition);
         }
     }
-
-    /**
-     * close all resource and background processes used by the the storage implementation
-     */
-    abstract protected void stop();
 
     /**
      * @param key       record key

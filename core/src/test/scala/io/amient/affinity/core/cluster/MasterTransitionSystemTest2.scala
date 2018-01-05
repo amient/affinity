@@ -76,8 +76,8 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with Embe
   val region1 = new Node(config)
   val region2 = new Node(config)
   gateway.awaitClusterReady {
-    region1.startContainer("keyspace1", List(0, 1), new MyTestPartition("keyspace1", "consistency-test"))
-    region2.startContainer("keyspace1", List(0, 1), new MyTestPartition("keyspace1", "consistency-test"))
+    region1.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
+    region2.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
   }
 
   override def afterAll(): Unit = {

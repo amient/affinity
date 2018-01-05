@@ -66,7 +66,7 @@ object KafkaStorage {
 
 }
 
-class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(stateConf, partition) {
+class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitions: Int) extends Storage(id, stateConf, partition) {
 
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 
@@ -221,12 +221,13 @@ class KafkaStorage(stateConf: StateConf, partition: Int, numPartitions: Int) ext
     }
   }
 
-  override protected def stop(): Unit = {
+  override def close(): Unit = {
     try {
       consumer.interrupt()
       consumer.kafkaConsumer.wakeup()
-    } finally {
       kafkaProducer.close()
+    } finally {
+      super.close()
     }
   }
 

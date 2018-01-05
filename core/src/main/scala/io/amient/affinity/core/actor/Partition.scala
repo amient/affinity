@@ -78,13 +78,13 @@ trait Partition extends ActorHandler with ActorState {
   }
 
   override def preStart(): Unit = {
-    log.debug(s"Starting partition: $keyspace/$partition")
+    log.debug(s"Starting keyspace: $keyspace, partition: $partition")
     context.parent ! PartitionOnline(self)
     super.preStart()
   }
 
   override def postStop(): Unit = {
-    log.debug(s"Stopping partition: $keyspace/$partition")
+    log.debug(s"Stopping keyspace: $keyspace, partition: $partition")
     context.parent ! PartitionOffline(self)
     try closeState() finally super.postStop()
   }

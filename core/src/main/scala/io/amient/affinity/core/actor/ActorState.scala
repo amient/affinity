@@ -23,6 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor.Actor
 import akka.event.Logging
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.{State, StateConf}
 
 import scala.collection.JavaConverters._
@@ -39,17 +40,21 @@ trait ActorState extends Actor {
     closeState()
   }
 
-  def state[K: ClassTag, V: ClassTag](store: String, conf: StateConf): State[K, V] = state[K, V](store, {
-    State.create[K, V](store, conf, context.system)
-  })
-
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
     state[K, V](store, {
-      State.create[K, V](keyspace, partition, store, context.system)
+      val identifier = if (partition < 0) store else s"$keyspace-$store-$partition"
+      val conf = Node.Conf(context.system.settings.config)
+      val numPartitions = conf.Affi.Keyspace(keyspace).NumPartitions()
+      val stateConf = conf.Affi.Keyspace(keyspace).State(store)
+      State.create[K, V](identifier, partition, stateConf, numPartitions, context.system)
     })
   }
 
-  def state[K, V](name:String, creator: => State[K, V]): State[K, V] = {
+  private[core] def state[K: ClassTag, V: ClassTag](broadcast: String, conf: StateConf): State[K, V] = state[K, V](broadcast, {
+    State.create[K, V](broadcast, 0, conf, 1, context.system)
+  })
+
+  private[core] def state[K, V](name: String, creator: => State[K, V]): State[K, V] = {
     val result: State[K, V] = creator
     result.storage.init()
     result.storage.boot()
@@ -58,21 +63,20 @@ trait ActorState extends Actor {
     result
   }
 
-  def getStateStore(stateStoreName: String): State[_, _] = {
+  private[core] def getStateStore(stateStoreName: String): State[_, _] = {
     storageRegistry.asScala.find(_._1 == stateStoreName).get._2
   }
 
-  def bootState(): Unit = storageRegistry.asScala.foreach { case (name, s) =>
+  private[core] def bootState(): Unit = storageRegistry.asScala.foreach { case (name, s) =>
     log.info(s"state store: '${name}', partition: ${s.storage.partition} booted, estimated num. keys=${s.numKeys}")
     s.storage.boot()
   }
 
 
-  def tailState(): Unit = storageRegistry.asScala.foreach(_._2.storage.tail())
+  private[core] def tailState(): Unit = storageRegistry.asScala.foreach(_._2.storage.tail())
 
-  def closeState(): Unit = {
+  private[core] def closeState(): Unit = {
     storageRegistry.asScala.foreach { case (name, store) =>
-      log.debug(s"Closing state store $name ")
       store.storage.close()
     }
     storageRegistry.clear()

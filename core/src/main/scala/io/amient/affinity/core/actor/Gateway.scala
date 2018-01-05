@@ -122,11 +122,11 @@ trait Gateway extends ActorHandler with ActorState {
   abstract override def manage = super.manage orElse {
 
     case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
-      context.parent ! Controller.GatewayCreated(-1)
-      if (conf.Gateway.Http.isDefined) {
-        log.warning("affinity.gateway.http interface is configured but the node is trying " +
-          s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
-      }
+        context.parent ! Controller.GatewayCreated(-1)
+        if (conf.Gateway.Http.isDefined) {
+          log.warning("affinity.gateway.http interface is configured but the node is trying " +
+            s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
+        }
 
     case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
       val service: ActorRef = keyspaces(group)._2

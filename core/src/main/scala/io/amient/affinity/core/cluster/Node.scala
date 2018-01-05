@@ -81,18 +81,22 @@ class Node(config: Config) {
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
+  private val terminated = system.whenTerminated
+
   private val log = Logging.getLogger(system, this)
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
   sys.addShutdownHook {
-    //in case the process is stopped from outside
-    shutdown()
+    if (!terminated.isCompleted) {
+      log.info("process killed - attempting graceful shutdown")
+      shutdown()
+    }
   }
 
   final def shutdown(): Unit = {
     controller ! GracefulShutdown()
-    Await.ready(system.whenTerminated, shutdownTimeout)
+    Await.ready(terminated, shutdownTimeout)
   }
 
   import system.dispatcher

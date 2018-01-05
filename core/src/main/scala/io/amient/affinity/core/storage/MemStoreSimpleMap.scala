@@ -25,7 +25,7 @@ import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
 
-class MemStoreSimpleMap(conf: StateConf) extends MemStore(conf) {
+class MemStoreSimpleMap(identifier: String, conf: StateConf) extends MemStore(identifier, conf) {
 
   //TODO implementation of ExpiringConcurrentHashMap or simply a cleaner Thread
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()

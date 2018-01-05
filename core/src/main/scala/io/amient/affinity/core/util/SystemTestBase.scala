@@ -117,12 +117,12 @@ trait SystemTestBase {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
-  class MyTestPartition(keyspace: String, store: String) extends Partition {
+  class MyTestPartition(store: String) extends Partition {
 
     import MyTestPartition._
     import context.dispatcher
 
-    val data = state(keyspace, State.create[String, String](keyspace, partition, store, context.system))
+    val data = state[String, String](store)
 
     override def handle: Receive = {
       case request@GetValue(key) => sender.reply(request) {

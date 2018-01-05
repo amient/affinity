@@ -42,34 +42,22 @@ object State {
     override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  def create[K: ClassTag, V: ClassTag](keyspace: String, partition: Int, store: String, system: ActorSystem): State[K, V] = {
-    val conf = Node.Conf(system.settings.config)
-    val numPartitions = conf.Affi.Keyspace(keyspace).NumPartitions()
-    val stateConf = conf.Affi.Keyspace(keyspace).State(store)
-    stateConf.Name.setValue(if (partition < 0) store else s"$keyspace-$store-$partition")
-    create(partition, stateConf, numPartitions, system)
-  }
-
-  def create[K: ClassTag, V: ClassTag](store: String, stateConf: StateConf, system: ActorSystem): State[K, V] = {
-    stateConf.Name.setValue(store)
-    create(0, stateConf, 1, system)
-  }
-
-
-  private def create[K: ClassTag, V: ClassTag](partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
-    val conf = Node.Conf(system.settings.config)
-    if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
+  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
-    val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(stateConf, partition, 1) else {
+    val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(identifier, stateConf, partition, 1) else {
+      if (!stateConf.MemStore.DataDir.isDefined) {
+        val conf = Node.Conf(system.settings.config)
+        if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
+      }
       val storageClass = stateConf.Storage.Class()
       val storageClassSymbol = rootMirror.classSymbol(storageClass)
       val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
       val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
       val constructorMirror = storageClassMirror.reflectConstructor(constructor)
-      constructorMirror(stateConf, partition, numPartitions).asInstanceOf[Storage]
+      constructorMirror(identifier, stateConf, partition, numPartitions).asInstanceOf[Storage]
     } catch {
-      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State ${stateConf.Name()}", e)
+      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)

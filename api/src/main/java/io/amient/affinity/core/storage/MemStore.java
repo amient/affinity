@@ -23,6 +23,7 @@ import io.amient.affinity.core.config.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -34,10 +35,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The implementing class must provide a constructor that takes two arguments:
- * Config config
- * int partition
+ * String identifier
+ * StateConf conf
  */
-public abstract class MemStore {
+public abstract class MemStore implements Closeable {
 
     public static class MemStoreConf extends CfgStruct<MemStoreConf> {
         public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
@@ -56,16 +57,16 @@ public abstract class MemStore {
     final protected int ttlSecs;
     final protected Path dataDir;
 
-    public MemStore(StateConf conf) throws IOException {
-        checkpointsEnable = isPersistent() && conf.Name.isDefined();
+    public MemStore(String identifier, StateConf conf) throws IOException {
+        checkpointsEnable = isPersistent();
         ttlSecs = conf.TtlSeconds.apply();
         if (!checkpointsEnable) {
             dataDir = null;
         } else {
             if (!conf.MemStore.DataDir.isDefined()) {
-              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via affinity.node config for store: " + conf.Name.apply());
+              throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via affinity.node config for store: " + identifier);
             }
-            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(conf.Name.apply()));
+            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(identifier));
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
         }
         manager = new MemStoreManager();
@@ -207,9 +208,9 @@ public abstract class MemStore {
         put(ByteBuffer.wrap(key), valueBuffer, offset);
     }
 
-    private class MemStoreManager extends Thread {
+    private class MemStoreManager extends Thread implements Closeable {
 
-        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L, false));
+        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L));
 
         volatile private boolean checkpointModified = false;
 
@@ -225,27 +226,6 @@ public abstract class MemStore {
             if (checkpointsEnable) try {
                 Path file = getFile();
                 if (Files.exists(file)) checkpoint.set(Checkpoint.readFromFile(file));
-//TODO #80 use something similar as below to implement the cleaner, but as part of the run() method
-//                if (!checkpoint.get().closed) {
-//                    if (!Files.exists(file)) {
-//                        log.info("MemStore checkpoint doesn't exits: " + file);
-//                        Files.createDirectories(file.getParent());
-//                    } else {
-//                        log.info("MemStore was not closed cleanly, fixing it...");
-//                    }
-//                    int actualSize = 0;
-//                    Iterator<Map.Entry<ByteBuffer, ByteBuffer>> i = iterator();
-//                    log.info("Checking records...");
-//                    while (i.hasNext()) {
-//                        actualSize += 1;
-//                        if (actualSize % 100000 == 0) {
-//                            log.info("Checked num. records: " + actualSize / 10000 + "k");
-//                        }
-//                        i.next();
-//                    }
-//                    log.info("Actual num. records: " + actualSize);
-//                    log.info("Implementation num. records: " + numKeys());
-//                }
                 log.info("Initialized " + checkpoint + " from " + file);
 
             } catch (IOException e) {
@@ -261,7 +241,7 @@ public abstract class MemStore {
                 while (!stopped) {
                     Thread.sleep(10000); //TODO make checkpoint interval configurable
                     if (checkpointsEnable && checkpointModified) {
-                        writeCheckpoint(false);
+                        writeCheckpoint();
                     }
                 }
             } catch (Exception e) {
@@ -270,11 +250,10 @@ public abstract class MemStore {
             }
         }
 
-        private void writeCheckpoint(boolean closing) throws IOException {
+        private void writeCheckpoint() throws IOException {
             Path file = getFile();
-            Checkpoint chk = (!closing) ? checkpoint.get()
-                    : checkpoint.updateAndGet(c -> new Checkpoint(c.offset, true));
-            log.debug("Writing checkpoint " + chk + " to file: " + file + ", final: " + closing);
+            Checkpoint chk = checkpoint.get();
+            log.debug("Writing checkpoint " + chk + " to file: " + file);
             chk.writeToFile(file);
             checkpointModified = false;
         }
@@ -286,7 +265,7 @@ public abstract class MemStore {
                 }
                 if (offset > chk.offset) {
                     if (checkpointsEnable) checkpointModified = true;
-                    return new Checkpoint(offset, false);
+                    return new Checkpoint(offset);
                 } else {
                     return chk;
                 }
@@ -295,7 +274,7 @@ public abstract class MemStore {
 
 
         public void close() throws IOException {
-            if (checkpointsEnable) writeCheckpoint(true);
+            if (checkpointsEnable) writeCheckpoint();
         }
     }
 
