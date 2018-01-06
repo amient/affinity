@@ -6,7 +6,6 @@ apply plugin: 'scala'
 apply plugin: 'signing'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
-apply plugin: 'gradle-one-jar'
 
 ext {
     sparkVersion = '2.0.2'
@@ -32,26 +31,5 @@ dependencies {
     provided group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
     provided (group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2')
 }
-
-
-task singlejar(type: OneJar) {
-    mainClass = 'io.amient.affinity.spark.Shell'
-}
-
-build.dependsOn singlejar
-
-//import org.apache.tools.ant.filters.ReplaceTokens
-
-//task startScripts(type: Copy) {
-//    from new File("$projectDir/src/main/scripts")
-//    into new File("$projectDir/build/bin")
-//    filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: rootProject.ext.getProperties())
-//    include('*.*')
-//    include('*')
-//    fileMode 0777
-//}
-//
-//build.dependsOn startScripts
-
 
 

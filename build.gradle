@@ -1,3 +1,5 @@
+import javafx.scene.effect.Shadow
+
 group = 'io.amient.affinity'
 version = '0.5.0-SNAPSHOT'
 
@@ -28,16 +30,21 @@ allprojects {
 
     buildscript {
         repositories {
-            mavenCentral()
+            maven {
+                url "https://plugins.gradle.org/m2/"
+            }
         }
         dependencies {
-            classpath 'com.github.rholder:gradle-one-jar:1.0.4'
+            classpath "com.github.jengelman.gradle.plugins:shadow:2.0.1"
         }
     }
+
 
     plugins.withType(JavaPlugin).whenPluginAdded {
 
         sourceCompatibility = rootProject.ext.javaVersion
+
+        libsDirName = 'lib' //gradle's default is libs but CreateStartScripts needs this to be lib
 
         repositories {
             mavenLocal()
