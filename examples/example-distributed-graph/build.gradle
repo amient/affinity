@@ -1,9 +1,9 @@
 group = rootProject.group
 version = rootProject.version
 
-apply plugin: 'scala'
 apply plugin: 'java'
-apply plugin: 'gradle-one-jar'
+apply plugin: 'scala'
+apply plugin: "com.github.johnrengelman.shadow"
 
 ext {
     mainClass = "io.amient.affinity.example.ExampleGraphMain"
@@ -12,13 +12,6 @@ ext {
     sparkVersion = '2.0.2'
     baseSparkVersion = sparkVersion.split("\\.\\d+\$")[0]
 }
-
-task singlejar(type: OneJar) {
-    mainClass = project.ext.mainClass
-}
-
-build.dependsOn singlejar
-
 
 dependencies {
     compile project(':core')
@@ -34,15 +27,27 @@ dependencies {
 }
 
 
+build.dependsOn shadowJar
+shadowJar {
+    from { project.configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes(
+            'Main-Class': mainClass,
+            'version': project.version,
+        )
+    }
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer) {
+        resource = 'reference.conf'
+    }
+}
 
-//FIXME is there a way to use CreateStartScripts with OneJar
-//task createStartScripts(type: CreateStartScripts) {
-//    outputDir = file("build/scripts")
-//    mainClassName = mainClass
-//    applicationName = mainScript
-//    classpath = singlejar.outputs.files
-//}
-//
-//build.dependsOn createStartScripts
-//libsDirName = 'lib'
-//
+task createStartScripts(type: CreateStartScripts) {
+    outputDir = file("build/scripts")
+    mainClassName = mainClass
+    applicationName = mainScript
+    classpath = shadowJar.outputs.files
+}
+
+build.dependsOn createStartScripts
+
+

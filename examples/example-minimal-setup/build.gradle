@@ -3,29 +3,13 @@ version = rootProject.version
 
 apply plugin: 'scala'
 apply plugin: 'java'
+apply plugin: "com.github.johnrengelman.shadow"
 
 ext {
-    mainClass = "io.amient.affinity.example.minimal.MinExampleMain"
+    mainClass = "io.amient.affinity.example.minimal.Main"
     mainScript = "example"
     kafkaMinorVersion = "0.10"
 }
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.github.rholder:gradle-one-jar:1.0.4'
-    }
-}
-apply plugin: 'gradle-one-jar'
-
-task singlejar(type: OneJar) {
-    mainClass = project.ext.mainClass
-}
-
-build.dependsOn singlejar
-
 
 dependencies {
     compile project(':core')
@@ -35,5 +19,27 @@ dependencies {
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
 }
 
+build.dependsOn shadowJar
+shadowJar {
+    from { project.configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes(
+                'Main-Class': mainClass,
+                'version': project.version,
+        )
+    }
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer) {
+        resource = 'reference.conf'
+    }
+}
+
+task createStartScripts(type: CreateStartScripts) {
+    outputDir = file("build/scripts")
+    mainClassName = mainClass
+    applicationName = mainScript
+    classpath = shadowJar.outputs.files
+}
+
+build.dependsOn createStartScripts
 
 
