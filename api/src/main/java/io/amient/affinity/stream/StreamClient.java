@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka;
+package io.amient.affinity.stream;
 
 import io.amient.affinity.core.ByteKey;
 import io.amient.affinity.core.PartitionedRecord;
@@ -30,18 +30,28 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Implementations of KafkaClient interface are used in KafkaRDD and provide direct 1-1 mapping between
- * kafka partitions to spark partitions.
+ * Implementations of StreamClient interface are used in CompactRDD and provide direct 1-1 mapping between
+ * stream partitions to spark partitions.
  */
-public interface KafkaClient extends Serializable {
+public interface StreamClient extends Serializable {
 
     List<Integer> getPartitions();
 
     Map<Long, Long> getOffsets(int partition);
 
-    Iterator<Record<ByteKey, byte[]>> iterator(int partition, Long startOffset, Long stopOffset);
-
     void publish(Iterator<PartitionedRecord<byte[], byte[]>> iter, Function<Long, Boolean> checker);
+
+
+    /**
+     * Underlying implementation may need to open resources specific for this iterator and must implement
+     * the release(..) method to close them.
+     *
+     * @param partition
+     * @param startOffset
+     * @param stopOffset
+     * @return
+     */
+    Iterator<Record<ByteKey, byte[]>> iterator(int partition, Long startOffset, Long stopOffset);
 
     void release(Iterator<Record<ByteKey, byte[]>> iter);
 

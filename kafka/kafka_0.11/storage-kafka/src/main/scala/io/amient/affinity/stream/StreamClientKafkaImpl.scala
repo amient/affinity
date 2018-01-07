@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.kafka
+package io.amient.affinity.stream
 
 import java.lang.Long
 import java.util
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class KafkaClientImpl(val topic: String, props: Properties) extends KafkaClient {
+class StreamClientKafkaImpl(val topic: String, props: Properties) extends StreamClient {
 
   private val log = LoggerFactory.getLogger(this.getClass)
 

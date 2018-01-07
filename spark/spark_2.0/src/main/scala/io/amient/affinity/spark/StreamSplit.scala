@@ -22,16 +22,16 @@ package io.amient.affinity.spark
 import org.apache.spark.Partition
 
 /**
-  * KafkaSplit is always related to a single kafka topic. Kafka topic may have multiple partitions and these
+  * StreamSplit is always related to a single topic. Topic may have multiple partitions and these
   * can be further sub-divided multiple times to get extra parallelism. Hence the number of splits if defined by
-  * number of kafka partition times the extraParallelism factor.
+  * number of stream partition times the extraParallelism factor.
   *
   * @param rddId       owner RDD
   * @param index       spark index for the partition
-  * @param partition   kafka index for the partition
+  * @param partition   index for the stream partition
   */
-class KafkaSplit(rddId: Int, override val index: Int, val partition: Int) extends Partition {
+class StreamSplit(rddId: Int, override val index: Int, val partition: Int) extends Partition {
   override def hashCode: Int = 41 * 41 * (41 + rddId) + (41 * index)
 
-  override def toString = s"KafkaSplit(index=$index, partition=$partition, rddId=$rddId)"
+  override def toString = s"StreamSplit(index=$index, partition=$partition, rddId=$rddId)"
 }

@@ -1,4 +1,4 @@
-package io.amient.affinity.kafka
+package io.amient.affinity.stream
 
 import java.util
 import java.util.Properties
@@ -13,9 +13,9 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-class ManagedKafkaConsumerImpl extends ManagedKafkaConsumer {
+class ManagedConsumerImpl extends ManagedConsumer {
 
-  private val log = LoggerFactory.getLogger(classOf[ManagedKafkaConsumerImpl])
+  private val log = LoggerFactory.getLogger(classOf[ManagedConsumerImpl])
 
   private var closed = true
 
@@ -27,6 +27,7 @@ class ManagedKafkaConsumerImpl extends ManagedKafkaConsumer {
       config.entrySet().foreach { case entry =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
+      put("enable.auto.commit", "false")
       put("key.deserializer", classOf[ByteArrayDeserializer].getName)
       put("value.deserializer", classOf[ByteArrayDeserializer].getName)
     }
@@ -71,6 +72,10 @@ class ManagedKafkaConsumerImpl extends ManagedKafkaConsumer {
       case r: ConsumerRecord[Array[Byte], Array[Byte]] =>
         new Record(r.key(), r.value(), r.timestamp())
     }
+  }
+
+  def commit() = {
+    kafkaConsumer.commitAsync()
   }
 
   def active() = !closed

@@ -29,9 +29,10 @@ import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
-import io.amient.affinity.kafka.{EmbeddedKafka, KafkaClientImpl}
+import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.example.graph.message.{Component, VertexProps}
-import io.amient.util.spark.KafkaRDD
+import io.amient.affinity.stream.StreamClientKafkaImpl
+import io.amient.util.spark.CompactRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
@@ -85,15 +86,15 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
     val serdeConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-    val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
+    val graphClient = new StreamClientKafkaImpl(topic = "graph", new Properties() {
       put("bootstrap.servers", kafkaBootstrap)
     })
 
-    val componentClient = new KafkaClientImpl(topic = "components", new Properties() {
+    val componentClient = new StreamClientKafkaImpl(topic = "components", new Properties() {
       put("bootstrap.servers", kafkaBootstrap)
     })
 
-    val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
+    val graphRdd = new CompactRDD[Int, VertexProps](sc, graphClient,
       AvroSerde.create(serdeConfig.value), compacted = true)
       .repartition(1)
       .sortByKey()
@@ -106,7 +107,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
       case _ => throw new AssertionError("Graph should contain 4 vertices")
     }
 
-    val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
+    val componentRdd = new CompactRDD[Int, Component](sc, componentClient,
       AvroSerde.create(serdeConfig.value), compacted = true)
 
     componentRdd.collect.toList match {
