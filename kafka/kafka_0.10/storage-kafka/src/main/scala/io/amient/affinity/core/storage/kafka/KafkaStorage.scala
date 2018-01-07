@@ -149,7 +149,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
           if (isInterrupted) throw new InterruptedException
 
           consuming = true
-          var lastProcessedOffset: Long = -1
+          var lastProcessedOffset: Long = endOffset
           while (consuming) {
 
             if (isInterrupted) throw new InterruptedException
