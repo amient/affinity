@@ -48,7 +48,7 @@ object LocalAvroSchemaRegistry {
 }
 
 class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
-  val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
+  val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
   val conf = new LocalAvroConf().apply(merged)
   val dataPath = conf.DataPath()
 

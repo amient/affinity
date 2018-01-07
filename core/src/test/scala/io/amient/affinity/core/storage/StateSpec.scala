@@ -15,7 +15,7 @@ class StateSpec extends TestKit(ActorSystem.create("test",
   ConfigFactory.parseMap(Map(
     Node.Conf.Affi.Gateway.Http.Host.path -> "127.0.0.1",
     Node.Conf.Affi.Gateway.Http.Port.path -> "0"
-  )).withFallback(ConfigFactory.defaultReference())))
+  )).withFallback(ConfigFactory.defaultReference)))
   with ImplicitSender with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   override def afterAll {

@@ -70,7 +70,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
   val config = ConfigFactory.parseMap(Map(
       CfAvroSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
       AvroSerde.Conf.Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName))
-    .withFallback(ConfigFactory.defaultReference())
+    .withFallback(ConfigFactory.defaultReference)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val topic = "visibility-test"

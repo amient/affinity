@@ -22,14 +22,12 @@ dependencies {
 build.dependsOn shadowJar
 shadowJar {
     from { project.configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    append 'reference.conf'
     manifest {
         attributes(
                 'Main-Class': mainClass,
                 'version': project.version,
         )
-    }
-    transform(com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer) {
-        resource = 'reference.conf'
     }
 }
 

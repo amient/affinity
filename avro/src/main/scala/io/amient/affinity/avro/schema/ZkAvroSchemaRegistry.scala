@@ -53,7 +53,7 @@ object ZkAvroSchemaRegistry {
 }
 
 class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
-  val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
+  val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
   val conf = new ZkAvroConf().apply(merged)
   private val zkRoot = conf.Root()
 

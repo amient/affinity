@@ -31,6 +31,7 @@ import io.amient.affinity.core.util.Reply
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
 object Controller {
 
@@ -51,6 +52,7 @@ class Controller extends Actor {
   private val log = Logging.getLogger(context.system, this)
 
   private val conf = Node.Conf(context.system.settings.config)
+  private val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds
 
   import Controller._
 
@@ -82,7 +84,10 @@ class Controller extends Actor {
         containers.put(group, promise)
         promise.future
       } catch {
-        case e: InvalidActorNameException => containers(group).future
+        case _: InvalidActorNameException => containers(group).future
+        case NonFatal(e) =>
+          log.error(e, s"Could not create container for $group with partitions $partitions")
+          throw e
       }
     }
 
@@ -118,7 +123,7 @@ class Controller extends Actor {
     }
 
     case request@GracefulShutdown() => sender.replyWith(request) {
-      implicit val timeout = Timeout(3000 milliseconds)
+      implicit val timeout = Timeout(shutdownTimeout)
       Future.sequence(context.children map { child =>
         log.debug("Requesting GracefulShutdown from " + child)
         child ? GracefulShutdown() recover {

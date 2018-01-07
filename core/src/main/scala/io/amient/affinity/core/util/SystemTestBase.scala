@@ -58,13 +58,13 @@ object SystemTestBase {
 
 trait SystemTestBase {
 
-  final def configure(): Config = configure(ConfigFactory.defaultReference())
+  final def configure(): Config = configure(ConfigFactory.defaultReference)
 
   final def configure(config: Config): Config = configure(config, None, None)
 
   final def configure(confname: String, zkConnect: Option[String] = None, kafkaBootstrap: Option[String] = None): Config = {
     configure(ConfigFactory.load(confname)
-      .withFallback(ConfigFactory.defaultReference()), zkConnect, kafkaBootstrap)
+      .withFallback(ConfigFactory.defaultReference), zkConnect, kafkaBootstrap)
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {

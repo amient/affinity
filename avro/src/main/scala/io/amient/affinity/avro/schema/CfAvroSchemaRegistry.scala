@@ -56,7 +56,7 @@ object CfAvroSchemaRegistry {
   * Instead a fully-qualified name of the class is the subject.
   */
 class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
-  val merged = config.withFallback(ConfigFactory.defaultReference().getConfig(AvroSerde.Conf.Avro.path))
+  val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
   val conf = new CfAvroConf().apply(merged)
   val client = new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
 

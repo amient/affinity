@@ -125,7 +125,7 @@ class Node(config: Config) {
       implicit val timeout = Timeout(startupTimeout)
       startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
     } catch {
-      case e: ConfigException =>
+      case NonFatal(e) =>
         throw new IllegalArgumentException(s"Could not start container for service $group with partitions ${partitions.mkString(", ")}", e)
     }
   }

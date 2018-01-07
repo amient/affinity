@@ -293,12 +293,12 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
         val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
         val actualConfig = admin.describeConfigs(List(topicConfigResource))
           .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-        val requiredConfigChanges = topicConfigs.filter { case (k,v) => actualConfig.get(k).value() != v }
-        if (requiredConfigChanges.size > 0) {
-          val entries: util.Collection[ConfigEntry] = requiredConfigChanges.map { case (k,v) => new ConfigEntry(k,v) }
+        val needsAlterConfig = topicConfigs.exists { case (k,v) => actualConfig.get(k).value() != v }
+        if (needsAlterConfig) {
+          val entries: util.Collection[ConfigEntry] = topicConfigs.map { case (k,v) => new ConfigEntry(k,v) }
           admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
             .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-          log.info(s"Topic $topic configuration altered successfully: $requiredConfigChanges")
+          log.info(s"Topic $topic configuration altered successfully")
         } else {
           log.debug(s"Topic $topic configuration is up to date")
         }

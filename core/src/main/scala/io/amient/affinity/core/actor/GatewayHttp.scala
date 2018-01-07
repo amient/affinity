@@ -356,7 +356,7 @@ trait WebSocketSupport extends GatewayHttp {
     import context.dispatcher
     implicit val scheduler = context.system.scheduler
     implicit val materializer = ActorMaterializer.create(context.system)
-    implicit val timeout = Timeout(1 second)
+    implicit val timeout = Timeout(6 second)
 
     service ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
       case keyValueMediator: ActorRef =>

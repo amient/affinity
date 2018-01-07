@@ -45,6 +45,7 @@ class Container(group: String) extends Actor {
   private val log = Logging.getLogger(context.system, this)
 
   private val conf = Node.Conf(context.system.settings.config)
+  private val startupTimeout = conf.Affi.StartupTimeoutMs().toLong milliseconds
 
   final private val akkaAddress = if (conf.Akka.Hostname() > "") {
     s"akka.tcp://${context.system.name}@${conf.Akka.Hostname()}:${conf.Akka.Port()}"
@@ -97,7 +98,7 @@ class Container(group: String) extends Actor {
       partitions -= ref
 
     case request @ MasterStatusUpdate(_, add, remove) => sender.reply(request) {
-      implicit val timeout = Timeout(5 seconds)
+      implicit val timeout = Timeout(startupTimeout)
       remove.toList.map(ref => ref ack BecomeStandby())
       add.toList.map(ref => ref ack BecomeMaster())
     }

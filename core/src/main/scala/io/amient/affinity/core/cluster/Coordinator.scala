@@ -123,7 +123,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
       val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
       val update = MasterStatusUpdate(group, currentMasters, Set())
-      implicit val timeout = Timeout(5 seconds)
+      implicit val timeout = Timeout(30 seconds)
       watcher ack (if (global) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
           logger.error(e, "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, terminating the system.")
@@ -154,7 +154,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
       val attempts = Future.sequence(newState.map { case (handle, actorPath) =>
         val selection = system.actorSelection(actorPath)
-        implicit val timeout = new Timeout(6 seconds)
+        implicit val timeout = new Timeout(30 seconds)
         selection.resolveOne() map (a => Success((handle, a))) recover {
           case NonFatal(e) =>
             logger.warning(s"$handle: ${e.getMessage}")
@@ -198,7 +198,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
     if (!closed.get) watchers.foreach { case (watcher, global) =>
-      implicit val timeout = Timeout(15 seconds)
+      implicit val timeout = Timeout(30 seconds)
       try {
         watcher ack (if (global) fullUpdate else fullUpdate.localTo(watcher)) onFailure {
           case e: Throwable => if (!closed.get) {
