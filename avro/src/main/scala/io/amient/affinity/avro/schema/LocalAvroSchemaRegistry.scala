@@ -27,7 +27,7 @@ import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.avro.schema.LocalAvroSchemaRegistry.LocalAvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
+import org.apache.avro.{Schema, SchemaValidationException, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
 
@@ -59,7 +59,12 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
   override def close(): Unit = ()
 
   override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
-    validator.validate(schema, existing)
+    try {
+      validator.validate(schema, existing)
+    } catch {
+      case e: SchemaValidationException =>
+        throw new RuntimeException(s"subject: $subject, schema: ${schema.getFullName} validation error", e)
+    }
     val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
     val schemaPath = dataPath.resolve(s"$id.avsc")
     Files.createFile(schemaPath)
@@ -69,12 +74,14 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
 
   override private[schema] def hypersynchronized[X](f: => X) = synchronized {
     val file = dataPath.resolve(".lock").toFile
+
     def getLock(countDown: Int = 30): Unit = {
       if (!file.createNewFile()) if (countDown > 0) {
         Thread.sleep(1000)
         getLock(countDown - 1)
       } else throw new java.nio.file.FileAlreadyExistsException("atomic createNewFile failed")
     }
+
     getLock()
     try {
       f
