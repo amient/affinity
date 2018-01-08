@@ -29,7 +29,7 @@ import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.I0Itec.zkclient.{IZkChildListener, ZkClient}
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
+import org.apache.avro.{Schema, SchemaValidationException, SchemaValidatorBuilder}
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConversions._
@@ -78,7 +78,12 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
   override def close(): Unit = zk.close()
 
   override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
-    validator.validate(schema, existing)
+    try {
+      validator.validate(schema, existing)
+    } catch {
+      case e: SchemaValidationException =>
+        throw new RuntimeException(s"subject: $subject, schema: ${schema.getFullName} validation error", e)
+    }
     val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
     val id = path.substring(zkRoot.length + 1).toInt
     id
