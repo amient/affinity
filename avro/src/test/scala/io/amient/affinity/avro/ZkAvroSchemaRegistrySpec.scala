@@ -43,8 +43,11 @@ class ZkAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZooKe
   it should "reject incompatible schema registration" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
     serde.register[Record_Current](v4schema)
-    an[SchemaValidationException] should be thrownBy (serde.initialize())
-
+    val thrown = intercept[RuntimeException] {
+      serde.initialize()
+    }
+    thrown.getMessage should include("validation error")
+    thrown.getCause.isInstanceOf[SchemaValidationException] should be(true)
   }
 
 }

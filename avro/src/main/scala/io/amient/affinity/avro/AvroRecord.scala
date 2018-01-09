@@ -57,23 +57,25 @@ object AvroRecord {
     write(x, x.getSchema, schemaId)
   }
 
-  def write(x: Any, schema: Schema, schemaId: Int = -1): Array[Byte] = {
-    if (x == null) {
-      return null
-    }
-    val valueOut = new ByteArrayOutputStream()
-    try {
-      val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
-      val writer = new GenericDatumWriter[Any](schema)
-      if (schemaId >= 0) {
-        valueOut.write(MAGIC)
-        ByteUtils.writeIntValue(schemaId, valueOut)
-      }
-      writer.write(x, encoder)
-      encoder.flush()
-      valueOut.toByteArray
-    } finally {
-      valueOut.close
+  def write(value: Any, schema: Schema, schemaId: Int = -1): Array[Byte] = {
+    value match {
+      case null => null
+      case record:AvroRecord if record._serializedInstanceBytes != null => record._serializedInstanceBytes
+      case any: Any =>
+        val valueOut = new ByteArrayOutputStream()
+        try {
+          val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
+          val writer = new GenericDatumWriter[Any](schema)
+          if (schemaId >= 0) {
+            valueOut.write(MAGIC)
+            ByteUtils.writeIntValue(schemaId, valueOut)
+          }
+          writer.write(any, encoder)
+          encoder.flush()
+          valueOut.toByteArray
+        } finally {
+          valueOut.close
+        }
     }
   }
 
@@ -106,6 +108,17 @@ object AvroRecord {
     }
   }
 
+  /**
+    *
+    * @param buf ByteBuffer version of the registered avro reader
+    * @param schemaRegistry
+    * @return AvroRecord for registered Type
+    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
+    *         null if bytes are null
+    */
+  def read(buf: ByteBuffer, schemaRegistry: AvroSchemaProvider): Any = {
+    if (buf == null) null else read(new ByteBufferInputStream(List(buf).asJava), schemaRegistry)
+  }
 
   /**
     *
@@ -116,19 +129,10 @@ object AvroRecord {
     *         null if bytes are null
     */
   def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
-    if (bytes == null) null else read(new ByteArrayInputStream(bytes), schemaRegistry)
-  }
-
-  /**
-    *
-    * @param bytes ByteBuffer version of the registered avro reader
-    * @param schemaRegistry
-    * @return AvroRecord for registered Type
-    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
-    *         null if bytes are null
-    */
-  def read(bytes: ByteBuffer, schemaRegistry: AvroSchemaProvider): Any = {
-    if (bytes == null) null else read(new ByteBufferInputStream(List(bytes).asJava), schemaRegistry)
+    if (bytes == null) null else read(new ByteArrayInputStream(bytes), schemaRegistry)  match {
+      case a: AvroRecord => a._serializedInstanceBytes = bytes; a
+      case other => other
+    }
   }
 
   /**
@@ -425,6 +429,8 @@ object AvroRecord {
 abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
   @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
+
+  @transient private var _serializedInstanceBytes: Array[Byte] = null
 
   private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
 

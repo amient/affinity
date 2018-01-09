@@ -21,7 +21,7 @@ package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Partition
@@ -33,6 +33,15 @@ import org.scalatest.Matchers
 import scala.collection.immutable.Seq
 
 class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
+
+  "Akka-serialized AvroRecord bytes" must {
+    "be identical to AvroSerde bytes - this is important for murmur2 hash partitioner" in {
+      val in = TestKey(1)
+      val bytes = SerializationExtension(system).serialize(in).get
+      val bytes2 = new MemorySchemaRegistry().toBytes(in)
+      bytes.mkString(".") should be(bytes2.mkString("."))
+    }
+  }
 
   "TupleSerde" must {
     "work with wrapped tuple3" in {
