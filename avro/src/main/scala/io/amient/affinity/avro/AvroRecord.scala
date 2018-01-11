@@ -383,9 +383,9 @@ object AvroRecord {
         SchemaBuilder.builder().stringType()
       } else if (tpe =:= typeOf[Null]) {
         SchemaBuilder.builder().nullType()
-      } else if (tpe <:< typeOf[Map[String, _]]) {
+      } else if (tpe <:< typeOf[Map[String, Any]]) {
         SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
-      } else if (tpe <:< typeOf[Iterable[_]]) {
+      } else if (tpe <:< typeOf[Iterable[Any]]) {
         SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
       } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
         tpe match {
@@ -398,7 +398,7 @@ object AvroRecord {
             val args = enumSymbols.toSeq.map(_.toString)
             SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
         }
-      } else if (tpe <:< typeOf[Option[_]]) {
+      } else if (tpe <:< typeOf[Option[Any]]) {
         SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
       } else if (tpe <:< typeOf[AvroRecord]) {
         val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)//universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
