@@ -94,7 +94,7 @@ object AvroRecord {
 
   private def deriveValue(schemaField: Schema, value: Any): AnyRef = {
     schemaField.getType match {
-      case ARRAY => value.asInstanceOf[Iterable[_]].map(deriveValue(schemaField.getElementType, _)).asJava
+      case ARRAY => value.asInstanceOf[Iterable[Any]].map(deriveValue(schemaField.getElementType, _)).asJava
       case ENUM => new EnumSymbol(schemaField, value)
       case MAP => value.asInstanceOf[Map[String, _]].mapValues(deriveValue(schemaField.getValueType, _)).asJava
       case UNION => value match {
@@ -243,17 +243,17 @@ object AvroRecord {
     })
   }
 
-  private object iterableCache extends LocalCache[Type, (Iterable[_]) => Iterable[_]] {
-    def getOrInitialize(tpe: Type): (Iterable[_]) => Iterable[_] = getOrInitialize(tpe, {
+  private object iterableCache extends LocalCache[Type, (Iterable[Any]) => Iterable[Any]] {
+    def getOrInitialize(tpe: Type): (Iterable[Any]) => Iterable[Any] = getOrInitialize(tpe, {
       if (tpe <:< typeOf[Set[_]]) {
         (iterable) => iterable.toSet
-      } else if (tpe <:< typeOf[List[_]]) {
+      } else if (tpe <:< typeOf[List[Any]]) {
         (iterable) => iterable.toList
-      } else if (tpe <:< typeOf[Vector[_]]) {
+      } else if (tpe <:< typeOf[Vector[Any]]) {
         (iterable) => iterable.toVector
-      } else if (tpe <:< typeOf[IndexedSeq[_]]) {
+      } else if (tpe <:< typeOf[IndexedSeq[Any]]) {
         (iterable) => iterable.toIndexedSeq
-      } else if (tpe <:< typeOf[Seq[_]]) {
+      } else if (tpe <:< typeOf[Seq[Any]]) {
         (iterable) => iterable.toSeq
       } else {
         (iterable) => iterable
@@ -263,7 +263,7 @@ object AvroRecord {
 
   private object unionCache extends LocalCache[Type, (Any, Schema) => Any] {
     def getOrInitialize(tpe: Type): (Any, Schema) => Any = getOrInitialize(tpe, {
-      if (tpe <:< typeOf[Option[_]]) {
+      if (tpe <:< typeOf[Option[Any]]) {
         (datum, schema) =>
           datum match {
             case null => None
@@ -318,7 +318,7 @@ object AvroRecord {
         }
       case ARRAY =>
         iterableCache.getOrInitialize(tpe) {
-          datum.asInstanceOf[java.util.Collection[_]].asScala.map(
+          datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
             item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
         }
       case FIXED => throw new NotImplementedError("Avro Fixed are not supported")
