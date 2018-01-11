@@ -26,7 +26,6 @@ import scala.collection.immutable.ListMap
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
 import scala.reflect.runtime.universe._
-import scala.util.control.NonFatal
 
 /**
   * This trait ensures that all the getters are fast and thread-safe.
@@ -128,29 +127,32 @@ trait AvroSchemaProvider {
       cacheBySubject += subject -> (cacheBySubject.get(subject).getOrElse(ListMap[Int, Schema]()) + (id -> schema))
     }
     val result = ListBuffer[Int]()
-    val _register = mutable.HashSet[(Int, Schema, String)]()
-    registration.result.foreach {
+    val executableRegistration = registration.result()
+    registration.clear()
+
+    val uniqueSchemaSubjects = mutable.HashSet[(Int, Schema, String)]()
+
+    executableRegistration.foreach {
       case (subject, schema) =>
         val versions = getVersions(subject).getOrElse(ListMap()).toList
         val alreadyRegisteredId: Int = (versions.map { case (id2, schema2) =>
-          _register += ((id2, schema2, subject))
+          uniqueSchemaSubjects += ((id2, schema2, subject))
           if (schema2 == schema) id2 else -1
         } :+ (-1)).max
         val schemaId = if (alreadyRegisteredId == -1) {
           val newlyRegisteredId = registerSchema(subject, schema, versions.map(_._2))
-          _register += ((newlyRegisteredId, schema, subject))
+          uniqueSchemaSubjects += ((newlyRegisteredId, schema, subject))
           newlyRegisteredId
         } else {
           alreadyRegisteredId
         }
-
         result += schemaId
+    }
 
-        _register.foreach { case (id2, schema2, subject2) =>
-          cacheById += id2 -> schema2
-          cacheBySchema += schema2 -> id2
-          cacheBySubject += subject2 -> (cacheBySubject.get(subject2).getOrElse(ListMap.empty[Int, Schema]) + (id2 -> schema2))
-        }
+    uniqueSchemaSubjects.foreach { case (id2, schema2, subject2) =>
+      cacheById += id2 -> schema2
+      cacheBySchema += schema2 -> id2
+      cacheBySubject += subject2 -> (cacheBySubject.get(subject2).getOrElse(ListMap.empty[Int, Schema]) + (id2 -> schema2))
     }
 
     cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
@@ -170,8 +172,6 @@ trait AvroSchemaProvider {
         case _: java.lang.ClassNotFoundException => //class doesn't exist in the current runtime - not a problem, we'll use generic records
       }
     }
-
-    registration.clear()
     result.result()
   }
 

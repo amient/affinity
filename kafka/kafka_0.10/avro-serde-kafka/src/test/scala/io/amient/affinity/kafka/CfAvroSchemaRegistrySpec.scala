@@ -65,11 +65,17 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
     //fqn should be already registered
     serde.getCurrentSchema(classOf[SimpleRecord].getName) should be(Some((9, data.getSchema)))
     //now simulate what KafkaAvroSerde would do
-    val (objSchema, schemaId) = serde.getOrRegisterSchema(data, "topic-simple")
+    val (objSchema, schemaId) = try {
+      serde.getOrRegisterSchema(data, "topic-simple")
+    } catch {
+      case e: RuntimeException =>
+        e.printStackTrace()
+        fail("could not register schema with topic-simple")
+    }
     schemaId should be(9)
     objSchema should be(data.getSchema)
     //and check the additional subject was registered with the same schema
     val versions = serde.getVersions("topic-simple")
-    versions.get(9) should be (data.getSchema)
+    versions should be (Some(Map(9 -> data.getSchema)))
   }
 }
