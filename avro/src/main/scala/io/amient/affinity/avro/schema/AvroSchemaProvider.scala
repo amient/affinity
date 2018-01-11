@@ -22,6 +22,7 @@ package io.amient.affinity.avro.schema
 import io.amient.affinity.avro.AvroRecord
 import org.apache.avro.Schema
 
+import scala.collection.immutable.ListMap
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
 import scala.reflect.runtime.universe._
@@ -39,7 +40,7 @@ trait AvroSchemaProvider {
 
   private var cacheBySchema: immutable.Map[Schema, Int] = Map() // schema id -> schema
 
-  private var cacheBySubject: immutable.Map[String, List[(Int, Schema)]] = Map() // subject -> schema ids
+  private var cacheBySubject: immutable.Map[String, Map[Int, Schema]] = Map() // subject -> schema ids
 
   private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int
 
@@ -60,6 +61,10 @@ trait AvroSchemaProvider {
 
   def describeSchemas: Map[Int, Schema] = cacheById
 
+  final def getVersions(subject: String): Option[Map[Int, Schema]] = {
+    cacheBySubject.get(subject)
+  }
+
   /**
     * Get current current compile-time schema for the given fully qualified type name
     *
@@ -67,6 +72,16 @@ trait AvroSchemaProvider {
     * @return
     */
   final def getCurrentSchema(fqn: String): Option[(Int, Schema)] = cacheByFqn.get(fqn)
+
+  /**
+    * Get schema for a given subject and schema id.
+    * @param subject
+    * @param schemaId
+    * @return Schema
+    */
+  final def getSchema(subject: String, schemaId: Int): Option[Schema] = {
+    cacheBySubject.get(subject).flatMap(_.get(schemaId))
+  }
 
   /**
     * Get id of a given schema as registered by the underlying registry
@@ -110,13 +125,13 @@ trait AvroSchemaProvider {
     all.foreach { case (id, subject, schema) =>
       cacheById += id -> schema
       cacheBySchema += schema -> id
-      cacheBySubject += subject -> (cacheBySubject.get(subject).getOrElse(List()) :+ (id, schema))
+      cacheBySubject += subject -> (cacheBySubject.get(subject).getOrElse(ListMap[Int, Schema]()) + (id -> schema))
     }
     val result = ListBuffer[Int]()
     val _register = mutable.HashSet[(Int, Schema, String)]()
     registration.result.foreach {
       case (subject, schema) =>
-        val versions = cacheBySubject.get(subject).getOrElse(List())
+        val versions = getVersions(subject).getOrElse(ListMap()).toList
         val alreadyRegisteredId: Int = (versions.map { case (id2, schema2) =>
           _register += ((id2, schema2, subject))
           if (schema2 == schema) id2 else -1
@@ -134,7 +149,7 @@ trait AvroSchemaProvider {
         _register.foreach { case (id2, schema2, subject2) =>
           cacheById += id2 -> schema2
           cacheBySchema += schema2 -> id2
-          cacheBySubject += subject2 -> (cacheBySubject.get(subject2).getOrElse(List()) :+ (id2, schema2))
+          cacheBySubject += subject2 -> (cacheBySubject.get(subject2).getOrElse(ListMap.empty[Int, Schema]) + (id2 -> schema2))
         }
     }
 
@@ -144,11 +159,11 @@ trait AvroSchemaProvider {
         cacheBySchema.get(schema) match {
           case Some(schemaId) => cacheByFqn += fqn -> (schemaId, schema)
           case None =>
-            val versions = cacheBySubject.get(fqn).getOrElse(List.empty)
-            val schemaId = registerSchema(fqn, schema, versions.map(_._2))
+            val versions = cacheBySubject.get(fqn).getOrElse(ListMap.empty[Int, Schema])
+            val schemaId = registerSchema(fqn, schema, versions.toList.map(_._2))
             cacheById += schemaId -> schema
             cacheBySchema += schema -> schemaId
-            cacheBySubject += fqn -> (versions :+ (schemaId, schema))
+            cacheBySubject += fqn -> (versions + (schemaId -> schema))
             cacheByFqn += fqn -> (schemaId, schema)
         }
       } catch {

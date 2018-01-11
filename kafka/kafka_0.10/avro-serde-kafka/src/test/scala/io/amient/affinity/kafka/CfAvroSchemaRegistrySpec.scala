@@ -34,20 +34,22 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
 
   behavior of "CfAvroSchemaRegistry"
 
-  it should "reject incompatible schema registration" in {
+  val serde = new CfAvroSchemaRegistry(ConfigFactory.parseMap(Map(
+    new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+  )))
 
-    val serde = new CfAvroSchemaRegistry(ConfigFactory.parseMap(Map(
-      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
-    )))
+  serde.register[SimpleKey]
+  serde.register[SimpleRecord]
+  val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
+  serde.register[CompositeRecord](v1schema)
+  serde.initialize()
 
-    serde.register[SimpleKey]
-    serde.register[SimpleRecord]
-    serde.initialize()
-
-    val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
-    serde.register[CompositeRecord](v1schema)
+  it should "allow compatible version of previously registered schema" in {
     serde.register[CompositeRecord]
-    serde.initialize()
+    serde.initialize() should be(List(11))
+  }
+
+  it should "reject incompatible schema registration" in {
 
     val thrown = intercept[RuntimeException]{
       val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
@@ -56,5 +58,18 @@ class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfReg
     }
     thrown.getMessage should include("incompatible")
 
+  }
+
+  it should "registerd topic subject when fqn subject is already registered" in {
+    val data = SimpleRecord()
+    //fqn should be already registered
+    serde.getCurrentSchema(classOf[SimpleRecord].getName) should be(Some((9, data.getSchema)))
+    //now simulate what KafkaAvroSerde would do
+    val (objSchema, schemaId) = serde.getOrRegisterSchema(data, "topic-simple")
+    schemaId should be(9)
+    objSchema should be(data.getSchema)
+    //and check the additional subject was registered with the same schema
+    val versions = serde.getVersions("topic-simple")
+    versions.get(9) should be (data.getSchema)
   }
 }
