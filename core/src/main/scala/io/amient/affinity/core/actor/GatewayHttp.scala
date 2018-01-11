@@ -75,6 +75,7 @@ object GatewayHttp {
     val KeyStoreResource = string("keystore.resource", false)
     val KeyStoreFile = string("keystore.file", false)
   }
+
 }
 
 trait GatewayHttp extends Gateway {
@@ -166,57 +167,6 @@ trait GatewayHttp extends Gateway {
     }
   }
 
-
-  private def errorResponse(e: Throwable, status: StatusCode, message: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
-    log.error(e, "affinity default exception handler")
-    HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage, headers = headers)
-  }
-
-  def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
-
-  def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
-    case e: ExecutionException  => handleException(e.getCause)
-    case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: IllegalStateException => errorResponse(e, Conflict, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: java.lang.AssertionError => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: UnsupportedOperationException =>errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
-    case NonFatal(e) => errorResponse(e, InternalServerError, headers = headers)
-  }
-
-  def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
-                            (implicit ctx: ExecutionContext) {
-    promise.completeWith(f recover handleException)
-  }
-
-  def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
-                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(delegate map f recover handleException)
-  }
-
-  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
-    val data = dataGenerator
-    data match {
-      case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
-        case None => HttpResponse(NotFound)
-        case Some(value) => Encoder.json(OK, value)
-        case any => Encoder.json(OK, any)
-      }
-      case _ => response.success(try {
-        data match {
-          case None => HttpResponse(NotFound)
-          case Some(value) => Encoder.json(OK, value)
-          case other => Encoder.json(OK, other)
-        }
-      } catch {
-        case NonFatal(e) => handleException(headers)(e)
-      })
-    }
-  } catch {
-    case e: Throwable => response.success(handleException(headers)(e))
-  }
-
   def accept(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
     val data = dataGenerator
     data match {
@@ -230,6 +180,66 @@ trait GatewayHttp extends Gateway {
   } catch {
     case e: Throwable => response.success(handleException(headers)(e))
   }
+
+  def handleAsText(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = {
+    handleAs(response, dataGenerator, headers)(data => Encoder.text(OK, data))
+  }
+
+  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = {
+    handleAs(response, dataGenerator, headers)(data => Encoder.json(OK, data))
+  }
+
+  def handleAs(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List())(f: (Any) => HttpResponse): Unit = try {
+    val data = dataGenerator
+    data match {
+      case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
+        case None => HttpResponse(NotFound)
+        case Some(value) => f(value)
+        case any => f(any)
+      }
+      case _ => response.success(try {
+        data match {
+          case None => HttpResponse(NotFound)
+          case Some(value) => f(value)
+          case other => f(other)
+        }
+      } catch {
+        case NonFatal(e) => handleException(headers)(e)
+      })
+    }
+  } catch {
+    case e: Throwable => response.success(handleException(headers)(e))
+  }
+
+
+  def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
+                            (implicit ctx: ExecutionContext) {
+    promise.completeWith(f recover handleException)
+  }
+
+  def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
+                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
+    promise.completeWith(delegate map f recover handleException)
+  }
+
+  def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
+
+  def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
+    case e: ExecutionException => handleException(e.getCause)
+    case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: IllegalStateException => errorResponse(e, Conflict, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: java.lang.AssertionError => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: UnsupportedOperationException => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
+    case NonFatal(e) => errorResponse(e, InternalServerError, headers = headers)
+  }
+
+  private def errorResponse(e: Throwable, status: StatusCode, message: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
+    log.error(e, s"${status} - default http error handler")
+    HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage, headers = headers)
+  }
+
 }
 
 
@@ -243,7 +253,7 @@ trait WebSocketSupport extends GatewayHttp {
     Some(scala.io.Source.fromInputStream(getClass.getResourceAsStream("/affinity.js")).mkString)
   } catch {
     case NonFatal(e) =>
-      log.warning("Could not load /affinity.js - it probably wasn't compiled from the affinity_node.js source, see README file for instructions: " + e.getMessage )
+      log.warning("Could not load /affinity.js - it probably wasn't compiled from the affinity_node.js source, see README file for instructions: " + e.getMessage)
       None
   }
 
@@ -252,7 +262,7 @@ trait WebSocketSupport extends GatewayHttp {
   private val avroSerde = AvroSerde.create(config)
 
   abstract override def handle: Receive = super.handle orElse {
-    case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.plain(OK, afjs.get))
+    case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get))
   }
 
   protected def jsonWebSocket(upgrade: UpgradeToWebSocket, keyspace: ActorRef, stateStoreName: String, key: Any)
@@ -360,6 +370,7 @@ trait WebSocketSupport extends GatewayHttp {
 
     service ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
       case keyValueMediator: ActorRef =>
+
         /**
           * Sink.actorRef supports custom termination message which will be sent to the source
           * by the websocket materialized flow when the client closes the connection.

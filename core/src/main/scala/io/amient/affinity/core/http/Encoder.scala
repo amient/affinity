@@ -136,14 +136,14 @@ object Encoder {
     }
   }
 
-  def plain(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+  def text(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
     h += Date(DateTime.now)
     h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
-    HttpResponse(status, entity = plain(value, gzip), headers = h.toList)
+    HttpResponse(status, entity = text(value, gzip), headers = h.toList)
   }
 
-  def plain(value: Any, gzip: Boolean): MessageEntity = {
+  def text(value: Any, gzip: Boolean): MessageEntity = {
     encode(ContentTypes.`text/plain(UTF-8)`, gzip) { (writer) =>
       writer.append(value.toString)
       writer.close()
