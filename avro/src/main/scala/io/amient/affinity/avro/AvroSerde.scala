@@ -91,13 +91,16 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaProvider {
     val schemaId = getCurrentSchema(schema.getFullName) match {
       case Some((schemaId: Int, regSchema: Schema)) if regSchema == schema => schemaId
       case _ =>
-        register(subject, schema)
         register(schema.getFullName, schema)
         initialize()
         getSchemaId(schema) match {
           case None => throw new IllegalStateException(s"Failed to register schema for $subject")
           case Some(id) => id
         }
+    }
+    if (!getSchema(subject, schemaId).isDefined) {
+      register(subject, schema)
+      initialize()
     }
     (schema, schemaId)
   }
