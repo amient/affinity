@@ -19,10 +19,6 @@
 
 package io.amient.affinity.stream;
 
-import io.amient.affinity.core.ByteKey;
-import io.amient.affinity.core.PartitionedRecord;
-import io.amient.affinity.core.Record;
-
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
@@ -51,8 +47,8 @@ public interface StreamClient extends Serializable {
      * @param stopOffset
      * @return
      */
-    Iterator<Record<ByteKey, byte[]>> iterator(int partition, Long startOffset, Long stopOffset);
+    Iterator<Record<byte[], byte[]>> iterator(int partition, Long startOffset, Long stopOffset);
 
-    void release(Iterator<Record<ByteKey, byte[]>> iter);
+    void release(Iterator<Record<byte[], byte[]>> iter);
 
 }

@@ -1,9 +1,9 @@
 package io.amient.affinity.stream;
 
 import com.typesafe.config.Config;
-import io.amient.affinity.core.Record;
 
 import java.io.Closeable;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -14,11 +14,21 @@ import java.util.Set;
  */
 public interface ManagedConsumer extends Closeable {
 
-    static ManagedConsumer bindNewInstance() throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        return Class.forName("io.amient.affinity.stream.ManagedConsumerImpl").asSubclass(ManagedConsumer.class).newInstance();
+    static Class<? extends ManagedConsumer> bindClass() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("io.amient.affinity.stream.ManagedConsumerImpl");
+        return cls.asSubclass(ManagedConsumer.class);
     }
 
-    void initialize(Config config, Set<String> topics);
+    static ManagedConsumer bindNewInstance(Config config)
+            throws ClassNotFoundException,
+            NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+        return bindClass().getConstructor(Config.class).newInstance(config);
+    }
+
+    void subscribe(String topic);
+
+    void subscribe(String topic, int partition);
 
     Map<String, Long> lag();
 
@@ -31,4 +41,19 @@ public interface ManagedConsumer extends Closeable {
 
     void commit();
 
+    default Iterator<Record<byte[], byte[]>> iterator() {
+        return new Iterator<Record<byte[], byte[]>>() {
+
+            @Override
+            public boolean hasNext() {
+                return false;
+            }
+
+            @Override
+            public Record<byte[], byte[]> next() {
+                return null;
+            }
+
+        };
+    }
 }

@@ -4,10 +4,9 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import com.typesafe.config.Config
-import io.amient.affinity.core.Record
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.stream.ManagedConsumer
+import io.amient.affinity.stream.{ManagedConsumer, Record}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -29,15 +28,15 @@ trait GatewayStream extends Gateway {
   @volatile private var processingPaused = true
 
   class RunnableInputStream[K: ClassTag, V: ClassTag](identifier: String, streamConfig: Config, processor: InputStreamProcessor[K,V]) extends Runnable {
-    val inputTopics = streamConfig.getStringList("topics").toSet
+    val inputTopic = streamConfig.getString("topic")
     val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
-    val consumer: ManagedConsumer = ManagedConsumer.bindNewInstance()
+    val consumer: ManagedConsumer = ManagedConsumer.bindNewInstance(config)
     private val keySerde = Serde.of[K](config)
     private val valSerde = Serde.of[V](config)
     override def run(): Unit = {
       try {
-        consumer.initialize(streamConfig.getConfig("consumer"), inputTopics)
-        log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topics: $inputTopics")
+        consumer.subscribe(inputTopic)
+        log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topic: $inputTopic")
         while (!closed) {
           //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
           //should be suspended anyway and hang so no need to do it for every record

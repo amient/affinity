@@ -19,11 +19,11 @@
 
 package io.amient.util.spark
 
-import io.amient.affinity.core.{ByteKey, ObjectHashPartitioner, PartitionedRecord, Record}
+import io.amient.affinity.core.ObjectHashPartitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
 import io.amient.affinity.spark.StreamSplit
-import io.amient.affinity.stream.StreamClient
+import io.amient.affinity.stream.{ByteKey, PartitionedRecord, Record, StreamClient}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
@@ -42,7 +42,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
     this(sc, client, serde, serde, compacted)
 
 
-  val compactor = (m1: Record[ByteKey, Array[Byte]], m2: Record[ByteKey, Array[Byte]]) =>
+  val compactor = (m1: Record[Array[Byte], Array[Byte]], m2: Record[Array[Byte], Array[Byte]]) =>
     if (m1.timestamp > m2.timestamp) m1 else m2
 
   val streamPartitions: List[Integer] = client.getPartitions().asScala.toList
@@ -73,12 +73,12 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       }
     }
 
-    val rawMessages: Iterator[(ByteKey, Record[ByteKey, Array[Byte]])] = {
-      fetcher.asScala.map((record: Record[ByteKey, Array[Byte]]) => (record.key, record))
+    val rawMessages: Iterator[(ByteKey, Record[Array[Byte], Array[Byte]])] = {
+      fetcher.asScala.map((record: Record[Array[Byte], Array[Byte]]) => (new ByteKey(record.key), record))
     }
 
     val iterator = if (!compacted) rawMessages else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, Record[ByteKey, Array[Byte]], Record[ByteKey, Array[Byte]]]((v) => v, compactor, compactor)
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, Record[Array[Byte], Array[Byte]], Record[Array[Byte], Array[Byte]]]((v) => v, compactor, compactor)
       spillMap.insertAll(rawMessages)
       spillMap.iterator
     }

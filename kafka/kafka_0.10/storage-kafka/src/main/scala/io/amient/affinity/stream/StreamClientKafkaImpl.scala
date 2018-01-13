@@ -23,7 +23,6 @@ import java.lang.Long
 import java.util
 import java.util.Properties
 
-import io.amient.affinity.core.{ByteKey, PartitionedRecord, Record}
 import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
@@ -101,20 +100,20 @@ class StreamClientKafkaImpl(val topic: String, props: Properties) extends Stream
     if (it.hasNext) it.next else throw new BrokerNotAvailableException("operation failed for all brokers")
   }
 
-  private val consumers = scala.collection.mutable.Map[util.Iterator[Record[ByteKey, Array[Byte]]], KafkaConsumer[_, _]]()
+  private val consumers = scala.collection.mutable.Map[util.Iterator[Record[Array[Byte], Array[Byte]]], KafkaConsumer[_, _]]()
 
-  override def release(iter: util.Iterator[Record[ByteKey, Array[Byte]]]): Unit = {
+  override def release(iter: util.Iterator[Record[Array[Byte], Array[Byte]]]): Unit = {
     consumers.get(iter).foreach(_.close())
   }
 
-  override def iterator(partition: Int, startOffset: Long, stopOffset: Long): util.Iterator[Record[ByteKey, Array[Byte]]] = {
+  override def iterator(partition: Int, startOffset: Long, stopOffset: Long): util.Iterator[Record[Array[Byte], Array[Byte]]] = {
 
     val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerConfig)
 
     val tp = new TopicPartition(topic, partition)
     consumer.assign(List(tp).asJava)
 
-    val result = new util.Iterator[Record[ByteKey, Array[Byte]]] {
+    val result = new util.Iterator[Record[Array[Byte], Array[Byte]]] {
       private var record: ConsumerRecord[Array[Byte], Array[Byte]] = null
       private var offset = startOffset
       private var setIter: util.Iterator[ConsumerRecord[Array[Byte], Array[Byte]]] = null
@@ -123,11 +122,11 @@ class StreamClientKafkaImpl(val topic: String, props: Properties) extends Stream
 
       override def hasNext: Boolean = record != null
 
-      override def next(): Record[ByteKey, Array[Byte]] = {
+      override def next(): Record[Array[Byte], Array[Byte]] = {
         if (record == null) {
           throw new NoSuchElementException
         } else {
-          val result = new Record(new ByteKey(record.key), record.value, record.timestamp)
+          val result = new Record(record.key, record.value, record.timestamp)
           seek
           result
         }

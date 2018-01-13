@@ -4,7 +4,6 @@ import java.util
 import java.util.Properties
 
 import com.typesafe.config.Config
-import io.amient.affinity.core.Record
 import org.apache.kafka.clients.consumer.{ConsumerRecord, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -13,29 +12,32 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-class ManagedConsumerImpl extends ManagedConsumer {
+class ManagedConsumerImpl(config: Config) extends ManagedConsumer {
 
   private val log = LoggerFactory.getLogger(classOf[ManagedConsumerImpl])
 
+  private val consumerProps = new Properties() {
+    require(config != null)
+    config.entrySet().foreach { case entry =>
+      put(entry.getKey, entry.getValue.unwrapped())
+    }
+    put("enable.auto.commit", "false")
+    put("key.deserializer", classOf[ByteArrayDeserializer].getName)
+    put("value.deserializer", classOf[ByteArrayDeserializer].getName)
+  }
+  private val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
+
   private var closed = true
 
-  private var kafkaConsumer: KafkaConsumer[Array[Byte], Array[Byte]] = null
-
-  override def initialize(config: Config, topics: util.Set[String]): Unit = {
-    val consumerProps = new Properties() {
-      require(config != null)
-      config.entrySet().foreach { case entry =>
-        put(entry.getKey, entry.getValue.unwrapped())
-      }
-      put("enable.auto.commit", "false")
-      put("key.deserializer", classOf[ByteArrayDeserializer].getName)
-      put("value.deserializer", classOf[ByteArrayDeserializer].getName)
-    }
-    kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
-    kafkaConsumer.subscribe(topics)
+  override def subscribe(topic: String): Unit = {
+    kafkaConsumer.subscribe(List(topic))
   }
 
-  private var partitionProgress = new mutable.HashMap[TopicPartition, Long]()
+  override def subscribe(topic: String, partition: Int): Unit = {
+    kafkaConsumer.assign(List(new TopicPartition(topic, partition)))
+  }
+
+  private val partitionProgress = new mutable.HashMap[TopicPartition, Long]()
 
   closed = false
 

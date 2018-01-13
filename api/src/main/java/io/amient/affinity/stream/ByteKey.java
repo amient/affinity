@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core;
+package io.amient.affinity.stream;
 
 import java.io.Serializable;
 import java.util.Arrays;
