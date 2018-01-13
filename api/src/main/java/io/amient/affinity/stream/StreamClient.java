@@ -37,15 +37,14 @@ public interface StreamClient extends Serializable {
 
     void publish(Iterator<PartitionedRecord<byte[], byte[]>> iter, Function<Long, Boolean> checker);
 
-
     /**
      * Underlying implementation may need to open resources specific for this iterator and must implement
      * the release(..) method to close them.
      *
-     * @param partition
-     * @param startOffset
-     * @param stopOffset
-     * @return
+     * @param partition stream partition identifier
+     * @param startOffset start offset within the given partition
+     * @param stopOffset last offset within the given partition
+     * @return iterator of Records between the given offset range
      */
     Iterator<Record<byte[], byte[]>> iterator(int partition, Long startOffset, Long stopOffset);
 
