@@ -22,14 +22,13 @@ package io.amient.util.spark
 import io.amient.affinity.core.ObjectHashPartitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.spark.StreamSplit
 import io.amient.affinity.stream.{ByteKey, PartitionedRecord, Record, StreamClient}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
 class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
@@ -45,20 +44,17 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
   val compactor = (m1: Record[Array[Byte], Array[Byte]], m2: Record[Array[Byte], Array[Byte]]) =>
     if (m1.timestamp > m2.timestamp) m1 else m2
 
-  val streamPartitions: List[Integer] = client.getPartitions().asScala.toList
-
   protected def getPartitions: Array[Partition] = {
-    var index = -1
-    streamPartitions.map { partition =>
-      index += 1
-      new StreamSplit(id, index, partition)
+    client.getPartitions().toList.sorted.map { p =>
+      new Partition {
+        override def index = p
+      }
     }.toArray
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(K, V)] = {
-    val streamSplit = split.asInstanceOf[StreamSplit]
-    val partition = streamSplit.partition
-    val (startOffset, stopOffset) = client.getOffsets(partition).asScala.head
+    val partition = split.index
+    val (startOffset, stopOffset) = client.getOffsets(partition).head
     val fetcher = client.iterator(partition, startOffset, stopOffset)
     val keySerdeInstance = keySerde
     val valueSerdeInstance = valueSerde
@@ -74,7 +70,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
     }
 
     val rawMessages: Iterator[(ByteKey, Record[Array[Byte], Array[Byte]])] = {
-      fetcher.asScala.map((record: Record[Array[Byte], Array[Byte]]) => (new ByteKey(record.key), record))
+      fetcher.map((record: Record[Array[Byte], Array[Byte]]) => (new ByteKey(record.key), record))
     }
 
     val iterator = if (!compacted) rawMessages else {
@@ -107,10 +103,10 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
             case e: EventTime => e.eventTimeUtc()
             case _ => System.currentTimeMillis()
           }
-          val partition = partitioner.partition(k, streamPartitions.length)
+          val partition = partitioner.partition(k, getPartitions.length)
           val record = new Record(keySerdeInstance.toBytes(k), valueSerdeInstance.toBytes(v), ts)
           new PartitionedRecord(partition, record)
-        }.asJava
+        }
 
         val checker = new java.util.function.Function[java.lang.Long, java.lang.Boolean] {
           override def apply(partialCount: java.lang.Long): java.lang.Boolean = {
