@@ -19,10 +19,11 @@
 
 package io.amient.util.spark
 
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.ObjectHashPartitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.stream.{ByteKey, PartitionedRecord, Record, StreamClient}
+import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
@@ -32,54 +33,61 @@ import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
 class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
-                                           client: StreamClient,
+                                           bootstrapServer: String,
                                            keySerde: => AbstractSerde[_ >: K],
                                            valueSerde: => AbstractSerde[_ >: V],
+                                           topic: String,
                                            compacted: Boolean = false) extends RDD[(K, V)](sc, Nil) {
 
-  def this(sc: SparkContext, client: StreamClient, serde: => AbstractSerde[Any], compacted: Boolean) =
-    this(sc, client, serde, serde, compacted)
+  def this(sc: SparkContext, bootstrapServer: String, serde: => AbstractSerde[Any], topic: String, compacted: Boolean) =
+    this(sc, bootstrapServer, serde, serde, topic, compacted)
 
+  type ByteRecord = Record[Array[Byte], Array[Byte]]
 
-  val compactor = (m1: Record[Array[Byte], Array[Byte]], m2: Record[Array[Byte], Array[Byte]]) =>
-    if (m1.timestamp > m2.timestamp) m1 else m2
+  val compactor = (m1: ByteRecord, m2: ByteRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
+
+  def config: Config = ConfigFactory.empty()
+    .withValue("bootstrap.servers", ConfigValueFactory.fromAnyRef(bootstrapServer))
 
   protected def getPartitions: Array[Partition] = {
-    client.getPartitions().toList.sorted.map { p =>
-      new Partition {
-        override def index = p
-      }
-    }.toArray
+    val consumer = ManagedStream.bindNewInstance(config)
+    try {
+      (0 until consumer.getNumPartitions(topic)).map { p =>
+        new Partition {
+          override def index = p
+        }
+      }.toArray
+    } finally {
+      consumer.close()
+    }
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(K, V)] = {
-    val partition = split.index
-    val (startOffset, stopOffset) = client.getOffsets(partition).head
-    val fetcher = client.iterator(partition, startOffset, stopOffset)
+    val consumer = ManagedStream.bindNewInstance(config)
     val keySerdeInstance = keySerde
     val valueSerdeInstance = valueSerde
-
     context.addTaskCompletionListener { _ =>
       try {
         keySerdeInstance.close()
       } finally try {
         valueSerdeInstance.close()
       } finally {
-        client.release(fetcher)
+        consumer.close()
       }
     }
 
-    val rawMessages: Iterator[(ByteKey, Record[Array[Byte], Array[Byte]])] = {
-      fetcher.map((record: Record[Array[Byte], Array[Byte]]) => (new ByteKey(record.key), record))
-    }
+    consumer.subscribe(topic, split.index)
 
-    val iterator = if (!compacted) rawMessages else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, Record[Array[Byte], Array[Byte]], Record[Array[Byte], Array[Byte]]]((v) => v, compactor, compactor)
-      spillMap.insertAll(rawMessages)
+    val rawRecords: Iterator[(ByteKey, ByteRecord)] = consumer.iterator()
+      .map((record: ByteRecord) => (new ByteKey(record.key), record))
+
+    val compactedRecords = if (!compacted) rawRecords else {
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, ByteRecord, ByteRecord]((v) => v, compactor, compactor)
+      spillMap.insertAll(rawRecords)
       spillMap.iterator
     }
 
-    iterator.map { case (key, record) =>
+    compactedRecords.map { case (key, record) =>
       (keySerdeInstance.fromBytes(key.bytes), valueSerdeInstance.fromBytes(record.value))
     }.collect {
       case (k: K, v: V) => (k, v)
@@ -92,6 +100,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
     context.register(produced)
 
     def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
+      val stream = ManagedStream.bindNewInstance(config)
       //TODO #17 hardcoded partitioner should be provided by the API instead
       val partitioner = new ObjectHashPartitioner
       val keySerdeInstance = keySerde
@@ -115,7 +124,8 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
           }
         }
 
-        client.publish(iterator, checker)
+        stream.publish(topic, iterator, checker)
+        stream.close()
       } finally try {
         keySerdeInstance.close()
       } finally {
@@ -123,10 +133,11 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       }
     }
 
-    log.info(s"Producing into ${client} ...")
+    log.info(s"Producing into $topic ...")
 
     context.runJob(data, updatePartition _)
 
-    log.info(s"Produced ${produced.value} messages into ${client}")
+    log.info(s"Produced ${produced.value} messages into $topic")
   }
+
 }

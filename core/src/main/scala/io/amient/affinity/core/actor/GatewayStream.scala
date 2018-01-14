@@ -4,9 +4,9 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.Serde
+import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.stream.{ManagedConsumer, Record}
+import io.amient.affinity.stream.{ManagedStream, Record}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -15,24 +15,14 @@ import scala.util.control.NonFatal
 
 trait GatewayStream extends Gateway {
 
-  private val log = Logging.getLogger(context.system, this)
-
-  private val config = context.system.settings.config
-
-  type InputStreamProcessor[K, V] = Record[K, V] => Unit
-
-  private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
-
-  @volatile private var closed = true
-  @volatile private var clusterSuspended = true
-  @volatile private var processingPaused = true
-
-  class RunnableInputStream[K: ClassTag, V: ClassTag](identifier: String, streamConfig: Config, processor: InputStreamProcessor[K,V]) extends Runnable {
+  class RunnableInputStream[K, V](identifier: String,
+                                  keySerde: AbstractSerde[K],
+                                  valSerde: AbstractSerde[V],
+                                  streamConfig: Config,
+                                  processor: InputStreamProcessor[K,V]) extends Runnable {
     val inputTopic = streamConfig.getString("topic")
     val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
-    val consumer: ManagedConsumer = ManagedConsumer.bindNewInstance(config)
-    private val keySerde = Serde.of[K](config)
-    private val valSerde = Serde.of[V](config)
+    val consumer: ManagedStream = ManagedStream.bindNewInstance(streamConfig)
     override def run(): Unit = {
       try {
         consumer.subscribe(inputTopic)
@@ -61,9 +51,23 @@ trait GatewayStream extends Gateway {
     }
   }
 
+  private val log = Logging.getLogger(context.system, this)
+
+  private val config = context.system.settings.config
+
+  type InputStreamProcessor[K, V] = Record[K, V] => Unit
+
+  private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
+
+  @volatile private var closed = true
+  @volatile private var clusterSuspended = true
+  @volatile private var processingPaused = true
+
   def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
     val streamConfig = config.getConfig(s"affinity.node.gateway.stream.$identifier")
-    declaredInputStreamProcessors += new RunnableInputStream[K,V](identifier, streamConfig, processor)
+    val keySerde: AbstractSerde[K] = Serde.of[K](config)
+    val valSerde: AbstractSerde[V] = Serde.of[V](config)
+    declaredInputStreamProcessors += new RunnableInputStream[K,V](identifier, keySerde, valSerde, streamConfig, processor)
   }
 
   val inputStreamManager = new Thread {
@@ -90,7 +94,7 @@ trait GatewayStream extends Gateway {
 
   override def preStart(): Unit = {
     inputStreamManager.start()
-    //FIXME #89 maybeStartMigration() code is can hang and there is no way of controlling an actor's preStart activity
+    //FIXME #89 maybeStartMigration() code can hang and there is no way of controlling an actor's preStart activity
     //    maybeStartMigration()
     super.preStart()
   }
@@ -143,7 +147,7 @@ trait GatewayStream extends Gateway {
 //        while (workers.filter(_.active).size > 0) {
 //          workers.filter(_.active).foreach { worker =>
 //            val copied = worker.copy()
-//            if (copied == 0 && worker.maxLag() <= 1) {
+//            if (copied == 0 && worker.maxLag() <= 0) {
 //              worker.close()
 //            } else {
 //              log.info(s"COPIED $copied RECORD FROM ${worker.inputTopic} TO ${worker.outputTopic}")
