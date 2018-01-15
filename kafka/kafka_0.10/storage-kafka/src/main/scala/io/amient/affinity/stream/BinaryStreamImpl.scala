@@ -19,7 +19,9 @@ class BinaryStreamImpl(config: Config, topic: String) extends BinaryStream {
 
   val producerConfig = new Properties() {
     config.entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
-    config.getConfig("producer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    if (config.hasPath("producer")) {
+      config.getConfig("producer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    }
     put("value.serializer", classOf[ByteArraySerializer].getName)
     put("key.serializer", classOf[ByteArraySerializer].getName)
   }
@@ -28,7 +30,9 @@ class BinaryStreamImpl(config: Config, topic: String) extends BinaryStream {
     require(config != null)
     put("auto.offset.reset", "earliest")
     config.entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
-    config.getConfig("consumer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    if (config.hasPath("consumer")) {
+      config.getConfig("consumer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    }
     put("enable.auto.commit", "false")
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)

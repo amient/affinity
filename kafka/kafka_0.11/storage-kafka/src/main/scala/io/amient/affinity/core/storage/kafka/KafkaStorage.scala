@@ -54,11 +54,11 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
+    val OldTopic = string("kafka.old.topic", false)
     val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
     val Producer = struct("kafka.producer", new KafkaProducerConf, true)
     val Consumer = struct("kafka.consumer", new KafkaConsumerConf, true)
-
   }
 
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)
