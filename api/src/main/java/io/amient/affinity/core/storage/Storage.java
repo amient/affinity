@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.config.CfgCls;
+import io.amient.affinity.core.config.CfgLong;
 import io.amient.affinity.core.config.CfgStruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,7 @@ public abstract class Storage implements Closeable {
 
     public static class StorageConf extends CfgStruct<StorageConf> {
         public CfgCls<Storage> Class = cls("class", Storage.class, true);
-
+        public CfgLong MinTimestamp = longint("min.timestamp", 0L);
         @Override
         protected Set<String> specializations() {
             return new HashSet<>(Arrays.asList("kafka"));

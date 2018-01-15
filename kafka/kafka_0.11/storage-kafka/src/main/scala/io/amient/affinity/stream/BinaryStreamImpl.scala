@@ -3,7 +3,8 @@ package io.amient.affinity.stream
 import java.util
 import java.util.Properties
 
-import com.typesafe.config.Config
+import io.amient.affinity.core.storage.Storage.StorageConf
+import io.amient.affinity.core.storage.kafka.KafkaStorage.KafkaStorageConf
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
@@ -13,25 +14,36 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-class BinaryStreamImpl(config: Config, topic: String) extends BinaryStream {
+class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
 
   private val log = LoggerFactory.getLogger(classOf[BinaryStreamImpl])
 
+  val kafkaStorageConf = KafkaStorageConf(conf)
+
+  val topic = kafkaStorageConf.Topic()
+
   val producerConfig = new Properties() {
-    config.entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
-    if (config.hasPath("producer")) {
-      config.getConfig("producer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    if (kafkaStorageConf.BootstrapServers.isDefined()) put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
+    if (kafkaStorageConf.Producer.isDefined) {
+      val producerConfig = kafkaStorageConf.Producer.config()
+      if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom key.serializer")
+      if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom value.serializer")
+      producerConfig.entrySet().foreach { case (entry) =>
+        put(entry.getKey, entry.getValue.unwrapped())
+      }
     }
     put("value.serializer", classOf[ByteArraySerializer].getName)
     put("key.serializer", classOf[ByteArraySerializer].getName)
   }
 
   private val consumerProps = new Properties() {
-    require(config != null)
     put("auto.offset.reset", "earliest")
-    config.entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
-    if (config.hasPath("consumer")) {
-      config.getConfig("consumer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    if (kafkaStorageConf.BootstrapServers.isDefined()) put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
+    if (kafkaStorageConf.Consumer.isDefined) {
+      val consumerConfig = kafkaStorageConf.Consumer.config()
+      consumerConfig.entrySet().foreach { case (entry) =>
+        put(entry.getKey, entry.getValue.unwrapped())
+      }
     }
     put("enable.auto.commit", "false")
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
@@ -41,36 +53,27 @@ class BinaryStreamImpl(config: Config, topic: String) extends BinaryStream {
   private val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
   private val partitionProgress = new mutable.HashMap[TopicPartition, Long]()
   private var closed = false
-  private var snapshot: collection.Map[TopicPartition, (Long, Long)] = null
+  private var progress: (Long, Long) = (0, -1)
 
   override def getNumPartitions(): Int = {
     kafkaConsumer.partitionsFor(topic).size()
   }
 
-  private def takeSnapshot(tps: Seq[TopicPartition]) = {
-    val startOffsets = kafkaConsumer.beginningOffsets(tps)
-    snapshot = kafkaConsumer.endOffsets(tps).map {
-      case (tp, endOffset) => (tp, (startOffsets(tp).toLong, endOffset.toLong))
-    }
-  }
-
   override def subscribe(): Unit = {
-    val tps = (0 until getNumPartitions()).map(p => new TopicPartition(topic, p))
-    takeSnapshot(tps)
     kafkaConsumer.subscribe(List(topic))
   }
 
   override def subscribe(partition: Int): Unit = {
-    val tps = List(new TopicPartition(topic, partition))
-    takeSnapshot(tps)
-    kafkaConsumer.assign(tps)
+    val tp = new TopicPartition(topic, partition)
+    kafkaConsumer.assign(List(tp))
+    val startOffset = kafkaConsumer.beginningOffsets(List(tp))(tp).toLong
+    progress = kafkaConsumer.endOffsets(List(tp))(tp) match {
+      case endOffset => (Math.max(kafkaConsumer.position(tp), startOffset) - 1, endOffset.toLong - 1)
+    }
   }
 
   override def lag(): Long = {
-    snapshot.map {
-      case (tp, (_, endOffset)) if partitionProgress.contains(tp) => endOffset - partitionProgress(tp) - 1
-      case (_, (startOffset, endOffset)) => endOffset - startOffset
-    }.max
+    progress._2 - progress._1
   }
 
   override def fetch(minTimestamp: Long): util.Iterator[Record[Array[Byte], Array[Byte]]] = {
@@ -80,8 +83,8 @@ class BinaryStreamImpl(config: Config, topic: String) extends BinaryStream {
       record =>
         val isAfterMinTimestamp = record.timestamp() >= minTimestamp
         val tp = new TopicPartition(record.topic, record.partition)
-        if (!partitionProgress.contains(tp) || record.offset > partitionProgress(tp)) {
-          partitionProgress.put(tp, record.offset)
+        if (record.offset > progress._1) {
+          progress = (record.offset, progress._2)
         }
         if (!isAfterMinTimestamp && !fastForwarded) {
           kafkaConsumer.offsetsForTimes(Map(new TopicPartition(record.topic(), record.partition()) -> new java.lang.Long(minTimestamp))).foreach {

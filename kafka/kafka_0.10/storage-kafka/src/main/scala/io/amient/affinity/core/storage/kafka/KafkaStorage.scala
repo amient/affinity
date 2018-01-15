@@ -50,18 +50,24 @@ object KafkaStorage {
     val Storage = struct("storage", new KafkaStorageConf, true)
   }
 
+  object KafkaStorageConf extends KafkaStorageConf {
+    override def apply(config: Config): KafkaStorageConf = new KafkaStorageConf().apply(config)
+  }
+
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
     val OldTopic = string("kafka.old.topic", false)
     val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
-    val Producer = struct("kafka.producer", new KafkaProducerConf, true)
-    val Consumer = struct("kafka.consumer", new KafkaConsumerConf, true)
+    val Producer = struct("kafka.producer", new KafkaProducerConf, false)
+    val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false)
   }
 
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)
 
-  class KafkaConsumerConf extends CfgStruct[KafkaConsumerConf](Cfg.Options.IGNORE_UNKNOWN)
+  class KafkaConsumerConf extends CfgStruct[KafkaConsumerConf](Cfg.Options.IGNORE_UNKNOWN) {
+    val GroupId = string("group.id", false)
+  }
 
 }
 

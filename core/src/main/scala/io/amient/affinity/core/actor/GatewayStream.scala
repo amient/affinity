@@ -6,6 +6,7 @@ import akka.event.Logging
 import com.typesafe.config.Config
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.EventTime
+import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.stream.{BinaryStream, Record}
 
 import scala.collection.JavaConversions._
@@ -18,16 +19,15 @@ trait GatewayStream extends Gateway {
   class RunnableInputStream[K, V](identifier: String,
                                   keySerde: AbstractSerde[K],
                                   valSerde: AbstractSerde[V],
-                                  streamConfig: Config,
+                                  streamConfig: StorageConf,
                                   processor: InputStreamProcessor[K, V]) extends Runnable {
-    val inputTopic = streamConfig.getString("topic")
-    val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
-    val consumer: BinaryStream = BinaryStream.bindNewInstance(streamConfig, inputTopic)
+    val minTimestamp = streamConfig.MinTimestamp()
+    val consumer: BinaryStream = BinaryStream.bindNewInstance(streamConfig)
 
     override def run(): Unit = {
       try {
         consumer.subscribe()
-        log.info(s"Initializing input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topic: $inputTopic")
+        log.info(s"Initializing input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, details: ${streamConfig}")
         var lastCommit = System.currentTimeMillis()
         while (!closed) {
           //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
@@ -73,7 +73,7 @@ trait GatewayStream extends Gateway {
   @volatile private var processingPaused = true
 
   def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = config.getConfig(s"affinity.node.gateway.stream.$identifier")
+    val streamConfig = new StorageConf().apply(config.getConfig(s"affinity.node.gateway.stream.$identifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
     declaredInputStreamProcessors += new RunnableInputStream[K, V](identifier, keySerde, valSerde, streamConfig, processor)
