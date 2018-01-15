@@ -20,8 +20,9 @@
 package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.util.Reply
 
-final case class GetVertexProps(vertex: Int) extends AvroRecord with Reply[Option[VertexProps]] {
-  override def hashCode(): Int = vertex.hashCode
+final case class GetVertexProps(vertex: Int) extends AvroRecord with Routed with Reply[Option[VertexProps]] {
+  override def key = vertex
 }

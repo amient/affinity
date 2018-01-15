@@ -19,7 +19,7 @@
 
 package io.amient.util.spark
 
-import io.amient.affinity.core.ObjectHashPartitioner
+import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
 import io.amient.affinity.stream._
@@ -96,8 +96,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
 
     def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
       val stream = streamBinder
-      //TODO #17 hardcoded partitioner should be provided by the API instead
-      val partitioner = new ObjectHashPartitioner
+      val partitioner = new Murmur2Partitioner
       val keySerdeInstance = keySerde
       val valueSerdeInstance = valueSerde
 

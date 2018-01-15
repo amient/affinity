@@ -27,6 +27,7 @@ import io.amient.affinity.avro.AvroSerde.AvroConf
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
 import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.storage.kafka.KafkaStorage
@@ -163,7 +164,6 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
       "acks" -> "all",
       "linger.ms" -> 20,
       "batch.size" -> 20,
-      "partitioner.class" -> classOf[KafkaObjectHashPartitioner].getName,
       "key.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
       "value.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
       "schema.registry.url" -> registryUrl

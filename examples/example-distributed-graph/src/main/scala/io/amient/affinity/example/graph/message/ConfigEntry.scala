@@ -26,8 +26,6 @@ import org.codehaus.jackson.annotate.JsonIgnore
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord {
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
-
-  override def hashCode(): Int = description.hashCode()
 }
 
 

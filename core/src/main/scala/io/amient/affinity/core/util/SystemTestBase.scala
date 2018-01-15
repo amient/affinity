@@ -39,10 +39,9 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway.GatewayClusterStatus
-import io.amient.affinity.core.actor.{Partition, Keyspace, Gateway}
+import io.amient.affinity.core.actor.{Gateway, Partition, Routed}
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.core.storage.State
 import org.apache.avro.util.ByteBufferInputStream
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
@@ -233,11 +232,11 @@ trait SystemTestBase {
 
 object MyTestPartition {
 
-  case class GetValue(key: String) extends Reply[Option[String]] {
+  case class GetValue(key: String) extends Routed with Reply[Option[String]] {
     override def hashCode(): Int = key.hashCode
   }
 
-  case class PutValue(key: String, value: String) extends Reply[Unit] {
+  case class PutValue(key: String, value: String) extends Routed with Reply[Unit] {
     override def hashCode(): Int = key.hashCode
   }
 

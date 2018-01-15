@@ -4,7 +4,8 @@ package io.amient.affinity.core;
 public class Murmur2Partitioner implements Partitioner {
 
     public int partition(Object key, byte[] serializedKey, int numPartitions) {
-        return (murmur2(serializedKey)  & 0x7fffffff) % numPartitions;
+        int result = (murmur2(serializedKey)  & 0x7fffffff) % numPartitions;
+        return result;
     }
 
     //the murmur2 function is identical to that of kafka (0.9+) and this is also tested under each kafka module
