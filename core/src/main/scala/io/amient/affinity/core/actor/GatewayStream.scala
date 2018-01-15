@@ -27,6 +27,7 @@ trait GatewayStream extends Gateway {
       try {
         consumer.subscribe()
         log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topic: $inputTopic")
+        var lastCommit = System.currentTimeMillis()
         while (!closed) {
           //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
           //should be suspended anyway and hang so no need to do it for every record
@@ -39,7 +40,12 @@ trait GatewayStream extends Gateway {
             val value: V = valSerde.fromBytes(record.value)
             processor(new Record(key, value, record.timestamp))
           }
-          consumer.commit() // TODO commit in larger intervals, not after every fetch
+          val now = System.currentTimeMillis()
+          // TODO configurable commit interval, currently 10s hard-coded
+          if (now - lastCommit > 10000) {
+            lastCommit = now
+            consumer.commit()
+          }
         }
       } catch {
         case NonFatal(e) => log.error(e, s"Input stream processor: $identifier")

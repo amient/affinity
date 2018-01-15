@@ -58,7 +58,8 @@ class Keyspace(config: Config) extends Actor {
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
-  //#75 TODO partitioning based on serialized bytes of the key
+  //#75 TODO partitioning based on serialized bytes of the key,
+  //either mixed trait Key or Tuple will be required for correct routing
   //val serialization = SerializationExtension(context.system)
   val partitioner = new ObjectHashPartitioner
 
