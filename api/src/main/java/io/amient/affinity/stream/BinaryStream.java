@@ -1,10 +1,12 @@
 package io.amient.affinity.stream;
 
 import com.typesafe.config.Config;
+import io.amient.affinity.core.storage.Storage;
 
 import java.io.Closeable;
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * BinaryStream represents any stream of data which consists of binary key-value pairs.
@@ -20,18 +22,19 @@ public interface BinaryStream extends Closeable {
 
     static BinaryStream bindNewInstance(Config config)
             throws ClassNotFoundException,
-            NoSuchMethodException, IllegalAccessException,
-            InvocationTargetException, InstantiationException {
-        return bindNewInstance(config, config.getString("topic"));
+            NoSuchMethodException,
+            InvocationTargetException,
+            InstantiationException,
+            IllegalAccessException {
+        return bindNewInstance(new Storage.StorageConf().apply(config));
     }
 
-    static BinaryStream bindNewInstance(Config config, String topic)
+    static BinaryStream bindNewInstance(Storage.StorageConf conf)
             throws ClassNotFoundException,
             NoSuchMethodException, IllegalAccessException,
             InvocationTargetException, InstantiationException {
-        return bindClass().getConstructor(Config.class, String.class).newInstance(config, topic);
+        return bindClass().getConstructor(Storage.StorageConf.class).newInstance(conf);
     }
-
 
     int getNumPartitions();
 

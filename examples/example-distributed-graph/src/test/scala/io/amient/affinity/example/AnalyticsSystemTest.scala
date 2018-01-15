@@ -86,7 +86,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
     val graphRdd = new CompactRDD[Int, VertexProps](
       sc, AvroSerde.create(broadcast.value),
-      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.graph.storage.kafka")))
+      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.graph.storage")))
 
     val sortedGraph = graphRdd.repartition(1).sortByKey().collect().toList
     sortedGraph match {
@@ -101,7 +101,7 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     val componentRdd = new CompactRDD[Int, Component](
       sc,
       AvroSerde.create(broadcast.value),
-      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.components.storage.kafka")))
+      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.components.storage")))
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>
