@@ -1,4 +1,4 @@
-package io.amient.affinity.core;
+package io.amient.affinity.stream;
 
 import java.io.Serializable;
 

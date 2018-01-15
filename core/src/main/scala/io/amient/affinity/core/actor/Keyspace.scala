@@ -21,6 +21,7 @@ package io.amient.affinity.core.actor
 
 import akka.actor.Actor
 import akka.routing._
+import akka.serialization.SerializationExtension
 import com.typesafe.config.Config
 import io.amient.affinity.core.{ObjectHashPartitioner, ack}
 import io.amient.affinity.core.config.CfgStruct
@@ -57,9 +58,13 @@ class Keyspace(config: Config) extends Actor {
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
+  //#75 TODO partitioning based on serialized bytes of the key,
+  //either mixed trait Key or Tuple will be required for correct routing
+  //val serialization = SerializationExtension(context.system)
   val partitioner = new ObjectHashPartitioner
 
   import context.dispatcher
+
 
   override def receive: Receive = {
 
@@ -97,17 +102,17 @@ class Keyspace(config: Config) extends Actor {
 
   private def getRoutee(message: Any): ActorRefRoutee = {
     val partition = message match {
-      case (t1,_) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
-      case (t1,_, _, _, _, _, _, _, _, _, _) => partitioner.partition(t1, numPartitions)
-      case v => partitioner.partition(v, numPartitions)
+      case (t1,_) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case (t1,_, _, _, _, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
+      case v => partitioner.partition(v, null, numPartitions)
     }
 
     routes.get(partition) match {

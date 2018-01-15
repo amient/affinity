@@ -19,71 +19,70 @@
 
 package io.amient.util.spark
 
-import io.amient.affinity.core.{ByteKey, ObjectHashPartitioner, PartitionedRecord, Record}
+import io.amient.affinity.core.ObjectHashPartitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.kafka._
-import io.amient.affinity.spark.KafkaSplit
+import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
-class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
-                                         client: KafkaClient,
-                                         keySerde: => AbstractSerde[_ >: K],
-                                         valueSerde: => AbstractSerde[_ >: V],
-                                         compacted: Boolean = false) extends RDD[(K, V)](sc, Nil) {
+class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
+                                           keySerde: => AbstractSerde[_ >: K],
+                                           valueSerde: => AbstractSerde[_ >: V],
+                                           streamBinder: => BinaryStream,
+                                           compacted: Boolean) extends RDD[(K, V)](sc, Nil) {
 
-  def this(sc: SparkContext, client: KafkaClient, serde: => AbstractSerde[Any], compacted: Boolean) =
-    this(sc, client, serde, serde, compacted)
+  def this(sc: SparkContext, serde: => AbstractSerde[Any], streamBinder: => BinaryStream, compacted: Boolean = true) =
+    this(sc, serde, serde, streamBinder, compacted)
 
+  type ByteRecord = Record[Array[Byte], Array[Byte]]
 
-  val compactor = (m1: Record[ByteKey, Array[Byte]], m2: Record[ByteKey, Array[Byte]]) =>
-    if (m1.timestamp > m2.timestamp) m1 else m2
-
-  val kafkaPartitions: List[Integer] = client.getPartitions().asScala.toList
+  val compactor = (m1: ByteRecord, m2: ByteRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
 
   protected def getPartitions: Array[Partition] = {
-    var index = -1
-    kafkaPartitions.map { partition =>
-      index += 1
-      new KafkaSplit(id, index, partition)
-    }.toArray
+    val consumer = streamBinder
+    try {
+      (0 until consumer.getNumPartitions()).map { p =>
+        new Partition {
+          override def index = p
+        }
+      }.toArray
+    } finally {
+      consumer.close()
+    }
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(K, V)] = {
-    val kafkaSplit = split.asInstanceOf[KafkaSplit]
-    val partition = kafkaSplit.partition
-    val (startOffset, stopOffset) = client.getOffsets(partition).asScala.head
-    val fetcher = client.iterator(partition, startOffset, stopOffset)
+    val stream = streamBinder
     val keySerdeInstance = keySerde
     val valueSerdeInstance = valueSerde
-
     context.addTaskCompletionListener { _ =>
       try {
         keySerdeInstance.close()
       } finally try {
         valueSerdeInstance.close()
       } finally {
-        client.release(fetcher)
+        stream.close()
       }
     }
 
-    val rawMessages: Iterator[(ByteKey, Record[ByteKey, Array[Byte]])] = {
-      fetcher.asScala.map((record: Record[ByteKey, Array[Byte]]) => (record.key, record))
-    }
+    stream.subscribe(split.index)
 
-    val iterator = if (!compacted) rawMessages else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, Record[ByteKey, Array[Byte]], Record[ByteKey, Array[Byte]]]((v) => v, compactor, compactor)
-      spillMap.insertAll(rawMessages)
+    val rawRecords: Iterator[(ByteKey, ByteRecord)] = stream.iterator()
+      .map((record: ByteRecord) => (new ByteKey(record.key), record))
+
+    val compactedRecords = if (!compacted) rawRecords else {
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, ByteRecord, ByteRecord]((v) => v, compactor, compactor)
+      spillMap.insertAll(rawRecords)
       spillMap.iterator
     }
 
-    iterator.map { case (key, record) =>
+    compactedRecords.map { case (key, record) =>
       (keySerdeInstance.fromBytes(key.bytes), valueSerdeInstance.fromBytes(record.value))
     }.collect {
       case (k: K, v: V) => (k, v)
@@ -96,6 +95,7 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
     context.register(produced)
 
     def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
+      val stream = streamBinder
       //TODO #17 hardcoded partitioner should be provided by the API instead
       val partitioner = new ObjectHashPartitioner
       val keySerdeInstance = keySerde
@@ -107,19 +107,15 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
             case e: EventTime => e.eventTimeUtc()
             case _ => System.currentTimeMillis()
           }
-          val partition = partitioner.partition(k, kafkaPartitions.length)
-          val record = new Record(keySerdeInstance.toBytes(k), valueSerdeInstance.toBytes(v), ts)
+          val serializedKey = keySerdeInstance.toBytes(k)
+          val serializedValue = valueSerdeInstance.toBytes(v)
+          val partition = partitioner.partition(k, serializedKey, getPartitions.length)
+          val record = new Record(serializedKey, serializedValue, ts)
           new PartitionedRecord(partition, record)
-        }.asJava
-
-        val checker = new java.util.function.Function[java.lang.Long, java.lang.Boolean] {
-          override def apply(partialCount: java.lang.Long): java.lang.Boolean = {
-            produced.add(partialCount)
-            !context.isInterrupted()
-          }
         }
 
-        client.publish(iterator, checker)
+        produced.add(stream.publish(iterator))
+        stream.close()
       } finally try {
         keySerdeInstance.close()
       } finally {
@@ -127,10 +123,9 @@ class KafkaRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       }
     }
 
-    log.info(s"Producing into ${client} ...")
-
     context.runJob(data, updatePartition _)
 
-    log.info(s"Produced ${produced.value} messages into ${client}")
+    log.info(s"Produced ${produced.value} messages")
   }
+
 }

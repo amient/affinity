@@ -1,12 +1,12 @@
 package io.amient.affinity.core.actor
 
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
-import io.amient.affinity.core.Record
-import io.amient.affinity.core.serde.Serde
+import com.typesafe.config.Config
+import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.kafka.ManagedKafkaConsumer
+import io.amient.affinity.stream.{BinaryStream, Record}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -15,70 +15,113 @@ import scala.util.control.NonFatal
 
 trait GatewayStream extends Gateway {
 
-  private val log = Logging.getLogger(context.system, this)
-
-  private val config = context.system.settings.config
-
-  private val inputStreamProcessors = new mutable.ListBuffer[Runnable]
-
-  private val inputStreamExecutor = Executors.newCachedThreadPool()
-
-  @volatile private var running = true
-
-  def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = config.getConfig(s"affinity.node.gateway.stream.$identifier")
-    inputStreamProcessors += new Runnable {
-      val inputTopics = streamConfig.getStringList("topics").toSet
-      val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
-      val keySerde = Serde.of[K](config)
-      val valSerde = Serde.of[V](config)
-      override def run(): Unit = {
-        val consumer: ManagedKafkaConsumer = Class.forName("io.amient.affinity.kafka.ManagedKafkaConsumerImpl")
-          .asSubclass(classOf[ManagedKafkaConsumer]).newInstance()
-        try {
-          consumer.initialize(streamConfig.getConfig("consumer"), inputTopics)
-          log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topics: $inputTopics")
-          while (running) {
-            for (record: Record[Array[Byte], Array[Byte]] <- consumer.fetch(minTimestamp)) {
-              val key: K = keySerde.fromBytes(record.key)
-              val value: V = valSerde.fromBytes(record.value)
-              processor(new Record(key, value, record.timestamp))
-            }
+  class RunnableInputStream[K, V](identifier: String,
+                                  keySerde: AbstractSerde[K],
+                                  valSerde: AbstractSerde[V],
+                                  streamConfig: Config,
+                                  processor: InputStreamProcessor[K,V]) extends Runnable {
+    val inputTopic = streamConfig.getString("topic")
+    val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
+    val consumer: BinaryStream = BinaryStream.bindNewInstance(streamConfig, inputTopic)
+    override def run(): Unit = {
+      try {
+        consumer.subscribe()
+        log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topic: $inputTopic")
+        var lastCommit = System.currentTimeMillis()
+        while (!closed) {
+          //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
+          //should be suspended anyway and hang so no need to do it for every record
+          if (processingPaused) {
+            synchronized(wait())
+            processingPaused = false
           }
-        } catch {
-          case NonFatal(e) => log.error(e, s"Input stream processor: $identifier")
-        } finally {
-          consumer.close()
-          log.info(s"Finished input stream processor: $identifier")
+          for (record: Record[Array[Byte], Array[Byte]] <- consumer.fetch(minTimestamp)) {
+            val key: K = keySerde.fromBytes(record.key)
+            val value: V = valSerde.fromBytes(record.value)
+            processor(new Record(key, value, record.timestamp))
+          }
+          val now = System.currentTimeMillis()
+          // TODO configurable commit interval, currently 10s hard-coded
+          if (now - lastCommit > 10000) {
+            lastCommit = now
+            consumer.commit()
+          }
         }
+      } catch {
+        case NonFatal(e) => log.error(e, s"Input stream processor: $identifier")
+        case _: InterruptedException =>
+      } finally {
+        consumer.close()
+        log.info(s"Finished input stream processor: $identifier")
       }
     }
   }
 
+  private val log = Logging.getLogger(context.system, this)
+
+  private val config = context.system.settings.config
+
+  type InputStreamProcessor[K, V] = Record[K, V] => Unit
+
+  private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
+
+  @volatile private var closed = true
+  @volatile private var clusterSuspended = true
+  @volatile private var processingPaused = true
+
+  def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
+    val streamConfig = config.getConfig(s"affinity.node.gateway.stream.$identifier")
+    val keySerde: AbstractSerde[K] = Serde.of[K](config)
+    val valSerde: AbstractSerde[V] = Serde.of[V](config)
+    declaredInputStreamProcessors += new RunnableInputStream[K,V](identifier, keySerde, valSerde, streamConfig, processor)
+  }
+
+  val inputStreamManager = new Thread {
+    var suspended = true
+    val inputStreamProcessors = declaredInputStreamProcessors.result()
+    val inputStreamExecutor = Executors.newFixedThreadPool(inputStreamProcessors.size)
+
+    override def run(): Unit = {
+      inputStreamProcessors.foreach(inputStreamExecutor.submit)
+      while (!closed) {
+        //FIXME kafka consumers may hang in the poll() method so we need something to nudge it like inputStreamProcessors.foreach(_.wakeup())
+        if (suspended != clusterSuspended) {
+          suspended = clusterSuspended
+          if (!suspended) {
+            inputStreamProcessors.foreach(p => p.synchronized(p.notify()))
+          }
+        }
+        synchronized(wait(1000))
+      }
+      inputStreamExecutor.shutdown()
+      inputStreamExecutor.awaitTermination(10, TimeUnit.SECONDS) //TODO use shutdown timeout
+    }
+  }
+
   override def preStart(): Unit = {
-    //FIXME this code is prone to hangs - there is no way of controlling an actor's preStart activity
-    //FIXME also this code assumes the key is avro serialized
-//    maybeStartMigration()
+    inputStreamManager.start()
+    //FIXME #89 maybeStartMigration() code can hang and there is no way of controlling an actor's preStart activity
+    //    maybeStartMigration()
     super.preStart()
   }
 
   override def postStop(): Unit = {
-    running = false
-    super.postStop()
+    closed = true
+    try {
+      inputStreamManager.synchronized(inputStreamManager.notify())
+    } finally {
+      super.postStop()
+    }
   }
 
   override def onClusterStatus(suspended: Boolean) = {
     super.onClusterStatus(suspended)
-    if (!suspended && running) {
-      maybeStartInputStreams()
-      //FIXME deal with suspended state while running, e.g. pause the underlying kafka consumers
-    }
+    this.clusterSuspended = suspended
+    inputStreamManager.synchronized(inputStreamManager.notify())
   }
 
-  private def maybeStartInputStreams(): Unit = {
-    inputStreamProcessors.foreach(inputStreamExecutor.submit)
-  }
 
+//TODO #89 Internal Repartitioner Tool - also this code assumes the key is avro serialized which may not be reasonable
 //  private def maybeStartMigration(): Unit = {
 //    if (config.hasPath("affinity.keyspace")) {
 //      val workers = (for (
@@ -110,7 +153,7 @@ trait GatewayStream extends Gateway {
 //        while (workers.filter(_.active).size > 0) {
 //          workers.filter(_.active).foreach { worker =>
 //            val copied = worker.copy()
-//            if (copied == 0 && worker.maxLag() <= 1) {
+//            if (copied == 0 && worker.maxLag() <= 0) {
 //              worker.close()
 //            } else {
 //              log.info(s"COPIED $copied RECORD FROM ${worker.inputTopic} TO ${worker.outputTopic}")

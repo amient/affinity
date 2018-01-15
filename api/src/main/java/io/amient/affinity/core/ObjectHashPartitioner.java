@@ -19,9 +19,9 @@
 
 package io.amient.affinity.core;
 
-public class ObjectHashPartitioner {
+public class ObjectHashPartitioner implements Partitioner {
 
-  public int partition(Object key, int numPartitions) {
+  public int partition(Object key, byte[] serializedKey, int numPartitions) {
     int absHashCode = Math.abs(key.hashCode());
     if (absHashCode == Integer.MIN_VALUE) {
       return 0 % numPartitions;

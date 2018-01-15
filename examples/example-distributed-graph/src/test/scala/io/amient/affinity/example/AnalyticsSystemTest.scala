@@ -19,19 +19,18 @@
 
 package io.amient.affinity.spark
 
-import java.util.Properties
-
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.AvroSerde
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.example.graph.message.{Component, VertexProps}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
-import io.amient.affinity.kafka.{EmbeddedKafka, KafkaClientImpl}
-import io.amient.affinity.example.graph.message.{Component, VertexProps}
-import io.amient.util.spark.KafkaRDD
+import io.amient.affinity.kafka.EmbeddedKafka
+import io.amient.affinity.stream.BinaryStream
+import io.amient.util.spark.CompactRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
@@ -83,37 +82,31 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val serdeConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+    val broadcast = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-    val graphClient = new KafkaClientImpl(topic = "graph", new Properties() {
-      put("bootstrap.servers", kafkaBootstrap)
-    })
+    val graphRdd = new CompactRDD[Int, VertexProps](
+      sc, AvroSerde.create(broadcast.value),
+      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.graph.storage.kafka")))
 
-    val componentClient = new KafkaClientImpl(topic = "components", new Properties() {
-      put("bootstrap.servers", kafkaBootstrap)
-    })
-
-    val graphRdd = new KafkaRDD[Int, VertexProps](sc, graphClient,
-      AvroSerde.create(serdeConfig.value), compacted = true)
-      .repartition(1)
-      .sortByKey()
-
-    graphRdd.collect().toList match {
+    val sortedGraph = graphRdd.repartition(1).sortByKey().collect().toList
+    sortedGraph match {
       case (1, VertexProps(_, 1, _)) ::
         (2, VertexProps(_, 1, _)) ::
         (3, VertexProps(_, 1, _)) ::
         (4, VertexProps(_, 1, _)) :: Nil =>
-      case _ => throw new AssertionError("Graph should contain 4 vertices")
+      case x =>
+        throw new AssertionError(s"Graph should contain 4 vertices but was: $x")
     }
 
-    val componentRdd = new KafkaRDD[Int, Component](sc, componentClient,
-      AvroSerde.create(serdeConfig.value), compacted = true)
+    val componentRdd = new CompactRDD[Int, Component](
+      sc,
+      AvroSerde.create(broadcast.value),
+      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.components.storage.kafka")))
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>
       case _ => throw new AssertionError("Graph should contain 1 component")
     }
-
     val updateBatch: RDD[(Int, Component)] = sc.parallelize(Array((1, null), (2, Component(0L, Set()))))
     componentRdd.update(updateBatch)
 

@@ -1,4 +1,4 @@
-package io.amient.affinity.core;
+package io.amient.affinity.stream;
 
 public class PartitionedRecord<K,V> {
     public final int partition;
