@@ -6,7 +6,7 @@ import akka.event.Logging
 import com.typesafe.config.Config
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.EventTime
-import io.amient.affinity.stream.{ManagedStream, Record}
+import io.amient.affinity.stream.{BinaryStream, Record}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -22,10 +22,10 @@ trait GatewayStream extends Gateway {
                                   processor: InputStreamProcessor[K,V]) extends Runnable {
     val inputTopic = streamConfig.getString("topic")
     val minTimestamp = if (streamConfig.hasPath("min.timestamp")) streamConfig.getLong("min.timestamp") else 0L
-    val consumer: ManagedStream = ManagedStream.bindNewInstance(streamConfig)
+    val consumer: BinaryStream = BinaryStream.bindNewInstance(streamConfig, inputTopic)
     override def run(): Unit = {
       try {
-        consumer.subscribe(inputTopic)
+        consumer.subscribe()
         log.info(s"Starting input stream processor: $identifier, min.timestamp: ${EventTime.localTime(minTimestamp)}, topic: $inputTopic")
         while (!closed) {
           //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does

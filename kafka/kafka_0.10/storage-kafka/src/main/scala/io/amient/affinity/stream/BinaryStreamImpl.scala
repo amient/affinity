@@ -13,17 +13,23 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-class ManagedStreamImpl(config: Config) extends ManagedStream {
+class BinaryStreamImpl(config: Config, topic: String) extends BinaryStream {
 
-  private val log = LoggerFactory.getLogger(classOf[ManagedStreamImpl])
+  private val log = LoggerFactory.getLogger(classOf[BinaryStreamImpl])
+
+  val producerConfig = new Properties() {
+    config.entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    config.getConfig("producer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    put("value.serializer", classOf[ByteArraySerializer].getName)
+    put("key.serializer", classOf[ByteArraySerializer].getName)
+  }
 
   private val consumerProps = new Properties() {
     require(config != null)
-    config.entrySet().foreach { case entry =>
-      put(entry.getKey, entry.getValue.unwrapped())
-    }
-    put("enable.auto.commit", "false")
     put("auto.offset.reset", "earliest")
+    config.entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    config.getConfig("consumer").entrySet().foreach { case entry => put(entry.getKey, entry.getValue.unwrapped()) }
+    put("enable.auto.commit", "false")
     put("key.deserializer", classOf[ByteArrayDeserializer].getName)
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)
   }
@@ -33,7 +39,7 @@ class ManagedStreamImpl(config: Config) extends ManagedStream {
   private var closed = false
   private var snapshot: collection.Map[TopicPartition, (Long, Long)] = null
 
-  override def getNumPartitions(topic: String): Int = {
+  override def getNumPartitions(): Int = {
     kafkaConsumer.partitionsFor(topic).size()
   }
 
@@ -44,13 +50,13 @@ class ManagedStreamImpl(config: Config) extends ManagedStream {
     }
   }
 
-  override def subscribe(topic: String): Unit = {
-    val tps = (0 until getNumPartitions(topic)).map(p => new TopicPartition(topic, p))
+  override def subscribe(): Unit = {
+    val tps = (0 until getNumPartitions()).map(p => new TopicPartition(topic, p))
     takeSnapshot(tps)
     kafkaConsumer.subscribe(List(topic))
   }
 
-  override def subscribe(topic: String, partition: Int): Unit = {
+  override def subscribe(partition: Int): Unit = {
     val tps = List(new TopicPartition(topic, partition))
     takeSnapshot(tps)
     kafkaConsumer.assign(tps)
@@ -97,19 +103,7 @@ class ManagedStreamImpl(config: Config) extends ManagedStream {
   def active() = !closed
 
 
-  override def publish(topic: String,
-                       iter: util.Iterator[PartitionedRecord[Array[Byte], Array[Byte]]],
-                       checker: java.util.function.Function[java.lang.Long, java.lang.Boolean]): Unit = {
-    val producerConfig = new Properties() {
-      put("bootstrap.servers", config.getString("bootstrap.servers"))
-      put("value.serializer", classOf[ByteArraySerializer].getName)
-      put("key.serializer", classOf[ByteArraySerializer].getName)
-      //    put("compression.codec", "snappy")
-      //    put("linger.ms", "200")
-      //    put("batch.size", "1000")
-      //    put("acks", "0")
-    }
-
+  override def publish(iter: util.Iterator[PartitionedRecord[Array[Byte], Array[Byte]]]): Long = {
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
     try {
       var messages = 0L
@@ -118,7 +112,7 @@ class ManagedStreamImpl(config: Config) extends ManagedStream {
         producer.send(new ProducerRecord(topic, kpr.partition, kpr.record.key, kpr.record.value))
         messages += 1
       }
-      if (!checker(messages)) sys.error("Kafka iterator producer interrupted")
+      messages
     } finally {
       producer.close()
     }

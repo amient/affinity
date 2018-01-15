@@ -5,31 +5,39 @@ import com.typesafe.config.Config;
 import java.io.Closeable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
-import java.util.function.Function;
 
 /**
- * ManagedStream is used by GatewayStream, Repartitioner Tool and CompactRDD
- * One of the kafka modules must be included that provides io.amient.affinity.stream.ManagedConsumerImpl
+ * BinaryStream represents any stream of data which consists of binary key-value pairs.
+ * It is used by GatewayStream, Repartitioner Tool and a CompactRDD.
+ * One of the modules must be included that provides io.amient.affinity.stream.BinaryStreamImpl
  */
-public interface ManagedStream extends Closeable {
+public interface BinaryStream extends Closeable {
 
-    static Class<? extends ManagedStream> bindClass() throws ClassNotFoundException {
-        Class<?> cls = Class.forName("io.amient.affinity.stream.ManagedStreamImpl");
-        return cls.asSubclass(ManagedStream.class);
+    static Class<? extends BinaryStream> bindClass() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("io.amient.affinity.stream.BinaryStreamImpl");
+        return cls.asSubclass(BinaryStream.class);
     }
 
-    static ManagedStream bindNewInstance(Config config)
+    static BinaryStream bindNewInstance(Config config)
             throws ClassNotFoundException,
             NoSuchMethodException, IllegalAccessException,
             InvocationTargetException, InstantiationException {
-        return bindClass().getConstructor(Config.class).newInstance(config);
+        return bindNewInstance(config, config.getString("topic"));
     }
 
-    int getNumPartitions(String topic);
+    static BinaryStream bindNewInstance(Config config, String topic)
+            throws ClassNotFoundException,
+            NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+        return bindClass().getConstructor(Config.class, String.class).newInstance(config, topic);
+    }
 
-    void subscribe(String topic);
 
-    void subscribe(String topic, int partition);
+    int getNumPartitions();
+
+    void subscribe();
+
+    void subscribe(int partition);
 
     long lag();
 
@@ -37,7 +45,7 @@ public interface ManagedStream extends Closeable {
 
     void commit();
 
-    void publish(String topic, Iterator<PartitionedRecord<byte[], byte[]>> iter, Function<Long, Boolean> checker);
+    long publish(Iterator<PartitionedRecord<byte[], byte[]>> iter);
 
     default Iterator<Record<byte[], byte[]>> iterator() {
         return new Iterator<Record<byte[], byte[]>>() {

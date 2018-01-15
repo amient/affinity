@@ -30,6 +30,6 @@ class KafkaObjectHashPartitioner extends ObjectHashPartitioner with Partitioner 
 
   override def partition(topic: String, key: scala.Any, keyBytes: Array[Byte], value: scala.Any, valueBytes: Array[Byte], cluster: Cluster): Int = {
     val partitions = cluster.partitionsForTopic(topic)
-    partition(key, partitions.size)
+    partition(key, keyBytes, partitions.size)
   }
 }

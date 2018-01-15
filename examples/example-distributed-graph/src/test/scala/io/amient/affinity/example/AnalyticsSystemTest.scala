@@ -29,6 +29,7 @@ import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.EmbeddedKafka
+import io.amient.affinity.stream.BinaryStream
 import io.amient.util.spark.CompactRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
@@ -81,10 +82,11 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
       .setAppName("Affinity_Spark_2.0")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val serdeConfig = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+    val broadcast = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
     val graphRdd = new CompactRDD[Int, VertexProps](
-      sc, kafkaBootstrap, AvroSerde.create(serdeConfig.value), topic = "graph", compacted = true)
+      sc, AvroSerde.create(broadcast.value),
+      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.graph.storage.kafka")))
 
     val sortedGraph = graphRdd.repartition(1).sortByKey().collect().toList
     sortedGraph match {
@@ -97,7 +99,9 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     }
 
     val componentRdd = new CompactRDD[Int, Component](
-      sc, kafkaBootstrap, AvroSerde.create(serdeConfig.value), topic = "components", compacted = true)
+      sc,
+      AvroSerde.create(broadcast.value),
+      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.components.storage.kafka")))
 
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>

@@ -1,10 +1,10 @@
 package io.amient.affinity.core;
 
 //TODO #75 this partitioner is not used yet because some of the use case classes rely on common hash which needs to be reconsidered
-public class Murmur2Partitioner {
+public class Murmur2Partitioner implements Partitioner {
 
-    public int partition(byte[] value, int numPartitions) {
-        return (murmur2(value)  & 0x7fffffff) % numPartitions;
+    public int partition(Object key, byte[] serializedKey, int numPartitions) {
+        return (murmur2(serializedKey)  & 0x7fffffff) % numPartitions;
     }
 
     //the murmur2 function is identical to that of kafka (0.9+) and this is also tested under each kafka module
