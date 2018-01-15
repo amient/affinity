@@ -1,7 +1,6 @@
 package io.amient.affinity.kafka
 
 import java.util
-import java.util.{Collection, Set}
 
 import io.amient.affinity.core.Murmur2Partitioner
 import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
@@ -26,7 +25,7 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
       ),
       new util.HashSet[String],
       new util.HashSet[String]))
-    val affinityP = affinityPartitioner.partition(key, serializedKey, 4)
+    val affinityP = affinityPartitioner.partition(serializedKey, 4)
     kafkaP should equal(affinityP)
   }
 

@@ -3,7 +3,7 @@ package io.amient.affinity.core;
 //TODO #75 this partitioner is not used yet because some of the use case classes rely on common hash which needs to be reconsidered
 public class Murmur2Partitioner implements Partitioner {
 
-    public int partition(Object key, byte[] serializedKey, int numPartitions) {
+    public int partition(byte[] serializedKey, int numPartitions) {
         int result = (murmur2(serializedKey)  & 0x7fffffff) % numPartitions;
         return result;
     }

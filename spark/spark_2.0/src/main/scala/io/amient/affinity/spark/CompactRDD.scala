@@ -108,7 +108,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
           }
           val serializedKey = keySerdeInstance.toBytes(k)
           val serializedValue = valueSerdeInstance.toBytes(v)
-          val partition = partitioner.partition(k, serializedKey, getPartitions.length)
+          val partition = partitioner.partition(serializedKey, getPartitions.length)
           val record = new Record(serializedKey, serializedValue, ts)
           new PartitionedRecord(partition, record)
         }

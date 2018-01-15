@@ -121,7 +121,7 @@ class Keyspace(config: Config) extends Actor {
     }
 
     val serializedKey = serialization.serialize(routableKey).get
-    val partition = partitioner.partition(key, serializedKey, numPartitions)
+    val partition = partitioner.partition(serializedKey, numPartitions)
 
     //log.trace(serializedKey.mkString(".") + " over " + numPartitions + " to " + partition)
 
