@@ -5,6 +5,7 @@ import java.util.concurrent.Future
 import io.amient.affinity.core.storage.StateConf
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.MappedJavaFuture
+import io.amient.affinity.stream.Record
 import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
 
 /**
@@ -12,8 +13,9 @@ import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
   */
 class FailingKafkaStorage(id: String, conf: StateConf, partition: Int, numParts: Int) extends KafkaStorage(id, conf, partition, numParts) {
 
-  override def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
-    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))) {
+  override def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
+    val producerRecord = new ProducerRecord(topic, partition, record.timestamp, record.key, record.value)
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }
   }

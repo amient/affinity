@@ -76,7 +76,7 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
     progress._2 - progress._1
   }
 
-  override def fetch(minTimestamp: Long): util.Iterator[Record[Array[Byte], Array[Byte]]] = {
+  override def fetch(minTimestamp: Long): util.Iterator[BinaryRecord] = {
     val kafkaRecords = kafkaConsumer.poll(6000).iterator()
     var fastForwarded = false
     val filteredKafkaRecords = kafkaRecords.filter {
@@ -99,7 +99,7 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
     }
 
     filteredKafkaRecords.map {
-      case r => new Record(r.key(), r.value(), r.timestamp())
+      case r => new BinaryRecord(r.key(), r.value(), r.timestamp())
     }
   }
 
@@ -109,14 +109,16 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
 
   def active() = !closed
 
-
-  override def publish(iter: util.Iterator[PartitionedRecord[Array[Byte], Array[Byte]]]): Long = {
+  override def publish(iter: util.Iterator[BinaryRecord]): Long = {
+    val partitioner = getDefaultPartitioner()
+    val numPartitions = getNumPartitions()
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
     try {
       var messages = 0L
       while (iter.hasNext) {
-        val kpr = iter.next()
-        producer.send(new ProducerRecord(topic, kpr.partition, kpr.record.key, kpr.record.value))
+        val record = iter.next()
+        val partition = partitioner.partition(record.key, numPartitions)
+        producer.send(new ProducerRecord(topic, partition, record.key, record.value))
         messages += 1
       }
       messages

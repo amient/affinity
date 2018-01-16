@@ -19,6 +19,8 @@
 
 package io.amient.util.spark
 
+import java.util
+
 import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
@@ -40,20 +42,18 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
   def this(sc: SparkContext, serde: => AbstractSerde[Any], streamBinder: => BinaryStream, compacted: Boolean = true) =
     this(sc, serde, serde, streamBinder, compacted)
 
-  type ByteRecord = Record[Array[Byte], Array[Byte]]
-
-  val compactor = (m1: ByteRecord, m2: ByteRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
+  val compactor = (m1: BinaryRecord, m2: BinaryRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
 
   protected def getPartitions: Array[Partition] = {
-    val consumer = streamBinder
+    val stream = streamBinder
     try {
-      (0 until consumer.getNumPartitions()).map { p =>
+      (0 until stream.getNumPartitions()).map { p =>
         new Partition {
           override def index = p
         }
       }.toArray
     } finally {
-      consumer.close()
+      stream.close()
     }
   }
 
@@ -73,12 +73,12 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
 
     stream.subscribe(split.index)
 
-    val rawRecords: Iterator[(ByteKey, ByteRecord)] = stream.iterator()
-      .map((record: ByteRecord) => (new ByteKey(record.key), record))
+    val binaryRecords: Iterator[BinaryRecord] = stream.iterator()
+    val kvRecords: Iterator[(ByteKey, BinaryRecord)] = binaryRecords.map(record => (new ByteKey(record.key), record))
 
-    val compactedRecords = if (!compacted) rawRecords else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, ByteRecord, ByteRecord]((v) => v, compactor, compactor)
-      spillMap.insertAll(rawRecords)
+    val compactedRecords = if (!compacted) kvRecords else {
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, BinaryRecord, BinaryRecord]((v) => v, compactor, compactor)
+      spillMap.insertAll(kvRecords)
       spillMap.iterator
     }
 
@@ -109,8 +109,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
           val serializedKey = keySerdeInstance.toBytes(k)
           val serializedValue = valueSerdeInstance.toBytes(v)
           val partition = partitioner.partition(serializedKey, getPartitions.length)
-          val record = new Record(serializedKey, serializedValue, ts)
-          new PartitionedRecord(partition, record)
+          new BinaryRecord(serializedKey, serializedValue, ts)
         }
 
         produced.add(stream.publish(iterator))

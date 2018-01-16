@@ -1,6 +1,8 @@
 package io.amient.affinity.stream;
 
 import com.typesafe.config.Config;
+import io.amient.affinity.core.Murmur2Partitioner;
+import io.amient.affinity.core.Partitioner;
 import io.amient.affinity.core.storage.Storage;
 
 import java.io.Closeable;
@@ -36,6 +38,10 @@ public interface BinaryStream extends Closeable {
         return bindClass().getConstructor(Storage.StorageConf.class).newInstance(conf);
     }
 
+    default Partitioner getDefaultPartitioner()  {
+        return new Murmur2Partitioner();
+    }
+
     int getNumPartitions();
 
     void subscribe();
@@ -44,17 +50,17 @@ public interface BinaryStream extends Closeable {
 
     long lag();
 
-    Iterator<Record<byte[], byte[]>> fetch(long minTimestamp);
+    Iterator<BinaryRecord> fetch(long minTimestamp);
 
     void commit();
 
-    long publish(Iterator<PartitionedRecord<byte[], byte[]>> iter);
+    long publish(Iterator<BinaryRecord> iter);
 
-    default Iterator<Record<byte[], byte[]>> iterator() {
-        return new Iterator<Record<byte[], byte[]>>() {
+    default Iterator<BinaryRecord> iterator() {
+        return new Iterator<BinaryRecord>() {
 
-            private Record<byte[], byte[]> record = null;
-            private Iterator<Record<byte[], byte[]>> i = null;
+            private BinaryRecord record = null;
+            private Iterator<BinaryRecord> i = null;
 
             @Override
             public boolean hasNext() {
@@ -63,11 +69,11 @@ public interface BinaryStream extends Closeable {
             }
 
             @Override
-            public Record<byte[], byte[]> next() {
+            public BinaryRecord next() {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 } else {
-                    Record<byte[], byte[]> result = record;
+                    BinaryRecord result = record;
                     seek();
                     return result;
                 }
