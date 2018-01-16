@@ -196,7 +196,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
     state1.storage.init()
     state0.storage.boot()
     state1.storage.boot()
-    //TODO #75 test that kafka default partitioner puts all records into the correct partitions
+    //TODO #75 test that kafka default partitioner + confluent avro serde partitions as expected
     (state0.numKeys + state1.numKeys) should equal(numWrites.get)
   }
 
