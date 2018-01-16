@@ -43,6 +43,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.actor.Partition.CreateKeyValueMediator
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -368,7 +369,7 @@ trait WebSocketSupport extends GatewayHttp {
     implicit val materializer = ActorMaterializer.create(context.system)
     implicit val timeout = Timeout(6 second)
 
-    service ? (key, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName) map {
+    service ? CreateKeyValueMediator(stateStoreName, key) map {
       case keyValueMediator: ActorRef =>
 
         /**

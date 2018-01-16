@@ -81,8 +81,8 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
     startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test") {
       override def preStart(): Unit = {
         super.preStart()
-        if (partition == 0) data.replace("B", "initialValueB")
-        else if (partition == 1) data.replace("A", "initialValueA")
+        data.replace("A", "initialValueA")
+        data.replace("B", "initialValueB")
       }
     })
   }

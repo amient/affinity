@@ -28,6 +28,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.stream.Record
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -270,7 +271,8 @@ class State[K, V](val storage: Storage,
       delete(key)
     } else {
       val valueBytes = valueSerde.toBytes(value)
-      storage.write(ByteUtils.bufToArray(key), valueBytes, recordTimestamp) map { offset =>
+      val record = new Record(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
+      storage.write(record) map { offset =>
         val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
         storage.memstore.put(key, memStoreValue, offset)
       }

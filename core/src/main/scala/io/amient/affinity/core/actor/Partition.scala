@@ -35,7 +35,8 @@ import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object Partition {
-  final val INTERNAL_CREATE_KEY_VALUE_MEDIATOR = "INTERNAL_CREATE_KEY_VALUE_MEDIATOR"
+  case class CreateKeyValueMediator(stateStore: String, key: Any) extends Routed
+
   case class BecomeStandby() extends Reply[Unit]
 
   case class BecomeMaster() extends Reply[Unit]
@@ -99,7 +100,7 @@ trait Partition extends ActorHandler with ActorState {
       sender.reply(msg) {}
       onBecomeStandby
 
-    case (key: Any, INTERNAL_CREATE_KEY_VALUE_MEDIATOR, stateStoreName: String) => try {
+    case CreateKeyValueMediator(stateStoreName: String, key: Any) => try {
       val state = getStateStore(stateStoreName)
       sender ! context.actorOf(Props(new KeyValueMediator(state, key)))
     } catch {

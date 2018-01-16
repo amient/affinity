@@ -3,7 +3,6 @@ package io.amient.affinity.core.actor
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
-import com.typesafe.config.Config
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.EventTime
 import io.amient.affinity.core.storage.Storage.StorageConf
@@ -38,7 +37,7 @@ trait GatewayStream extends Gateway {
             log.info(s"Resuming input stream processor: $identifier")
             processingPaused = false
           }
-          for (record: Record[Array[Byte], Array[Byte]] <- consumer.fetch(minTimestamp)) {
+          for (record <- consumer.fetch(minTimestamp)) {
             val key: K = keySerde.fromBytes(record.key)
             val value: V = valSerde.fromBytes(record.value)
             processor(new Record(key, value, record.timestamp))
@@ -109,8 +108,6 @@ trait GatewayStream extends Gateway {
 
   override def preStart(): Unit = {
     inputStreamManager.start()
-    //FIXME #89 maybeStartMigration() code can hang and there is no way of controlling an actor's preStart activity
-    //    maybeStartMigration()
     super.preStart()
   }
 
@@ -128,52 +125,6 @@ trait GatewayStream extends Gateway {
     this.clusterSuspended = suspended
     inputStreamManager.synchronized(inputStreamManager.notify())
   }
-
-
-  //TODO #89 Internal Repartitioner Tool - also this code assumes the key is avro serialized which may not be reasonable
-  //  private def maybeStartMigration(): Unit = {
-  //    if (config.hasPath("affinity.keyspace")) {
-  //      val workers = (for (
-  //        keyspaceToMigrate: String <- config.getObject("affinity.keyspace").keySet().toList;
-  //        stateToMigrate: String <- config.getObject(s"affinity.keyspace.$keyspaceToMigrate.state").keySet().toList
-  //      ) yield {
-  //        val keyspaceConfig = Keyspace.KeyspaceConf(config.getConfig(s"affinity.keyspace.${keyspaceToMigrate}"))
-  //        val stateConfig = keyspaceConfig.State(stateToMigrate)
-  //        val kafkaOutputStateConf = KafkaStorage.StateConf(stateConfig)
-  //        if (!kafkaOutputStateConf.Storage.OldTopic.isDefined) {
-  //          None
-  //        } else {
-  //          val targetNumParts = keyspaceConfig.NumPartitions()
-  //          val minTimestamp = stateConfig.MinTimestamp()
-  //          val kafkaInputStateConf: KafkaStateConf = KafkaStorage.StateConf(kafkaOutputStateConf.config())
-  //          val inputTopic = kafkaOutputStateConf.Storage.OldTopic()
-  //          if (kafkaOutputStateConf.Storage.Topic() != inputTopic) {
-  //            kafkaInputStateConf.Storage.Topic.setValue(inputTopic)
-  //            val keySerde = AvroSerde.create(config)
-  //            Some(new Repartitioner(keySerde, kafkaInputStateConf, minTimestamp, kafkaOutputStateConf, targetNumParts))
-  //          } else {
-  //            None
-  //          }
-  //        }
-  //      }).flatten
-  //
-  //      if (workers.size > 0) {
-  //        log.info(s"MIGRATING WITH ACTIVE WORKERS ${workers.filter(_.active).size}")
-  //        while (workers.filter(_.active).size > 0) {
-  //          workers.filter(_.active).foreach { worker =>
-  //            val copied = worker.copy()
-  //            if (copied == 0 && worker.maxLag() <= 0) {
-  //              worker.close()
-  //            } else {
-  //              log.info(s"COPIED $copied RECORD FROM ${worker.inputTopic} TO ${worker.outputTopic}")
-  //            }
-  //          }
-  //        }
-  //        log.info(s"MIGRATION COMPLETED")
-  //      }
-  //    }
-  //
-  //  }
 
 }
 

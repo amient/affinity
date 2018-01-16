@@ -19,9 +19,13 @@
 
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.Murmur2Partitioner;
+import io.amient.affinity.core.Partitioner;
 import io.amient.affinity.core.config.CfgCls;
 import io.amient.affinity.core.config.CfgLong;
 import io.amient.affinity.core.config.CfgStruct;
+import io.amient.affinity.stream.BinaryRecord;
+import io.amient.affinity.stream.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +59,7 @@ public abstract class Storage implements Closeable {
     final public MemStore memstore;
     final public String id;
     final public int partition;
+    final protected Partitioner defaultPartitioner = new Murmur2Partitioner();
 
     public Storage(String id, StateConf conf, int partition) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         this.partition = partition;
@@ -102,12 +107,10 @@ public abstract class Storage implements Closeable {
     }
 
     /**
-     * @param key       record key
-     * @param value     record value
-     * @param timestamp logical event time
+     * @param record    record with binary key, binary value and event timestamp
      * @return Future with long offset/audit increment
      */
-    abstract public Future<Long> write(byte[] key, byte[] value, long timestamp);
+    abstract public Future<Long> write(Record<byte[], byte[]> record);
 
     abstract public Future<Long> delete(byte[] key);
 

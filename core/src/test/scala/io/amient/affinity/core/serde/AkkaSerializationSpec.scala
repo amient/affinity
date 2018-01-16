@@ -25,6 +25,7 @@ import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Partition
+import io.amient.affinity.core.actor.Partition.CreateKeyValueMediator
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.transaction.TestKey
@@ -43,14 +44,31 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
     }
   }
 
+  "Akka-serialized String bytes" must {
+    "be identical to AvroSerde bytes - this is important for murmur2 hash partitioner" in {
+      val in = "test-string"
+      val bytes = SerializationExtension(system).serialize(in).get
+      val bytes2 = new MemorySchemaRegistry().toBytes(in)
+      bytes.mkString(".") should be(bytes2.mkString("."))
+    }
+  }
+
   "TupleSerde" must {
     "work with wrapped tuple3" in {
-      val in = (1000, Partition.INTERNAL_CREATE_KEY_VALUE_MEDIATOR, "graph")
+      val in = (1000, 1.1, "graph")
       val bytes = SerializationExtension(system).serialize(in).get
-      val out = SerializationExtension(system).deserialize(bytes, classOf[Tuple3[Int, String, String]]).get
+      val out = SerializationExtension(system).deserialize(bytes, classOf[Tuple3[Int, Double, String]]).get
       out should be(in)
     }
 
+  }
+
+  "Java serializer" must {
+    "work with internal messages" in {
+      val in = CreateKeyValueMediator("state", 1)
+      val bytes = SerializationExtension(system).serialize(in).get
+      println(bytes.mkString("."))
+    }
   }
 
   "OptionSerde" must {

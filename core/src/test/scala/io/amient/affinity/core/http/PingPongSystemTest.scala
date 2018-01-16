@@ -22,18 +22,22 @@ package io.amient.affinity.core.http
 import akka.http.javadsl.model.ContentTypes
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.core.util.{Scatter, SystemTestBase}
 import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.language.{existentials, implicitConversions, postfixOps}
+
+case class ClustrPing() extends Scatter[String] {
+  override def gather(r1: String, r2: String) = r2
+}
 
 class PingPongSystemTest extends FlatSpec with SystemTestBase with BeforeAndAfterAll with Matchers {
 
@@ -45,14 +49,16 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with BeforeAndAfte
 
     implicit val materializer = ActorMaterializer.create(context.system)
 
-    val regionService = keyspace("region")
+    implicit val scheduler = context.system.scheduler
+
+    val ks = keyspace("region")
 
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
-        delegateAndHandleErrors(response, regionService ? "ping") {
+        delegateAndHandleErrors(response, ks gather ClustrPing() ) {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
       case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
@@ -65,7 +71,7 @@ class PingPongSystemTest extends FlatSpec with SystemTestBase with BeforeAndAfte
   gateway.awaitClusterReady {
     region.startContainer("region", List(0,1), new Partition {
       override def handle: Receive = {
-        case "ping" => sender ! "pong"
+        case req@ClustrPing() => sender.reply(req)("pong")
       }
     })
   }

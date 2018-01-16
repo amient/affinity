@@ -29,6 +29,7 @@ import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.{StateConf, Storage}
 import io.amient.affinity.core.util.MappedJavaFuture
+import io.amient.affinity.stream.{BinaryRecord, Record}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -56,7 +57,6 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
-    val OldTopic = string("kafka.old.topic", false)
     val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
     val Producer = struct("kafka.producer", new KafkaProducerConf, false)
@@ -78,7 +78,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   private val conf = KafkaStorage.StateConf(stateConf).Storage
 
   final val topic = conf.Topic()
-  final val ttlSec = stateConf.TtlSeconds()
+  final val ttlMs = stateConf.TtlSeconds() * 1000L
 
   private val producerProps = new Properties() {
     if (conf.Producer.isDefined) {
@@ -114,7 +114,9 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     put("value.deserializer", classOf[ByteArrayDeserializer].getName)
   }
 
-  ensureCorrectTopicConfiguration()
+  ensureCorrectTopicConfiguration(
+    conf.BootstrapServers(), topic, numPartitions, conf.ReplicationFactor().toShort, ttlMs)
+
 
   protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
 
@@ -128,12 +130,10 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
     val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
 
-    val tp = new TopicPartition(topic, partition)
-    val consumerPartitions = util.Arrays.asList(tp)
-
     override def run(): Unit = {
-
       try {
+        val tp = new TopicPartition(topic, partition)
+        val consumerPartitions = util.Arrays.asList(tp)
 
         kafkaConsumer.assign(consumerPartitions)
         val endOffset: Long = kafkaConsumer.endOffsets(consumerPartitions).get(tp) - 1
@@ -236,8 +236,10 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     }
   }
 
-  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
-    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))) {
+  def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
+    val p = if (partition < 0) defaultPartitioner.partition(record.key, numPartitions) else partition
+    val producerRecord = new ProducerRecord(topic, p, record.timestamp, record.key, record.value)
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }
   }
@@ -248,7 +250,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     }
   }
 
-  private def ensureCorrectTopicConfiguration() {
+  private def ensureCorrectTopicConfiguration(bootstrapServer: String, topic: String, numPartitions: Int, replicationFactor: Short, ttlMs: Long): Unit = {
     log.warn(s"Using Kafka version < 0.11 - cannot auto-configure topics")
   }
 

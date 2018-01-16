@@ -25,7 +25,7 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
       ),
       new util.HashSet[String],
       new util.HashSet[String]))
-    val affinityP = affinityPartitioner.partition(key, serializedKey, 4)
+    val affinityP = affinityPartitioner.partition(serializedKey, 4)
     kafkaP should equal(affinityP)
   }
 

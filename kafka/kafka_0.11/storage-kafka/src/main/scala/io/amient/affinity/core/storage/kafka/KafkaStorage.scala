@@ -29,9 +29,10 @@ import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.{StateConf, Storage}
 import io.amient.affinity.core.util.MappedJavaFuture
+import io.amient.affinity.stream.{BinaryRecord, Record}
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
 import org.apache.kafka.common.errors.{TopicExistsException, WakeupException}
@@ -58,7 +59,6 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
-    val OldTopic = string("kafka.old.topic", false)
     val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
     val Producer = struct("kafka.producer", new KafkaProducerConf, false)
@@ -130,12 +130,10 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
     val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
 
-    val tp = new TopicPartition(topic, partition)
-    val consumerPartitions = util.Arrays.asList(tp)
-
     override def run(): Unit = {
-
       try {
+        val tp = new TopicPartition(topic, partition)
+        val consumerPartitions = util.Arrays.asList(tp)
 
         kafkaConsumer.assign(consumerPartitions)
         val endOffset: Long = kafkaConsumer.endOffsets(consumerPartitions).get(tp) - 1
@@ -238,8 +236,10 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     }
   }
 
-  def write(key: Array[Byte], value: Array[Byte], timestamp: Long): Future[java.lang.Long] = {
-    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, timestamp, key, value))) {
+  def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
+    val p = if (partition < 0) defaultPartitioner.partition(record.key, numPartitions) else partition
+    val producerRecord = new ProducerRecord(topic, p, record.timestamp, record.key, record.value)
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }
   }
@@ -252,13 +252,13 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
   private def ensureCorrectTopicConfiguration() {
     val adminProps = new Properties() {
-      put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, producerProps.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
+      put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, conf.BootstrapServers())
     }
     val admin = AdminClient.create(adminProps)
     try {
       val adminTimeoutMs = 15000
-      val replicationFactor = conf.ReplicationFactor().toShort
       val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
+      val replicationFactor = conf.ReplicationFactor().toShort
       val topicConfigs = Map(
         TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
         TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
@@ -313,5 +313,4 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
       admin.close()
     }
   }
-
 }

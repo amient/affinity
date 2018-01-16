@@ -20,6 +20,7 @@
 package io.amient.affinity.core.http
 
 import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.actor.Routed
 
 
 object Side extends Enumeration {
@@ -27,11 +28,12 @@ object Side extends Enumeration {
   val LEFT, RIGHT = Value
 }
 
-case class ID(val id: Int) extends AvroRecord {
-  override def hashCode(): Int = id.hashCode()
+case class ID(id: Int) extends AvroRecord with Routed {
+  override def key = id
 }
 
-case class Base(val id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq()) extends AvroRecord {
-  override def hashCode(): Int = id.hashCode()
+case class Base(id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq())
+  extends AvroRecord with Routed {
+  override def key = id.id
 }
 

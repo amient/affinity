@@ -19,13 +19,15 @@
 package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.transaction.Instruction
 
-final case class DeleteComponent(cid: Int) extends AvroRecord with Instruction[Option[Component]] {
-  override def hashCode(): Int = cid.hashCode
+final case class DeleteComponent(cid: Int) extends AvroRecord with Routed with Instruction[Option[Component]] {
 
   override def reverse(c: Option[Component]) = c match {
     case None => None
     case Some(result) => Some(UpdateComponent(cid, result))
   }
+
+  override def key = cid
 }

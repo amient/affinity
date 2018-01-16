@@ -19,14 +19,16 @@
 
 package io.amient.affinity.core.actor
 
+import java.lang
+
 import akka.actor.Actor
 import akka.routing._
 import akka.serialization.SerializationExtension
 import com.typesafe.config.Config
-import io.amient.affinity.core.{ObjectHashPartitioner, ack}
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.StateConf
 import io.amient.affinity.core.util.{Reply, ScatterGather}
+import io.amient.affinity.core.{Murmur2Partitioner, ack}
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -44,8 +46,13 @@ object Keyspace {
   }
 
   final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
+
   final case class ServiceAvailability(group: String, suspended: Boolean)
 
+}
+
+trait Routed {
+  def key: Any
 }
 
 class Keyspace(config: Config) extends Actor {
@@ -58,15 +65,23 @@ class Keyspace(config: Config) extends Actor {
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
-  //#75 TODO partitioning based on serialized bytes of the key,
-  //either mixed trait Key or Tuple will be required for correct routing
-  //val serialization = SerializationExtension(context.system)
-  val partitioner = new ObjectHashPartitioner
+  val serialization = SerializationExtension(context.system)
+
+  val partitioner = new Murmur2Partitioner
 
   import context.dispatcher
 
 
   override def receive: Receive = {
+
+    case message: Routed => getRoutee(message.key).send(message, sender)
+
+    case req@ScatterGather(message: Reply[Any], t) => sender.replyWith(req) {
+      val recipients = routes.values
+      implicit val timeout = t
+      implicit val scheduler = context.system.scheduler
+      Future.sequence(recipients.map(x => x.ref ack message))
+    }
 
     /**
       * relying on Region to assign partition name equal to physical partition id
@@ -89,36 +104,32 @@ class Keyspace(config: Config) extends Actor {
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
 
-    case req@ScatterGather(message: Reply[Any], t) => sender.replyWith(req) {
-      val recipients = routes.values
-      implicit val timeout = t
-      implicit val scheduler = context.system.scheduler
-      Future.sequence(recipients.map(x => x.ref ack message))
-    }
-
-    case message => getRoutee(message).send(message, sender)
-
   }
 
-  private def getRoutee(message: Any): ActorRefRoutee = {
-    val partition = message match {
-      case (t1,_) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case (t1,_, _, _, _, _, _, _, _, _, _) => partitioner.partition(t1, null, numPartitions)
-      case v => partitioner.partition(v, null, numPartitions)
+  private def getRoutee(key: Any): ActorRefRoutee = {
+
+    val routableKey: AnyRef = key match {
+      case ref: AnyRef => ref
+      case b: Byte => new lang.Byte(b)
+      case c: Char => new lang.Character(c)
+      case z: Boolean => new lang.Boolean(z)
+      case s: Short => new lang.Short(s)
+      case i: Int => new lang.Integer(i)
+      case l: Long => new lang.Long(l)
+      case f: Float => new lang.Float(f)
+      case d: Double => new lang.Double(d)
     }
+
+    val serializedKey = serialization.serialize(routableKey).get
+    val partition = partitioner.partition(serializedKey, numPartitions)
+
+    //log.trace(serializedKey.mkString(".") + " over " + numPartitions + " to " + partition)
 
     routes.get(partition) match {
       case Some(routee) => routee
       case None =>
         throw new IllegalStateException(s"Partition $partition is not represented in the cluster")
+
       /**
         * This means that no region has registered the partition which may happen for 2 reasons:
         * 1. all regions representing that partition are genuinely down and not coming back
