@@ -21,28 +21,60 @@
 
 ## Basic principles
 
- - 2 types of gateway: Http and Stream - gateways are the entry to the system from outside
- - Stream Gateway can be used to simply ingest/process external stream
- - Http Gateway can be used to define HTTP methods to access the data inside
+Internally, as well as externally Affinity is a fully event-driven system.
+On the outside it offers two interfaces: Stream and Http which  are the entry
+to the system:
+ - Stream Interface can be used to simply ingest/process external stream
+ - Http Interface can be used to define HTTP methods to access the data inside
+
+Both of these interfaces communicate with the internal system only through
+akka messages which can be simple ! Tell flows, ? Ask flows or ?? Ack
+flows - these a strongly typed versions of Ask with retries, provided by the core module
+all the way to complex internal event chains which may result in zero or
+more events being fired back to the external systems.
 
 Underneath the Http and Stream Gateway layer there is a common Akka Gateway
-that represents all of the keyspaces as simple actors each managing a set
-of partitions - same keyspace can be referenced by any number of nodes
-with a full consistency guaranteed (relying on partitioning rather then vertical concurrency)
+that represents all of the Keyspaces as simple actors each managing a set
+of partitions - same Keyspace can be referenced by any number of nodes
+with a full consistency guaranteed.
 
 Applications typically extend the common Gateway to create traits of functionality
 around a keyspace and then mixes them into a higher order traits where orchestrated
 behaviours can be implemented. The final composite logic is attached to either
 a StreamGateway, HttpGateway or both.
 
-Actors that represent Keyspaces can be referenced in any of the Gateway traits
-    and take care of the routing of the messages which is designed to mimic
-    the default partitioning scheme of apache kafka - this is not necessary
-    for correct functioning of the system as the partitioning scheme is
-    completely embedded within the Affinity universe but it helps to know
-    that an external kafka producer can be used with its default partitioner
-    to create a topic which will be completely compatible with affinity's view
-    of the data - this helps with migrations and other miscellaneous ops.
+Actors that represent Keyspaces can be referenced in any of the Gateway traits and take
+care of the routing of the messages which is designed to mimic the default partitioning
+scheme of apache kafka - this is not necessary for correct functioning of the system as
+the partitioning scheme is completely embedded within the Affinity universe but it helps
+to know that an external kafka producer can be used with its default partitioner to create
+a topic which will be completely compatible with affinity's view of the data - this helps
+with migrations and other miscellaneous ops.
+
+Keyspace Actor routes all request to Partition Actors which implement the logic over
+the data partition - each Keyspace is therefore a dynamic Akka Router which
+maintains a copy of the active Partition Actors using internal instance of Coordinator
+(see distributed coordination section below).
+
+Gateways are hence the orchestration layer while Keyspaces are completely
+constrained to the partition scope. (There is an experimintal piece of code around
+lightweight transactions that can be wrapped around orchestrated logic which use reversible
+Instructions to compensate failed operations but this is probably going to be abandonned
+as for it to operate consistently distributed locks would have to be used)
+
+### The Http Layer
+
+In the Http Gateway, the HTTP Interface is completely async done with Akka Http.
+HTTP Handlers participate in handling the incoming HTTP Requests by chaining the
+actor handle: Receive method of the GatewayHttp trait.
+
+Handlers translate requests into Akka Messages which may be routed to a partition
+or handled directly in the gateway or by orchestrating an internal event flow that
+must conclude eventuall in fulfilling the response promise.
+
+WebSockets can be attached to Key-Value entities which then receive automatically
+all changes to that entity and the concept can be also extended to push notification
+via external delivery system like Google FCM or Apple APN.
 
 
 ## Serialization
@@ -84,6 +116,17 @@ defined number of partitions but each partition can be served by multiple
 instances, typically on different nodes, at the same time. If there are multiple
 Partition Actors for the same physical partition Coordinator uses distributed
 logic to choose one of them as master and the others become standby.
+
+On becoming a Master, the Partition Actor stops consuming (tailing) the the
+underlying topic, because the master receives all the writes, its in-memory
+state is consistent and it only publishes to the kafka for future bootstrap
+and keeping other standby(s) for the partitions up to date.
+
+On becoming a Standby, the Partition Actor resumes consuming the underlying topic
+and stops receiving until it again becomes a master. Standby is not a read replica
+at the moment but it could be an option but the systems tend to be quite simple
+and still scale well horizontally by the means of partitioning rather then
+opening the door for vertical concurrency.
 
 ## State Management
 
@@ -139,57 +182,17 @@ a read-write api on top of its stores, the global state consistency
 is not as strong as that of partitioned keyspace because there is not
 a single actor guarding it.
 
-## The Http Layer
-
- - In Http Gateway HTTP Interface is completely async done with Akka Http.
- - HTTP Handlers participate in handling the incoming HTTP Requests
-    by chaining the handle: Receive method of the GatewayHttp Actor
- - Handlers translate requests into Akka Messages - they can either ? Ask
-    and get response which they turn into HTTP Response or just ! Tell
-    and respond with No Content or Accepted, etc.
- - WebSockets can be attached to Key-Value entities which then receive
-    automatically all changes to that entity as well as any other
-    user-defined events
- - Each Keyspace is therefore a dynamic Akka Router which maintains a copy
-    of the active Partition Actors, kept up to date by a pluggable
-    Coordinator (ZooKeeper and Embedded embedded implementations provided)
- - Each Handler has access to all Keyspace Actors by extending the Gateway
-    as mentioned above. Any task that needs to be handled by a partitioned
-    logic is passed to on of the Keyspace Actor. This may be a simple forward or
-    it can be an orchestrated sequence of Asks and Tells.
- - Gateways are hence the orchestration layer while Keyspaces are completely
-    constrained to the partition scope.
- - Keyspace Actor routes all request to Partition Actors which implement
-    the logic over the data partition and respond to the sender which
-    will ultimately be the calling Handler but sometimes the caller
-    may be other Services in the cluster. The partition doesn't have
-    any knowledge of the larger cluster it is part of.
- - On becoming a Master, the Partition Actor stops consuming (tailing)
-    the the underlying topic, because the master receives all the writes,
-    its in-memory state is consistent and it only publishes to the kafka
-    for future bootstrap and keeping other standby(s) for the partitions
-    up to date.
- - On becoming a Standby, the Partition Actor resumes consuming the
-     underlying topic and stops receiving until it again becomes a master.
- - Standby is not a read replica at the moment but it could be an option
- - custom Akka ack implementation which is strongly typed
- - Lightweight Transactions can be wrapped around orchestrated logic
-    which use reversible Instructions to rollback failed operations
- - Support for different Avro schema providers which are implementations of
-    a generalised concept similar to Confluent Schema Registry (for which
-    an implementation is provided) - this allows to use embedded schema
-    provider for development and testing while in production can be
-    deployed with full distributed schema registry. These avro registries
-     are implemented with standard Akka Serialisation and are at the same
-     time compatible with Confluent Schema Registry which means the same
-     serialization is used for Akka transport, MemStores and Storage.
-
-
 # Configuration
 
- - Config validation layer on top of typesafe.Config
- - ...
+Affinity uses HOCON configuration which is layered on top of set of reference.conf files
+that includes Akka default and Affinity defaults.
 
+Applications typically have their own default configuration layered on top of the reference
+files and a set of thin, deployment specific conf files.
+
+Internally Affinity has it's own type-safe configuration abstraction that is initialized
+from the HOCON conf files. These type-safe configuration descriptors handles validation,
+enforcement and messaging around invalid configuration.
 
 # Development 
 
