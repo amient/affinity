@@ -66,10 +66,10 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
   override def subscribe(partition: Int): Unit = {
     val tp = new TopicPartition(topic, partition)
     kafkaConsumer.assign(List(tp))
-    val startOffset = kafkaConsumer.beginningOffsets(List(tp))(tp).toLong
-    progress = kafkaConsumer.endOffsets(List(tp))(tp) match {
-      case endOffset => (Math.max(kafkaConsumer.position(tp), startOffset) - 1, endOffset.toLong - 1)
-    }
+    val position = kafkaConsumer.position(tp)
+    val startOffset = kafkaConsumer.beginningOffsets(List(tp))(tp)
+    val endOffset = kafkaConsumer.endOffsets(List(tp))(tp)
+    progress = (math.max(position, startOffset) - 1, endOffset - 1)
   }
 
   override def lag(): Long = {
@@ -77,25 +77,21 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
   }
 
   override def fetch(minTimestamp: Long): util.Iterator[BinaryRecord] = {
-    val kafkaRecords = kafkaConsumer.poll(6000).iterator()
+    val kafkaRecords = kafkaConsumer.poll(6000)
     var fastForwarded = false
-    val filteredKafkaRecords = kafkaRecords.filter {
-      record =>
-        val isAfterMinTimestamp = record.timestamp() >= minTimestamp
-        val tp = new TopicPartition(record.topic, record.partition)
-        if (record.offset > progress._1) {
-          progress = (record.offset, progress._2)
-        }
-        if (!isAfterMinTimestamp && !fastForwarded) {
-          kafkaConsumer.offsetsForTimes(Map(new TopicPartition(record.topic(), record.partition()) -> new java.lang.Long(minTimestamp))).foreach {
-            case (tp, oat) => if (oat.offset > record.offset) {
-              log.info(s"Fast forward partition ${record.topic()}/${record.partition()} because record.timestamp(${record.timestamp()}) < $minTimestamp")
-              kafkaConsumer.seek(tp, oat.offset())
-            }
+    val filteredKafkaRecords = kafkaRecords.iterator().filter { record =>
+      val isAfterMinTimestamp = record.timestamp() >= minTimestamp
+      if (record.offset > progress._1) progress = (record.offset, progress._2)
+      if (!isAfterMinTimestamp && !fastForwarded) {
+        kafkaConsumer.offsetsForTimes(Map(new TopicPartition(record.topic(), record.partition()) -> new java.lang.Long(minTimestamp))).foreach {
+          case (tp, oat) => if (oat.offset > record.offset) {
+            log.info(s"Fast forward partition ${record.topic()}/${record.partition()} because record.timestamp(${record.timestamp()}) < $minTimestamp")
+            kafkaConsumer.seek(tp, oat.offset())
           }
-          fastForwarded = true
         }
-        isAfterMinTimestamp
+        fastForwarded = true
+      }
+      isAfterMinTimestamp
     }
 
     filteredKafkaRecords.map {

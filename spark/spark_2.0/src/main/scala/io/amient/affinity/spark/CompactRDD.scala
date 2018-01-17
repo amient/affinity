@@ -19,8 +19,6 @@
 
 package io.amient.util.spark
 
-import java.util
-
 import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.EventTime
@@ -96,7 +94,6 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
 
     def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
       val stream = streamBinder
-      val partitioner = new Murmur2Partitioner
       val keySerdeInstance = keySerde
       val valueSerdeInstance = valueSerde
 
@@ -108,7 +105,6 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
           }
           val serializedKey = keySerdeInstance.toBytes(k)
           val serializedValue = valueSerdeInstance.toBytes(v)
-          val partition = partitioner.partition(serializedKey, getPartitions.length)
           new BinaryRecord(serializedKey, serializedValue, ts)
         }
 

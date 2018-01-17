@@ -67,7 +67,7 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
     "work with internal messages" in {
       val in = CreateKeyValueMediator("state", 1)
       val bytes = SerializationExtension(system).serialize(in).get
-      println(bytes.mkString("."))
+      println(bytes.mkString(".")) //TODO assert this is the case
     }
   }
 
