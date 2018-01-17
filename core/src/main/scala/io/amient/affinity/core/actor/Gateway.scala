@@ -56,7 +56,7 @@ trait Gateway extends ActorHandler with ActorState {
   private val broadcasts = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def broadcast[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = try {
+  def global[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = try {
     broadcasts.get(broadcastName) match {
       case Some((broadcastState, _)) => broadcastState.asInstanceOf[State[K, V]]
       case None =>

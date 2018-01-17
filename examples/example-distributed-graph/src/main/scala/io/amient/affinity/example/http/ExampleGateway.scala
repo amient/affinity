@@ -59,7 +59,7 @@ class ExampleGatewayRoot extends GatewayHttp {
   /**
     * settings is a broadcast memstore which holds an example set of api keys for custom authentication.
     */
-  val settings: State[String, ConfigEntry] = broadcast[String, ConfigEntry]("settings")
+  val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   override def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {
     case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)

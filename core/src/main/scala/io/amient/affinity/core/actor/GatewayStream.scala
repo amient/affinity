@@ -15,11 +15,75 @@ import scala.util.control.NonFatal
 
 trait GatewayStream extends Gateway {
 
+  @volatile private var closed = false
+  @volatile private var clusterSuspended = true
+  @volatile private var processingPaused = true
+  private val lock = new Object
+
+  private val log = Logging.getLogger(context.system, this)
+
+  private val config = context.system.settings.config
+
+  type InputStreamProcessor[K, V] = Record[K, V] => Unit
+
+  private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
+
+  def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
+    val streamConfig = new StorageConf().apply(config.getConfig(s"affinity.node.gateway.stream.$identifier"))
+    val keySerde: AbstractSerde[K] = Serde.of[K](config)
+    val valSerde: AbstractSerde[V] = Serde.of[V](config)
+    declaredInputStreamProcessors += new RunnableInputStream[K, V](identifier, keySerde, valSerde, streamConfig, processor)
+  }
+
+  val inputStreamManager = new Thread {
+    override def run(): Unit = {
+      val inputStreamProcessors = declaredInputStreamProcessors.result()
+      val inputStreamExecutor = Executors.newFixedThreadPool(inputStreamProcessors.size)
+      try {
+        inputStreamProcessors.foreach(inputStreamExecutor.submit)
+        while (!closed) {
+          //FIXME kafka consumers may hang in the poll() method so we need something to nudge it like inputStreamProcessors.foreach(_.wakeup())
+          inputStreamProcessors.foreach { p =>
+            p.synchronized(p.notify())
+          }
+          lock.synchronized(lock.wait(1000))
+        }
+        inputStreamExecutor.shutdown()
+        inputStreamExecutor.awaitTermination(10, TimeUnit.SECONDS) //TODO use shutdown timeout
+      } finally {
+        inputStreamExecutor.shutdownNow()
+      }
+    }
+  }
+
+  override def preStart(): Unit = {
+    inputStreamManager.start()
+    super.preStart()
+  }
+
+  override def postStop(): Unit = {
+    closed = true
+    try {
+      lock.synchronized(lock.notify())
+    } finally {
+      super.postStop()
+    }
+  }
+
+  override def onClusterStatus(suspended: Boolean) = synchronized {
+    if (clusterSuspended != suspended) {
+      this.clusterSuspended = suspended
+      super.onClusterStatus(suspended)
+      lock.synchronized(lock.notify())
+    }
+  }
+
   class RunnableInputStream[K, V](identifier: String,
                                   keySerde: AbstractSerde[K],
                                   valSerde: AbstractSerde[V],
                                   streamConfig: StorageConf,
                                   processor: InputStreamProcessor[K, V]) extends Runnable {
+
     val minTimestamp = streamConfig.MinTimestamp()
     val consumer: BinaryStream = BinaryStream.bindNewInstance(streamConfig)
 
@@ -42,6 +106,7 @@ trait GatewayStream extends Gateway {
             val value: V = valSerde.fromBytes(record.value)
             processor(new Record(key, value, record.timestamp))
           }
+          //FIXME this type of processing has at-most-once guarantees
           val now = System.currentTimeMillis()
           // TODO configurable commit interval, currently 10s hard-coded
           if (now - lastCommit > 10000) {
@@ -59,72 +124,6 @@ trait GatewayStream extends Gateway {
     }
   }
 
-  private val log = Logging.getLogger(context.system, this)
-
-  private val config = context.system.settings.config
-
-  type InputStreamProcessor[K, V] = Record[K, V] => Unit
-
-  private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
-
-  @volatile private var closed = false
-  @volatile private var clusterSuspended = true
-  @volatile private var processingPaused = true
-
-  def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = new StorageConf().apply(config.getConfig(s"affinity.node.gateway.stream.$identifier"))
-    val keySerde: AbstractSerde[K] = Serde.of[K](config)
-    val valSerde: AbstractSerde[V] = Serde.of[V](config)
-    declaredInputStreamProcessors += new RunnableInputStream[K, V](identifier, keySerde, valSerde, streamConfig, processor)
-  }
-
-  val inputStreamManager = new Thread {
-    var suspended = true
-
-    override def run(): Unit = {
-      val inputStreamProcessors = declaredInputStreamProcessors.result()
-      val inputStreamExecutor = Executors.newFixedThreadPool(inputStreamProcessors.size)
-      try {
-        inputStreamProcessors.foreach(inputStreamExecutor.submit)
-        while (!closed) {
-          //FIXME kafka consumers may hang in the poll() method so we need something to nudge it like inputStreamProcessors.foreach(_.wakeup())
-          if (suspended != clusterSuspended) {
-            suspended = clusterSuspended
-            if (!suspended) {
-              inputStreamProcessors.foreach { p =>
-                p.synchronized(p.notify())
-              }
-            }
-          }
-          synchronized(wait(1000))
-        }
-        inputStreamExecutor.shutdown()
-        inputStreamExecutor.awaitTermination(10, TimeUnit.SECONDS) //TODO use shutdown timeout
-      } finally {
-        inputStreamExecutor.shutdownNow()
-      }
-    }
-  }
-
-  override def preStart(): Unit = {
-    inputStreamManager.start()
-    super.preStart()
-  }
-
-  override def postStop(): Unit = {
-    closed = true
-    try {
-      inputStreamManager.synchronized(inputStreamManager.notify())
-    } finally {
-      super.postStop()
-    }
-  }
-
-  override def onClusterStatus(suspended: Boolean) = {
-    super.onClusterStatus(suspended)
-    this.clusterSuspended = suspended
-    inputStreamManager.synchronized(inputStreamManager.notify())
-  }
 
 }
 
