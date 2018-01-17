@@ -56,6 +56,15 @@ the data partition - each Keyspace is therefore a dynamic Akka Router which
 maintains a copy of the active Partition Actors using internal instance of Coordinator
 (see distributed coordination section below).
 
+The system doesn't have any dynamic partition assignment algorithm implemented but there
+are some options being considered - all partitions are assigned by configuration. Because
+the partitions often leave a sizable footprint in the form of indexes on a local disk
+It is therefore not desirable to implement a naive partition assignment but the manual static
+assignment is not good either so there are some discussions around a kind of
+resonance with the previous state until certain thershold of inbalance is created
+by adding or removing nodes, increasing replication factor, etc. - the ground work
+for this has been already done at the MemStore level, see State Management section below.
+
 Gateways are hence the orchestration layer while Keyspaces are completely
 constrained to the partition scope. (There is an experimintal piece of code around
 lightweight transactions that can be wrapped around orchestrated logic which use reversible
@@ -124,19 +133,22 @@ and keeping other standby(s) for the partitions up to date.
 
 On becoming a Standby, the Partition Actor resumes consuming the underlying topic
 and stops receiving until it again becomes a master. Standby is not a read replica
-at the moment but it could be an option but the systems tend to be quite simple
-and still scale well horizontally by the means of partitioning rather then
-opening the door for vertical concurrency.
+at the moment but it could be an option however the applications implemented
+with the current master-exclusivity tend to be quite simple and still scale well
+horizontally by the means of partitioning - read-replicas would break the possibility
+ of total consistency when required.
 
 ## State Management
 
-All data is stored in the physical storage in the form
-of change log, e.g. Kafka compacted topic. Each physical partition
-can have multiple active API Partitions, one of which is 
+All data is stored 1) in the persistent storage in the form
+of change log, e.g. Kafka compacted topic and 2) in a memstore implementation
+which like SimpleMap or RocksDb. Each physical partition has one exclusive owner
+- master - for both reads and writes which is then tailed by all standby replicas.
+So a single Storage Partition can have multiple active Affinity Partitions, one of which is
 always a master and the remainder are standby(s).
 
-As mentioned elsewhere, Keyspace is composed of Partitions and each
-Partition can contain multilple state stores whose partitioning scheme will
+As mentioned elsewhere, Keyspace (Actor) manages a set of Partitions (also Actors)
+and each Partition can hold multilple state stores whose partitioning scheme will
 be aligned with that of the entire overarching Keyspace, however each
 state can define specific details about how to store the data, what type
 of memstore to use, what TTL to observe and more.
@@ -150,9 +162,8 @@ For kafka 0.11 and higher there is an AdminClient that is used to
    the compaction, replication, retention and other aspects derived from
    the overarching Keyspace properties and individual State properties.
 
-In the most consistent setup, master takes all reads and writes 
-and records each write in the storage change log while reads
-come directly from the in-memory data set.
+Master takes all reads and writes and records each write in the storage change log
+while reads come directly from the in-memory data set.
 After storage has accepted the write, master updates its own 
 in-memory state - this way the level of data loss acceptance can
 be controlled by simply configuring the appropriate ack level
@@ -163,11 +174,23 @@ in-memory state up-to-date. In in the event of master failure,
 one of the standby(s) is picked to be the new master. This way
 zero-downtime is possible for both failures as well as upgrades.
 
-In cases where eventual read consistency is sufficient, standby(s) 
+As described above, the system currently doesn't have any dynamic partition assignment
+as the assignment algorithm must not be naive and the system should tend to
+stay in the assignment if the cost of moving the partition is too high, until
+a certain thershold of imbalance is reached. The state partitions can already be rebuilt
+from the changelog whenever they move host while each host maintains last known
+checkpoint for all partitions it has hosted previously.
+For the partitions that are currently assigned to a host bootstrap is practically instantaneous
+while for partitions that have been hosted before but have been later reassigned
+the bootsrap may be partial. While still some partitions may need to be bootstrapped completely
+in case of completely new assignment or checkpoint corruption.
+
+
+### Notes on consistency
+
+In cases where eventual read consistency is sufficient, standby(s)
 can also be used as read replicas (this is currently not implemented
 but the design is expecting this to come in future).
-
-### Note on consistency of global state stores
 
 The State described above applies to Keyspaces - these are represented
 by a Keyspace actor that routes all messages to all of its Partition
@@ -175,11 +198,11 @@ actors. Since actors are single-threaded and there is only one master
 actor per partition the integrity of reads and writes is guaranteed.
 
 Sometimes it is necessary to use global state rather than partitioned
-keyspace. In this case all gateways that hold reference to a global
+Keyspace. In this case all gateways that hold reference to a global
 state see the same data. It is a useful concept, similar to broadcast
-variables in batch processors but because affinity is provides
+variables in batch processors but because Affinity provides
 a read-write api on top of its stores, the global state consistency
-is not as strong as that of partitioned keyspace because there is not
+is not as strong as that of partitioned Keyspace because there is not
 a single actor guarding it.
 
 # Configuration
@@ -193,6 +216,8 @@ files and a set of thin, deployment specific conf files.
 Internally Affinity has it's own type-safe configuration abstraction that is initialized
 from the HOCON conf files. These type-safe configuration descriptors handles validation,
 enforcement and messaging around invalid configuration.
+
+TODO ..
 
 # Development 
 
