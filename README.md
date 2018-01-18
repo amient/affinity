@@ -66,10 +66,10 @@ by adding or removing nodes, increasing replication factor, etc. - the ground wo
 for this has been already done at the MemStore level, see State Management section below.
 
 Gateways are hence the orchestration layer while Keyspaces are completely
-constrained to the partition scope. (There is an experimintal piece of code around
+constrained to the partition scope. (There ws an experimintal piece of code around
 lightweight transactions that can be wrapped around orchestrated logic which use reversible
-Instructions to compensate failed operations but this is probably going to be abandonned
-as for it to operate consistently distributed locks would have to be used)
+Instructions to compensate failed operations but this was abandonned as for it to operate
+consistently distributed locks would have to be used)
 
 ### The Http Layer
 

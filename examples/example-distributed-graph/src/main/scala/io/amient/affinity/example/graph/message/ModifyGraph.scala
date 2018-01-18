@@ -21,15 +21,10 @@ package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.transaction.Instruction
+import io.amient.affinity.core.util.Reply
 
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Routed with Instruction[VertexProps] {
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Routed with Reply[VertexProps] {
 
   override def key = vertex
-
-  def reverse(props: VertexProps) = op match {
-    case GOP.ADD => Some(ModifyGraph(vertex, edge, GOP.REMOVE))
-    case GOP.REMOVE => Some(ModifyGraph(vertex, edge, GOP.ADD))
-  }
 
 }

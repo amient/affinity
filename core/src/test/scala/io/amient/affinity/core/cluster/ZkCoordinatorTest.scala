@@ -2,12 +2,19 @@ package io.amient.affinity.core.cluster
 
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.core.actor.GatewayHttp
-import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.core.actor.{GatewayHttp, Routed}
+import io.amient.affinity.core.util.{Reply, SystemTestBase}
 import io.amient.affinity.kafka.EmbeddedZooKeeper
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConversions._
+
+case class ZkTestKey(val id: Int) extends AvroRecord with Routed with Reply[Option[ZkTestValue]] {
+  override def key = this
+}
+
+case class ZkTestValue(items: List[Int]) extends AvroRecord
 
 class ZkCoordinatorTest extends FlatSpec with SystemTestBase with EmbeddedZooKeeper with Matchers {
 

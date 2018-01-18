@@ -21,13 +21,9 @@ package io.amient.affinity.example.graph.message
 
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.transaction.Instruction
+import io.amient.affinity.core.util.Reply
 
-final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord with Routed with Instruction[Int] {
+final case class UpdateVertexComponent(vertex: Int, component: Int) extends AvroRecord with Routed with Reply[Int] {
 
   override def key = vertex
-
-  override def reverse(result: Int): Option[UpdateVertexComponent] = {
-    if (result == component) None else Some(UpdateVertexComponent(vertex, result))
-  }
 }

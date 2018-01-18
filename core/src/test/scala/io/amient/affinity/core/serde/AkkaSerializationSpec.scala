@@ -21,23 +21,26 @@ package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.avro.schema.MemorySchemaRegistry
+import io.amient.affinity.avro.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.IntegrationTestBase
-import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.actor.Partition.CreateKeyValueMediator
+import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.http.TestValue
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
-import io.amient.affinity.core.transaction.TestKey
+import io.amient.affinity.core.util.Reply
 import org.scalatest.Matchers
 
 import scala.collection.immutable.Seq
+
+case class Key(key: Int) extends AvroRecord with Routed with Reply[Option[TestValue]]
 
 class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
 
   "Akka-serialized AvroRecord bytes" must {
     "be identical to AvroSerde bytes - this is important for murmur2 hash partitioner" in {
-      val in = TestKey(1)
+      val in = Key(1)
       val bytes = SerializationExtension(system).serialize(in).get
       val bytes2 = new MemorySchemaRegistry().toBytes(in)
       bytes.mkString(".") should be(bytes2.mkString("."))
@@ -105,9 +108,9 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
   "List" must {
 
     "serialize correctly when elements are AvroRecords" in {
-      val x: Seq[TestKey] = List(TestKey(1), TestKey(2), TestKey(3))
+      val x: Seq[Key] = List(Key(1), Key(2), Key(3))
       val y: Array[Byte] = SerializationExtension(system).serialize(x).get
-      val z: Seq[TestKey] = SerializationExtension(system).deserialize(y, classOf[List[TestKey]]).get
+      val z: Seq[Key] = SerializationExtension(system).deserialize(y, classOf[List[Key]]).get
       z should be(x)
     }
 
@@ -121,9 +124,9 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
   "Set" must {
 
     "serialize correctly when elements are AvroRecords" in {
-      val x: Set[TestKey] = Set(TestKey(1), TestKey(2), TestKey(3))
+      val x: Set[Key] = Set(Key(1), Key(2), Key(3))
       val y: Array[Byte] = SerializationExtension(system).serialize(x).get
-      val z: Set[TestKey] = SerializationExtension(system).deserialize(y, classOf[Set[TestKey]]).get
+      val z: Set[Key] = SerializationExtension(system).deserialize(y, classOf[Set[Key]]).get
       z should be(x)
     }
   }
