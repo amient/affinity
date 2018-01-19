@@ -65,11 +65,14 @@ resonance with the previous state until certain thershold of inbalance is create
 by adding or removing nodes, increasing replication factor, etc. - the ground work
 for this has been already done at the MemStore level, see State Management section below.
 
-Gateways are hence the orchestration layer while Keyspaces are completely
-constrained to the partition scope. (There ws an experimintal piece of code around
-lightweight transactions that can be wrapped around orchestrated logic which use reversible
-Instructions to compensate failed operations but this was abandonned as for it to operate
-consistently distributed locks would have to be used)
+Gateways tend to be the orchestration layer while Keyspaces and their Partitions
+ are usually restricted to their scope, however any Actor within the system can hold
+ a reference to any defined Keyspace so for example an individual Partition of one Keyspace may
+ target another Keyspace as a whole - this allows for full event chains rather then
+
+There ws an experimintal piece of code around lightweight transactions that can be wrapped
+around orchestrated logic which use reversible Instructions to compensate failed operations
+but this was abandonned as for it to operate consistently distributed locks would have to be used.
 
 ### The Http Layer
 
