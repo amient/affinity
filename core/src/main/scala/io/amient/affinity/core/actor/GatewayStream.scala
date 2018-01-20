@@ -4,8 +4,8 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.storage.EventTime
 import io.amient.affinity.core.storage.Storage.StorageConf
+import io.amient.affinity.core.util.EventTime
 import io.amient.affinity.stream.{BinaryStream, Record}
 
 import scala.collection.JavaConversions._

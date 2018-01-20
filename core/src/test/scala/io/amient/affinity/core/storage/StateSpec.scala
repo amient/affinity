@@ -5,11 +5,12 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.util.EventTime
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
 
-case class ExpirableValue(data: String, val eventTimeUtc: Long) extends AvroRecord with EventTime
+case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
 class StateSpec extends TestKit(ActorSystem.create("test",
   ConfigFactory.parseMap(Map(

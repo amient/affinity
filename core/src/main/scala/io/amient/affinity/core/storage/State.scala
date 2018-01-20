@@ -27,7 +27,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.core.util.{ByteUtils, EventTime}
 import io.amient.affinity.stream.Record
 
 import scala.collection.JavaConverters._
@@ -264,7 +264,7 @@ class State[K, V](val storage: Storage,
   private def put(key: ByteBuffer, value: V): Future[Checkpoint] = {
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
-      case e: EventTime => e.eventTimeUtc()
+      case e: EventTime => e.eventTimeUnix()
       case _ => nowMs
     }
     if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {

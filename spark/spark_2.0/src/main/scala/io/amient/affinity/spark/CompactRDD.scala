@@ -21,7 +21,7 @@ package io.amient.util.spark
 
 import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.storage.EventTime
+import io.amient.affinity.core.util.EventTime
 import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
@@ -100,7 +100,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       try {
         val iterator = partition.map { case (k, v) =>
           val ts = v match {
-            case e: EventTime => e.eventTimeUtc()
+            case e: EventTime => e.eventTimeUnix()
             case _ => System.currentTimeMillis()
           }
           val serializedKey = keySerdeInstance.toBytes(k)
