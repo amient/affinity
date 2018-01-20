@@ -177,6 +177,10 @@ trait SystemTestBase {
 
     def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
 
+    def wsuri(path: String) = new java.net.URI(s"ws://localhost:$httpPort$path")
+
+    def wssuri(path: String) = new java.net.URI(s"wss://localhost:$httpPort$path")
+
     def http(method: HttpMethod, uri: Uri): Future[HttpResponse] = {
       http(HttpRequest(method = method, uri = uri))
     }

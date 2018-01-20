@@ -34,8 +34,8 @@ import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.EmbeddedKafka
-import io.amient.affinity.ws.AvroWebSocketClient
-import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
+import io.amient.affinity.ws.WebSocketClient
+import io.amient.affinity.ws.WebSocketClient.AvroMessageHandler
 import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.codehaus.jackson.JsonNode
 import org.scalatest.{FlatSpec, Matchers}
@@ -166,7 +166,7 @@ class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with
   "Graph API" should "stream changes to vertex websocket subscribers" in {
     val lastMessage = new AtomicReference[GenericRecord](null)
     lastMessage.synchronized {
-      val ws = new AvroWebSocketClient(URI.create(s"ws://localhost:$httpPort/vertex?id=1000"), new AvroMessageHandler() {
+      val ws = new WebSocketClient(URI.create(s"ws://localhost:$httpPort/vertex?id=1000"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
         override def onMessage(message: scala.Any): Unit = {
           lastMessage.synchronized {

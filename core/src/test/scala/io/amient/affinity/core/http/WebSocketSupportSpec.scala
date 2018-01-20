@@ -32,8 +32,8 @@ import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.ws.AvroWebSocketClient
-import io.amient.affinity.ws.AvroWebSocketClient.AvroMessageHandler
+import io.amient.affinity.ws.WebSocketClient
+import io.amient.affinity.ws.WebSocketClient.AvroMessageHandler
 import org.apache.avro.generic.GenericData
 import org.scalatest.Matchers
 
@@ -80,7 +80,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
     "throw exception for unknown type schema request" in {
       (try {
-        val ws = new AvroWebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
+        val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
           override def onMessage(message: scala.Any): Unit = ()
           override def onError(e: Throwable): Unit = ()
         })
@@ -97,7 +97,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
     "retrieve valid schema for known type and send a receive objects according to that schama" in {
       val lastMessage = new AtomicReference[Any](null)
-      val ws = new AvroWebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
+      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
         override def onMessage(message: scala.Any): Unit = {
           lastMessage.synchronized {

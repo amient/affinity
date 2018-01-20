@@ -38,7 +38,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 @ClientEndpoint
-final public class AvroWebSocketClient {
+final public class WebSocketClient {
 
     public interface TextMessageHandler {
         void onMessage(String message);
@@ -55,15 +55,28 @@ final public class AvroWebSocketClient {
     private Map<Integer, Schema> schemas = new HashMap<>();
     private Map<String, Integer> types = new HashMap<>();
     private Queue<Map.Entry<Integer, byte[]>> queue = new LinkedList<>();
-    private TextMessageHandler textMessageHandler = null;
+    final private TextMessageHandler textMessageHandler;
     final private AvroMessageHandler avroMessageHandler;
 
-    public AvroWebSocketClient(URI endpointURI, AvroMessageHandler avroMessageHandler) {
+    public WebSocketClient(URI endpointURI, AvroMessageHandler avroMessageHandler) {
         try {
             //TODO #28 reuse container for multiple websockets to different entities
             WebSocketContainer container = ContainerProvider.getWebSocketContainer();
             container.connectToServer(this, endpointURI);
             this.avroMessageHandler = avroMessageHandler;
+            this.textMessageHandler = null;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public WebSocketClient(URI endpointURI, TextMessageHandler textMessageHandler) {
+        try {
+            //TODO #28 reuse container for multiple websockets to different entities
+            WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+            container.connectToServer(this, endpointURI);
+            this.textMessageHandler = textMessageHandler;
+            this.avroMessageHandler = null;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
