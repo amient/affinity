@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse, headers}
 import scala.concurrent.Promise
 import scala.concurrent.duration.Duration
 
-final case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse]) {
+case class HttpExchange(request: HttpRequest, promise: Promise[HttpResponse]) {
   def timeout(newTimeout: Duration): Boolean = {
     request.header[headers.`Timeout-Access`] match {
       case None ⇒ false

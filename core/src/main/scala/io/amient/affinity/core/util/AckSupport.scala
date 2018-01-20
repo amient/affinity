@@ -104,9 +104,16 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
         case i => promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
         case cause: AkkaException => promise.failure(cause)
-        case cause: IllegalArgumentException => promise.failure(cause)
         case cause: NoSuchElementException => promise.failure(cause)
-        case cause if (retry <= 0) => promise.failure(new RuntimeException(s"${target.path.name} failed to respond to $message ", cause))
+        case cause: IllegalArgumentException => promise.failure(cause)
+        case cause: AssertionError => promise.failure(cause)
+        case cause: IllegalAccessException => promise.failure(cause)
+        case cause: SecurityException => promise.failure(cause)
+        case cause: NotImplementedError => promise.failure(cause)
+        case cause: UnsupportedOperationException => promise.failure(cause)
+        case cause if (retry <= 0) =>
+          log.error(s"${target.path.name} failed to respond to $message ")
+          promise.failure(cause)
         case _: TimeoutException =>
           log.warn(s"Retrying $target ack $message due to timeout $timeout")
           attempt(retry - 1)

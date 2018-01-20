@@ -229,9 +229,11 @@ trait GatewayHttp extends Gateway {
     case e: ExecutionException => handleException(e.getCause)
     case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: AssertionError => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: IllegalStateException => errorResponse(e, Conflict, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: java.lang.AssertionError => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: scala.NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: IllegalAccessException => errorResponse(e, Forbidden)
+    case e: SecurityException => errorResponse(e, Unauthorized)
+    case e: NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
     case e: UnsupportedOperationException => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
     case NonFatal(e) => errorResponse(e, InternalServerError, headers = headers)
   }
