@@ -35,7 +35,7 @@ import akka.pattern.ask
 import akka.serialization.SerializationExtension
 import akka.stream.ActorMaterializer
 import akka.stream.actor.ActorPublisher
-import akka.stream.actor.ActorPublisherMessage.Request
+import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
@@ -263,11 +263,11 @@ trait WebSocketSupport extends GatewayHttp {
 
   private val avroSerde = AvroSerde.create(config)
 
+  private implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
+
   abstract override def handle: Receive = super.handle orElse {
     case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get))
   }
-
-  implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
 
   /**
     * jsonWebSocket:
@@ -292,7 +292,7 @@ trait WebSocketSupport extends GatewayHttp {
     customWebSocket(exchange, new DownstreamActor {
       override def onOpen(upstream: ActorRef): Unit = mediator ! RegisterMediatorSubscriber(upstream)
 
-      override def onClose(): Unit = mediator ! PoisonPill
+      override def onClose(upstream: ActorRef): Unit = mediator ! PoisonPill
 
       override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
         case text: TextMessage => mediator ! Decoder.json(text.getStrictText)
@@ -344,7 +344,7 @@ trait WebSocketSupport extends GatewayHttp {
     customWebSocket(exchange, new DownstreamActor {
       override def onOpen(upstream: ActorRef): Unit = mediator ! RegisterMediatorSubscriber(upstream)
 
-      override def onClose(): Unit = mediator ! PoisonPill
+      override def onClose(upstream: ActorRef): Unit = mediator ! PoisonPill
 
       override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
         case text: TextMessage =>
@@ -444,14 +444,16 @@ trait WebSocketSupport extends GatewayHttp {
 
     def onOpen(upstream: ActorRef): Unit = ()
 
-    def onClose(): Unit // mediator ! PoisonPill
+    def onClose(upstream: ActorRef): Unit = ()
 
     def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit]
 
     override def postStop(): Unit = {
       log.debug("WebSocket Downstream Actor Closing")
-      if (upstream != null) upstream ! PoisonPill
-      onClose()
+      if (upstream != null) {
+        upstream ! PoisonPill
+        onClose(upstream)
+      }
     }
 
     final override def receive: Receive = {
@@ -460,7 +462,12 @@ trait WebSocketSupport extends GatewayHttp {
         sender ! true
         onOpen(upstream)
       case msg: Message if upstream == null => log.warning(s"websocket actors not yet connected, dropping 1 message ${msg.getClass}")
-      case msg: Message => receiveMessage(upstream)(msg)
+      case msg: Message =>
+        try {
+          receiveMessage(upstream)(msg)
+        } catch {
+          case e: Throwable => log.error(e, "websocket downstream message could not be handled")
+        }
     }
 
   }
@@ -488,6 +495,7 @@ trait WebSocketSupport extends GatewayHttp {
 
     override def manage: Receive = {
       case Request(_) => push()
+      case Cancel => log.warning("UpstreamActor received Cancel event")
     }
 
     override def unhandled: Receive = {

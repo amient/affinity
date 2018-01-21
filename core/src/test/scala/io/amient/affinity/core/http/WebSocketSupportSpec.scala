@@ -89,7 +89,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
             private var mediator: ActorRef = null
 
-            override def onClose(): Unit = if (mediator != null) mediator ! PoisonPill
+            override def onClose(upstream: ActorRef): Unit = if (mediator != null) mediator ! PoisonPill
 
             override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
               case TextMessage.Strict("Hello") =>
