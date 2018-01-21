@@ -21,20 +21,24 @@ package io.amient.affinity.core.http
 
 import java.io.IOException
 import java.net.URI
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
-import akka.actor.Props
-import akka.http.scaladsl.model.HttpMethods.GET
+import akka.actor.{ActorRef, PoisonPill, Props}
+import akka.event.{Logging, LoggingAdapter}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.avro.AvroRecord
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
 import io.amient.affinity.core.actor._
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
-import io.amient.affinity.ws.WebSocketClient.AvroMessageHandler
+import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, JsonMessageHandler, TextMessageHandler}
 import org.apache.avro.generic.GenericData
+import org.codehaus.jackson.JsonNode
 import org.scalatest.Matchers
 
 import scala.concurrent.Await
@@ -48,21 +52,69 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(10 seconds)
 
-  controller ? CreateContainer("region", List(0,1,2,3), Props(new Partition() {
+  controller ? CreateContainer("region", List(0, 1, 2, 3), Props(new Partition() {
     val data = state[Int, Base]("test")
 
     override def handle: Receive = {
-      case base: Base => data.replace(base.id.id, base)
+      case base: Base =>
+        data.replace(base.id.id, base)
+        sender ! true
+      case ID(s) => data.push(s, ID(s+1))
     }
   }))
 
   val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with WebSocketSupport {
+
+    private val log: LoggingAdapter = Logging.getLogger(context.system, this)
+
     val regionService = keyspace("region")
+
     override def handle: Receive = {
-      case http@HTTP(GET, PATH("test"), _, response) =>
-        avroWebSocket(http, regionService,  "test", 1) {
-          case null =>
+
+      case WEBSOCK(PATH("test-avro-socket", INT(x)), _, socket) =>
+        connectKeyValueMediator(regionService, "test", x) map {
+          case keyValueMediator => avroWebSocket(socket, keyValueMediator)
         }
+
+      case HTTP(HttpMethods.GET, PATH("update-it"), _, response) =>
+        accept(response, regionService ? Base(ID(2), Side.RIGHT))
+
+      case WEBSOCK(PATH("test-json-socket"), _, socket) =>
+        connectKeyValueMediator(regionService, "test", 2) map {
+          case keyValueMediator => jsonWebSocket(socket, keyValueMediator)
+        }
+
+      case WEBSOCK(PATH("test-custom-socket"), _, socket) =>
+        customWebSocket(socket, new DownstreamActor {
+
+            private var mediator: ActorRef = null
+
+            override def onClose(): Unit = if (mediator != null) mediator ! PoisonPill
+
+            override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
+              case TextMessage.Strict("Hello") =>
+                connectKeyValueMediator(regionService, "test", 3) map {
+                  case keyValueMediator =>
+                    log.info(s"subscribing to $keyValueMediator")
+                    this.mediator = keyValueMediator
+                    keyValueMediator ! RegisterMediatorSubscriber(upstream)
+                    upstream ! TextMessage.Strict("Welcome")
+                    upstream ! TextMessage.Strict("Here is your token")
+                }
+              case msg if mediator == null => log.warning(s"IGNORING DOWNSTREAM - MEDIATOR NOT CONNECTED: $msg")
+              case TextMessage.Strict("Write") if mediator != null =>
+                mediator ! ID(3)
+
+            }
+
+          }, new UpstreamActor {
+            override def handle: Receive = {
+              case None => push("{}")
+              case Some(base@Base(id, side, _)) => push(Encoder.json(base))
+              case id:ID => push(Encoder.json(id))
+            }
+          })
+
     }
   })) map {
     case port: Int => port
@@ -76,11 +128,11 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     super.afterAll
   }
 
-  "WebSocket channel" must {
+  "AvroWebSocket channel" must {
 
     "throw exception for unknown type schema request" in {
       (try {
-        val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
+        val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-avro-socket/100"), new AvroMessageHandler() {
           override def onMessage(message: scala.Any): Unit = ()
           override def onError(e: Throwable): Unit = ()
         })
@@ -95,31 +147,82 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       }) should be(true)
     }
 
-    "retrieve valid schema for known type and send a receive objects according to that schama" in {
-      val lastMessage = new AtomicReference[Any](null)
-      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test"), new AvroMessageHandler() {
+    "retrieve valid schema for known type and forward a receive objects to and from the keyaspace according to that schema" in {
+      val wsqueue = new LinkedBlockingQueue[AnyRef]()
+      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-avro-socket/101"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
-        override def onMessage(message: scala.Any): Unit = {
-          lastMessage.synchronized {
-            lastMessage.set(message)
-            lastMessage.notify()
-          }
-        }
-
+        override def onMessage(message: AnyRef): Unit = if (message != null) wsqueue.add(message)
       })
       try {
-        val schema = ws.getSchema("io.amient.affinity.core.http.Base")
+        val schema = ws.getSchema(classOf[Base].getName)
         schema should equal(AvroRecord.inferSchema(classOf[Base]))
-        ws.send(Base(ID(1), Side.LEFT, Seq(ID(2))))
-        lastMessage.synchronized {
-          lastMessage.wait(1500)
-          (lastMessage.get != null) should be(true)
-        }
-        val record = lastMessage.get.asInstanceOf[GenericData.Record]
-        record.get("id").asInstanceOf[GenericData.Record].get("id") should be(1)
+        ws.send(Base(ID(101), Side.LEFT, Seq(ID(2000))))
+        val push1 = wsqueue.poll(1, TimeUnit.SECONDS)
+        push1 should not be (null)
+        val record = push1.asInstanceOf[GenericData.Record]
+        record.get("id").asInstanceOf[GenericData.Record].get("id") should be(101)
         record.get("side").toString should be("LEFT")
         record.get("seq").asInstanceOf[GenericData.Array[GenericData.Record]].size should be(1)
-        record.get("seq").asInstanceOf[GenericData.Array[GenericData.Record]].get(0).get("id") should be(2)
+        record.get("seq").asInstanceOf[GenericData.Array[GenericData.Record]].get(0).get("id") should be(2000)
+      } finally {
+        ws.close()
+      }
+    }
+
+    "handle received messages with custom handler if defined at the partition level" in {
+      val wsqueue = new LinkedBlockingQueue[AnyRef]()
+      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-avro-socket/102"), new AvroMessageHandler() {
+        override def onError(e: Throwable): Unit = e.printStackTrace()
+        override def onMessage(message: AnyRef): Unit = if (message != null) wsqueue.add(message)
+      })
+      try {
+        ws.getSchema(classOf[ID].getName)
+        ws.send(ID(102))
+        val push1 = wsqueue.poll(1, TimeUnit.SECONDS)
+        push1 should not be (null)
+        val record = push1.asInstanceOf[GenericData.Record]
+        record.getSchema.getFullName should be(classOf[ID].getName)
+        record.get("id") should be(103)
+      } finally {
+        ws.close()
+      }
+    }
+  }
+
+  "Json WebSocket channel" must {
+    "receive json updates from the connected key-value" in {
+      val wsqueue = new LinkedBlockingQueue[JsonNode]()
+      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-json-socket"), new JsonMessageHandler() {
+        override def onError(e: Throwable): Unit = e.printStackTrace()
+        override def onMessage(message: JsonNode) = wsqueue.add(message)
+      })
+      try {
+        val push1 = wsqueue.poll(1, TimeUnit.SECONDS)
+        push1 should be(Decoder.json("{}"))
+        http_get(Uri(s"http://127.0.0.1:$httpPort/update-it"))
+        val push2 = wsqueue.poll(1, TimeUnit.SECONDS)
+        push2 should be(Decoder.json("{\"type\":\"io.amient.affinity.core.http.Base\",\"data\":{\"id\":{\"id\":2},\"side\":\"RIGHT\",\"seq\":[]}}"))
+      } finally {
+        ws.close()
+      }
+    }
+  }
+
+  "Custom WebSocket channel" must {
+    "work" in {
+      val wsqueue = new LinkedBlockingQueue[String]()
+      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-custom-socket"), new TextMessageHandler() {
+        override def onError(e: Throwable): Unit = e.printStackTrace()
+        override def onMessage(message: String) = wsqueue.add(message)
+      })
+      try {
+        ws.send("Hello")
+        wsqueue.poll(1, TimeUnit.SECONDS) should be ("Welcome")
+        wsqueue.poll(1, TimeUnit.SECONDS) should be ("Here is your token")
+        wsqueue.poll(1, TimeUnit.SECONDS) should be ("{}") //initial value of the key
+        ws.send("Write")
+        wsqueue.poll(1, TimeUnit.SECONDS) should be ("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
+
       } finally {
         ws.close()
       }

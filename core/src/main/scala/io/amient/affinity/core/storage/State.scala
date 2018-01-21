@@ -342,7 +342,7 @@ class State[K, V](val storage: Storage,
         o
     }
     observable.addObserver(observer)
-    observer.update(observable, apply(key.asInstanceOf[K])) // send initial value on subscription
+    observer.update(observable, apply(key.asInstanceOf[K])) // send initial value on subscription FIXME - maybe this is up to the websocket impl. to decide
     observer
   }
 

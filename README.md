@@ -13,13 +13,29 @@
 
  ![Cluster Architecture](doc/affinity.png)
 
- - akka http as the main interface with websocket layer
- - akka for asynchronous communication and consistency guarantees
- - zookeeper for distributed coordination
- - RocksDb, MemDb, SimpleMap implementations
- - kafka as a fault-tolerant change log storage
+ - Akka as the principal api and internal communication protocol
+ - Zookeeper for distributed coordination and elasticity
+ - Kafka as a fault-tolerant storage and messaging backbone
+ - Akka Http as the main interface with websocket layer
+ - RocksDb, MemDb, SimpleMap for state store implementations
+ - Avro with central schema registry for all serialization
 
 ## Basic principles
+
+Affinity is a stream-processor which can be seen as a "micro" world
+where kafka ecosystem is the "macro". It is designed with linear
+scalability, fault-tolerance, zero-downtime, consistency and elasticity.
+
+Publish/Subscribe model is extended to record-level granularity with
+avro univerese reaching from the underlying kafka storage and spark shell
+that can present kafka topics as RDD of case classes all the way to
+the javascript implementation that is capable of taking schemas from
+the central schema registry. With built-in web-socket support on top
+of Akka Http a large-scale, efficient and fault tolerant APIs serving
+billions of devices can implemented. This way, for example web-socket
+clients, which are supported as first-class, can publish and subscribe
+events to/from an individual key realm within any number of keyspaces
+using super-efficient delta messages serialized with binary avro encoder.
 
 Internally, as well as externally Affinity is a fully event-driven system.
 On the outside it offers two interfaces: Stream and Http which  are the entry
@@ -27,7 +43,7 @@ to the system:
  - Stream Interface can be used to simply ingest/process external stream
  - Http Interface can be used to define HTTP methods to access the data inside
 
-Both of these interfaces communicate with the internal system only through
+Both of the interfaces communicate with the internal system only through
 akka messages which can be simple ! Tell flows, ? Ask flows or ?? Ack
 flows - these a strongly typed versions of Ask with retries, provided by the core module
 all the way to complex internal event chains which may result in zero or

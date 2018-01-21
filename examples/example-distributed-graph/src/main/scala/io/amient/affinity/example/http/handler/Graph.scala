@@ -49,18 +49,10 @@ trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
     /**
       * WebSocket GET /vertex?id=<vid>
       */
-    case http@HTTP(GET, PATH("vertex"), QUERY(("id", INT(vertex))), response) =>
-      http.request.header[UpgradeToWebSocket] match {
-        case None => response.success(Encoder.html(OK, html))
-        case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          try {
-            avroWebSocket(upgrade, graphService, "graph", vertex) {
-              case _: Edge => // custom handler of Edge
-            }
-          } catch {
-            case NonFatal(e) => e.printStackTrace(); throw e
-          }
-        }
+    case HTTP(GET, PATH("vertex"), _, response) => response.success(Encoder.html(OK, html))
+    case WEBSOCK(PATH("vertex"), QUERY(("id", INT(vertex))), socket) =>
+      connectKeyValueMediator(graphService, "graph", vertex) map {
+        keyValueMediator => avroWebSocket(socket, keyValueMediator)
       }
 
     /**
@@ -77,14 +69,10 @@ trait Graph extends ExampleGatewayRoot with WebSocketSupport with GraphLogic {
     /**
       * WebSocket GET /component?id=<vid>
       */
-    case http@HTTP(GET, PATH("component"), QUERY(("id", INT(cid))), response) =>
-      http.request.header[UpgradeToWebSocket] match {
-        case None => response.success(Encoder.html(OK, html))
-        case Some(upgrade) => fulfillAndHandleErrors(http.promise) {
-          avroWebSocket(upgrade, graphService, "components", cid) {
-            case _ =>
-          }
-        }
+    case HTTP(GET, PATH("component"), _, response) => response.success(Encoder.html(OK, html))
+    case WEBSOCK(PATH("component"), QUERY(("id", INT(cid))), socket) =>
+      connectKeyValueMediator(graphService, "components", cid) map {
+        case keyValueMediator => avroWebSocket(socket, keyValueMediator)
       }
 
     /**

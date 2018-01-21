@@ -71,7 +71,6 @@ class Keyspace(config: Config) extends Actor {
 
   import context.dispatcher
 
-
   override def receive: Receive = {
 
     case message: Routed => getRoutee(message.key).send(message, sender)

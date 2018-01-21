@@ -27,6 +27,8 @@ import org.apache.avro.io.Encoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.avro.util.ByteBufferOutputStream;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
 
 import javax.websocket.*;
 import java.io.ByteArrayOutputStream;
@@ -43,6 +45,24 @@ final public class WebSocketClient {
     public interface TextMessageHandler {
         void onMessage(String message);
         void onError(Throwable e);
+    }
+
+    public interface JsonMessageHandler extends TextMessageHandler {
+        ObjectMapper mapper = new ObjectMapper();
+
+        void onMessage(JsonNode message);
+
+        @Override
+        default void onMessage(String message) {
+            JsonNode x = null;
+            try {
+                x = mapper.readValue(message, JsonNode.class);
+                if (x != null) onMessage(x);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     public interface AvroMessageHandler {
@@ -124,7 +144,7 @@ final public class WebSocketClient {
                 byte[] bytes = new byte[buf.remaining()];
                 buf.get(bytes);
                 if (!schemas.containsKey(schemaId)) {
-                    queue.add(new AbstractMap.SimpleEntry<Integer, byte[]>(schemaId, bytes));
+                    queue.add(new AbstractMap.SimpleEntry<>(schemaId, bytes));
                     ByteBufferOutputStream req = new ByteBufferOutputStream();
                     DataOutputStream reqData = new DataOutputStream(req);
                     reqData.write(123);

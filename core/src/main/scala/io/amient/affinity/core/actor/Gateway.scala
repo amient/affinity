@@ -11,6 +11,7 @@ import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Keyspace.{CheckServiceAvailability, ServiceAvailability}
+import io.amient.affinity.core.actor.Partition.{CreateKeyValueMediator, KeyValueMediatorCreated}
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
 import io.amient.affinity.core.cluster.{Coordinator, Node}
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
@@ -93,18 +94,6 @@ trait Gateway extends ActorHandler with ActorState {
       throw e
   }
 
-  private def checkClusterStatus(msg: Option[ServiceAvailability] = None): Unit = {
-    val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
-    if (gatewayShouldBeSuspended != handlingSuspended) {
-      handlingSuspended = gatewayShouldBeSuspended
-      onClusterStatus(gatewayShouldBeSuspended)
-      if (self.path.name == "gateway") {
-        msg.foreach(context.system.eventStream.publish(_)) // this one is for IntegrationTestBase
-        context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
-      }
-    }
-  }
-
   abstract override def preStart(): Unit = {
     super.preStart()
     checkClusterStatus()
@@ -148,6 +137,13 @@ trait Gateway extends ActorHandler with ActorState {
 
   }
 
+  def connectKeyValueMediator(keyspace: ActorRef, stateStoreName: String, key: Any): Future[ActorRef] = {
+    implicit val timeout = Timeout(1 second)
+    keyspace ? CreateKeyValueMediator(stateStoreName, key) collect {
+      case KeyValueMediatorCreated(keyValueMediator) => keyValueMediator
+    }
+  }
+
   def describeAvro: scala.collection.immutable.Map[String, String] = {
     val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
     serde.describeSchemas.map {
@@ -170,4 +166,16 @@ trait Gateway extends ActorHandler with ActorState {
     Await.result(routeeSets, t).map(_.routees).flatten.map(_.toString).toList.sorted
   }
 
+
+  private def checkClusterStatus(msg: Option[ServiceAvailability] = None): Unit = {
+    val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
+    if (gatewayShouldBeSuspended != handlingSuspended) {
+      handlingSuspended = gatewayShouldBeSuspended
+      onClusterStatus(gatewayShouldBeSuspended)
+      if (self.path.name == "gateway") {
+        msg.foreach(context.system.eventStream.publish(_)) // this one is for IntegrationTestBase
+        context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
+      }
+    }
+  }
 }

@@ -19,18 +19,30 @@
 
 package io.amient.affinity.core.http
 
+import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.HttpMethods._
+import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 
 import scala.annotation.tailrec
 import scala.concurrent.Promise
 
 object RequestMatchers {
 
+  object WEBSOCK {
+    def unapply(exchange: HttpExchange): Option[(Path, Query, WebSocketExchange)] = {
+      exchange.request.header[UpgradeToWebSocket] map {
+        case upgrade: UpgradeToWebSocket => (exchange.request.uri.path,exchange.request.uri.query(),  WebSocketExchange(upgrade, exchange.promise))
+      }
+    }
+  }
+
   object HTTP {
     def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = {
-      Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
+      exchange.request.header[UpgradeToWebSocket] match {
+        case None => Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
+        case _ => None
+      }
     }
   }
 

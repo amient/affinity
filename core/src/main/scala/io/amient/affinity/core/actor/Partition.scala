@@ -23,19 +23,20 @@ import java.util.{Observable, Observer}
 
 import akka.actor.{Actor, ActorRef, Props, Status}
 import akka.event.Logging
-import akka.pattern.ask
-import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
+import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object Partition {
+  //FIXME #122 make special serializer for mediation messages - currently this is java and the footprint is huge
   case class CreateKeyValueMediator(stateStore: String, key: Any) extends Routed
+  case class KeyValueMediatorCreated(mediator: ActorRef)
+  case class RegisterMediatorSubscriber(subscriber: ActorRef)
 
   case class BecomeStandby() extends Reply[Unit]
 
@@ -102,18 +103,18 @@ trait Partition extends ActorHandler with ActorState {
 
     case CreateKeyValueMediator(stateStoreName: String, key: Any) => try {
       val state = getStateStore(stateStoreName)
-      sender ! context.actorOf(Props(new KeyValueMediator(state, key)))
+      sender ! KeyValueMediatorCreated(context.actorOf(Props(new KeyValueMediator(self, state, key))))
     } catch {
       case NonFatal(e) => sender ! Status.Failure(e)
     }
   }
 }
 
-class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
+class KeyValueMediator(partition: ActorRef, state: State[_, _], key: Any) extends Actor {
 
   private var observer: Option[Observer] = None
 
-  import context.dispatcher
+  //import context.dispatcher
 
   implicit val scheduler = context.system.scheduler
 
@@ -122,21 +123,23 @@ class KeyValueMediator(state: State[_, _], key: Any) extends Actor {
   }
 
   override def receive: Receive = {
-    case frontend: ActorRef => createKeyValueObserver(key, frontend)
+    case RegisterMediatorSubscriber(subscriber:ActorRef) => createKeyValueObserver(key, subscriber)
+    case forward: Any => partition.tell(forward, sender)
   }
 
   def createKeyValueObserver(key: Any, frontend: ActorRef): Unit = {
     observer = Some(state.addKeyValueObserver(key, new Observer() {
       override def update(o: Observable, arg: scala.Any): Unit = {
-        val t = 1 seconds
-        implicit val timeout = Timeout(t)
-        //here is the ack the requires the actorPublisher at the gateway side to ack the receipt
-        //TODO write a system test that verifies that websocket actor publisher sends a unit ack
-        (frontend ? arg) recover {
-          case any =>
-            //in case of any error the mediator will be stopped and also any front end that watches it
-            context.stop(self)
-        }
+        frontend ! arg //FIXME !!! previously there seem to have been a bug where something had to be sent to the key value mediator
+//        val t = 1 seconds
+//        implicit val timeout = Timeout(t)
+//        //here is the ack the requires the actorPublisher at the gateway side to ack the receipt
+//        //TODO write a system test that verifies that websocket actor publisher sends a unit ack
+//        (frontend ? arg) recover {
+//          case any =>
+//            //in case of any error the mediator will be stopped and also any front end that watches it
+//            context.stop(self)
+//        }
       }
     }))
   }
