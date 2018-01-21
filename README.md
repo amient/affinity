@@ -15,7 +15,7 @@
 
  - Akka as the principal api and internal communication protocol
  - Zookeeper for distributed coordination and elasticity
- - Kafka as a fault-tolerant storage and messaging backbone
+ - Kafka as a fault-tolerant storage and integration backbone
  - Akka Http as the main interface with websocket layer
  - RocksDb, MemDb, SimpleMap for state store implementations
  - Avro with central schema registry for all serialization
