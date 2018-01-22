@@ -267,7 +267,8 @@ The codebase is split into several modules:
 
 Current versions:
     Scala 2.11.8
-    Kafka 1.0.0
+    Kafka 0.11.0.2
+    Confluent 3.3.1
     Spark 2.0.2
 
 Using gradle root project properties scalaVersion, kafkaVersion and sparkVersion the projecct can
@@ -278,7 +279,6 @@ be cross-compiled. Below is the list of branches that are m
     - kafka_0.10-scala_2.11
     - kafka_0.11-scala_2.11
     - TODO Spark: 1.6.x, 2.0.x
-    - TODO
 
 ## JavaScript (affinity.js)
 

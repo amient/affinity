@@ -19,7 +19,7 @@ ext {
     zkClientVersion = '0.10' // zkclient provides zookeeper server transitively
     kafkaVersion = '0.11.0.2'
     sparkVersion = '2.0.2'
-    confluentVersion = '0.11.0.20'
+    confluentVersion = '3.3.1'
     //
     baseKafkaVersion = kafkaVersion.split("\\.\\d+\$")[0]
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
