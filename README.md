@@ -240,7 +240,8 @@ TODO ..
 
 # Development 
 
-The codebase is split into several modules:
+The codebase is split into several modules, some of which can and should be used independently
+of the akka core:
 
  - `api` is the internal programming api and utiliities for writing memstore and storage plugins (Java)
  - `avro` scala case class <--> avro automatic conversion with schema registry wrappers (conf,zk,local,embedded) (Scala)
@@ -257,13 +258,13 @@ The codebase is split into several modules:
 
 ## Testing the code
 
-    ./gradlew test    
+    ./zzz test
     
 ## Building the project
         
-    ./gradlew build
+    ./zzz build
 
-### Cross-compiling
+### Cross-builds
 
 Current versions:
     Scala 2.11.8
@@ -271,8 +272,9 @@ Current versions:
     Confluent 3.3.1
     Spark 2.0.2
 
-Using gradle root project properties scalaVersion, kafkaVersion and sparkVersion the projecct can
-be cross-compiled. Below is the list of branches that are m
+The `zzz` script uses git and gradle to switch between the maintained master branches
+but the   root project properties scalaVersion, kafkaVersion and sparkVersion the projecct can
+be used to create a custom enivironment.
 
 #### Scala 2.11
     - core-scala_2.11

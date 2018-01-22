@@ -18,11 +18,11 @@ continue() {
 
 Usage() {
     echo ""
-    echo "Usage: ./z (test|build|install|publish)"
+    echo "Usage: ./zzz (test|build|install|publish)"
     echo ""
     echo "  This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "Example: ./z test"
+    echo "Example: ./zzz test"
     echo "  The above will run tests on the following branches, while attempting to merge master into each"
     echo "      master"
     echo "      master-kafka_0.10"
