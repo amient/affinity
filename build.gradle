@@ -6,16 +6,25 @@ version = '0.5.0-SNAPSHOT'
 ext {
     javaVersion = '1.8'
     junitVersion = '4.12'
+    typesafeConfigVersion = '1.3.0'
+    //
     scalaVersion = '2.11.8'
     scalaTestVersion = '2.2.6'
     scalaCheckVersion = '1.12.5'
-    baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
-    typesafeConfigVersion = '1.3.0'
     slf4jVersion = '1.7.21'
     akkaVersion = '2.4.20'
     akkaHttpVersion = '10.0.10'
-    zkClientVersion = '0.10' // zkclient provides zookeeper server transitively
+    //
     avroVersion = '1.8.2' // avro version provides also jackson transiently
+    zkClientVersion = '0.10' // zkclient provides zookeeper server transitively
+    kafkaVersion = '1.0.0'
+    sparkVersion = '2.0.2'
+    confluentVersion = '4.0.0'
+    //
+    baseKafkaVersion = kafkaVersion.split("\\.\\d+\$")[0]
+    baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
+    baseSparkVersion = sparkVersion.split("\\.\\d+\$")[0]
+
 }
 
 task wrapper(type: Wrapper) {

@@ -246,15 +246,14 @@ The codebase is split into several modules:
  - `avro` scala case class <--> avro automatic conversion with schema registry wrappers (conf,zk,local,embedded) (Scala)
  - `core` is the main scala library with js-avro extension (Scala)
  - `examples/..` contain example applications (Scala)
- - `kafka/kafka_X.X/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
- - `kafka/kafka_X.X/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala)
- - `kafka/kafka_X.X/storage-kafka` module with kafka storage and binary stream implementations
- - `kafka/kafka_X.X/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
+ - `kafka/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
+ - `kafka/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala)
+ - `kafka/storage-kafka` module with kafka storage and binary stream implementations
+ - `kafka/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
  - `spark/spark_2.0` uses the underlying stream storage as CompactRDD with all the serde magic
  - `ws-client` custom web socket with avro support (Java)
-
 
 ## Testing the code
 
@@ -263,6 +262,23 @@ The codebase is split into several modules:
 ## Building the project
         
     ./gradlew build
+
+### Cross-compiling
+
+Current versions:
+    Scala 2.11.8
+    Kafka 1.0.0
+    Spark 2.0.2
+
+Using gradle root project properties scalaVersion, kafkaVersion and sparkVersion the projecct can
+be cross-compiled. Below is the list of branches that are m
+
+#### Scala 2.11
+    - core-scala_2.11
+    - kafka_0.10-scala_2.11
+    - kafka_0.11-scala_2.11
+    - TODO Spark: 1.6.x, 2.0.x
+    - TODO
 
 ## JavaScript (affinity.js)
 

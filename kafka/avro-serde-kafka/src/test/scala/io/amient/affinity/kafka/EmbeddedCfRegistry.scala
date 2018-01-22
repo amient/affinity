@@ -1,9 +1,8 @@
-package io.amient.affinity.avro
+package io.amient.affinity.kafka
 
 import java.nio.channels.ServerSocketChannel
 import java.util.Properties
 
-import io.amient.affinity.kafka.EmbeddedKafka
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import io.confluent.kafka.schemaregistry.rest.{SchemaRegistryConfig, SchemaRegistryRestApplication}
 import org.scalatest.{BeforeAndAfterAll, Suite}

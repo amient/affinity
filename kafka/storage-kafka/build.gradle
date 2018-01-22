@@ -1,0 +1,55 @@
+group = rootProject.group
+version = rootProject.version
+
+apply plugin: 'scala'
+apply plugin: 'java'
+apply plugin: 'signing'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+
+ext {
+    artefact = 'storage-kafka_' + rootProject.baseKafkaVersion + '-scala_' + baseScalaVersion
+    serdeArtefact = 'avro-serde-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
+    coreArtefact = 'core-scala_'+ rootProject.baseScalaVersion
+}
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId artefact
+            from components.java
+        }
+    }
+}
+
+install.repositories.mavenInstaller.pom.artifactId = artefact
+def installer = install.repositories.mavenInstaller
+[installer]*.pom*.whenConfigured { pom ->
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'core' }.artifactId = ext.coreArtefact
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro-serde-kafka' }.artifactId = ext.serdeArtefact
+}
+
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.1"
+    }
+}
+
+apply plugin: "com.github.johnrengelman.shadow"
+assemble.dependsOn shadowJar
+
+dependencies {
+    compile project(':core')
+    compile project(':kafka:avro-serde-kafka')
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: rootProject.kafkaVersion
+    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    testCompile project(':kafka:test-util-kafka')
+}
+
+
+

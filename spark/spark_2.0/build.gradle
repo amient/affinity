@@ -8,30 +8,29 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    sparkVersion = '2.0.2'
+    artefact = 'spark_2.0-scala_' + rootProject.baseScalaVersion
 }
-
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
-install.repositories.mavenInstaller.pom.artifactId = 'spark_2.0-scala_' + baseScalaVersion
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+install.repositories.mavenInstaller.pom.artifactId = artefact
 
 publishing {
     publications {
         maven(MavenPublication) {
-            artifactId 'spark_2.0-scala_' + baseScalaVersion
+            artifactId artefact
             from components.java
         }
     }
 }
 
 dependencies {
-    provided 'org.scala-lang:scala-library:' + scalaVersion
+    provided 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     compile project(':api')
-    testCompile project(':kafka:kafka_0.11:storage-kafka')
-    testCompile project(':kafka:kafka_0.11:test-util-kafka')
-    provided group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
-    provided group: 'org.apache.spark', name: 'spark-sql_' + baseScalaVersion, version: sparkVersion
-    provided group: 'org.apache.parquet', name: 'parquet-avro', version: avroVersion
-    provided (group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2')
+    testCompile project(':kafka:storage-kafka')
+    testCompile project(':kafka:test-util-kafka')
+    provided group: 'org.apache.spark', name: 'spark-core_' + rootProject.baseScalaVersion, version: rootProject.sparkVersion
+    provided group: 'org.apache.spark', name: 'spark-sql_' + rootProject.baseScalaVersion, version: rootProject.sparkVersion
+    provided group: 'org.apache.parquet', name: 'parquet-avro', version: rootProject.avroVersion
+    provided (group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2')
 }
 
 

@@ -7,32 +7,30 @@ apply plugin: 'signing'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'avro-scala_' + baseScalaVersion
-install.repositories.mavenInstaller.pom.artifactId = 'avro-scala_' + baseScalaVersion
+ext {
+    artefact='avro-scala_' + rootProject.baseScalaVersion
+}
+//uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+install.repositories.mavenInstaller.pom.artifactId = artefact
 
 publishing {
     publications {
         maven(MavenPublication) {
-            artifactId 'avro-scala_' + baseScalaVersion
+            artifactId artefact
             from components.java
         }
     }
 }
 
-ext {
-    confluentVersion = '3.2.2'
-    //kafkaProject = project(':kafka:kafka_0.10').ext.confluentVersion
-}
-
 dependencies {
 
     compile project(':api')
-    compile 'org.scala-lang:scala-library:' + scalaVersion
-    compile 'org.scala-lang:scala-reflect:' + scalaVersion
-    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
-    compile group: 'org.apache.avro', name: 'avro', version: avroVersion
+    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    compile 'org.scala-lang:scala-reflect:' + rootProject.scalaVersion
+    compile group: 'com.101tec', name: 'zkclient', version: rootProject.zkClientVersion
+    compile group: 'org.apache.avro', name: 'avro', version: rootProject.avroVersion
     testCompile project(':core')
-    testCompile project(':kafka:kafka_0.11:test-util-kafka')
+    testCompile project(':kafka:test-util-kafka')
     testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
 }
 

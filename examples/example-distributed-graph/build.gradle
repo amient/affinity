@@ -8,22 +8,19 @@ apply plugin: "com.github.johnrengelman.shadow"
 ext {
     mainClass = "io.amient.affinity.example.ExampleGraphMain"
     mainScript = "example-graph-api"
-    kafkaMinorVersion = "0.11"
-    sparkVersion = '2.0.2'
-    baseSparkVersion = sparkVersion.split("\\.\\d+\$")[0]
 }
 
 dependencies {
     compile project(':core')
-    compile project(':kafka:kafka_' + kafkaMinorVersion + ':storage-kafka')
+    compile project(':kafka:storage-kafka')
     compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
     compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':ws-client')
-    testCompile project(':kafka:kafka_' + kafkaMinorVersion + ':test-util-kafka')
-    testCompile project(':spark:spark_' + baseSparkVersion)
-    testCompile group: 'org.apache.spark', name: 'spark-core_' + baseScalaVersion, version: sparkVersion
-    testCompile group: 'org.apache.avro', name: 'avro-mapred', version: avroVersion, classifier: 'hadoop2'
+    testCompile project(':kafka:test-util-kafka')
+    testCompile project(':spark:spark_' + rootProject.baseSparkVersion)
+    testCompile group: 'org.apache.spark', name: 'spark-core_' + rootProject.baseScalaVersion, version: rootProject.sparkVersion
+    testCompile group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2'
 }
 
 
