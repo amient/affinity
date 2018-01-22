@@ -13,32 +13,45 @@ continue() {
     MESSAGE=$2
     if [ $result -ne 0 ]; then
         fail $MESSAGE
-
-
     fi
 }
 
-if [ -z $1 ]; then
+Usage() {
     echo ""
-    echo "Usage: ./z.sh <gradle-command> [<gradle-command [...]]"
+    echo "Usage: ./z (test|build|install|publish)"
     echo ""
     echo "  This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "Example: ./z.sh test"
+    echo "Example: ./z test"
     echo "  The above will run tests on the following branches, while attempting to merge master into each"
     echo "      master"
-    echo "      master-kafka_0.11"
     echo "      master-kafka_0.10"
-    echo "      develop-scala_2.12"
     echo ""
     fail "Missing at least one gradle command argument"
-fi
+}
 
-if [ $1 == "publish" ]; then
-    C="uploadArchives -Pmaven-central"
-else
-    C=$1
-fi
+
+case "$1" in
+    test)
+        C="test --quiet"
+        ALL="true"
+        ;;
+    build)
+        C="build --quiet --exclude-task test --quiet"
+        ALL="false"
+        ;;
+    install)
+        C="install"
+        ALL="false"
+        ;;
+    publish)
+        C="uploadArchives -Pmaven-central --quiet"
+        ALL="false"
+        ;;
+    *)
+        Usage
+        ;;
+esac
 
 MASTER="126-cross-compile"
 continue $? "initializze"
@@ -48,7 +61,7 @@ git checkout $MASTER
 continue $? "$MASTER: checkout"
 MESSAGE="$MASTER: $C (all modules)"
 echo $MESSAGE
-./gradlew $C --quiet
+./gradlew $C
 continue $? $MESSAGE
 
 #excute on kafka_0.10 / kafka modules only
@@ -61,12 +74,18 @@ MESSAGE="$BRANCH: merge $MASTER"
 echo $MESSAGE
 git merge $MASTER
 continue $? $MESSAGE
-MESSAGE="$BRANCH: $C (kafka modules)"
-echo $MESSAGE
-./gradlew :kafka:avro-formatter-kafka:$C --quiet
-./gradlew :kafka:avro-serde-kafka:$C --quiet
-./gradlew :kafka:storage-kafka:$C --quiet
-./gradlew :kafka:test-util-kafka:$C --quiet
+if [ $ALL == "true" ]; then
+    MESSAGE="$BRANCH: $C"
+    echo $MESSAGE
+    ./gradlew $C
+else
+    MESSAGE="$BRANCH: $C (kafka modules)"
+    echo $MESSAGE
+    ./gradlew :kafka:avro-formatter-kafka:$C
+    ./gradlew :kafka:avro-serde-kafka:$C
+    ./gradlew :kafka:storage-kafka:$C
+    ./gradlew :kafka:test-util-kafka:$C
+fi
 continue $? "$BRANCH: $C"
 
 
