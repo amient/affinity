@@ -10,7 +10,9 @@ apply plugin: 'maven-publish'
 ext {
     artefact = 'test-util-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
 }
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+if (rootProject.hasProperty('maven-central')) {
+    uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+}
 publishing {
     publications {
         maven(MavenPublication) {

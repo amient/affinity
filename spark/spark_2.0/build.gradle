@@ -10,7 +10,9 @@ apply plugin: 'maven-publish'
 ext {
     artefact = 'spark_2.0-scala_' + rootProject.baseScalaVersion
 }
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+if (rootProject.hasProperty('maven-central')) {
+    uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+}
 install.repositories.mavenInstaller.pom.artifactId = artefact
 
 publishing {

@@ -48,6 +48,79 @@ allprojects {
         }
     }
 
+    plugins.withType(MavenPlugin).whenPluginAdded {
+
+        task sourcesJar(type: Jar) {
+            classifier = 'sources'
+            from sourceSets.main.allSource
+        }
+
+        task javadocJar(type: Jar) {
+            classifier = 'javadoc'
+            from javadoc
+        }
+
+        artifacts {
+            archives javadocJar, sourcesJar
+        }
+
+        signing {
+            sign configurations.archives
+        }
+
+        uploadArchives {
+            repositories {
+                if (rootProject.hasProperty("maven-central")) {
+                    mavenDeployer {
+
+                        beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+                        repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                            authentication(userName: ossrhUsername, password: ossrhPassword)
+                        }
+
+                        snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                            authentication(userName: ossrhUsername, password: ossrhPassword)
+                        }
+
+                        if (plugins.hasPlugin(ScalaPlugin)) {
+                            pom.artifactId = project.name + "_scala-" + baseScalaVersion
+                        }
+
+                        pom.project {
+
+                            name 'Affinity Library'
+                            packaging 'jar'
+                            // optionally artifactId can be defined here
+                            description 'Library for building fast, scalable, fault-tolerant Data APIs based on Akka, ZooKeeper and Kafka.'
+                            url 'https://github.com/amient/affinity'
+
+                            scm {
+                                connection 'scm:git:https://github.com/amient/affinity.git'
+                                developerConnection 'scm:git:https://github.com/amient/affinity.git'
+                                url 'https://github.com/amient/affinity.git'
+                            }
+
+                            licenses {
+                                license {
+                                    name 'The Apache License, Version 2.0'
+                                    url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                                }
+                            }
+
+                            developers {
+                                developer {
+                                    id 'michal.haris'
+                                    name 'Michal Haris'
+                                    email 'mharis@amient.io'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     plugins.withType(JavaPlugin).whenPluginAdded {
 
@@ -89,7 +162,7 @@ allprojects {
         }
 
         configurations {
-            all*.exclude group: 'org.slf4j', module:'slf4j-log4j12'
+            all*.exclude group: 'org.slf4j', module: 'slf4j-log4j12'
         }
 
     }
@@ -99,7 +172,7 @@ allprojects {
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'
             jvmArgs = ['-Djava.util.logging.config.file=' + rootProject.projectDir + '/api/src/main/resources/logging.properties']
-            args = ['-R', 'build/classes/test', '-o' ]
+            args = ['-R', 'build/classes/test', '-o']
             classpath = sourceSets.test.runtimeClasspath
         }
         test.dependsOn scalaTest
@@ -110,7 +183,6 @@ allprojects {
         }
     }
 }
-
 
 //monkey patch for IDEA vs. Gradle 3.+
 ScalaCompileOptions.metaClass.daemonServer = true

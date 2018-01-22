@@ -11,7 +11,9 @@ ext {
     artefact = 'avro-formatter-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
     serdeArtefact = 'avro-serde-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
 }
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+if (rootProject.hasProperty('maven-central')) {
+    uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+}
 publishing {
     publications {
         maven(MavenPublication) {
@@ -24,7 +26,7 @@ publishing {
 install.repositories.mavenInstaller.pom.artifactId = artefact
 def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro-serde-kafka' }.artifactId = ext.serdeArtefact
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro-serde-kafka' }.artifactId = serdeArtefact
 }
 
 buildscript {
