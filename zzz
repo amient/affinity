@@ -53,7 +53,7 @@ case "$1" in
         ;;
 esac
 
-MASTER="126-cross-compile"
+MASTER="master"
 continue $? "initializze"
 
 #excute on master branch / all modules
