@@ -1,11 +1,14 @@
-include ':api', ':avro', ':core', ':rocksdb', ':mapdb', ':ws-client',
+include ':api',
+        ':avro',
+        ':core',
+        ':rocksdb', ':mapdb',
+        ':ws-client',
+        ':spark',
 
         ':kafka:storage-kafka',
         ':kafka:avro-serde-kafka',
         ':kafka:avro-formatter-kafka',
         ':kafka:test-util-kafka',
-
-        ':spark:spark_2.0',
 
         ':examples:example-distributed-graph',
         ':examples:example-minimal-setup'
