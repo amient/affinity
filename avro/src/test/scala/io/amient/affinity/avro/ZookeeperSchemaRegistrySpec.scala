@@ -23,12 +23,12 @@ class ZookeeperSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZo
   serde.register[Record_Current]
   serde.register[Record_Current](v3schema)
 
-  val List(_, _, _, _, _, _, _, _, _, backwardSchemaId, currentSchemaId, forwardSchemaId) = serde.initialize()
+  val List(_, _, _, _, _, _, _, _, _, _, backwardSchemaId, currentSchemaId, forwardSchemaId) = serde.initialize()
 
   it should "work in a backward-compatibility scenario" in {
     val oldValue = Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.C)), 10)
     val oldBytes = serde.write(oldValue, v1schema, backwardSchemaId)
-    oldBytes.mkString(",") should be("0,0,0,0,9,2,2,4,0,0,20")
+    oldBytes.mkString(",") should be("0,0,0,0,10,2,2,4,0,0,20")
     val upgraded = serde.fromBytes(oldBytes)
     upgraded should be(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.C)), Map()))
   }

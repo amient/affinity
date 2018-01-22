@@ -46,7 +46,7 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCf
 
   it should "allow compatible version of previously registered schema" in {
     serde.register[CompositeRecord]
-    serde.initialize() should be(List(11))
+    serde.initialize() should be(List(12))
   }
 
   it should "reject incompatible schema registration" in {
@@ -63,7 +63,7 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCf
   it should "registerd topic subject when fqn subject is already registered" in {
     val data = SimpleRecord()
     //fqn should be already registered
-    serde.getCurrentSchema(classOf[SimpleRecord].getName) should be(Some((9, data.getSchema)))
+    serde.getCurrentSchema(classOf[SimpleRecord].getName) should be(Some((10, data.getSchema)))
     //now simulate what KafkaAvroSerde would do
     val (objSchema, schemaId) = try {
       serde.getOrRegisterSchema(data, "topic-simple")
@@ -72,10 +72,10 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCf
         e.printStackTrace()
         fail("could not register schema with topic-simple")
     }
-    schemaId should be(9)
+    schemaId should be(10)
     objSchema should be(data.getSchema)
     //and check the additional subject was registered with the same schema
     val versions = serde.getVersions("topic-simple")
-    versions should be (Some(Map(9 -> data.getSchema)))
+    versions should be (Some(Map(10 -> data.getSchema)))
   }
 }

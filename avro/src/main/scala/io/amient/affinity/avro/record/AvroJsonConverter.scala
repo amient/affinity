@@ -29,6 +29,7 @@ object AvroJsonConverter {
   def toJson(out: Writer, schema: Schema, data: Any): Unit = {
     val gen: JsonGenerator = jfactory.createJsonGenerator(out)
 
+    //TODO use AvroExtractors with encoder instead of repeating the extraction logic
     def generate(datum: Any, schemas: List[Schema]): Unit = {
       require(schemas.size > 0, s"No schemas provided for datum: ${datum.getClass}")
 
@@ -48,7 +49,7 @@ object AvroJsonConverter {
           case d: Double if typeIsAllowed(Schema.Type.DOUBLE) => gen.writeNumber(d)
           case s: String if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s)
           case s: Utf8 if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s.toString)
-          case b: java.nio.ByteBuffer if typeIsAllowed(Schema.Type.BYTES) => gen.writeBinary(b.array())
+          case b: java.nio.ByteBuffer if typeIsAllowed(Schema.Type.BYTES) => gen.writeBinary(b.array()) //FIXME #123
           case b: Array[Byte] if typeIsAllowed(Schema.Type.FIXED) => gen.writeBinary(b)
           case r: IndexedRecord if typeIsAllowed(Schema.Type.RECORD) =>
             gen.writeStartObject()

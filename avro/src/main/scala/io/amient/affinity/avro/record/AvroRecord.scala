@@ -23,6 +23,7 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
 import java.util
 
+import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
@@ -33,10 +34,11 @@ import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
 import org.codehaus.jackson.annotate.JsonIgnore
 
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Seq
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
-object AvroRecord {
+object AvroRecord extends AvroExtractors {
 
   val INT_SCHEMA = Schema.create(Schema.Type.INT)
   val BOOLEAN_SCHEMA = Schema.create(Schema.Type.BOOLEAN)
@@ -46,7 +48,6 @@ object AvroRecord {
   val STRING_SCHEMA = Schema.create(Schema.Type.STRING)
   val BYTES_SCHEMA = Schema.create(Schema.Type.BYTES)
   val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
-
 
   def write(value: Any, schema: Schema): Array[Byte] = {
     val output = new ByteArrayOutputStream()
@@ -61,7 +62,7 @@ object AvroRecord {
   def write[O <: OutputStream](value: Any, schema: Schema, output: O): O = {
     val encoder = EncoderFactory.get().binaryEncoder(output, null)
     val writer = new GenericDatumWriter[Any](schema)
-    writer.write(value, encoder)
+    writer.write(extract(value, List(schema)), encoder)
     encoder.flush()
     output
   }
@@ -74,9 +75,11 @@ object AvroRecord {
 
   def read[T: TypeTag](bytes: Array[Byte], writerSchema: Schema, readerSchema: Schema): T = {
     val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
-    val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
-    val record: GenericRecord = reader.read(null, decoder)
-    read(record)
+    val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
+    reader.read(null, decoder) match {
+      case record: GenericRecord => read(record)
+      case other => readDatum(other, typeOf[T], readerSchema).asInstanceOf[T]
+    }
   }
 
   /**
@@ -88,6 +91,7 @@ object AvroRecord {
     */
   private def deriveValue(schemaField: Schema, value: Any): AnyRef = {
     schemaField.getType match {
+      case BYTES => java.nio.ByteBuffer.wrap(value.asInstanceOf[Array[Byte]])
       case ARRAY => value.asInstanceOf[Iterable[Any]].map(deriveValue(schemaField.getElementType, _)).asJava
       case ENUM => new EnumSymbol(schemaField, value)
       case MAP => value.asInstanceOf[Map[String, _]].mapValues(deriveValue(schemaField.getValueType, _)).asJava
@@ -212,6 +216,12 @@ object AvroRecord {
     })
   }
 
+  /**
+    * Read avro value, e.g. GenericRecord or primitive into scala case class or scala primitive
+    * @param record
+    * @param schema
+    * @return
+    */
   def read(record: Any, schema: Schema): Any = {
     val tpe = schema.getType match {
       case NULL => typeOf[Null]
@@ -221,13 +231,14 @@ object AvroRecord {
       case FLOAT => typeOf[Float]
       case DOUBLE => typeOf[Double]
       case STRING => typeOf[String]
-      case BYTES => typeOf[java.nio.ByteBuffer]
+      case BYTES => typeOf[Array[Byte]]
       case _ => fqnTypeCache.getOrInitialize(schema.getFullName)
     }
     readDatum(record, tpe, schema)
   }
 
-  def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
+  //TODO instead Any, this method should be readDatum[T: TypeTag](...):T because there are some unchecked .asInstanceOf[T]
+  def readDatum[T: TypeTag](datum: Any, tpe: Type, schema: Schema): Any = {
     schema.getType match {
       case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
       case INT => new java.lang.Integer(datum.asInstanceOf[Int])
@@ -235,7 +246,7 @@ object AvroRecord {
       case FLOAT => new java.lang.Float(datum.asInstanceOf[Float])
       case DOUBLE => new java.lang.Double(datum.asInstanceOf[Double])
       case LONG => new java.lang.Long(datum.asInstanceOf[Long])
-      case BYTES => datum.asInstanceOf[java.nio.ByteBuffer]
+      case BYTES => ByteUtils.bufToArray(datum.asInstanceOf[java.nio.ByteBuffer])
       case STRING if datum == null => null
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
       case ENUM => enumCache.getOrInitialize(tpe).apply(datum.asInstanceOf[EnumSymbol].toString)
@@ -282,6 +293,7 @@ object AvroRecord {
   }
 
   def inferSchema(obj: Any): Schema = {
+    //TODO use extractors here because the list is incomplete
     obj match {
       case container: GenericContainer => container.getSchema
       case null => AvroRecord.NULL_SCHEMA
@@ -292,7 +304,7 @@ object AvroRecord {
       case _: Float => AvroRecord.FLOAT_SCHEMA
       case _: Double => AvroRecord.DOUBLE_SCHEMA
       case _: String => AvroRecord.STRING_SCHEMA
-      case _: java.nio.ByteBuffer => AvroRecord.BYTES_SCHEMA
+      case _: Array[Byte] => AvroRecord.BYTES_SCHEMA
       case _ =>
         val m = runtimeMirror(obj.getClass.getClassLoader)
         val classSymbol = m.staticClass(obj.getClass.getName)
@@ -316,7 +328,7 @@ object AvroRecord {
         SchemaBuilder.builder().floatType()
       } else if (tpe =:= definitions.DoubleTpe) {
         SchemaBuilder.builder().doubleType()
-      } else if (tpe =:= typeOf[java.nio.ByteBuffer]) {
+      } else if (tpe =:= typeOf[Array[Byte]]) {
         SchemaBuilder.builder().bytesType()
       } else if (tpe =:= typeOf[String]) {
         SchemaBuilder.builder().stringType()

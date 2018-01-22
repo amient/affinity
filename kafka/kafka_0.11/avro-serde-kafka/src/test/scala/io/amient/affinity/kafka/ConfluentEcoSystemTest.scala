@@ -19,7 +19,6 @@
 
 package io.amient.affinity.kafka
 
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.config.ConfigFactory
@@ -44,13 +43,13 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
 object UUID {
-  def apply(uuid: java.util.UUID): UUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
+  def apply(uuid: java.util.UUID): UUID = apply(ByteUtils.uuid(uuid))
 
   def random: UUID = apply(java.util.UUID.randomUUID)
 }
 
-case class UUID(val data: ByteBuffer) extends AvroRecord {
-  def javaUUID: java.util.UUID = ByteUtils.uuid(data.array)
+case class UUID(val data: Array[Byte]) extends AvroRecord {
+  def javaUUID: java.util.UUID = ByteUtils.uuid(data)
 }
 
 case class KEY(id: Int) extends AvroRecord {

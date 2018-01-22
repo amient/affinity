@@ -47,13 +47,15 @@ case class Record_Current(
 case class Record_V3(val items: Seq[SimpleRecord] = Seq(), val index: Map[String, SimpleRecord] = Map()) extends AvroRecord
 
 object AvroUUID {
-  def apply(uuid: UUID): AvroUUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
+  def apply(uuid: UUID): AvroUUID = apply(ByteUtils.uuid(uuid))
 }
 
-case class AvroUUID(val data: ByteBuffer) extends AvroRecord {
-  def uuid: UUID = ByteUtils.uuid(data.array)
-  override def hashCode(): Int = data.hashCode()
+case class AvroUUID(val data: Array[Byte]) extends AvroRecord {
+  def uuid: UUID = ByteUtils.uuid(data)
+  override def hashCode(): Int = ByteUtils.murmur2(data)
 }
+
+case class AvroBytes(raw: Array[Byte], optional: Option[Array[Byte]], listed: List[Array[Byte]]) extends AvroRecord
 
 case class AvroEnums(raw: SimpleEnum.Value = SimpleEnum.A,
                      on: Option[SimpleEnum.Value] = None,
