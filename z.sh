@@ -40,14 +40,19 @@ continue $? "initializze"
 git checkout $MASTER
 continue $? "$MASTER: checkout"
 
+MESSAGE="$MASTER: $1 (all modules)"
+echo $MESSAGE
 ./gradlew $1 --quiet
-continue $? "$MASTER: $1"
+continue $? $MESSAGE
 
 BRANCH="master-kafka_0.10"
+MESSAGE="$BRANCH: checkout"
 git checkout $BRANCH
-continue $? "$BRANCH: checkout"
+continue $? $MESSAGE
+MESSAGE="$BRANCH: merge $MASTER"
 git merge $MASTER
-continue $? "$BRANCH: merge $MASTER"
+continue $? $MESSAGE
+MESSAGE="$BRANCH: install (kafka modules)"
 ./gradlew :kafka:avro-formatter-kafka:$1 --quiet
 ./gradlew :kafka:avro-serde-kafka:$1 --quiet
 ./gradlew :kafka:storage-kafka:$1 --quiet
