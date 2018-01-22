@@ -23,10 +23,10 @@ import java.io.PrintStream
 import java.util.Properties
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
-import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry.ZkAvroConf
-import io.amient.affinity.avro.schema.{CfAvroSchemaRegistry, ZkAvroSchemaRegistry}
-import io.amient.affinity.avro.{AvroJsonConverter, AvroSerde}
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
+import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
+import io.amient.affinity.avro.{ConfluentSchemaRegistry, ZookeeperSchemaRegistry}
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.codehaus.jackson.JsonNode
@@ -55,11 +55,11 @@ class AvroMessageFormatter extends MessageFormatter {
       pretty = true
     }
     if (props.containsKey("schema.registry.url")) {
-      serde = new CfAvroSchemaRegistry(ConfigFactory.empty
+      serde = new ConfluentSchemaRegistry(ConfigFactory.empty
         .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
     } else if (props.containsKey("schema.zookeeper.connect")) {
-      serde = new ZkAvroSchemaRegistry(ConfigFactory.empty
+      serde = new ZookeeperSchemaRegistry(ConfigFactory.empty
         .withValue(new ZkAvroConf().Connect.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.zookeeper.connect"))))
     } else {

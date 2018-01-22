@@ -39,7 +39,7 @@ import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
@@ -363,7 +363,7 @@ trait WebSocketSupport extends GatewayHttp {
             buf.get(0) match {
               case 123 => upstream ! buildSchemaPushMessage(schemaId = buf.getInt(1))
               case 0 => try {
-                val record: Any = AvroRecord.read(buf, avroSerde)
+                val record: Any = avroSerde.read(buf)
                 mediator ! record
               } catch {
                 case NonFatal(e) => log.error(e, "Invalid avro object received from the client")

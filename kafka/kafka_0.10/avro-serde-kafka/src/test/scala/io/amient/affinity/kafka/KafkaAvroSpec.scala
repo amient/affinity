@@ -3,10 +3,10 @@ package io.amient.affinity.kafka
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.avro.AvroSerde.AvroConf
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.ConfluentSchemaRegistry
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.util.Utf8
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -34,7 +34,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "bootstrap.servers" -> kafkaBootstrap,
       "key.serializer" -> classOf[KafkaAvroSerializer].getName,
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
-      new AvroConf().Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 
@@ -81,7 +81,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
 
   it should "write case classes via pre-configured confluent registry and read with affinity deserializer" in {
 
-    object TestRegistry extends CfAvroSchemaRegistry(ConfigFactory.defaultReference
+    object TestRegistry extends ConfluentSchemaRegistry(ConfigFactory.defaultReference
       .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))) {
       register[TestRecord]
       initialize()
@@ -94,7 +94,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "bootstrap.servers" -> kafkaBootstrap,
       "key.serializer" -> classOf[KafkaAvroSerializer].getName,
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
-      new AvroConf().Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
     ).mapValues(_.toString.asInstanceOf[AnyRef]))
 
@@ -111,7 +111,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
 
     )

@@ -248,7 +248,7 @@ The codebase is split into several modules:
  - `examples/..` contain example applications (Scala)
  - `kafka/kafka_X.X/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
  - `kafka/kafka_X.X/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala)
- - `kafka/kafka_X.X/storage-kafka` module with kafka storage and confluent schema provider (Scala)
+ - `kafka/kafka_X.X/storage-kafka` module with kafka storage and binary stream implementations
  - `kafka/kafka_X.X/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)

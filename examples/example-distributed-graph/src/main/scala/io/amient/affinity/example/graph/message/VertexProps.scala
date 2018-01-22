@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 
 final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord {
   def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)

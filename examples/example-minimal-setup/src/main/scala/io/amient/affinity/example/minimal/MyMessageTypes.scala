@@ -20,7 +20,7 @@
 
 package io.amient.affinity.example.minimal
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.util.Reply
 

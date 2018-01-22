@@ -21,6 +21,7 @@ package io.amient.affinity.avro
 
 import java.util.UUID
 
+import io.amient.affinity.avro.record.AvroRecord
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -34,10 +35,10 @@ class AvroRecordPropSpec extends PropSpec with PropertyChecks with Matchers {
   property("Case Class constructor default arguments are AvroRecord defaults") {
     val b = SimpleRecord()
     assert(b == SimpleRecord(SimpleKey(0), A, Seq()))
-    AvroRecord.read(AvroRecord.write(b, b.schema), classOf[SimpleRecord], b.schema) should equal(SimpleRecord(SimpleKey(0), A, Seq()))
+    AvroRecord.read[SimpleRecord](AvroRecord.write(b, b.schema), b.schema) should equal(SimpleRecord(SimpleKey(0), A, Seq()))
     val c = Record_Current()
     assert(c == Record_Current(Seq(), Map(), Set()))
-    AvroRecord.read(AvroRecord.write(c, c.schema), classOf[Record_Current], c.schema) should equal(Record_Current(Seq(), Map(), Set()))
+    AvroRecord.read[Record_Current](AvroRecord.write(c, c.schema), c.schema) should equal(Record_Current(Seq(), Map(), Set()))
   }
 
   def uuids: Gen[UUID] = for {
@@ -49,7 +50,7 @@ class AvroRecordPropSpec extends PropSpec with PropertyChecks with Matchers {
     forAll(uuids) { uuid: UUID =>
       val x = AvroUUID(uuid)
       val bytes = AvroRecord.write(x, x.schema)
-      val copy = AvroRecord.read(bytes, classOf[AvroUUID], x.schema)
+      val copy = AvroRecord.read[AvroUUID](bytes, x.schema)
       copy.uuid should be(uuid)
     }
   }
@@ -69,7 +70,7 @@ class AvroRecordPropSpec extends PropSpec with PropertyChecks with Matchers {
   property("AvroRecord.write is fully reversible by AvroRecord.read") {
     forAll(composites) { composite: Record_Current =>
       val bytes = AvroRecord.write(composite, composite.schema)
-      AvroRecord.read(bytes, classOf[Record_Current], composite.schema) should equal(composite )
+      AvroRecord.read[Record_Current](bytes, composite.schema) should equal(composite )
     }
   }
 

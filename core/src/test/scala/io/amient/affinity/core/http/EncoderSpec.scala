@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.http
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import org.scalatest.{FlatSpec, Matchers}
 
 case class TestRecord(a: String, b: Int) extends AvroRecord

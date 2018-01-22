@@ -36,7 +36,7 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
+import io.amient.affinity.avro.ZookeeperSchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway.GatewayClusterStatus
 import io.amient.affinity.core.actor.{Gateway, Partition, Routed}
@@ -77,7 +77,7 @@ trait SystemTestBase {
       case Some(zkConnectString) =>
         layer1
           .withValue(CoordinatorZk.Conf.ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(ZkAvroSchemaRegistry.Conf.Avro.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(ZookeeperSchemaRegistry.Conf.Avro.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {

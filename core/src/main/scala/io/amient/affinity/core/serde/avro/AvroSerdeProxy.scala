@@ -2,7 +2,7 @@ package io.amient.affinity.core.serde.avro
 
 import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
-import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.serde.{Serde, Serdes}
 
 import scala.util.Try

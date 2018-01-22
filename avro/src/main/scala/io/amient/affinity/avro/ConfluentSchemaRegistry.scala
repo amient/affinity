@@ -17,16 +17,15 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.avro.schema
-
+package io.amient.affinity.avro
 
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.AvroSerde.{AvroConf, Conf}
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.record.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.apache.avro.Schema
 import org.codehaus.jackson.JsonNode
@@ -34,7 +33,7 @@ import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 
-object CfAvroSchemaRegistry {
+object ConfluentSchemaRegistry {
 
   object Conf extends Conf {
     override def apply(config: Config): Conf = new Conf().apply(config)
@@ -51,22 +50,22 @@ object CfAvroSchemaRegistry {
 }
 
 /**
-  * Confluent Schema Registry provider and serde
-  * This provider uses Confluent Schema Registry but doesn't use the topic-key and topic-value subjects.
+  * Confluent Schema Registry serde
+  * This uses Confluent Schema Registry but doesn't use the topic-key and topic-value subjects.
   * Instead a fully-qualified name of the class is the subject.
   */
-class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
+class ConfluentSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
   val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
   val conf = new CfAvroConf().apply(merged)
   val client = new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
 
   override def close(): Unit = ()
 
-  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
+  override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
     client.registerSchema(subject, schema)
   }
 
-  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
+  override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
     client.getSubjects.flatMap {
       subject =>
         client.getVersions(subject).toList.map { version =>
@@ -168,7 +167,7 @@ class CfAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     }
   }
 
-  override private[schema] def hypersynchronized[X](f: => X) = synchronized {
+  override private[avro] def hypersynchronized[X](f: => X) = synchronized {
     //TODO: verify that confluent schema registry behaves well under concurrent attempts to register the same schema
     f
   }

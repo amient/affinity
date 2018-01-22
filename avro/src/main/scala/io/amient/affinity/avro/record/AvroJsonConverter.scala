@@ -1,4 +1,4 @@
-package io.amient.affinity.avro
+package io.amient.affinity.avro.record
 
 import java.io.{StringWriter, Writer}
 

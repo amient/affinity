@@ -17,9 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.avro.schema
+package io.amient.affinity.avro
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import org.apache.avro.Schema
 
 import scala.collection.immutable.ListMap
@@ -31,7 +31,7 @@ import scala.reflect.runtime.universe._
   * This trait ensures that all the getters are fast and thread-safe.
   * Implementing classes do not have to be thread-safe
   */
-trait AvroSchemaProvider {
+trait AvroSchemaRegistry {
 
   private var cacheByFqn = immutable.Map[String, (Int, Schema)]() // schema.fqn -> current schema id
 
@@ -41,11 +41,11 @@ trait AvroSchemaProvider {
 
   private var cacheBySubject: immutable.Map[String, Map[Int, Schema]] = Map() // subject -> schema ids
 
-  private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int
+  private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int
 
-  private[schema] def getAllRegistered: List[(Int, String, Schema)]
+  private[avro] def getAllRegistered: List[(Int, String, Schema)]
 
-  private[schema] def hypersynchronized[X](f: => X): X
+  private[avro] def hypersynchronized[X](f: => X): X
 
   private val registration = ListBuffer[(String, Schema)]()
 

@@ -1,6 +1,5 @@
 package io.amient.affinity.avro
 
-import io.amient.affinity.avro.schema.MemorySchemaRegistry
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory

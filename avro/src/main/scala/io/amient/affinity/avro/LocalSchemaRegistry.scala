@@ -17,21 +17,21 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.avro.schema
+package io.amient.affinity.avro
 
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.AvroSerde.AvroConf
-import io.amient.affinity.avro.schema.LocalAvroSchemaRegistry.LocalAvroConf
+import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
+import io.amient.affinity.avro.record.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.apache.avro.{Schema, SchemaValidationException, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
 
-object LocalAvroSchemaRegistry {
+object LocalSchemaRegistry {
 
   object Conf extends Conf {
     override def apply(config: Config): Conf = new Conf().apply(config)
@@ -47,7 +47,7 @@ object LocalAvroSchemaRegistry {
 
 }
 
-class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
+class LocalSchemaRegistry(config: Config) extends AvroSerde {
   val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
   val conf = new LocalAvroConf().apply(merged)
   val dataPath = conf.DataPath()
@@ -58,7 +58,7 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
 
   override def close(): Unit = ()
 
-  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
+  override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
     try {
       validator.validate(schema, existing)
     } catch {
@@ -72,7 +72,7 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
     id
   }
 
-  override private[schema] def hypersynchronized[X](f: => X) = synchronized {
+  override private[avro] def hypersynchronized[X](f: => X) = synchronized {
     val file = dataPath.resolve(".lock").toFile
 
     def getLock(countDown: Int = 30): Unit = {
@@ -91,7 +91,7 @@ class LocalAvroSchemaRegistry(config: Config) extends AvroSerde {
   }
 
 
-  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
+  override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
     val builder = List.newBuilder[(Int, String, Schema)]
     Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {

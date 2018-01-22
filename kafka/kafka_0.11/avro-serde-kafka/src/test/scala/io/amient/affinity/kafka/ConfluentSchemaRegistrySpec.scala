@@ -1,9 +1,9 @@
 package io.amient.affinity.kafka
 
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.avro.AvroRecord
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.ConfluentSchemaRegistry
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.record.AvroRecord
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -28,13 +28,13 @@ case class CompositeRecord(
                    val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord
 
 
-class CfAvroSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfRegistry {
+class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfRegistry {
 
   override def numPartitions = 1
 
   behavior of "CfAvroSchemaRegistry"
 
-  val serde = new CfAvroSchemaRegistry(ConfigFactory.parseMap(Map(
+  val serde = new ConfluentSchemaRegistry(ConfigFactory.parseMap(Map(
     new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
   )))
 

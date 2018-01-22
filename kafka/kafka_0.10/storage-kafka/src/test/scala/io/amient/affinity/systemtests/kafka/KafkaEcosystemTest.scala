@@ -6,10 +6,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.AvroSerde.AvroConf
-import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry
-import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry.ZkAvroConf
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.ZookeeperSchemaRegistry
+import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
@@ -48,7 +48,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
   private val log = LoggerFactory.getLogger(classOf[KafkaEcosystemTest])
 
   val config = configure(ConfigFactory.load("systemtests")
-    .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZkAvroSchemaRegistry].getName))
+    .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = ActorSystem.create("KafkaEcoSystem", config)
@@ -73,8 +73,8 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
   behavior of "KafkaDeserializer"
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
-    config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZkAvroSchemaRegistry].getName)
-    system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZkAvroSchemaRegistry].getName)
+    config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
     val topic = KafkaStorage.StateConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
@@ -100,7 +100,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[ZkAvroSchemaRegistry].getName,
+      new AvroConf().Class.path -> classOf[ZookeeperSchemaRegistry].getName,
       new ZkAvroConf().Connect.path -> zkConnect
     )
 

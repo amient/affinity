@@ -19,7 +19,7 @@
 
 package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.util.TimeCryptoProofSHA256
 import org.codehaus.jackson.annotate.JsonIgnore
 

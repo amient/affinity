@@ -26,7 +26,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.{Date, HttpEncodings, `Content-Encoding`}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import io.amient.affinity.avro.AvroJsonConverter
+import io.amient.affinity.avro.record.AvroJsonConverter
 import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferOutputStream
 import org.codehaus.jackson.JsonNode

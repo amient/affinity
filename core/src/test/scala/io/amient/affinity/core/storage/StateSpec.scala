@@ -3,7 +3,8 @@ package io.amient.affinity.core.storage
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.MemorySchemaRegistry
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.EventTime
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -14,6 +15,7 @@ case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRec
 
 class StateSpec extends TestKit(ActorSystem.create("test",
   ConfigFactory.parseMap(Map(
+    Node.Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
     Node.Conf.Affi.Gateway.Http.Host.path -> "127.0.0.1",
     Node.Conf.Affi.Gateway.Http.Port.path -> "0"
   )).withFallback(ConfigFactory.defaultReference)))

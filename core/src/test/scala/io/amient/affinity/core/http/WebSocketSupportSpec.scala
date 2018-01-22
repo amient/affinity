@@ -29,7 +29,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber

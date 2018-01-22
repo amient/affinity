@@ -17,14 +17,14 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.avro.schema
+package io.amient.affinity.avro
 
 import java.util
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.AvroSerde.AvroConf
-import io.amient.affinity.avro.schema.ZkAvroSchemaRegistry.ZkAvroConf
+import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
+import io.amient.affinity.avro.record.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
 import org.I0Itec.zkclient.serialize.ZkSerializer
@@ -35,7 +35,7 @@ import org.apache.zookeeper.CreateMode
 import scala.collection.JavaConversions._
 import scala.collection.immutable
 
-object ZkAvroSchemaRegistry {
+object ZookeeperSchemaRegistry {
 
   object Conf extends Conf
 
@@ -52,7 +52,7 @@ object ZkAvroSchemaRegistry {
 
 }
 
-class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProvider {
+class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
   val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
   val conf = new ZkAvroConf().apply(merged)
   private val zkRoot = conf.Root()
@@ -77,7 +77,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
 
   override def close(): Unit = zk.close()
 
-  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
+  override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = {
     try {
       validator.validate(schema, existing)
     } catch {
@@ -89,7 +89,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     id
   }
 
-  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
+  override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
     val ids = zk.getChildren(zkRoot)
     ids.toList.map { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
@@ -98,7 +98,7 @@ class ZkAvroSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaProv
     }
   }
 
-  override private[schema] def hypersynchronized[X](f: => X): X = synchronized {
+  override private[avro] def hypersynchronized[X](f: => X): X = synchronized {
     val lockPath = zkRoot + "-lock"
     var acquired = 0
     do {

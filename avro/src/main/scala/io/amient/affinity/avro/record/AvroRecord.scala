@@ -17,21 +17,18 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.avro
+package io.amient.affinity.avro.record
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
+import java.io.{ByteArrayOutputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
-import java.nio.ByteBuffer
 import java.util
 
-import io.amient.affinity.avro.schema.AvroSchemaProvider
-import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
-import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
+import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
-import org.apache.avro.util.{ByteBufferInputStream, Utf8}
+import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
 import org.codehaus.jackson.annotate.JsonIgnore
 
@@ -40,8 +37,6 @@ import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
 object AvroRecord {
-
-  private val MAGIC: Byte = 0
 
   val INT_SCHEMA = Schema.create(Schema.Type.INT)
   val BOOLEAN_SCHEMA = Schema.create(Schema.Type.BOOLEAN)
@@ -53,45 +48,44 @@ object AvroRecord {
   val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
 
 
-  def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
-    write(x, x.getSchema, schemaId)
-  }
-
-  def write(value: Any, schema: Schema, schemaId: Int = -1): Array[Byte] = {
-    value match {
-      case null => null
-      case record:AvroRecord if record._serializedInstanceBytes != null => record._serializedInstanceBytes
-      case any: Any =>
-        val valueOut = new ByteArrayOutputStream()
-        try {
-          val encoder = EncoderFactory.get().binaryEncoder(valueOut, null)
-          val writer = new GenericDatumWriter[Any](schema)
-          if (schemaId >= 0) {
-            valueOut.write(MAGIC)
-            ByteUtils.writeIntValue(schemaId, valueOut)
-          }
-          writer.write(any, encoder)
-          encoder.flush()
-          valueOut.toByteArray
-        } finally {
-          valueOut.close
-        }
+  def write(value: Any, schema: Schema): Array[Byte] = {
+    val output = new ByteArrayOutputStream()
+    try {
+      write(value, schema, output)
+      output.toByteArray
+    } finally {
+      output.close
     }
   }
 
-  def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], schema: Schema): T = read(bytes, cls, schema, schema)
+  def write[O <: OutputStream](value: Any, schema: Schema, output: O): O = {
+    val encoder = EncoderFactory.get().binaryEncoder(output, null)
+    val writer = new GenericDatumWriter[Any](schema)
+    writer.write(value, encoder)
+    encoder.flush()
+    output
+  }
+
+  def read[T: TypeTag](bytes: Array[Byte], schema: Schema): T = read(bytes, schema, schema)
 
   def read[T: TypeTag](record: GenericContainer): T = {
     readDatum(record, typeOf[T], record.getSchema).asInstanceOf[T]
   }
 
-  def read[T: TypeTag](bytes: Array[Byte], cls: Class[T], writerSchema: Schema, readerSchema: Schema): T = {
+  def read[T: TypeTag](bytes: Array[Byte], writerSchema: Schema, readerSchema: Schema): T = {
     val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
     val reader = new GenericDatumReader[GenericRecord](writerSchema, readerSchema)
     val record: GenericRecord = reader.read(null, decoder)
     read(record)
   }
 
+  /**
+    * deriveValue is used in reflection to get defaults for constructor arguments
+    *
+    * @param schemaField
+    * @param value
+    * @return
+    */
   private def deriveValue(schemaField: Schema, value: Any): AnyRef = {
     schemaField.getType match {
       case ARRAY => value.asInstanceOf[Iterable[Any]].map(deriveValue(schemaField.getElementType, _)).asJava
@@ -108,63 +102,6 @@ object AvroRecord {
     }
   }
 
-  /**
-    *
-    * @param buf ByteBuffer version of the registered avro reader
-    * @param schemaRegistry
-    * @return AvroRecord for registered Type
-    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
-    *         null if bytes are null
-    */
-  def read(buf: ByteBuffer, schemaRegistry: AvroSchemaProvider): Any = {
-    if (buf == null) null else read(new ByteBufferInputStream(List(buf).asJava), schemaRegistry)
-  }
-
-  /**
-    *
-    * @param bytes
-    * @param schemaRegistry
-    * @return AvroRecord for registered Type
-    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
-    *         null if bytes are null
-    */
-  def read(bytes: Array[Byte], schemaRegistry: AvroSchemaProvider): Any = {
-    if (bytes == null) null else read(new ByteArrayInputStream(bytes), schemaRegistry)  match {
-      case a: AvroRecord => a._serializedInstanceBytes = bytes; a
-      case other => other
-    }
-  }
-
-  /**
-    *
-    * @param bytesIn InputStream implementation for the registered avro reader
-    * @param schemaRegistry
-    * @return AvroRecord for registered Type
-    *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
-    *         null if bytes are null
-    */
-  def read(bytesIn: InputStream, schemaRegistry: AvroSchemaProvider): Any = {
-    require(bytesIn.read() == MAGIC)
-    val schemaId = ByteUtils.readIntValue(bytesIn)
-    require(schemaId >= 0)
-    val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
-    schemaRegistry.schema(schemaId) match {
-      case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
-      case Some(writerSchema) =>
-        val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
-        schemaRegistry.getCurrentSchema(writerSchema.getFullName) match {
-          case None =>
-            //case classes are not present in this runtime, just use GenericRecord
-            val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
-            reader.read(null, decoder)
-          case Some((_, readerSchema)) =>
-            //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
-            val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-            val record = reader.read(null, decoder)
-            read(record, readerSchema)
-        }
-    }
-  }
 
   class LocalCache[K, I] extends ThreadLocal[java.util.HashMap[K, I]] {
     override def initialValue() = new util.HashMap[K, I]()
@@ -202,7 +139,7 @@ object AvroRecord {
   }
 
   private object classFieldsCache extends LocalCache[Class[_], Map[Int, Field]] {
-    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field]= getOrInitialize(cls, {
+    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field] = getOrInitialize(cls, {
       val schemaFields = schema.getFields
       val params: Array[Parameter] = cls.getConstructors()(0).getParameters
       require(params.length == schemaFields.size,
@@ -325,6 +262,8 @@ object AvroRecord {
     }
   }
 
+  def inferSchema[T: TypeTag]: Schema = inferSchema(typeOf[T])
+
   def inferSchema(cls: Class[_]): Schema = {
     inferSchema(classTypeCache.getOrInitialize(cls, fqnTypeCache.getOrInitialize(cls.getName)))
   }
@@ -401,7 +340,8 @@ object AvroRecord {
       } else if (tpe <:< typeOf[Option[Any]]) {
         SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
       } else if (tpe <:< typeOf[AvroRecord]) {
-        val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)//universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
+        val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
+        //universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
         val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
         val companionMirror = typeMirror.reflect(moduleMirror.instance)
         val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
@@ -430,7 +370,7 @@ abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
   @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
 
-  @transient private var _serializedInstanceBytes: Array[Byte] = null
+  @transient private[avro] var _serializedInstanceBytes: Array[Byte] = null
 
   private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
 

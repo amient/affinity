@@ -23,8 +23,8 @@ package io.amient.affinity.core.cluster
 import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.util.Timeout
-import com.typesafe.config.{Config, ConfigException}
-import io.amient.affinity.avro.AvroSerde.AvroConf
+import com.typesafe.config.Config
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor.Gateway.GatewayConf

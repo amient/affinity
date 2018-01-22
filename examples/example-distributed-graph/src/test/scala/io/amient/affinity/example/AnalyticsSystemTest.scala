@@ -21,7 +21,7 @@ package io.amient.affinity.spark
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.graph.message.{Component, VertexProps}

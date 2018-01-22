@@ -25,7 +25,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.{Controller, GatewayHttp, Partition, Routed}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}

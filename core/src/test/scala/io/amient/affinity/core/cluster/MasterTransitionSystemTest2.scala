@@ -26,8 +26,8 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.avro.AvroSerde
-import io.amient.affinity.avro.schema.MemorySchemaRegistry
+import io.amient.affinity.avro.MemorySchemaRegistry
+import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.Encoder

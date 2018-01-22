@@ -3,8 +3,7 @@ package io.amient.affinity.kafka
 import java.util
 
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import org.apache.avro.Schema
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import org.apache.kafka.common.serialization.Serializer
 
 class KafkaAvroSerializer extends Serializer[Any] {
@@ -22,7 +21,7 @@ class KafkaAvroSerializer extends Serializer[Any] {
     require(serde != null, "AvroSerde not configured")
     val subject = s"$topic-${if (isKey) "key" else "value"}"
     val (objSchema, schemaId) = serde.getOrRegisterSchema(data, subject)
-    AvroRecord.write(data, objSchema, schemaId)
+    serde.write(data, objSchema, schemaId)
   }
 
   override def close(): Unit = if (serde != null) serde.close()

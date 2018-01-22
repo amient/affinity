@@ -17,17 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.avro.schema
+package io.amient.affinity.avro
 
 import java.util.concurrent.ConcurrentHashMap
 
-import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
 import scala.collection.immutable.Seq
 
-class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
+class MemorySchemaRegistry extends AvroSerde with AvroSchemaRegistry {
 
   protected val internal = new ConcurrentHashMap[Int, Schema]()
 
@@ -35,7 +35,7 @@ class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
 
   private val validator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
 
-  override private[schema] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
+  override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
     validator.validate(schema, existing)
     val schemaId: Int = internal.find(_._2 == schema) match {
       case None =>
@@ -48,7 +48,7 @@ class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
     schemaId
   }
 
-  override private[schema] def getAllRegistered: List[(Int, String, Schema)] = {
+  override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
     internal2.flatMap {
       case (subject: String, ids: Seq[Int]) => ids.map {
         case id => (id, subject, internal.get(id))
@@ -56,6 +56,6 @@ class MemorySchemaRegistry extends AvroSerde with AvroSchemaProvider {
     }.toList
   }
 
-  override private[schema] def hypersynchronized[X](f: => X): X = synchronized(f)
+  override private[avro] def hypersynchronized[X](f: => X): X = synchronized(f)
 
 }

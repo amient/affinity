@@ -2,7 +2,7 @@ package io.amient.affinity.core.cluster
 
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigValueFactory
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.{GatewayHttp, Routed}
 import io.amient.affinity.core.util.{Reply, SystemTestBase}
 import io.amient.affinity.kafka.EmbeddedZooKeeper

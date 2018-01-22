@@ -3,7 +3,7 @@ package io.amient.affinity.kafka
 import java.util
 
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.avro.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde
 import org.apache.kafka.common.serialization.Deserializer
 
 class KafkaAvroDeserializer extends Deserializer[Any] {

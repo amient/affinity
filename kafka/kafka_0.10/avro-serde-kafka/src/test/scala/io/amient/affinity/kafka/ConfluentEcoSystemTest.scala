@@ -23,14 +23,13 @@ import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.avro.AvroSerde.AvroConf
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry
-import io.amient.affinity.avro.schema.CfAvroSchemaRegistry.CfAvroConf
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.Murmur2Partitioner
+import io.amient.affinity.avro.ConfluentSchemaRegistry
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
@@ -39,10 +38,10 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
-import scala.concurrent.ExecutionContext.Implicits.global
 
 object UUID {
   def apply(uuid: java.util.UUID): UUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
@@ -69,8 +68,8 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
   private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemTest])
 
   val config = ConfigFactory.parseMap(Map(
-      CfAvroSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
-      AvroSerde.Conf.Avro.Class.path -> classOf[CfAvroSchemaRegistry].getName))
+      ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
+      AvroSerde.Conf.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName))
     .withFallback(ConfigFactory.defaultReference)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
@@ -117,7 +116,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[CfAvroSchemaRegistry].getName,
+      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 

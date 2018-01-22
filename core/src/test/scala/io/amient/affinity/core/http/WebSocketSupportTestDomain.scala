@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.http
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.Routed
 
 

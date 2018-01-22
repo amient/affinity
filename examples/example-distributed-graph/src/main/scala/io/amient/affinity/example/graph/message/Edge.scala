@@ -19,6 +19,6 @@
 
 package io.amient.affinity.example.graph.message
 
-import io.amient.affinity.avro.AvroRecord
+import io.amient.affinity.avro.record.AvroRecord
 
 final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord

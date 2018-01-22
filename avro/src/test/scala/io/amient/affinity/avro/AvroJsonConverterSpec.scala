@@ -1,5 +1,6 @@
 package io.amient.affinity.avro
 
+import io.amient.affinity.avro.record.AvroJsonConverter
 import org.scalatest.{FlatSpec, Matchers}
 
 class AvroJsonConverterSpec extends FlatSpec with Matchers {

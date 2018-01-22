@@ -21,8 +21,8 @@ package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.schema.MemorySchemaRegistry
-import io.amient.affinity.avro.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.MemorySchemaRegistry
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Partition.CreateKeyValueMediator
 import io.amient.affinity.core.actor.Routed
