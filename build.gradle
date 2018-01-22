@@ -21,7 +21,7 @@ ext {
     sparkVersion = '2.0.2'
     confluentVersion = '3.3.1'
     //
-    baseKafkaVersion = kafkaVersion.split("\\.\\d+\$")[0]
+    baseKafkaVersion = kafkaVersion.split("\\.")[0] + '.' + kafkaVersion.split("\\.")[1]
     baseScalaVersion = scalaVersion.split("\\.\\d+\$")[0]
     baseSparkVersion = sparkVersion.split("\\.\\d+\$")[0]
 

@@ -34,15 +34,25 @@ if [ -z $1 ]; then
     fail "Missing at least one gradle command argument"
 fi
 
-GRADLE_COMMANDS=$@
+MASTER="126-cross-compile"
+continue $? "initializze"
 
+git checkout $MASTER
+continue $? "$MASTER: checkout"
 
+./gradlew $1 --quiet
+continue $? "$MASTER: $1"
 
-git checkout 126-
-#continue $? "Checkout master branch"
+BRANCH="master-kafka_0.10"
+git checkout $BRANCH
+continue $? "$BRANCH: checkout"
+git merge $MASTER
+continue $? "$BRANCH: merge $MASTER"
+./gradlew :kafka:avro-formatter-kafka:$1 --quiet
+./gradlew :kafka:avro-serde-kafka:$1 --quiet
+./gradlew :kafka:storage-kafka:$1 --quiet
+./gradlew :kafka:test-util-kafka:$1 --quiet
+continue $? "$BRANCH: $1"
 
-
-#./gradlew build
-#continue $? "build"
-
-echo $GRADLE_COMMANDS
+git checkout $MASTER
+continue $? "Checkout back to root branch"
