@@ -38,11 +38,13 @@ case class Key(key: Int) extends AvroRecord with Routed with Reply[Option[TestVa
 
 class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
 
+  val registry = new MemorySchemaRegistry()
+
   "Akka-serialized AvroRecord bytes" must {
     "be identical to AvroSerde bytes - this is important for murmur2 hash partitioner" in {
       val in = Key(1)
       val bytes = SerializationExtension(system).serialize(in).get
-      val bytes2 = new MemorySchemaRegistry().toBytes(in)
+      val bytes2 = registry.toBytes(in)
       bytes.mkString(".") should be(bytes2.mkString("."))
     }
   }
@@ -51,7 +53,7 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
     "be identical to AvroSerde bytes - this is important for murmur2 hash partitioner" in {
       val in = "test-string"
       val bytes = SerializationExtension(system).serialize(in).get
-      val bytes2 = new MemorySchemaRegistry().toBytes(in)
+      val bytes2 = registry.toBytes(in)
       bytes.mkString(".") should be(bytes2.mkString("."))
     }
   }
