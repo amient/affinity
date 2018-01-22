@@ -240,29 +240,47 @@ TODO ..
 
 # Development 
 
-The codebase is split into several modules:
+The codebase is split into several modules, some of which can and should be used independently
+of the akka core:
 
  - `api` is the internal programming api and utiliities for writing memstore and storage plugins (Java)
  - `avro` scala case class <--> avro automatic conversion with schema registry wrappers (conf,zk,local,embedded) (Scala)
  - `core` is the main scala library with js-avro extension (Scala)
  - `examples/..` contain example applications (Scala)
- - `kafka/kafka_X.X/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
- - `kafka/kafka_X.X/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala)
- - `kafka/kafka_X.X/storage-kafka` module with kafka storage and binary stream implementations
- - `kafka/kafka_X.X/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
+ - `kafka/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
+ - `kafka/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala)
+ - `kafka/storage-kafka` module with kafka storage and binary stream implementations
+ - `kafka/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
  - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
- - `spark/spark_2.0` uses the underlying stream storage as CompactRDD with all the serde magic
+ - `spark` uses the underlying stream storage as CompactRDD with all the serde magic
  - `ws-client` custom web socket with avro support (Java)
-
 
 ## Testing the code
 
-    ./gradlew test    
+    ./zzz test
     
 ## Building the project
         
-    ./gradlew build
+    ./zzz build
+
+### Cross-builds
+
+Current versions:
+    Scala 2.11.8
+    Kafka 0.11.0.2
+    Confluent 3.3.1
+    Spark 2.0.2
+
+The `zzz` script uses git and gradle to switch between the maintained master branches
+but the   root project properties scalaVersion, kafkaVersion and sparkVersion the projecct can
+be used to create a custom enivironment.
+
+#### Scala 2.11
+    - core-scala_2.11
+    - kafka_0.10-scala_2.11
+    - kafka_0.11-scala_2.11
+    - TODO Spark: 1.6.x, 2.0.x
 
 ## JavaScript (affinity.js)
 

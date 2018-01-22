@@ -8,13 +8,12 @@ apply plugin: "com.github.johnrengelman.shadow"
 ext {
     mainClass = "io.amient.affinity.example.minimal.Main"
     mainScript = "example"
-    kafkaMinorVersion = "0.10"
 }
 
 dependencies {
     compile project(':core')
     compile project(':rocksdb')
-    compile project(':kafka:kafka_' + kafkaMinorVersion + ':storage-kafka')
+    compile project(':kafka:storage-kafka')
     compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.21'
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
 }

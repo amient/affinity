@@ -1,0 +1,38 @@
+group = rootProject.group
+version = rootProject.version
+
+apply plugin: 'java'
+apply plugin: 'scala'
+apply plugin: 'signing'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+
+ext {
+    artefact = 'spark_' + rootProject.baseSparkVersion + '-scala_' + rootProject.baseScalaVersion
+}
+if (rootProject.hasProperty('maven-central')) {
+    uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+}
+install.repositories.mavenInstaller.pom.artifactId = artefact
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId artefact
+            from components.java
+        }
+    }
+}
+
+dependencies {
+    provided 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    compile project(':api')
+    testCompile project(':kafka:storage-kafka')
+    testCompile project(':kafka:test-util-kafka')
+    provided group: 'org.apache.spark', name: 'spark-core_' + rootProject.baseScalaVersion, version: rootProject.sparkVersion
+    provided group: 'org.apache.spark', name: 'spark-sql_' + rootProject.baseScalaVersion, version: rootProject.sparkVersion
+    provided group: 'org.apache.parquet', name: 'parquet-avro', version: rootProject.avroVersion
+    provided (group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2')
+}
+
+

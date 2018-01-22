@@ -188,20 +188,9 @@ There is also a separate module that provides class for the standard console con
 ship with confluent schema registry - the wire format is the same, except with affinity tools
 you can work with type-safe case classes instead of generic avro records.**
 
-#### Kafka 0.10.x Series
+- (avro-serde-scala)[kafka/avro-serde-kafka]
+- (avro-formatter-scala)[kafka/avro-formatter-kafka]
 
-- (avro-serde-kafka_0.10-scala)[kafka/kafka_0.10/avro-serde-kafka]
-- (avro-formatter-kafka_0.10-scala)[kafka/kafka_0.10/avro-formatter-kafka]
-
-
-#### Kafka 0.11.x Series
-
-- (avro-serde-kafka_0.11-scala)[kafka/kafka_0.11/avro-serde-kafka]
-- (avro-formatter-kafka_0.11-scala)[kafka/kafka_0.11/avro-formatter-kafka]
-
-#### Kafka 1.0.x Series
-
-...
 
 
 

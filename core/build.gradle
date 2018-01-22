@@ -7,19 +7,25 @@ apply plugin: 'signing'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
-//uploadArchives.repositories.mavenDeployer.pom.artifactId = 'core-scala_' + baseScalaVersion
+ext {
+    artefact='core-scala_' + rootProject.baseScalaVersion
+    avroArtefact='avro-scala_' + rootProject.baseScalaVersion
+}
+if (rootProject.hasProperty('maven-central')) {
+    uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
+}
 publishing {
     publications {
         maven(MavenPublication) {
-            artifactId 'core-scala_' + baseScalaVersion
+            artifactId artefact
             from components.java
         }
     }
 }
-install.repositories.mavenInstaller.pom.artifactId = 'core-scala_' + baseScalaVersion
+install.repositories.mavenInstaller.pom.artifactId = artefact
 def installer = install.repositories.mavenInstaller
 [installer]*.pom*.whenConfigured { pom ->
-    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro' }.artifactId = 'avro-scala_'+baseScalaVersion
+    pom.dependencies.find {dep -> dep.groupId == 'io.amient.affinity' && dep.artifactId == 'avro' }.artifactId = avroArtefact
 }
 
 dependencies {
@@ -35,8 +41,8 @@ dependencies {
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
 
     testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
-    testCompile project(':kafka:kafka_0.11:storage-kafka')
-    testCompile project(':kafka:kafka_0.11:test-util-kafka')
+    testCompile project(':kafka:storage-kafka')
+    testCompile project(':kafka:test-util-kafka')
     testCompile project(':ws-client')
 
 }
