@@ -34,30 +34,41 @@ if [ -z $1 ]; then
     fail "Missing at least one gradle command argument"
 fi
 
+if [ $1 == "publish" ]; then
+    C="uploadArchives -Pmaven-central"
+else
+    C=$1
+fi
+
 MASTER="126-cross-compile"
 continue $? "initializze"
 
+#excute on master branch / all modules
 git checkout $MASTER
 continue $? "$MASTER: checkout"
-
-MESSAGE="$MASTER: $1 (all modules)"
+MESSAGE="$MASTER: $C (all modules)"
 echo $MESSAGE
-./gradlew $1 --quiet
+./gradlew $C --quiet
 continue $? $MESSAGE
 
+#excute on kafka_0.10 / kafka modules only
 BRANCH="master-kafka_0.10"
 MESSAGE="$BRANCH: checkout"
+echo $MESSAGE
 git checkout $BRANCH
 continue $? $MESSAGE
 MESSAGE="$BRANCH: merge $MASTER"
+echo $MESSAGE
 git merge $MASTER
 continue $? $MESSAGE
-MESSAGE="$BRANCH: install (kafka modules)"
-./gradlew :kafka:avro-formatter-kafka:$1 --quiet
-./gradlew :kafka:avro-serde-kafka:$1 --quiet
-./gradlew :kafka:storage-kafka:$1 --quiet
-./gradlew :kafka:test-util-kafka:$1 --quiet
-continue $? "$BRANCH: $1"
+MESSAGE="$BRANCH: $C (kafka modules)"
+echo $MESSAGE
+./gradlew :kafka:avro-formatter-kafka:$C --quiet
+./gradlew :kafka:avro-serde-kafka:$C --quiet
+./gradlew :kafka:storage-kafka:$C --quiet
+./gradlew :kafka:test-util-kafka:$C --quiet
+continue $? "$BRANCH: $C"
+
 
 git checkout $MASTER
 continue $? "Checkout back to root branch"
