@@ -47,7 +47,7 @@ Below is the table of all supported types, all which support default values.
     Float                   float
     Double                  double
     String                  string
-    byte[]                  bytes               
+    Array[Byte]             bytes               
     Map[String, T]          map(T)              Maps have to have String keys
     Iterable[T]             array(T)            List[T], Seq[T], Set[T], etc.
     Enumeration             enum                only scala enums are suppored
