@@ -9,7 +9,7 @@ class KafkaAvroSerdeSpec extends FlatSpec with Matchers with EmbeddedCfRegistry 
 
   behavior of "KafkaAvroSerde for Kafka Streams"
 
-//  override def numPartitions: Int = 1
+  override def numPartitions: Int = 1
 
   it should "work with Confluent Schema Registry"  in {
     val serde = new KafkaAvroSerde[SimpleKey]
