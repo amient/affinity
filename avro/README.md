@@ -47,13 +47,12 @@ Below is the table of all supported types, all which support default values.
     Float                   float
     Double                  double
     String                  string
-    byte[]                  bytes               TODO: some legacy code uses java.nio.ByteBuffer
+    byte[]                  bytes               
     Map[String, T]          map(T)              Maps have to have String keys
     Iterable[T]             array(T)            List[T], Seq[T], Set[T], etc.
-    Enumeration             enum                only scala enums are suppored, not java ones
+    Enumeration             enum                only scala enums are suppored
     Option[T]               union(null,T)
-    AvroRecord              indexed-record      nested schemas are allowed
-    Either[L,R]             union(null,L,R)     TODO: this will be supported once switched to macros
+    case class              indexed-record      nested schemas are allowed
 
 ### Note on Top-level primitive types
 

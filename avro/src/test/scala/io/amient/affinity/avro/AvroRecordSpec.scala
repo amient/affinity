@@ -1,5 +1,7 @@
 package io.amient.affinity.avro
 
+import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
@@ -33,14 +35,14 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBytes(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 10))
-    oldValue.mkString(".") should be ("0.0.0.0.7.2.2.0.0.0.20")
+    oldValue.mkString(".") should be ("0.0.0.0.8.2.2.0.0.0.20")
     val renderedValue = newSerde.fromBytes(oldValue)
     renderedValue should be(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map()))
   }
 
   "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
     val newValue = newSerde.toBytes(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("1" -> SimpleRecord(SimpleKey(1), SimpleEnum.A))))
-    newValue.mkString(",") should be ("0,0,0,0,8,2,2,0,0,0,2,2,49,2,0,0,0,0")
+    newValue.mkString(",") should be ("0,0,0,0,9,2,2,0,0,0,2,2,49,2,0,0,0,0")
     val downgradedValue = oldSerde.fromBytes(newValue)
     downgradedValue should be(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 0))
   }
@@ -52,6 +54,45 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     newSerde.fromBytes(newSerde.toBytes(1.0f)) should equal(1.0f)
     newSerde.fromBytes(newSerde.toBytes(10.01)) should equal(10.01)
     newSerde.fromBytes(newSerde.toBytes("hello")) should equal("hello")
+  }
+
+  "Array[Byte]"  should "be treated as Avro Bytes underlied by nio.ByteBuffer" in {
+    def compare(x: AvroBytes, y: AvroBytes) {
+      ByteUtils.equals(x.raw, y.raw) should be(true)
+      ByteUtils.equals(x.optional.get, y.optional.get) should be(true)
+      x.listed.zip(y.listed).foreach { case (a, b) => ByteUtils.equals(a, b) should be(true) }
+    }
+    val schema = AvroRecord.inferSchema[AvroBytes]
+    schema.toString should be ("{\"type\":\"record\",\"name\":\"AvroBytes\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"raw\",\"type\":\"bytes\"},{\"name\":\"optional\",\"type\":[\"null\",\"bytes\"]},{\"name\":\"listed\",\"type\":{\"type\":\"array\",\"items\":\"bytes\"}}]}")
+    val original = AvroBytes(Array[Byte](1,2,3), Some(Array[Byte](6)), List(Array[Byte](10),Array[Byte](100)))
+    val bytes = AvroRecord.write(original, schema)
+    compare(original, AvroRecord.read[AvroBytes](bytes, schema))
+
+    val bytes2 = newSerde.toBytes(original)
+    compare(original, newSerde.fromBytes(bytes2).asInstanceOf[AvroBytes])
+  }
+
+  "Primitives used as top-level types" should "be transparently serialized" in {
+    val data = Array[Byte](1,2,3,4,5)
+    val schema = AvroRecord.inferSchema(data)
+    schema should be (AvroRecord.BYTES_SCHEMA)
+    schema.getType should be (Schema.Type.BYTES)
+    AvroRecord.inferSchema[Array[Byte]] should be(schema)
+    val bytes = AvroRecord.write(data, schema)
+    bytes.mkString(".") should be("10.1.2.3.4.5")
+    ByteUtils.equals(data, AvroRecord.read[Array[Byte]](bytes, schema)) should be (true)
+    val bytes2 = AvroRecord.write(2048, AvroRecord.INT_SCHEMA)
+    bytes2.mkString(".") should be("-128.32")
+    AvroRecord.read[Int](bytes2, AvroRecord.INT_SCHEMA) should be (2048)
+  }
+
+  "List used as top-level type" should "be transparently serialized" in {
+    val value = List(1,2,4)
+    val schema = AvroRecord.inferSchema[List[Int]]
+    schema.toString should be ("{\"type\":\"array\",\"items\":\"int\"}")
+    val data = AvroRecord.write(value, schema)
+    AvroRecord.read[List[Int]](data, schema) should be(value)
+
   }
 
   "Scala Enums" should "be treated as EnumSymbols" in {

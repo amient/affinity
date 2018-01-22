@@ -56,7 +56,7 @@ trait AvroSchemaRegistry {
   register[Float]("float")
   register[Double]("double")
   register[String]("string")
-  //register[java.nio.ByteBuffer]("bytes")
+  register[Array[Byte]]("bytes")
 
   def describeSchemas: Map[Int, Schema] = cacheById
 

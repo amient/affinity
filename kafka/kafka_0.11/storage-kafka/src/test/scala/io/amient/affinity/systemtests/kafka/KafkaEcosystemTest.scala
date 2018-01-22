@@ -1,6 +1,5 @@
 package io.amient.affinity.systemtests.kafka
 
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
@@ -24,12 +23,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 object UUID {
-  def apply(uuid: java.util.UUID): UUID = apply(ByteBuffer.wrap(ByteUtils.uuid(uuid)))
+  def apply(uuid: java.util.UUID): UUID = apply(ByteUtils.uuid(uuid))
 
   def random: UUID = apply(java.util.UUID.randomUUID)
 }
 
-case class UUID(val data: ByteBuffer) extends AvroRecord {
+case class UUID(val data: Array[Byte]) extends AvroRecord {
   def javaUUID: java.util.UUID = ByteUtils.uuid(data.array)
 }
 
