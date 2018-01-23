@@ -165,7 +165,7 @@ More information about schema compatibility and projection can be found on Apach
 
 ## Schema Registries
 
-AvroRecord class and it's companion object described above is only the bottom layer of the
+AvroRecord class and its companion object described above is only the bottom layer of the
 serialization stack.
 
 ...
@@ -175,14 +175,14 @@ serialization stack.
 All the functionality provided by the AvroRecord, AvroSerde and AvroSchemaRegistry
 is packaged within each kafka module to implement the following standard interfaces:
 
-    **io.amient.affinity.kafka.KafkaAvroSerializer** implements org.apache.kafka.common.serialization.Serializer
-    **io.amient.affinity.kafka.KafkaAvroDeserializer** implements org.apache.kafka.common.serialization.Deserializer
-    **io.amient.affinity.kafka.KafkaAvroSerde[T]** implements org.apache.kafka.common.serialization.Serde[T]
+    io.amient.affinity.kafka.KafkaAvroSerializer implements org.apache.kafka.common.serialization.Serializer
+    io.amient.affinity.kafka.KafkaAvroDeserializer implements org.apache.kafka.common.serialization.Deserializer
+    io.amient.affinity.kafka.KafkaAvroSerde[T] implements org.apache.kafka.common.serialization.Serde[T]
 
 The only extra dependency that these modules carry is the respective version *org.apache.kafka:kafka-clients*.
 There is also a separate module that provides class for the standard console consumer:
 
-    **io.amient.affinity.kafka.AvroMessageFormatter** implements kafka.common.MessageFormatter
+    io.amient.affinity.kafka.AvroMessageFormatter implements kafka.common.MessageFormatter
 
 **NOTE: the above serde tools can be used interchangably with serializers and deserializers that
 ship with confluent schema registry - the wire format is the same, except with affinity tools

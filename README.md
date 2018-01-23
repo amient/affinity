@@ -132,6 +132,9 @@ At the moment this is done at runtime by reflection but this will be
  give performance character comparable to serializing and deserializing
  generic avro records but the need for these should disappear with a
  macro-based approach.
+## Avro Schemas
+
+See (Avro Module)[avro] for more details and examples
 
 ## Distributed coordination
 
@@ -321,10 +324,4 @@ logback is used, in another log4j.
 For all testing slf4j-jdk14 (Java Logging) binding is used and is configured for all modules in:
 api/src/test/resources/logging.properties
 
-## Avro Schemas
 
-..
-
-### Avro Kafka Serializer and Deserializer
-
-...
