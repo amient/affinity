@@ -26,11 +26,8 @@ branch() {
     echo "modules=$SETS"
     echo "commands=$C"
 
-
-    MESSAGE="$BRANCH/checkout"
-    echo $MESSAGE
     git checkout $BRANCH
-    continue $? $MESSAGE
+    continue $? "$BRANCH/checkout"
 
     if [ "$BRANCH" != "master" ]; then
         MESSAGE="$BRANCH/merge $MASTER"
@@ -39,30 +36,31 @@ branch() {
         continue $? $MESSAGE
     fi
 
-    if [ $SETS == "-" ]; then
-        MESSAGE="$BRANCH/$C (all modules)"
-        echo $MESSAGE
-        ./gradlew $C
-        continue $? $MESSAGE
-    elif [ $SETS == "kafka" ]; then
-        MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
-        echo $MESSAGE
-        ./gradlew :kafka:avro-formatter-kafka:$C
-        continue $? $MESSAGE
-        MESSAGE="$BRANCH/:kafka:avro-serde-kafka:$C"
-        echo $MESSAGE
-        ./gradlew :kafka:avro-serde-kafka:$C
-        continue $? $MESSAGE
-        MESSAGE="$BRANCH/:kafka:storage-kafka:$C"
-        ./gradlew :kafka:storage-kafka:$C
-        continue $? $MESSAGE
-        MESSAGE="$BRANCH/:kafka:test-util-kafka:$C"
-        ./gradlew :kafka:test-util-kafka:$C
-        continue $? $MESSAGE
-    else
-        fail "Unknown set of modules: $SETS"
+    if [ "$C" != "-" ]; then
+        if [ "$SETS" == "-" ]; then
+            MESSAGE="$BRANCH/$C (all modules)"
+            echo $MESSAGE
+            ./gradlew $C
+            continue $? $MESSAGE
+        elif [ $SETS == "kafka" ]; then
+            MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
+            echo $MESSAGE
+            ./gradlew :kafka:avro-formatter-kafka:$C
+            continue $? $MESSAGE
+            MESSAGE="$BRANCH/:kafka:avro-serde-kafka:$C"
+            echo $MESSAGE
+            ./gradlew :kafka:avro-serde-kafka:$C
+            continue $? $MESSAGE
+            MESSAGE="$BRANCH/:kafka:storage-kafka:$C"
+            ./gradlew :kafka:storage-kafka:$C
+            continue $? $MESSAGE
+            MESSAGE="$BRANCH/:kafka:test-util-kafka:$C"
+            ./gradlew :kafka:test-util-kafka:$C
+            continue $? $MESSAGE
+        else
+            fail "Unknown set of modules: $SETS"
+        fi
     fi
-    continue $? "$BRANCH: $C"
 
 }
 
@@ -80,6 +78,7 @@ Usage() {
     echo "  TASK: "
     echo "      test                - run test on branches only"
     echo "      test-all            - run all tests on master and all branches"
+    echo "      merge               - only merge master into all branches"
     echo "      install             - install selected modules sets from all branches into local maven"
     echo "      publish-master      - publish selected modules sets to maven-central"
     echo "      publish-branches    - publish selected modules sets maven-central"
@@ -95,6 +94,11 @@ case "$1" in
         ;;
     test)
         C="test --quiet"
+        RUN_ON_MASTER="false"
+        RUN_ON_BRANCHES="true"
+        ;;
+    merge)
+        C="-"
         RUN_ON_MASTER="false"
         RUN_ON_BRANCHES="true"
         ;;
