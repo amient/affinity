@@ -4,7 +4,8 @@ fail() {
     MESSAGE=$1
     RED='\033[0;31m'
     NC='\033[0m'
-    echo -e "$RED Failure: $MESSAGE $NC"
+    echo -e "${RED}Failure: $MESSAGE $NC"
+    echo ""
     exit 1;
 }
 
@@ -16,27 +17,29 @@ continue() {
     fi
 }
 
-branch_kafka() {
+branch() {
     BRANCH=$1
     C=$2
-    ALL=$3
+    MODULES=$3
 
     MESSAGE="$BRANCH/checkout"
     echo $MESSAGE
     git checkout $BRANCH
     continue $? $MESSAGE
 
-    MESSAGE="$BRANCH/merge $MASTER"
-    echo $MESSAGE
-    git merge $MASTER --no-edit
-    continue $? $MESSAGE
+    if [ "$BRANCH" != "master" ]; then
+        MESSAGE="$BRANCH/merge $MASTER"
+        echo $MESSAGE
+        git merge $MASTER --no-edit
+        continue $? $MESSAGE
+    fi
 
-    if [ $ALL == "true" ]; then
+    if [ $MODULES == "*" ]; then
         MESSAGE="$BRANCH/$C (all modules)"
         echo $MESSAGE
         ./gradlew $C
         continue $? $MESSAGE
-    else
+    elif [ $MODULES == "kafka" ]; then
         MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
         echo $MESSAGE
         ./gradlew :kafka:avro-formatter-kafka:$C
@@ -51,6 +54,8 @@ branch_kafka() {
         MESSAGE="$BRANCH/:kafka:test-util-kafka:$C"
         ./gradlew :kafka:test-util-kafka:$C
         continue $? $MESSAGE
+    else
+        fail "Unknown set of modules: $MODULES"
     fi
     continue $? "$BRANCH: $C"
 
@@ -58,58 +63,72 @@ branch_kafka() {
 
 Usage() {
     echo ""
-    echo "Usage: ./zzz (test|build|install|publish)"
+    echo "This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "  This script will run the given gradle commands over the whole cross-compiled space of this project."
+    echo "Usage: ./zzz <TASK> <MODULE-SET>"
     echo ""
-    echo "Example: ./zzz test"
-    echo "  The above will run tests on the following branches, while attempting to merge master into each"
-    echo "      master"
-    echo "      master-kafka_0.10"
+    echo "  MODULE-SET:"
+    echo "      *                   - run for all modules"
+    echo "      kafka               - run for all kafka submodules"
+    echo "      spark               - run for all spark submodules"
     echo ""
-    fail "Missing at least one gradle command argument"
+    echo "  TASK: "
+    echo "      test                - run test on branches only"
+    echo "      test-all            - run all tests on master and all branches"
+    echo "      install             - install selected modules sets from all branches into local maven"
+    echo "      publish-master      - publish selected modules sets to maven-central"
+    echo "      publish-branches    - publish selected modules sets maven-central"
+    echo ""
+    echo ""
 }
 
 case "$1" in
     test-all)
         C="test --quiet"
-        ALL="true"
         RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="true"
         ;;
     test)
         C="test --quiet"
         RUN_ON_MASTER="false"
-        ALL="false"
+        RUN_ON_BRANCHES="true"
         ;;
     install)
         C="install"
-        ALL="false"
         RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="true"
         ;;
-    publish)
+    publish-master)
+        C="uploadArchives -Pmaven-central --quiet"
+        RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="false"
+        ;;
+    publish-kafka-branches)
         C="uploadArchives -Pmaven-central --quiet"
         ALL="false"
         RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="true"
         ;;
     *)
         Usage
+        fail "Invalid <TASK> argument"
         ;;
 esac
 
-MASTER="master"
-git checkout $MASTER
-continue $? "$MASTER/checkout"
+if [ -z "$2" ]; then
+    Usage
+    fail "Missing <MODULE-SET> argument"
+fi
 
 #excute on master branch / all modules
 if [ "$RUN_ON_MASTER" == "true" ]; then
-    MESSAGE="$MASTER/$C (all modules)"
-    echo $MESSAGE
-    ./gradlew $C
-    continue $? $MESSAGE
+    branch "master" $C $ALL
 fi
 
-branch_kafka "master-kafka_0.10" $C $ALL
-branch_kafka "master-kafka_0.11" $C $ALL
+if [ "$RUN_ON_BRANCHES" == "true" ]; then
+    branch "master-kafka_0.10" $C $ALL
+    branch "master-kafka_0.11" $C $ALL
+fi
 
 git checkout $MASTER
 continue $? "Checkout back to root branch"
