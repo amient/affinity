@@ -12,7 +12,7 @@ class KafkaAvroSerdeSpec extends FlatSpec with Matchers with EmbeddedCfRegistry 
   override def numPartitions: Int = 1
 
   it should "work with Confluent Schema Registry"  in {
-    val serde = new KafkaAvroSerde[SimpleKey]
+    val serde = new SpecificKafkaAvroSerde[SimpleKey]
     serde.configure(new util.HashMap[String,String] {
       put("schema.registry.class", classOf[ConfluentSchemaRegistry].getName)
       put("schema.registry.url", registryUrl)
@@ -24,7 +24,7 @@ class KafkaAvroSerdeSpec extends FlatSpec with Matchers with EmbeddedCfRegistry 
 
   it should "work with MemorySchemaRegistry"  ignore {
     //FIXME MemorySchemaRegistry doesn't take any configuration so cannot be shared accress serializer - deserializer
-    val serde = new KafkaAvroSerde[SimpleKey]
+    val serde = new SpecificKafkaAvroSerde[SimpleKey]
     serde.configure(new util.HashMap[String,String] {
       put("schema.registry.class", classOf[MemorySchemaRegistry].getName)
     }, true)
