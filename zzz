@@ -22,9 +22,10 @@ branch() {
     SETS="$2"
     C="${@:3}"
 
-    echo "branch=$BRANCH"
-    echo "modules=$SETS"
-    echo "commands=$C"
+    echo ""
+#    echo "branch=$BRANCH"
+#    echo "modules=$SETS"
+#    echo "commands=$C"
 
     git checkout $BRANCH
     continue $? "$BRANCH/checkout"
