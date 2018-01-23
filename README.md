@@ -132,9 +132,8 @@ At the moment this is done at runtime by reflection but this will be
  give performance character comparable to serializing and deserializing
  generic avro records but the need for these should disappear with a
  macro-based approach.
-## Avro Schemas
 
-See (Avro Module)[avro] for more details and examples
+See [Avro Module](/avro) for more details and examples
 
 ## Distributed coordination
 
