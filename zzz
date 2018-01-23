@@ -19,6 +19,7 @@ continue() {
 branch_kafka() {
     BRANCH=$1
     C=$2
+    ALL=$3
 
     MESSAGE="$BRANCH/checkout"
     echo $MESSAGE
@@ -27,7 +28,7 @@ branch_kafka() {
 
     MESSAGE="$BRANCH/merge $MASTER"
     echo $MESSAGE
-    git merge $MASTER
+    git merge $MASTER --no-edit
     continue $? $MESSAGE
 
     if [ $ALL == "true" ]; then
@@ -69,23 +70,26 @@ Usage() {
     fail "Missing at least one gradle command argument"
 }
 
-
 case "$1" in
-    test)
+    test-all)
         C="test --quiet"
         ALL="true"
+        RUN_ON_MASTER="true"
         ;;
-    build)
-        C="build --quiet --exclude-task test --quiet"
+    test)
+        C="test --quiet"
+        RUN_ON_MASTER="false"
         ALL="false"
         ;;
     install)
         C="install"
         ALL="false"
+        RUN_ON_MASTER="true"
         ;;
     publish)
         C="uploadArchives -Pmaven-central --quiet"
         ALL="false"
+        RUN_ON_MASTER="true"
         ;;
     *)
         Usage
@@ -97,13 +101,15 @@ git checkout $MASTER
 continue $? "$MASTER/checkout"
 
 #excute on master branch / all modules
-MESSAGE="$MASTER/$C (all modules)"
-echo $MESSAGE
-./gradlew $C
-continue $? $MESSAGE
+if [ "$RUN_ON_MASTER" == "true" ]; then
+    MESSAGE="$MASTER/$C (all modules)"
+    echo $MESSAGE
+    ./gradlew $C
+    continue $? $MESSAGE
+fi
 
-branch_kafka "master-kafka_0.10" $C
-branch_kafka "master-kafka_0.11" $C
+branch_kafka "master-kafka_0.10" $C $ALL
+branch_kafka "master-kafka_0.11" $C $ALL
 
 git checkout $MASTER
 continue $? "Checkout back to root branch"
