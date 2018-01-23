@@ -16,6 +16,45 @@ continue() {
     fi
 }
 
+branch_kafka() {
+    BRANCH=$1
+    C=$2
+
+    MESSAGE="$BRANCH/checkout"
+    echo $MESSAGE
+    git checkout $BRANCH
+    continue $? $MESSAGE
+
+    MESSAGE="$BRANCH/merge $MASTER"
+    echo $MESSAGE
+    git merge $MASTER
+    continue $? $MESSAGE
+
+    if [ $ALL == "true" ]; then
+        MESSAGE="$BRANCH/$C (all modules)"
+        echo $MESSAGE
+        ./gradlew $C
+        continue $? $MESSAGE
+    else
+        MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
+        echo $MESSAGE
+        ./gradlew :kafka:avro-formatter-kafka:$C
+        continue $? $MESSAGE
+        MESSAGE="$BRANCH/:kafka:avro-serde-kafka:$C"
+        echo $MESSAGE
+        ./gradlew :kafka:avro-serde-kafka:$C
+        continue $? $MESSAGE
+        MESSAGE="$BRANCH/:kafka:storage-kafka:$C"
+        ./gradlew :kafka:storage-kafka:$C
+        continue $? $MESSAGE
+        MESSAGE="$BRANCH/:kafka:test-util-kafka:$C"
+        ./gradlew :kafka:test-util-kafka:$C
+        continue $? $MESSAGE
+    fi
+    continue $? "$BRANCH: $C"
+
+}
+
 Usage() {
     echo ""
     echo "Usage: ./zzz (test|build|install|publish)"
@@ -54,40 +93,17 @@ case "$1" in
 esac
 
 MASTER="master"
-continue $? "initializze"
+git checkout $MASTER
+continue $? "$MASTER/checkout"
 
 #excute on master branch / all modules
-git checkout $MASTER
-continue $? "$MASTER: checkout"
-MESSAGE="$MASTER: $C (all modules)"
+MESSAGE="$MASTER/$C (all modules)"
 echo $MESSAGE
 ./gradlew $C
 continue $? $MESSAGE
 
-#excute on kafka_0.10 / kafka modules only
-BRANCH="master-kafka_0.10"
-MESSAGE="$BRANCH: checkout"
-echo $MESSAGE
-git checkout $BRANCH
-continue $? $MESSAGE
-MESSAGE="$BRANCH: merge $MASTER"
-echo $MESSAGE
-git merge $MASTER
-continue $? $MESSAGE
-if [ $ALL == "true" ]; then
-    MESSAGE="$BRANCH: $C"
-    echo $MESSAGE
-    ./gradlew $C
-else
-    MESSAGE="$BRANCH: $C (kafka modules)"
-    echo $MESSAGE
-    ./gradlew :kafka:avro-formatter-kafka:$C
-    ./gradlew :kafka:avro-serde-kafka:$C
-    ./gradlew :kafka:storage-kafka:$C
-    ./gradlew :kafka:test-util-kafka:$C
-fi
-continue $? "$BRANCH: $C"
-
+branch_kafka "master-kafka_0.10" $C
+branch_kafka "master-kafka_0.11" $C
 
 git checkout $MASTER
 continue $? "Checkout back to root branch"
