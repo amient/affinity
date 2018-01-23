@@ -234,9 +234,9 @@ that includes Akka default and Affinity defaults.
 Applications typically have their own default configuration layered on top of the reference
 files and a set of thin, deployment specific conf files.
 
-Internally Affinity has it's own type-safe configuration abstraction that is initialized
-from the HOCON conf files. These type-safe configuration descriptors handles validation,
-enforcement and messaging around invalid configuration.
+Internally Affinity has its own type-safe configuration abstraction that is initialized
+from the HOCON conf files. These type-safe configuration descriptors handle validation,
+enforcement of requirements and messaging around invalid settings.
 
 TODO ..
 
@@ -246,7 +246,7 @@ The codebase is split into several modules, some of which can and should be used
 of the akka core:
 
  - `api` is the internal programming api and utiliities for writing memstore and storage plugins (Java)
- - `avro` scala case class <--> avro automatic conversion with schema registry wrappers (conf,zk,local,embedded) (Scala)
+ - `avro` scala case class <--> generic avro conversion with schema registry wrappers (Scala)
  - `core` is the main scala library with js-avro extension (Scala)
  - `examples/..` contain example applications (Scala)
  - `kafka/avro-formatter-kafka` kafka formatter for console consumer for the `avro` module (Scala)
@@ -316,8 +316,8 @@ When doing a lot of work on the javascript watchify can be used
 
 ## Logging
 
-Affinity uses SLF4j and it also redirects alla Akka loggin to SLF4J.
-It doesn't provide any binding for compile configuration, that is left to applications - in one of the example,
+Affinity uses SLF4j and it also redirects all Akka logging to SLF4J.
+It doesn't provide any binding for compile configuration, that is left to applications - in one of the examples,
 logback is used, in another log4j.
 
 For all testing slf4j-jdk14 (Java Logging) binding is used and is configured for all modules in:
