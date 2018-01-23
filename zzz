@@ -18,9 +18,14 @@ continue() {
 }
 
 branch() {
-    BRANCH=$1
-    C=$2
-    MODULES=$3
+    BRANCH="$1"
+    SETS="$2"
+    C="${@:3}"
+
+    echo "branch=$BRANCH"
+    echo "modules=$SETS"
+    echo "commands=$C"
+
 
     MESSAGE="$BRANCH/checkout"
     echo $MESSAGE
@@ -34,12 +39,12 @@ branch() {
         continue $? $MESSAGE
     fi
 
-    if [ $MODULES == "*" ]; then
+    if [ $SETS == "-" ]; then
         MESSAGE="$BRANCH/$C (all modules)"
         echo $MESSAGE
         ./gradlew $C
         continue $? $MESSAGE
-    elif [ $MODULES == "kafka" ]; then
+    elif [ $SETS == "kafka" ]; then
         MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
         echo $MESSAGE
         ./gradlew :kafka:avro-formatter-kafka:$C
@@ -55,7 +60,7 @@ branch() {
         ./gradlew :kafka:test-util-kafka:$C
         continue $? $MESSAGE
     else
-        fail "Unknown set of modules: $MODULES"
+        fail "Unknown set of modules: $SETS"
     fi
     continue $? "$BRANCH: $C"
 
@@ -65,10 +70,10 @@ Usage() {
     echo ""
     echo "This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "Usage: ./zzz <TASK> <MODULE-SET>"
+    echo "Usage: ./zzz <TASK> [<MODULE-SET>]"
     echo ""
     echo "  MODULE-SET:"
-    echo "      *                   - run for all modules"
+    echo "      -                   - if omitted runs for all modules"
     echo "      kafka               - run for all kafka submodules"
     echo "      spark               - run for all spark submodules"
     echo ""
@@ -116,19 +121,20 @@ case "$1" in
 esac
 
 if [ -z "$2" ]; then
-    Usage
-    fail "Missing <MODULE-SET> argument"
+    SETS="-"
+else
+    SETS="$2"
 fi
 
 #excute on master branch / all modules
 if [ "$RUN_ON_MASTER" == "true" ]; then
-    branch "master" $C $ALL
+    branch "master" "$SETS" "$C"
 fi
 
 if [ "$RUN_ON_BRANCHES" == "true" ]; then
-    branch "master-kafka_0.10" $C $ALL
-    branch "master-kafka_0.11" $C $ALL
+    branch "master-kafka_0.10" "$SETS" $C
+    branch "master-kafka_0.11" "$SETS" $C
 fi
 
-git checkout $MASTER
+git checkout "master"
 continue $? "Checkout back to root branch"
