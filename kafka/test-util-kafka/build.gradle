@@ -30,7 +30,12 @@ dependencies {
     compile group: 'org.scalatest', name: 'scalatest_' + rootProject.baseScalaVersion, version: rootProject.scalaTestVersion
     compile group: 'org.scalacheck', name: 'scalacheck_' + rootProject.baseScalaVersion, version: rootProject.scalaCheckVersion
     compile group: 'com.101tec', name: 'zkclient', version: rootProject.zkClientVersion
-    compile group: 'org.apache.kafka', name: 'kafka_'+ rootProject.baseScalaVersion, version: rootProject.kafkaVersion
+    compile (group: 'org.apache.kafka', name: 'kafka_'+ rootProject.baseScalaVersion, version: rootProject.kafkaVersion) {
+        exclude group: 'com.fasterxml.jackson.core'
+    }
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: rootProject.jacksonVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: rootProject.jacksonVersion
+
 }
 
 
