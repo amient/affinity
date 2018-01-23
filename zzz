@@ -31,9 +31,9 @@ branch() {
     continue $? "$BRANCH/checkout"
 
     if [ "$BRANCH" != "master" ]; then
-        MESSAGE="$BRANCH/merge $MASTER"
+        MESSAGE="$BRANCH/merge master"
         echo $MESSAGE
-        git merge $MASTER --no-edit
+        git merge master --no-edit
         continue $? $MESSAGE
     fi
 
