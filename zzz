@@ -23,12 +23,10 @@ branch() {
     C="${@:3}"
 
     echo ""
-#    echo "branch=$BRANCH"
-#    echo "modules=$SETS"
-#    echo "commands=$C"
-
     git checkout $BRANCH
     continue $? "$BRANCH/checkout"
+    git pull $BRANCH
+    continue $? "$BRANCH/pull"
 
     if [ "$BRANCH" != "master" ]; then
         MESSAGE="$BRANCH/merge master"
