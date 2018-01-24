@@ -113,10 +113,10 @@ case "$1" in
         RUN_ON_MASTER="true"
         RUN_ON_BRANCHES="false"
         ;;
-    publish-kafka-branches)
+    publish-branches)
         C="uploadArchives -Pmaven-central --quiet"
         ALL="false"
-        RUN_ON_MASTER="true"
+        RUN_ON_MASTER="false"
         RUN_ON_BRANCHES="true"
         ;;
     *)
