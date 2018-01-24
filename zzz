@@ -25,7 +25,7 @@ branch() {
     echo ""
     git checkout $BRANCH
     continue $? "$BRANCH/checkout"
-    git pull $BRANCH
+    git pull
     continue $? "$BRANCH/pull"
 
     if [ "$BRANCH" != "master" ]; then
