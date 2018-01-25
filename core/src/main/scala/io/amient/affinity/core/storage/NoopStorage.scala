@@ -24,7 +24,7 @@ import io.amient.affinity.stream.Record
 
 class NoopStorage(id: String, conf: StateConf, partition:Int, numParts: Int) extends Storage(id, conf, partition) {
 
-  override def init(): Unit = ()
+  override def init(state: ObservableState[_]): Unit = ()
 
   override def boot(): Unit = ()
 

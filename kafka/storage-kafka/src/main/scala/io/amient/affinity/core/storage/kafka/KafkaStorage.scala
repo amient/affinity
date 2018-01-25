@@ -20,16 +20,16 @@
 package io.amient.affinity.core.storage.kafka
 
 import java.util
-import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ExecutionException, Future, TimeUnit}
+import java.util.{Optional, Properties}
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
-import io.amient.affinity.core.storage.{StateConf, Storage}
-import io.amient.affinity.core.util.MappedJavaFuture
-import io.amient.affinity.stream.{BinaryRecord, Record}
+import io.amient.affinity.core.storage.{ObservableState, StateConf, Storage}
+import io.amient.affinity.core.util.{EventTime, MappedJavaFuture}
+import io.amient.affinity.stream.Record
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
@@ -80,8 +80,12 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   private val conf = KafkaStorage.StateConf(stateConf).Storage
 
   final val topic = conf.Topic()
+
   final val ttlMs = stateConf.TtlSeconds() * 1000L
-  final val readonly: Boolean = stateConf.ReadOnly()
+  final val minTimestamp: Long = math.max(stateConf.MinTimestampUnixMs(),
+    if (ttlMs < 0) 0L else EventTime.unix() - ttlMs)
+
+  final val readonly: Boolean = stateConf.External()
 
   val consumerProps = new Properties() {
     if (conf.Consumer.isDefined) {
@@ -101,6 +105,8 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   }
 
   ensureCorrectTopicConfiguration()
+
+  private var state: ObservableState[_] = null
 
   protected val kafkaProducer: KafkaProducer[Array[Byte], Array[Byte]] =
     if (readonly) null else {
@@ -144,8 +150,11 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
         memstore.getCheckpoint match {
           case checkpoint if checkpoint.offset <= 0 =>
-            log.info(s"Rewinding $tp")
-            kafkaConsumer.seekToBeginning(consumerPartitions)
+            log.info(s"Rewinding $tp to event time: " + EventTime.local(minTimestamp))
+            kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(minTimestamp))).get(tp) match {
+              case null => kafkaConsumer.seekToEnd(consumerPartitions)
+              case offsetAndTime => kafkaConsumer.seek(tp, offsetAndTime.offset)
+            }
           case checkpoint =>
             log.info(s"Seeking ${checkpoint.offset} into $tp")
             kafkaConsumer.seek(tp, checkpoint.offset)
@@ -165,10 +174,13 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
               val records = kafkaConsumer.poll(500)
               for (r <- records.iterator()) {
                 lastProcessedOffset = r.offset()
+                //for tailing state it means either it is a) replica b) external
                 if (r.value == null) {
                   memstore.unload(r.key, r.offset())
+                  if (tailing) state.internalPush(r.key, Optional.empty[Array[Byte]])
                 } else {
                   memstore.load(r.key, r.value, r.offset(), r.timestamp())
+                  if (tailing) state.internalPush(r.key, Optional.of(r.value))
                 }
               }
               if (!tailing && lastProcessedOffset >= endOffset) {
@@ -198,7 +210,8 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     }
   }
 
-  private[affinity] def init(): Unit = {
+  private[affinity] def init(state: ObservableState[_]): Unit = {
+    this.state = state
     consumer.start()
   }
 
@@ -303,8 +316,10 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
         val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
         val actualConfig = admin.describeConfigs(List(topicConfigResource))
           .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-        val needsAlterConfig = topicConfigs.exists { case (k,v) => actualConfig.get(k).value() != v }
-        if (needsAlterConfig) {
+        val configOutOfSync = topicConfigs.exists { case (k,v) => actualConfig.get(k).value() != v }
+        if (readonly) {
+          if (configOutOfSync) log.warn(s"External State configuration doesn't match the state configuration: $topicConfigs")
+        } else if (configOutOfSync) {
           val entries: util.Collection[ConfigEntry] = topicConfigs.map { case (k,v) => new ConfigEntry(k,v) }
           admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
             .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)

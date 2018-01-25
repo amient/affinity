@@ -190,8 +190,8 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
     //now bootstrap the state
     val state0 = createStateStoreForPartition(topic, 0)
     val state1 = createStateStoreForPartition(topic, 1)
-    state0.storage.init()
-    state1.storage.init()
+    state0.storage.init(state0)
+    state1.storage.init(state1)
     state0.storage.boot()
     state1.storage.boot()
     //TODO #75 test that kafka default partitioner + confluent avro serde partitions as expected
