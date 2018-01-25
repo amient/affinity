@@ -27,6 +27,17 @@ class StateSpec extends TestKit(ActorSystem.create("test",
 
   behavior of "State"
 
+  it should "not allow writes and deletes in read-only state" in {
+    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
+      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+      State.StateConf.Storage.Class.path -> classOf[NoopStorage].getName,
+      State.StateConf.ReadOnly.path -> "true"
+    )))
+    val state = State.create[Long, ExpirableValue]("read-only-store", 0, stateConf, 1, system)
+    an[RuntimeException] should be thrownBy (state.insert(1L, ExpirableValue("one", 1)))
+    an[RuntimeException] should be thrownBy (state.delete(1L))
+  }
+
   it should "work without ttl" in {
 
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(

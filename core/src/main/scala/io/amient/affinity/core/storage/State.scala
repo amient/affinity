@@ -46,6 +46,7 @@ object State {
   def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
+    val readonly = stateConf.ReadOnly()
     val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(identifier, stateConf, partition, 1) else {
       if (!stateConf.MemStore.DataDir.isDefined) {
         val conf = Node.Conf(system.settings.config)
@@ -62,7 +63,7 @@ object State {
     }
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
-    new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs)
+    new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly)
   }
 
 }
@@ -71,7 +72,8 @@ class State[K, V](val storage: Storage,
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   ttlMs: Long = -1,
-                  lockTimeoutMs: Int = 10000) extends Observable {
+                  lockTimeoutMs: Int = 10000,
+                  readonly: Boolean = false) extends Observable {
 
   self =>
 
@@ -148,7 +150,7 @@ class State[K, V](val storage: Storage,
     * @param value new value to be associated with the key
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def replace(key: K, value: V): Future[Unit] = {
+  def replace(key: K, value: V): Future[Unit] = ifNotReadOnly {
     put(ByteBuffer.wrap(keySerde.toBytes(key)), value).map(__ => push(key, value))
   }
 
@@ -158,7 +160,7 @@ class State[K, V](val storage: Storage,
     * @param key to delete
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def delete(key: K): Future[Unit] = {
+  def delete(key: K): Future[Unit] = ifNotReadOnly {
     delete(ByteBuffer.wrap(keySerde.toBytes(key))).map(_ => push(key, null))
   }
 
@@ -197,9 +199,11 @@ class State[K, V](val storage: Storage,
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
-  def insert(key: K, value: V): Future[V] = update(key) {
-    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
-    case None => (Some(value), Some(value), value)
+  def insert(key: K, value: V): Future[V] = ifNotReadOnly {
+    update(key) {
+      case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
+      case None => (Some(value), Some(value), value)
+    }
   }
 
   /**
@@ -212,7 +216,7 @@ class State[K, V](val storage: Storage,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
-  def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
+  def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = ifNotReadOnly {
     try {
       val k = ByteBuffer.wrap(keySerde.toBytes(key))
       val l = lock(key)
@@ -248,6 +252,10 @@ class State[K, V](val storage: Storage,
     } catch {
       case NonFatal(e) => Future.failed(e)
     }
+  }
+
+  private def ifNotReadOnly[X](f : => X): X = {
+    if (!readonly) f else throw new RuntimeException("Cannot modify a read-only  state store")
   }
 
   /**

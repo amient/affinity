@@ -81,23 +81,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
   final val topic = conf.Topic()
   final val ttlMs = stateConf.TtlSeconds() * 1000L
-
-  private val producerProps = new Properties() {
-    if (conf.Producer.isDefined) {
-      val producerConfig = conf.Producer.config()
-      if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
-      if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
-      if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
-      producerConfig.entrySet().foreach { case (entry) =>
-        put(entry.getKey, entry.getValue.unwrapped())
-      }
-    }
-    put("bootstrap.servers", conf.BootstrapServers())
-    put("key.serializer", classOf[ByteArraySerializer].getName)
-    put("value.serializer", classOf[ByteArraySerializer].getName)
-  }
-
-  require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
+  final val readonly: Boolean = stateConf.ReadOnly()
 
   val consumerProps = new Properties() {
     if (conf.Consumer.isDefined) {
@@ -118,7 +102,25 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
   ensureCorrectTopicConfiguration()
 
-  protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+  protected val kafkaProducer: KafkaProducer[Array[Byte], Array[Byte]] =
+    if (readonly) null else {
+      val producerProps = new Properties() {
+        if (conf.Producer.isDefined) {
+          val producerConfig = conf.Producer.config()
+          if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
+          if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
+          if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
+          producerConfig.entrySet().foreach { case (entry) =>
+            put(entry.getKey, entry.getValue.unwrapped())
+          }
+        }
+        put("bootstrap.servers", conf.BootstrapServers())
+        put("key.serializer", classOf[ByteArraySerializer].getName)
+        put("value.serializer", classOf[ByteArraySerializer].getName)
+      }
+      require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
+      new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+    }
 
   @volatile private var tailing = true
 
@@ -230,13 +232,14 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     try {
       consumer.interrupt()
       consumer.kafkaConsumer.wakeup()
-      kafkaProducer.close()
+      if (!readonly) kafkaProducer.close
     } finally {
       super.close()
     }
   }
 
   def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
+    if (readonly) throw new RuntimeException("Leaked write into a readonly storage")
     val p = if (partition < 0) defaultPartitioner.partition(record.key, numPartitions) else partition
     val producerRecord = new ProducerRecord(topic, p, record.timestamp, record.key, record.value)
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
@@ -245,6 +248,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   }
 
   def delete(key: Array[Byte]): Future[java.lang.Long] = {
+    if (readonly) throw new RuntimeException("Leaked write into a readonly storage")
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, key, null))) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }
