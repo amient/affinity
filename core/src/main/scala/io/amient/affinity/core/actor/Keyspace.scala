@@ -22,6 +22,7 @@ package io.amient.affinity.core.actor
 import java.lang
 
 import akka.actor.Actor
+import akka.actor.Status.Failure
 import akka.routing._
 import akka.serialization.SerializationExtension
 import com.typesafe.config.Config
@@ -32,6 +33,7 @@ import io.amient.affinity.core.{Murmur2Partitioner, ack}
 
 import scala.collection.mutable
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 object Keyspace {
 
@@ -73,7 +75,11 @@ class Keyspace(config: Config) extends Actor {
 
   override def receive: Receive = {
 
-    case message: Routed => getRoutee(message.key).send(message, sender)
+    case message: Routed => try {
+      getRoutee(message.key).send(message, sender)
+    } catch {
+      case NonFatal(e) => sender ! Failure(new RuntimeException(s"Could not route $message", e))
+    }
 
     case req@ScatterGather(message: Reply[Any], t) => sender.replyWith(req) {
       val recipients = routes.values
