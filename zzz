@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-ROOT="117-readonly-statee-option"
-
 fail() {
     MESSAGE=$1
     RED='\033[0;31m'
@@ -81,7 +79,10 @@ Usage() {
     echo ""
     echo "This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "Usage: ./zzz <TASK> [<MODULE-SET>]"
+    echo "Usage: ./zzz <ROOT-BRANCH> <TASK> [<MODULE-SET>]"
+    echo ""
+    echo "  ROOT-BRANCH             Can be either master or any development branch"
+    echo "                          - if it's not master, variant branches will be created automatically"
     echo ""
     echo "  MODULE-SET:"
     echo "      -                   - if omitted runs for all modules"
@@ -99,7 +100,14 @@ Usage() {
     echo ""
 }
 
-case "$1" in
+if [ -z "$1" ]; then
+    Usage
+    fail "Missing root branch argument"
+fi
+
+ROOT="$1"
+
+case "$2" in
     clean)
         C="clean"
         RUN_ON_ROOT="true"
@@ -150,17 +158,18 @@ case "$1" in
         ;;
 esac
 
-if [ -z "$2" ]; then
+if [ -z "$3" ]; then
     SETS="-"
 else
-    SETS="$2"
+    SETS="$3"
 fi
 
-#excute on the root branch / all modules
+#excute on the root branch
 if [ "$RUN_ON_ROOT" == "true" ]; then
     variant "--" "$SETS" "$C"
 fi
 
+#excute on the variant branches
 if [ "$RUN_ON_VARIANTS" == "true" ]; then
     variant "kafka_0.10" "$SETS" $C
     variant "kafka_0.11" "$SETS" $C
