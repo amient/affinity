@@ -78,14 +78,12 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 
   private val conf = KafkaStorage.StateConf(stateConf).Storage
-
+  final val readonly: Boolean = stateConf.External()
   final val topic = conf.Topic()
-
   final val ttlMs = stateConf.TtlSeconds() * 1000L
   final val minTimestamp: Long = math.max(stateConf.MinTimestampUnixMs(),
     if (ttlMs < 0) 0L else EventTime.unix() - ttlMs)
 
-  final val readonly: Boolean = stateConf.External()
 
   val consumerProps = new Properties() {
     if (conf.Consumer.isDefined) {
@@ -105,8 +103,6 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   }
 
   ensureCorrectTopicConfiguration()
-
-  private var state: ObservableState[_] = null
 
   protected val kafkaProducer: KafkaProducer[Array[Byte], Array[Byte]] =
     if (readonly) null else {
@@ -131,6 +127,8 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   @volatile private var tailing = true
 
   @volatile private var consuming = false
+
+  @volatile private var state: ObservableState[_] = null
 
   private val consumerError = new AtomicReference[Throwable](null)
 
