@@ -45,6 +45,8 @@ import scala.util.Random
 
 class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
+  val specTimeout = 15 seconds
+
   override def numPartitions = 2
 
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
@@ -119,7 +121,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with Embe
         }
         requestCount.set(requests.size)
         try {
-          val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
+          val statuses = Await.result(Future.sequence(requests), specTimeout).groupBy(x => x).map {
             case (status, list) => (status, list.length)
           }
           errorCount.set(requestCount.get - statuses("303 See Other"))
@@ -143,7 +145,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with Embe
         gateway.http(GET, gateway.uri(s"/$key")).map {
           response => (response.entity, jsonStringEntity(value))
         }
-      }), 10 seconds)
+      }), specTimeout)
       x.count { case (entity, expected) => entity != expected } should be(0)
     } finally {
       client.interrupt()

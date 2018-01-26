@@ -49,7 +49,7 @@ public abstract class Storage implements Closeable {
 
     public static class StorageConf extends CfgStruct<StorageConf> {
         public CfgCls<Storage> Class = cls("class", Storage.class, true);
-        public CfgLong MinTimestamp = longint("min.timestamp", 0L);
+        public CfgLong MinTimestamp = longint("min.timestamp.ms", 0L);
         @Override
         protected Set<String> specializations() {
             return new HashSet<>(Arrays.asList("kafka"));
@@ -74,8 +74,10 @@ public abstract class Storage implements Closeable {
     /**
      * the contract of this method is that it should start a background process of restoring
      * the state from the underlying storage.
+     * @param state observable state object that will receive notifications about updates coming externally
+     *              through the storage layer
      */
-    abstract public void init();
+    abstract public void init(ObservableState<?> state);
 
     /**
      * The implementation should stop listening for updates on the underlying topic after it has

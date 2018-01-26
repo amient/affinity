@@ -24,13 +24,21 @@ import io.amient.affinity.stream.Record
 
 class NoopStorage(id: String, conf: StateConf, partition:Int, numParts: Int) extends Storage(id, conf, partition) {
 
-  override def init(): Unit = ()
+  final val readonly: Boolean = conf.External()
+
+  override def init(state: ObservableState[_]): Unit = ()
 
   override def boot(): Unit = ()
 
   override def tail(): Unit = ()
 
-  override def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = CompletableFuture.completedFuture((-1L))
+  override def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
+    if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
+    CompletableFuture.completedFuture((-1L))
+  }
 
-  override def delete(key: Array[Byte]): Future[java.lang.Long] = CompletableFuture.completedFuture((-1L))
+  override def delete(key: Array[Byte]): Future[java.lang.Long] = {
+    if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
+    CompletableFuture.completedFuture((-1L))
+  }
 }

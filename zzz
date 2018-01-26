@@ -17,22 +17,34 @@ continue() {
     fi
 }
 
-branch() {
-    BRANCH="$1"
+variant() {
+    VARIANT="$1"
     SETS="$2"
     C="${@:3}"
 
     echo ""
-    git checkout $BRANCH
-    continue $? "$BRANCH/checkout"
-    git pull
-    continue $? "$BRANCH/pull"
-
-    if [ "$BRANCH" != "master" ]; then
-        MESSAGE="$BRANCH/merge master"
-        echo $MESSAGE
-        git merge master --no-edit
-        continue $? $MESSAGE
+    if [ "$VARIANT" == "$ROOT" ]; then
+        git checkout master
+        continue $? "master/checkout"
+        git pull
+        continue $? "master/pull"
+        BRANCH="$ROOT"
+        if [ "$BRANCH" != "master" ]; then
+            git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH
+            continue $? "$BRANCH/checkout"
+        fi
+    else
+        git checkout "master-$VARIANT"
+        continue $? "master-$VARIANT/checkout"
+        git pull
+        continue $? "master-$VARIANT/pull"
+        BRANCH="$ROOT-$VARIANT"
+        if [ "$BRANCH" != "master-$VARIANT" ]; then
+            git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH
+            continue $? "$BRANCH/checkout"
+        fi
+        git merge $ROOT --no-edit
+        continue $? "$BRANCH/merge $ROOT"
     fi
 
     if [ "$C" != "-" ]; then
@@ -67,7 +79,10 @@ Usage() {
     echo ""
     echo "This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "Usage: ./zzz <TASK> [<MODULE-SET>]"
+    echo "Usage: ./zzz <ROOT-BRANCH> <TASK> [<MODULE-SET>]"
+    echo ""
+    echo "  ROOT-BRANCH             Can be either master or any development branch"
+    echo "                          - if it's not master, variant branches will be created automatically"
     echo ""
     echo "  MODULE-SET:"
     echo "      -                   - if omitted runs for all modules"
@@ -76,46 +91,66 @@ Usage() {
     echo ""
     echo "  TASK: "
     echo "      test                - run test on branches only"
-    echo "      test-all            - run all tests on master and all branches"
-    echo "      merge               - only merge master into all branches"
+    echo "      test-all            - run all tests on root and all variants"
+    echo "      merge               - only merge root into all variants"
     echo "      install             - install selected modules sets from all branches into local maven"
-    echo "      publish-master      - publish selected modules sets to maven-central"
-    echo "      publish-branches    - publish selected modules sets maven-central"
+    echo "      publish-master      - publish selected modules sets to maven-central - only for master root"
+    echo "      publish-branches    - publish selected modules sets maven-central - only for master root"
     echo ""
     echo ""
 }
 
-case "$1" in
+if [ -z "$1" ]; then
+    Usage
+    fail "Missing root branch argument"
+fi
+
+ROOT="$1"
+
+case "$2" in
+    clean)
+        C="clean"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="true"
+        ;;
     test-all)
         C="test --quiet"
-        RUN_ON_MASTER="true"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="true"
         ;;
     test)
         C="test --quiet"
-        RUN_ON_MASTER="false"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="false"
+        RUN_ON_VARIANTS="true"
         ;;
     merge)
         C="-"
-        RUN_ON_MASTER="false"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="false"
+        RUN_ON_VARIANTS="true"
         ;;
     install)
         C="install"
-        RUN_ON_MASTER="true"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="true"
         ;;
     publish-master)
+        if [ "$ROOT" != "master" ]; then
+            Usage
+            fail "publish tasks can be performed only when ROOT=master"
+        fi
         C="uploadArchives -Pmaven-central --quiet"
-        RUN_ON_MASTER="true"
-        RUN_ON_BRANCHES="false"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="false"
         ;;
     publish-branches)
+        if [ "$ROOT" != "master" ]; then
+            Usage
+            fail "publish tasks can be performed only when ROOT=master"
+        fi
         C="uploadArchives -Pmaven-central --quiet"
         ALL="false"
-        RUN_ON_MASTER="false"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="false"
+        RUN_ON_VARIANTS="true"
         ;;
     *)
         Usage
@@ -123,21 +158,22 @@ case "$1" in
         ;;
 esac
 
-if [ -z "$2" ]; then
+if [ -z "$3" ]; then
     SETS="-"
 else
-    SETS="$2"
+    SETS="$3"
 fi
 
-#excute on master branch / all modules
-if [ "$RUN_ON_MASTER" == "true" ]; then
-    branch "master" "$SETS" "$C"
+#excute on the root branch
+if [ "$RUN_ON_ROOT" == "true" ]; then
+    variant "$ROOT" "$SETS" "$C"
 fi
 
-if [ "$RUN_ON_BRANCHES" == "true" ]; then
-    branch "master-kafka_0.10" "$SETS" $C
-    branch "master-kafka_0.11" "$SETS" $C
+#excute on the variant branches
+if [ "$RUN_ON_VARIANTS" == "true" ]; then
+    variant "kafka_0.10" "$SETS" $C
+    variant "kafka_0.11" "$SETS" $C
 fi
 
-git checkout "master"
+git checkout "$ROOT"
 continue $? "Checkout back to root branch"

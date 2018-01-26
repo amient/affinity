@@ -56,8 +56,8 @@ trait ActorState extends Actor {
 
   private[core] def state[K, V](name: String, creator: => State[K, V]): State[K, V] = {
     val result: State[K, V] = creator
-    result.storage.init()
-    result.storage.boot()
+    result.storage.init(result)
+    if (!result.external) result.storage.boot()
     result.storage.tail()
     storageRegistry.add((name, result))
     result
@@ -69,11 +69,15 @@ trait ActorState extends Actor {
 
   private[core] def bootState(): Unit = storageRegistry.asScala.foreach { case (name, s) =>
     log.info(s"state store: '${name}', partition: ${s.storage.partition} booted, estimated num. keys=${s.numKeys}")
-    s.storage.boot()
+    if (s.external) s.storage.tail() else s.storage.boot()
   }
 
 
-  private[core] def tailState(): Unit = storageRegistry.asScala.foreach(_._2.storage.tail())
+  private[core] def tailState(): Unit = {
+    storageRegistry.asScala.foreach { case (_, s) =>
+      s.storage.tail()
+    }
+  }
 
   private[core] def closeState(): Unit = {
     storageRegistry.asScala.foreach { case (name, store) =>

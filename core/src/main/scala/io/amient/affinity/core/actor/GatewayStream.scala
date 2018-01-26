@@ -90,7 +90,7 @@ trait GatewayStream extends Gateway {
     override def run(): Unit = {
       try {
         consumer.subscribe()
-        log.info(s"Initializing input stream processor: $identifier, min.timestamp: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
+        log.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommit = System.currentTimeMillis()
         while (!closed) {
           //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does

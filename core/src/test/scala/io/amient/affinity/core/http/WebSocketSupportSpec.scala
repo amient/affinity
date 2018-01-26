@@ -49,8 +49,10 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
   import system.dispatcher
 
+  val specTimeout = 6 seconds
+
   private val controller = system.actorOf(Props(new Controller), name = "controller")
-  implicit val timeout = Timeout(10 seconds)
+  implicit val timeout = Timeout(specTimeout)
 
   controller ? CreateContainer("region", List(0, 1, 2, 3), Props(new Partition() {
     val data = state[Int, Base]("test")
@@ -124,7 +126,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
   override def afterAll: Unit = {
     controller ! GracefulShutdown()
-    Await.ready(system.whenTerminated, 10 seconds)
+    Await.ready(system.whenTerminated, specTimeout)
     super.afterAll
   }
 
@@ -157,7 +159,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
         val schema = ws.getSchema(classOf[Base].getName)
         schema should equal(AvroRecord.inferSchema(classOf[Base]))
         ws.send(Base(ID(101), Side.LEFT, Seq(ID(2000))))
-        val push1 = wsqueue.poll(1, TimeUnit.SECONDS)
+        val push1 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
         push1 should not be (null)
         val record = push1.asInstanceOf[GenericData.Record]
         record.get("id").asInstanceOf[GenericData.Record].get("id") should be(101)
@@ -178,7 +180,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       try {
         ws.getSchema(classOf[ID].getName)
         ws.send(ID(102))
-        val push1 = wsqueue.poll(1, TimeUnit.SECONDS)
+        val push1 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
         push1 should not be (null)
         val record = push1.asInstanceOf[GenericData.Record]
         record.getSchema.getFullName should be(classOf[ID].getName)
@@ -197,10 +199,10 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
         override def onMessage(message: JsonNode) = wsqueue.add(message)
       })
       try {
-        val push1 = wsqueue.poll(1, TimeUnit.SECONDS)
+        val push1 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
         push1 should be(Decoder.json("{}"))
         http_get(Uri(s"http://127.0.0.1:$httpPort/update-it"))
-        val push2 = wsqueue.poll(1, TimeUnit.SECONDS)
+        val push2 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
         push2 should be(Decoder.json("{\"type\":\"io.amient.affinity.core.http.Base\",\"data\":{\"id\":{\"id\":2},\"side\":\"RIGHT\",\"seq\":[]}}"))
       } finally {
         ws.close()
@@ -217,11 +219,11 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       })
       try {
         ws.send("Hello")
-        wsqueue.poll(1, TimeUnit.SECONDS) should be ("Welcome")
-        wsqueue.poll(1, TimeUnit.SECONDS) should be ("Here is your token")
-        wsqueue.poll(1, TimeUnit.SECONDS) should be ("{}") //initial value of the key
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("Welcome")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("Here is your token")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("{}") //initial value of the key
         ws.send("Write")
-        wsqueue.poll(1, TimeUnit.SECONDS) should be ("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
 
       } finally {
         ws.close()

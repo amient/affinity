@@ -1,4 +1,4 @@
-package io.amient.affinity.systemtests.kafka
+package io.amient.affinity.kafka
 
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -13,7 +13,6 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.{ByteUtils, SystemTestBase}
-import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroDeserializer}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
@@ -40,13 +39,13 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
   override def hashCode(): Int = key.hashCode()
 }
 
-class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions: Int = 2
 
-  private val log = LoggerFactory.getLogger(classOf[KafkaEcosystemTest])
+  private val log = LoggerFactory.getLogger(classOf[KafkaStorageSpec])
 
-  val config = configure(ConfigFactory.load("systemtests")
+  val config = configure(ConfigFactory.load("kafkastoragetest")
     .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
@@ -69,16 +68,46 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
     State.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
   }
 
+  behavior of "KafkaStorage"
+  it should "survive failing writes" in {
+    config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    val stateStoreName = "failure-test"
+    val topic = KafkaStorage.StateConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
+    val state = createStateStoreForPartition("keyspace1", partition = 0, stateStoreName)
+    runTestWithState(state, topic, 100)
+  }
+
+  it should "fast forward to a min.timestamp on bootstrap if bigger than now - ttl" ignore {
+    //FIXME add test for min.timestamp in storage bootstrap
+  }
+  it should "fast forward to a now - ttl if min.timestamp provided" ignore {
+    //FIXME add test for state.ttl in storage bootstrap
+  }
+
+  it should "stop consuming after boot when state.external=false and " ignore {
+    //FIXME add stroage test for state.external=true
+  }
+  it should "never enter boot() when state.external=true" ignore {
+    createStateStoreForPartition("keyspace1", partition = 0, "external-test")
+    //FIXME add stroage test for state.external=true
+  }
+
   behavior of "KafkaDeserializer"
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
+
     config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
     val topic = KafkaStorage.StateConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
     val state = createStateStoreForPartition("keyspace1", partition = 0, stateStoreName)
-    val numWrites = new AtomicInteger(10)
+    runTestWithState(state, topic, 10)
+  }
+
+  private def runTestWithState(state: State[Int, TestRecord], topic: String, numRecords: Int) {
+    val numWrites = new AtomicInteger(numRecords)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
@@ -89,6 +118,7 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
       })
     })
     Await.ready(updates, 10 seconds)
+    numWrites.get should be >= 0
     log.info(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
     state.numKeys should equal(numWrites.get)
 
@@ -123,6 +153,6 @@ class KafkaEcosystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka
       consumer.close()
     }
 
-
   }
+
 }

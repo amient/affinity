@@ -23,8 +23,9 @@ import java.nio.ByteBuffer
 import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.config.Config
+import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.{ByteUtils, EventTime}
@@ -46,6 +47,7 @@ object State {
   def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
+    val readonly = stateConf.External()
     val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(identifier, stateConf, partition, 1) else {
       if (!stateConf.MemStore.DataDir.isDefined) {
         val conf = Node.Conf(system.settings.config)
@@ -62,25 +64,30 @@ object State {
     }
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
-    new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs)
+    new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly)
   }
 
 }
 
+
 class State[K, V](val storage: Storage,
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
-                  ttlMs: Long = -1,
-                  lockTimeoutMs: Int = 10000) extends Observable {
+                  val ttlMs: Long = -1,
+                  val lockTimeoutMs: Int = 10000,
+                  val external: Boolean = false) extends ObservableState[K] {
 
   self =>
-
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
+
+  def uncheckedMediator(partition: ActorRef, key: Any): Props = {
+    Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
+  }
 
   /**
     * @return a weak iterator that doesn't block read and write operations
@@ -197,9 +204,11 @@ class State[K, V](val storage: Storage,
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
-  def insert(key: K, value: V): Future[V] = update(key) {
-    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
-    case None => (Some(value), Some(value), value)
+  def insert(key: K, value: V): Future[V] = {
+    update(key) {
+      case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
+      case None => (Some(value), Some(value), value)
+    }
   }
 
   /**
@@ -305,53 +314,11 @@ class State[K, V](val storage: Storage,
   def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
-        case (key: Any, event: Any) => pf.lift((key.asInstanceOf[K], event))
-        case _ => //TODO issue warning
+        case entry: java.util.Map.Entry[K, _] => pf.lift((entry.getKey, entry.getValue))
+        case (key: Any, event: Any) => pf.lift(key.asInstanceOf[K], event)
+        case illegal => throw new RuntimeException(s"Can't send $illegal to observers")
       }
     })
-  }
-
-  /**
-    * Observables are attached to individual keys in this State
-    */
-  private var observables = scala.collection.mutable.Map[K, ObservableKeyValue]()
-
-  def push(key: K, event: Any): Unit = {
-    try {
-      observables.get(key).foreach(_.notifyObservers(event))
-    } finally {
-      setChanged()
-      notifyObservers((key, event))
-    }
-  }
-
-  class ObservableKeyValue extends Observable {
-    override def notifyObservers(arg: scala.Any): Unit = {
-      //TODO with atomic cell versioning we could cancel out redundant updates
-      setChanged()
-      super.notifyObservers(arg)
-    }
-  }
-
-  def addKeyValueObserver(key: Any, observer: Observer): Observer = {
-    val observable = observables.get(key.asInstanceOf[K]) match {
-      case Some(o) => o
-      case None =>
-        val o: ObservableKeyValue = new ObservableKeyValue()
-        observables += key.asInstanceOf[K] -> o
-        o
-    }
-    observable.addObserver(observer)
-    observer.update(observable, apply(key.asInstanceOf[K])) // send initial value on subscription FIXME - maybe this is up to the websocket impl. to decide
-    observer
-  }
-
-  def removeKeyValueObserver(key: Any, observer: Observer): Unit = {
-    observables.get(key.asInstanceOf[K]).foreach {
-      observable =>
-        observable.deleteObserver(observer)
-        if (observable.countObservers() == 0) observables -= key.asInstanceOf[K]
-    }
   }
 
   /**
@@ -384,4 +351,11 @@ class State[K, V](val storage: Storage,
     l
   }
 
+  override def internalPush(key: Array[Byte], value: Optional[Array[Byte]]) = {
+    if (value.isPresent) {
+      push(keySerde.fromBytes(key), Some(valueSerde.fromBytes(value.get)))
+    } else {
+      push(keySerde.fromBytes(key), None)
+    }
+  }
 }

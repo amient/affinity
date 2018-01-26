@@ -20,16 +20,16 @@
 package io.amient.affinity.core.storage.kafka
 
 import java.util
-import java.util.Properties
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ExecutionException, Future, TimeUnit}
+import java.util.{Optional, Properties}
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.Storage.StorageConf
-import io.amient.affinity.core.storage.{StateConf, Storage}
-import io.amient.affinity.core.util.MappedJavaFuture
-import io.amient.affinity.stream.{BinaryRecord, Record}
+import io.amient.affinity.core.storage.{ObservableState, StateConf, Storage}
+import io.amient.affinity.core.util.{EventTime, MappedJavaFuture}
+import io.amient.affinity.stream.Record
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
@@ -78,26 +78,12 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   val log = LoggerFactory.getLogger(classOf[KafkaStorage])
 
   private val conf = KafkaStorage.StateConf(stateConf).Storage
-
+  final val readonly: Boolean = stateConf.External()
   final val topic = conf.Topic()
   final val ttlMs = stateConf.TtlSeconds() * 1000L
+  final val minTimestamp: Long = math.max(stateConf.MinTimestampUnixMs(),
+    if (ttlMs < 0) 0L else EventTime.unix() - ttlMs)
 
-  private val producerProps = new Properties() {
-    if (conf.Producer.isDefined) {
-      val producerConfig = conf.Producer.config()
-      if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
-      if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
-      if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
-      producerConfig.entrySet().foreach { case (entry) =>
-        put(entry.getKey, entry.getValue.unwrapped())
-      }
-    }
-    put("bootstrap.servers", conf.BootstrapServers())
-    put("key.serializer", classOf[ByteArraySerializer].getName)
-    put("value.serializer", classOf[ByteArraySerializer].getName)
-  }
-
-  require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
 
   val consumerProps = new Properties() {
     if (conf.Consumer.isDefined) {
@@ -118,11 +104,31 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
   ensureCorrectTopicConfiguration()
 
-  protected val kafkaProducer = new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+  protected val kafkaProducer: KafkaProducer[Array[Byte], Array[Byte]] =
+    if (readonly) null else {
+      val producerProps = new Properties() {
+        if (conf.Producer.isDefined) {
+          val producerConfig = conf.Producer.config()
+          if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
+          if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("key.serializer cannot be overriden for KafkaStroage producer")
+          if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("value.serializer cannot be overriden for KafkaStroage producer")
+          producerConfig.entrySet().foreach { case (entry) =>
+            put(entry.getKey, entry.getValue.unwrapped())
+          }
+        }
+        put("bootstrap.servers", conf.BootstrapServers())
+        put("key.serializer", classOf[ByteArraySerializer].getName)
+        put("value.serializer", classOf[ByteArraySerializer].getName)
+      }
+      require(producerProps.getProperty("acks", "1") != "0", "State store kafka producer acks cannot be configured to 0, at least 1 ack is required for consistency")
+      new KafkaProducer[Array[Byte], Array[Byte]](producerProps)
+    }
 
   @volatile private var tailing = true
 
   @volatile private var consuming = false
+
+  @volatile private var state: ObservableState[_] = null
 
   private val consumerError = new AtomicReference[Throwable](null)
 
@@ -142,8 +148,11 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
 
         memstore.getCheckpoint match {
           case checkpoint if checkpoint.offset <= 0 =>
-            log.info(s"Rewinding $tp")
-            kafkaConsumer.seekToBeginning(consumerPartitions)
+            log.info(s"Rewinding $tp to event time: " + EventTime.local(minTimestamp))
+            kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(minTimestamp))).get(tp) match {
+              case null => kafkaConsumer.seekToEnd(consumerPartitions)
+              case offsetAndTime => kafkaConsumer.seek(tp, offsetAndTime.offset)
+            }
           case checkpoint =>
             log.info(s"Seeking ${checkpoint.offset} into $tp")
             kafkaConsumer.seek(tp, checkpoint.offset)
@@ -163,10 +172,13 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
               val records = kafkaConsumer.poll(500)
               for (r <- records.iterator()) {
                 lastProcessedOffset = r.offset()
+                //for tailing state it means either it is a) replica b) external
                 if (r.value == null) {
                   memstore.unload(r.key, r.offset())
+                  if (tailing) state.internalPush(r.key, Optional.empty[Array[Byte]])
                 } else {
                   memstore.load(r.key, r.value, r.offset(), r.timestamp())
+                  if (tailing) state.internalPush(r.key, Optional.of(r.value))
                 }
               }
               if (!tailing && lastProcessedOffset >= endOffset) {
@@ -196,7 +208,8 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     }
   }
 
-  private[affinity] def init(): Unit = {
+  private[affinity] def init(state: ObservableState[_]): Unit = {
+    this.state = state
     consumer.start()
   }
 
@@ -230,13 +243,14 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
     try {
       consumer.interrupt()
       consumer.kafkaConsumer.wakeup()
-      kafkaProducer.close()
+      if (!readonly) kafkaProducer.close
     } finally {
       super.close()
     }
   }
 
   def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
+    if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
     val p = if (partition < 0) defaultPartitioner.partition(record.key, numPartitions) else partition
     val producerRecord = new ProducerRecord(topic, p, record.timestamp, record.key, record.value)
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
@@ -245,6 +259,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   }
 
   def delete(key: Array[Byte]): Future[java.lang.Long] = {
+    if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, key, null))) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }
@@ -299,8 +314,10 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
         val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
         val actualConfig = admin.describeConfigs(List(topicConfigResource))
           .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-        val needsAlterConfig = topicConfigs.exists { case (k,v) => actualConfig.get(k).value() != v }
-        if (needsAlterConfig) {
+        val configOutOfSync = topicConfigs.exists { case (k,v) => actualConfig.get(k).value() != v }
+        if (readonly) {
+          if (configOutOfSync) log.warn(s"External State configuration doesn't match the state configuration: $topicConfigs")
+        } else if (configOutOfSync) {
           val entries: util.Collection[ConfigEntry] = topicConfigs.map { case (k,v) => new ConfigEntry(k,v) }
           admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
             .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)

@@ -22,6 +22,7 @@ package io.amient.affinity.core.actor
 import java.io.FileInputStream
 import java.security.{KeyStore, SecureRandom}
 import java.util
+import java.util.Optional
 import java.util.concurrent.ExecutionException
 import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
@@ -303,6 +304,8 @@ trait WebSocketSupport extends GatewayHttp {
       override def handle: Receive = {
         case None => push(TextMessage.Strict("{}"))
         case Some(value) => push(TextMessage.Strict(Encoder.json(value)))
+        case opt: Optional[_] if !opt.isPresent => push(TextMessage.Strict("{}"))
+        case opt: Optional[_] => push(TextMessage.Strict(Encoder.json(opt.get)))
         case other => push(TextMessage.Strict(Encoder.json(other)))
       }
     })
@@ -396,6 +399,8 @@ trait WebSocketSupport extends GatewayHttp {
         case None => push(BinaryMessage.Strict(ByteString())) //non-existent or delete key-value from the mediator
         case Some(value: AvroRecord) => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
         case value: AvroRecord => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
+        case opt: Optional[_] if !opt.isPresent => push(BinaryMessage.Strict(ByteString()))
+        case opt: Optional[_] if opt.get.isInstanceOf[AvroRecord] => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(opt.get))))
       }
     })
   }

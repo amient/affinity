@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import java.util.{Observable, Observer}
+import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{Actor, ActorRef, Props, Status}
 import akka.event.Logging
@@ -103,18 +103,17 @@ trait Partition extends ActorHandler with ActorState {
 
     case CreateKeyValueMediator(stateStoreName: String, key: Any) => try {
       val state = getStateStore(stateStoreName)
-      sender ! KeyValueMediatorCreated(context.actorOf(Props(new KeyValueMediator(self, state, key))))
+      val props = state.uncheckedMediator(self, key)
+      sender ! KeyValueMediatorCreated(context.actorOf(props))
     } catch {
       case NonFatal(e) => sender ! Status.Failure(e)
     }
   }
 }
 
-class KeyValueMediator(partition: ActorRef, state: State[_, _], key: Any) extends Actor {
+class KeyValueMediator[K](partition: ActorRef, state: State[K, _], key: K) extends Actor {
 
   private var observer: Option[Observer] = None
-
-  //import context.dispatcher
 
   implicit val scheduler = context.system.scheduler
 
@@ -127,21 +126,17 @@ class KeyValueMediator(partition: ActorRef, state: State[_, _], key: Any) extend
     case forward: Any => partition.tell(forward, sender)
   }
 
-  def createKeyValueObserver(key: Any, frontend: ActorRef): Unit = {
-    observer = Some(state.addKeyValueObserver(key, new Observer() {
+  def createKeyValueObserver(key: K, frontend: ActorRef): Unit = {
+
+    observer = Some(new Observer {
       override def update(o: Observable, arg: scala.Any): Unit = {
-        frontend ! arg //FIXME !!! previously there seem to have been a bug where something had to be sent to the key value mediator
-//        val t = 1 seconds
-//        implicit val timeout = Timeout(t)
-//        //here is the ack the requires the actorPublisher at the gateway side to ack the receipt
-//        //TODO write a system test that verifies that websocket actor publisher sends a unit ack
-//        (frontend ? arg) recover {
-//          case any =>
-//            //in case of any error the mediator will be stopped and also any front end that watches it
-//            context.stop(self)
-//        }
+        frontend ! arg
       }
-    }))
+    })
+    val observable = state.addKeyValueObserver(key, observer.get)
+
+    // send initial value on subscription TODO - maybe this is up to the client, e.g. websocket impl., to decide
+    observer.foreach(_.update(observable, state.get(key)))
   }
 
 

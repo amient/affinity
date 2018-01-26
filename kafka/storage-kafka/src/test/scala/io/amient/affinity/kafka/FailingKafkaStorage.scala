@@ -1,4 +1,4 @@
-package io.amient.affinity.systemtests.kafka
+package io.amient.affinity.kafka
 
 import java.util.concurrent.Future
 
@@ -16,7 +16,10 @@ class FailingKafkaStorage(id: String, conf: StateConf, partition: Int, numParts:
   override def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
     val producerRecord = new ProducerRecord(topic, partition, record.timestamp, record.key, record.value)
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
-      override def map(result: RecordMetadata): java.lang.Long = result.offset()
+      override def map(result: RecordMetadata): java.lang.Long = {
+        if (System.currentTimeMillis() % 3 == 0) throw new RuntimeException("simulated kafka producer error")
+        result.offset()
+      }
     }
   }
 
