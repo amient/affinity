@@ -41,6 +41,8 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
 
 class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
+  val specTimeout = 15 seconds
+
   override def numPartitions: Int = 2
 
   private val log = LoggerFactory.getLogger(classOf[KafkaStorageSpec])
@@ -117,7 +119,7 @@ class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka w
         e
       })
     })
-    Await.ready(updates, 10 seconds)
+    Await.ready(updates, specTimeout)
     numWrites.get should be >= 0
     log.info(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
     state.numKeys should equal(numWrites.get)
@@ -141,7 +143,7 @@ class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka w
       var read = 0
       val numReads = numWrites.get
       while (read < numReads) {
-        val records = consumer.poll(10000)
+        val records = consumer.poll(specTimeout.toMillis)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1
