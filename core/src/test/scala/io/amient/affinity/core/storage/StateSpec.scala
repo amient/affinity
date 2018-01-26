@@ -10,6 +10,8 @@ import io.amient.affinity.core.util.EventTime
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
@@ -25,6 +27,8 @@ class StateSpec extends TestKit(ActorSystem.create("test",
     TestKit.shutdownActorSystem(system)
   }
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   behavior of "State"
 
   it should "not allow writes and deletes in read-only state" in {
@@ -34,8 +38,8 @@ class StateSpec extends TestKit(ActorSystem.create("test",
       State.StateConf.External.path -> "true"
     )))
     val state = State.create[Long, ExpirableValue]("read-only-store", 0, stateConf, 1, system)
-    an[RuntimeException] should be thrownBy (state.insert(1L, ExpirableValue("one", 1)))
-    an[RuntimeException] should be thrownBy (state.delete(1L))
+    an[RuntimeException] should be thrownBy (Await.result(state.insert(1L, ExpirableValue("one", 1)), 2 seconds))
+    an[RuntimeException] should be thrownBy (Await.result(state.delete(1L), 2 seconds))
   }
 
   it should "work without ttl" in {
@@ -48,9 +52,10 @@ class StateSpec extends TestKit(ActorSystem.create("test",
 
     val nowMs = System.currentTimeMillis()
 
-    state.insert(1L, ExpirableValue("one", nowMs - 9000))
-    state.insert(2L, ExpirableValue("two", nowMs - 3000))
-    state.insert(3L, ExpirableValue("three", nowMs))
+    Await.result(Future.sequence(List(
+      state.insert(1L, ExpirableValue("one", nowMs - 9000)),
+      state.insert(2L, ExpirableValue("two", nowMs - 3000)),
+      state.insert(3L, ExpirableValue("three", nowMs)))), 2 seconds)
     state(1L) should be(Some(ExpirableValue("one", nowMs - 9000)))
     state(2L) should be(Some(ExpirableValue("two", nowMs - 3000)))
     state(3L) should be(Some(ExpirableValue("three", nowMs)))
@@ -68,9 +73,10 @@ class StateSpec extends TestKit(ActorSystem.create("test",
 
     val nowMs = System.currentTimeMillis()
 
-    state.insert(1L, ExpirableValue("one", nowMs - 9000))
-    state.insert(2L, ExpirableValue("two", nowMs - 3000))
-    state.insert(3L, ExpirableValue("three", nowMs))
+    Await.result(Future.sequence(List(
+      state.insert(1L, ExpirableValue("one", nowMs - 9000)),
+      state.insert(2L, ExpirableValue("two", nowMs - 3000)),
+      state.insert(3L, ExpirableValue("three", nowMs)))), 2 seconds)
     state(1L) should be(None)
     state(2L) should be(Some(ExpirableValue("two", nowMs - 3000)))
     state(3L) should be(Some(ExpirableValue("three", nowMs)))

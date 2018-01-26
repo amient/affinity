@@ -250,7 +250,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   }
 
   def write(record: Record[Array[Byte], Array[Byte]]): Future[java.lang.Long] = {
-    if (readonly) throw new RuntimeException("Leaked write into a readonly storage")
+    if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
     val p = if (partition < 0) defaultPartitioner.partition(record.key, numPartitions) else partition
     val producerRecord = new ProducerRecord(topic, p, record.timestamp, record.key, record.value)
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(producerRecord)) {
@@ -259,7 +259,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   }
 
   def delete(key: Array[Byte]): Future[java.lang.Long] = {
-    if (readonly) throw new RuntimeException("Leaked write into a readonly storage")
+    if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
     new MappedJavaFuture[RecordMetadata, java.lang.Long](kafkaProducer.send(new ProducerRecord(topic, partition, key, null))) {
       override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }

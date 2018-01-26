@@ -155,7 +155,7 @@ class State[K, V](val storage: Storage,
     * @param value new value to be associated with the key
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def replace(key: K, value: V): Future[Unit] = ifNotExternal {
+  def replace(key: K, value: V): Future[Unit] = {
     put(ByteBuffer.wrap(keySerde.toBytes(key)), value).map(__ => push(key, value))
   }
 
@@ -165,7 +165,7 @@ class State[K, V](val storage: Storage,
     * @param key to delete
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def delete(key: K): Future[Unit] = ifNotExternal {
+  def delete(key: K): Future[Unit] = {
     delete(ByteBuffer.wrap(keySerde.toBytes(key))).map(_ => push(key, null))
   }
 
@@ -204,7 +204,7 @@ class State[K, V](val storage: Storage,
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
-  def insert(key: K, value: V): Future[V] = ifNotExternal {
+  def insert(key: K, value: V): Future[V] = {
     update(key) {
       case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
       case None => (Some(value), Some(value), value)
@@ -221,7 +221,7 @@ class State[K, V](val storage: Storage,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
-  def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = ifNotExternal {
+  def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       val k = ByteBuffer.wrap(keySerde.toBytes(key))
       val l = lock(key)
@@ -257,10 +257,6 @@ class State[K, V](val storage: Storage,
     } catch {
       case NonFatal(e) => Future.failed(e)
     }
-  }
-
-  private def ifNotExternal[X](f: => X): X = {
-    if (!external) f else throw new RuntimeException("Cannot modify a state store which produced externally")
   }
 
   /**
