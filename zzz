@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+ROOT="117-readonly-statee-option"
+
 fail() {
     MESSAGE=$1
     RED='\033[0;31m'
@@ -17,22 +19,34 @@ continue() {
     fi
 }
 
-branch() {
-    BRANCH="$1"
+variant() {
+    VARIANT="$1"
     SETS="$2"
     C="${@:3}"
 
     echo ""
-    git checkout $BRANCH
-    continue $? "$BRANCH/checkout"
-    git pull
-    continue $? "$BRANCH/pull"
-
-    if [ "$BRANCH" != "master" ]; then
-        MESSAGE="$BRANCH/merge master"
-        echo $MESSAGE
-        git merge master --no-edit
-        continue $? $MESSAGE
+    if [ "$VARIANT" == "--" ]; then
+        git checkout master
+        continue $? "master/checkout"
+        git pull
+        continue $? "master/pull"
+        BRANCH="$ROOT"
+        if [ "$BRANCH" != "master" ]; then
+            git checkout -b $BRANCH
+            continue $? "$BRANCH/checkout -b"
+        fi
+    else
+        git checkout "master-$VARIANT"
+        continue $? "master-$VARIANT/checkout"
+        git pull
+        continue $? "master-$VARIANT/pull"
+        BRANCH="$ROOT-$VARIANT"
+        if [ "$BRANCH" != "master-$VARIANT" ]; then
+            git checkout -b $BRANCH
+            continue $? "$BRANCH/checkout -b"
+        fi
+        git merge $ROOT --no-edit
+        continue $? "$BRANCH/merge $ROOT"
     fi
 
     if [ "$C" != "-" ]; then
@@ -76,11 +90,11 @@ Usage() {
     echo ""
     echo "  TASK: "
     echo "      test                - run test on branches only"
-    echo "      test-all            - run all tests on master and all branches"
-    echo "      merge               - only merge master into all branches"
+    echo "      test-all            - run all tests on root and all variants"
+    echo "      merge               - only merge root into all variants"
     echo "      install             - install selected modules sets from all branches into local maven"
-    echo "      publish-master      - publish selected modules sets to maven-central"
-    echo "      publish-branches    - publish selected modules sets maven-central"
+    echo "      publish-master      - publish selected modules sets to maven-central - only for master root"
+    echo "      publish-branches    - publish selected modules sets maven-central - only for master root"
     echo ""
     echo ""
 }
@@ -88,34 +102,42 @@ Usage() {
 case "$1" in
     test-all)
         C="test --quiet"
-        RUN_ON_MASTER="true"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="true"
         ;;
     test)
         C="test --quiet"
-        RUN_ON_MASTER="false"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="false"
+        RUN_ON_VARIANTS="true"
         ;;
     merge)
         C="-"
-        RUN_ON_MASTER="false"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="false"
+        RUN_ON_VARIANTS="true"
         ;;
     install)
         C="install"
-        RUN_ON_MASTER="true"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="true"
         ;;
     publish-master)
+        if [ "$ROOT" != "master" ]; then
+            Usage
+            fail "publish tasks can be performed only when ROOT=master"
+        fi
         C="uploadArchives -Pmaven-central --quiet"
-        RUN_ON_MASTER="true"
-        RUN_ON_BRANCHES="false"
+        RUN_ON_ROOT="true"
+        RUN_ON_VARIANTS="false"
         ;;
     publish-branches)
+        if [ "$ROOT" != "master" ]; then
+            Usage
+            fail "publish tasks can be performed only when ROOT=master"
+        fi
         C="uploadArchives -Pmaven-central --quiet"
         ALL="false"
-        RUN_ON_MASTER="false"
-        RUN_ON_BRANCHES="true"
+        RUN_ON_ROOT="false"
+        RUN_ON_VARIANTS="true"
         ;;
     *)
         Usage
@@ -129,15 +151,15 @@ else
     SETS="$2"
 fi
 
-#excute on master branch / all modules
-if [ "$RUN_ON_MASTER" == "true" ]; then
-    branch "master" "$SETS" "$C"
+#excute on the root branch / all modules
+if [ "$RUN_ON_ROOT" == "true" ]; then
+    variant "--" "$SETS" "$C"
 fi
 
-if [ "$RUN_ON_BRANCHES" == "true" ]; then
-    branch "master-kafka_0.10" "$SETS" $C
-    branch "master-kafka_0.11" "$SETS" $C
+if [ "$RUN_ON_VARIANTS" == "true" ]; then
+    variant "kafka_0.10" "$SETS" $C
+    variant "kafka_0.11" "$SETS" $C
 fi
 
-git checkout "master"
+git checkout "$ROOT"
 continue $? "Checkout back to root branch"
