@@ -23,7 +23,7 @@ variant() {
     C="${@:3}"
 
     echo ""
-    if [ "$VARIANT" == "--" ]; then
+    if [ "$VARIANT" == "$ROOT" ]; then
         git checkout master
         continue $? "master/checkout"
         git pull
@@ -166,7 +166,7 @@ fi
 
 #excute on the root branch
 if [ "$RUN_ON_ROOT" == "true" ]; then
-    variant "--" "$SETS" "$C"
+    variant "$ROOT" "$SETS" "$C"
 fi
 
 #excute on the variant branches
