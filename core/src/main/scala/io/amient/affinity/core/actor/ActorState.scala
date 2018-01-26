@@ -33,7 +33,7 @@ trait ActorState extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val stores = new CopyOnWriteArrayList[(String, State[_, _])]()
+  private val storageRegistry = new CopyOnWriteArrayList[(String, State[_, _])]()
 
   abstract override def postStop(): Unit = {
     super.postStop()
@@ -59,31 +59,31 @@ trait ActorState extends Actor {
     result.storage.init(result)
     if (!result.external) result.storage.boot()
     result.storage.tail()
-    stores.add((name, result))
+    storageRegistry.add((name, result))
     result
   }
 
   private[core] def getStateStore(stateStoreName: String): State[_, _] = {
-    stores.asScala.find(_._1 == stateStoreName).get._2
+    storageRegistry.asScala.find(_._1 == stateStoreName).get._2
   }
 
-  private[core] def activateStoreMasters(): Unit = stores.asScala.foreach { case (name, s) =>
+  private[core] def boot(): Unit = storageRegistry.asScala.foreach { case (name, s) =>
     log.info(s"state store: '${name}', partition: ${s.storage.partition} booted, estimated num. keys=${s.numKeys}")
     if (s.external) s.storage.tail() else s.storage.boot()
   }
 
 
-  private[core] def activiateStoreReplicas(): Unit = {
-    stores.asScala.foreach { case (_, s) =>
+  private[core] def tail(): Unit = {
+    storageRegistry.asScala.foreach { case (_, s) =>
       s.storage.tail()
     }
   }
 
   private[core] def closeState(): Unit = {
-    stores.asScala.foreach { case (name, store) =>
+    storageRegistry.asScala.foreach { case (name, store) =>
       store.storage.close()
     }
-    stores.clear()
+    storageRegistry.clear()
   }
 
 }
