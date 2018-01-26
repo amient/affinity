@@ -32,8 +32,8 @@ variant() {
         continue $? "master/pull"
         BRANCH="$ROOT"
         if [ "$BRANCH" != "master" ]; then
-            git checkout -b $BRANCH
-            continue $? "$BRANCH/checkout -b"
+            git checkout -B $BRANCH
+            continue $? "$BRANCH/checkout -B"
         fi
     else
         git checkout "master-$VARIANT"
@@ -42,8 +42,8 @@ variant() {
         continue $? "master-$VARIANT/pull"
         BRANCH="$ROOT-$VARIANT"
         if [ "$BRANCH" != "master-$VARIANT" ]; then
-            git checkout -b $BRANCH
-            continue $? "$BRANCH/checkout -b"
+            git checkout -B $BRANCH
+            continue $? "$BRANCH/checkout -B"
         fi
         git merge $ROOT --no-edit
         continue $? "$BRANCH/merge $ROOT"
