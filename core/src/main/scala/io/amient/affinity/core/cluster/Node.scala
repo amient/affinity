@@ -61,7 +61,7 @@ object Node {
     val Avro = struct("avro", new AvroConf(), true)
     val Coorinator = struct("coordinator", new Coordinator.CoorinatorConf, true)
     val Keyspace = group("keyspace", classOf[KeyspaceConf], false)
-    val Broadcast = group("broadcast", classOf[StateConf], false)
+    val Global = group("global", classOf[StateConf], false)
     val Containers = group("node.container", classOf[CfgIntList], false)
     val Gateway = struct("node.gateway", new GatewayConf, false)
     val StartupTimeoutMs = integer("node.startup.timeout.ms", true)

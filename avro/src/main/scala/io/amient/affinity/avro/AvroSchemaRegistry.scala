@@ -22,9 +22,11 @@ package io.amient.affinity.avro
 import io.amient.affinity.avro.record.AvroRecord
 import org.apache.avro.Schema
 
+import scala.collection.immutable
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ListBuffer
-import scala.collection.{immutable, mutable}
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
 /**
@@ -112,7 +114,28 @@ trait AvroSchemaRegistry {
     }
   }
 
+  //register compile-time type with a specific schema version and its fqn as subject
+  final def register[T: TypeTag](schema: Schema): Unit = register(typeOf[T].typeSymbol.fullName, schema)
+
+  //register compile-time type with its current/actual schema and a custom subject
+  final def register[T: TypeTag](subject: String): Unit = register(subject, AvroRecord.inferSchema(typeOf[T]))
+
+  //register compile-time type with its current/actual schema and its fqn as subject
+  final def register[T: TypeTag]: Unit = register(typeOf[T].typeSymbol.fullName, AvroRecord.inferSchema(typeOf[T]))
+
+  final def register(subject: String, schema: Schema) = {
+    registration += ((subject, schema))
+  }
+
   final def initialize(): List[Int] = initialize(None)
+
+  final def initialize[K: ClassTag](subject: String): List[Int] = {
+    val cls = implicitly[reflect.ClassTag[K]].runtimeClass
+    val mirror = universe.runtimeMirror(cls.getClassLoader)
+    val keyType = mirror.classSymbol(implicitly[reflect.ClassTag[K]].runtimeClass).toType
+    val keySchema = AvroRecord.inferSchema(keyType)
+    initialize(subject, keySchema)
+  }
 
   final def initialize(subject: String, schema: Schema): List[Int] = initialize(Some(subject, schema))
 
@@ -126,33 +149,25 @@ trait AvroSchemaRegistry {
       cacheBySchema += schema -> id
       cacheBySubject += subject -> (cacheBySubject.get(subject).getOrElse(ListMap[Int, Schema]()) + (id -> schema))
     }
-    val result = ListBuffer[Int]()
     val executableRegistration = registration.result()
     registration.clear()
 
-    val uniqueSchemaSubjects = mutable.HashSet[(Int, Schema, String)]()
+    val result = ListBuffer[Int]()
 
     executableRegistration.foreach {
       case (subject, schema) =>
+        val alreadyRegisteredId: Int = cacheBySchema.get(schema).getOrElse(-1)
         val versions = getVersions(subject).getOrElse(ListMap()).toList
-        val alreadyRegisteredId: Int = (versions.map { case (id2, schema2) =>
-          uniqueSchemaSubjects += ((id2, schema2, subject))
-          if (schema2 == schema) id2 else -1
-        } :+ (-1)).max
-        val schemaId = if (alreadyRegisteredId == -1) {
-          val newlyRegisteredId = registerSchema(subject, schema, versions.map(_._2))
-          uniqueSchemaSubjects += ((newlyRegisteredId, schema, subject))
-          newlyRegisteredId
+        val schemaId = if ((alreadyRegisteredId == -1) || (!versions.contains((alreadyRegisteredId, schema)))) {
+          val id = registerSchema(subject, schema, versions.map(_._2))
+          cacheBySchema += schema -> id
+          cacheById += id -> schema
+          cacheBySubject += subject -> (cacheBySubject.get(subject).getOrElse(ListMap.empty[Int, Schema]) + (id -> schema))
+          id
         } else {
           alreadyRegisteredId
         }
         result += schemaId
-    }
-
-    uniqueSchemaSubjects.foreach { case (id2, schema2, subject2) =>
-      cacheById += id2 -> schema2
-      cacheBySchema += schema2 -> id2
-      cacheBySubject += subject2 -> (cacheBySubject.get(subject2).getOrElse(ListMap.empty[Int, Schema]) + (id2 -> schema2))
     }
 
     cacheBySchema.keys.map(_.getFullName).foreach { fqn =>
@@ -175,19 +190,6 @@ trait AvroSchemaRegistry {
     result.result()
   }
 
-
-  //register compile-time type with a specific schema version and its fqn as subject
-  final def register[T: TypeTag](schema: Schema): Unit = register(typeOf[T].typeSymbol.fullName, schema)
-
-  //register compile-time type with its current/actual schema and a custom subject
-  final def register[T: TypeTag](subject: String): Unit = register(subject, AvroRecord.inferSchema(typeOf[T]))
-
-  //register compile-time type with its current/actual schema and its fqn as subject
-  final def register[T: TypeTag]: Unit = register(typeOf[T].typeSymbol.fullName, AvroRecord.inferSchema(typeOf[T]))
-
-  final def register(subject: String, schema: Schema) = {
-    registration += ((subject, schema))
-  }
 
 
 }

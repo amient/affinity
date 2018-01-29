@@ -41,4 +41,8 @@ class NoopStorage(id: String, conf: StateConf, partition:Int, numParts: Int) ext
     if (readonly) throw new RuntimeException("Modification attempt on a readonly storage")
     CompletableFuture.completedFuture((-1L))
   }
+
+  override def keySubject() = null
+
+  override def valueSubject() = null
 }

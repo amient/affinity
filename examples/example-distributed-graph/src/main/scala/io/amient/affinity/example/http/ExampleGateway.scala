@@ -56,9 +56,6 @@ class ExampleGateway extends ExampleGatewayRoot
 
 class ExampleGatewayRoot extends GatewayHttp {
 
-  /**
-    * settings is a broadcast memstore which holds an example set of api keys for custom authentication.
-    */
   val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   override def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {

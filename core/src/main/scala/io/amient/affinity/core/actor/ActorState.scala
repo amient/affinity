@@ -50,8 +50,8 @@ trait ActorState extends Actor {
     })
   }
 
-  private[core] def state[K: ClassTag, V: ClassTag](broadcast: String, conf: StateConf): State[K, V] = state[K, V](broadcast, {
-    State.create[K, V](broadcast, 0, conf, 1, context.system)
+  private[core] def state[K: ClassTag, V: ClassTag](globalStore: String, conf: StateConf): State[K, V] = state[K, V](globalStore, {
+    State.create[K, V](globalStore, 0, conf, 1, context.system)
   })
 
   private[core] def state[K, V](name: String, creator: => State[K, V]): State[K, V] = {
