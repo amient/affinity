@@ -114,6 +114,22 @@ public abstract class Storage implements Closeable {
      */
     abstract public Future<Long> write(Record<byte[], byte[]> record);
 
+    /**
+     * @param key to be delete
+     * @return Future with long offset/audit increment
+     */
     abstract public Future<Long> delete(byte[] key);
+
+    /**
+     * Provides subject name for schema registry
+     * @return subject string, null if the implementation doesn't require schema registrations
+     */
+    abstract public String keySubject();
+
+    /**
+     * Provides subject name for schema registry
+     * @return subject string, null if the implementation doesn't require schema registrations
+     */
+    abstract public String valueSubject();
 
 }

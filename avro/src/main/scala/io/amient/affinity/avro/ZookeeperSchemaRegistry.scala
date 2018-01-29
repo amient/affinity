@@ -33,7 +33,7 @@ import org.apache.avro.{Schema, SchemaValidationException, SchemaValidatorBuilde
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConversions._
-import scala.collection.immutable
+import scala.collection.{immutable, mutable}
 
 object ZookeeperSchemaRegistry {
 
@@ -58,20 +58,27 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
   private val zkRoot = conf.Root()
 
   private val zk = new ZkClient(conf.Connect(), conf.SessionTimeoutMs(), conf.ConnectTimeoutMs(), new ZkSerializer {
-      def serialize(o: Object): Array[Byte] = o.toString.getBytes
-
-      override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
-    })
-
+    def serialize(o: Object): Array[Byte] = o.toString.getBytes
+    override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
+  })
 
   private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
 
-  @volatile private var internal = immutable.Map[String, List[(Int, Schema)]]()
-
-  if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot, true)
-  updateInternal(zk.subscribeChildChanges(zkRoot, new IZkChildListener() {
+  private val zkSchemas = s"$zkRoot/schemas"
+  private val schemas = mutable.Map[Schema, Int]()
+  if (!zk.exists(zkSchemas)) zk.createPersistent(zkSchemas, true)
+  updateSchemas(zk.subscribeChildChanges(zkSchemas, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
-      updateInternal(children)
+      updateSchemas(children)
+    }
+  }))
+
+  private val zkSubjects = s"$zkRoot/subjects"
+  private var subjects = mutable.Map[String, Set[Int]]()
+  if (!zk.exists(zkSubjects)) zk.createPersistent(zkSubjects, true)
+  updateSubjects(zk.subscribeChildChanges(zkSubjects, new IZkChildListener() {
+    override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
+      updateSubjects(children)
     }
   }))
 
@@ -84,22 +91,30 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
       case e: SchemaValidationException =>
         throw new RuntimeException(s"subject: $subject, schema: ${schema.getFullName} validation error", e)
     }
-    val path = zk.create(s"$zkRoot/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL)
-    val id = path.substring(zkRoot.length + 1).toInt
+    val id = schemas.get(schema).getOrElse {
+      val id = zk.create(s"$zkSchemas/", schema.toString(true), CreateMode.PERSISTENT_SEQUENTIAL).substring(zkSchemas.length + 1).toInt
+      schemas += schema -> id
+      id
+    }
+
+    subjects.get(subject).getOrElse(Set()) match {
+      case list if list.contains(id) =>
+      case list => subjects += subject -> (list + id)
+    }
     id
   }
 
   override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
-    val ids = zk.getChildren(zkRoot)
+    val ids = zk.getChildren(zkSchemas)
     ids.toList.map { id =>
-      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
+      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkSchemas/$id"))
       val schemaId = id.toInt
-      (schemaId, schema.getFullName, schema) //TODO schema.getFullName is a lazy subject, we need /zkRoot/subjects + /zkRoot/schemas
+      (schemaId, schema.getFullName, schema) //TODO #133 schema.getFullName is a lazy subject, we need /zkRoot/subjects + /zkRoot/schemas
     }
   }
 
   override private[avro] def hypersynchronized[X](f: => X): X = synchronized {
-    val lockPath = zkRoot + "-lock"
+    val lockPath = zkRoot + "/lock"
     var acquired = 0
     do {
       try {
@@ -118,13 +133,20 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
     try f finally zk.delete(lockPath)
   }
 
-  private def updateInternal(ids: util.List[String]): Unit = {
-    internal = ids.toList.map { id =>
-      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkRoot/$id"))
+  private def updateSchemas(ids: util.List[String]): Unit = {
+    ids.toList.foreach { id =>
+      val schema = new Schema.Parser().parse(zk.readData[String](s"$zkSchemas/$id"))
       val FQN = schema.getFullName
       val schemaId = id.toInt
-      (FQN, (schemaId, schema))
-    }.groupBy(_._1).mapValues(_.map(_._2))
+      schemas += schema -> schemaId
+    }
+  }
+
+  private def updateSubjects(_subjects: util.List[String]): Unit = {
+    _subjects.toList.foreach { subject =>
+      val ids = zk.readData[String](s"$zkSubjects/$subject").split(",").map(_.toInt).toSet
+      subjects += subject -> ids
+    }
   }
 
 }

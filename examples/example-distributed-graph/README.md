@@ -42,7 +42,7 @@ e.g. from the Kafka home dir:
         --topic settings --partitions 1 --replication-factor 1 --config cleanup.policy=compact
         
 The graph topic will hold the the main domain data for the app and the
- settings is a broadcast topic with a single partition.
+ settings is a global state with a single partition.
 
 Running the `ExampleApp` can be done directly from an IDE or by
 running the standalone jar which is created during the gradlew build

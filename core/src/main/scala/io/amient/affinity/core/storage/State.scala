@@ -25,8 +25,11 @@ import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.config.Config
+import io.amient.affinity.avro.AvroSchemaRegistry
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.{ByteUtils, EventTime}
 import io.amient.affinity.stream.Record
@@ -35,6 +38,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
+import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal
 
@@ -44,7 +48,9 @@ object State {
     override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem)
+  : State[K, V] = {
+
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val readonly = stateConf.External()
@@ -62,8 +68,31 @@ object State {
     } catch {
       case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
+
+    def asAvroRegistry[S](serde: AbstractSerde[S]): Option[AvroSchemaRegistry] = {
+      serde match {
+        case proxy: AvroSerdeProxy => Some(proxy.internal)
+        case registry: AvroSchemaRegistry => Some(registry)
+        case _ => None
+      }
+    }
+
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
+    if (!readonly) {
+      for (registry <- asAvroRegistry(keySerde)) {
+        storage.keySubject match {
+          case null =>
+          case some => registry.initialize[K](some)
+        }
+      }
+      for (registry <- asAvroRegistry(valueSerde)) {
+        storage.valueSubject match {
+          case null =>
+          case some => registry.initialize[V](some)
+        }
+      }
+    }
     new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly)
   }
 

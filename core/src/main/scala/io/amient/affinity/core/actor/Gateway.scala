@@ -54,15 +54,15 @@ trait Gateway extends ActorHandler with ActorState {
   def onClusterStatus(suspended: Boolean): Unit = ()
 
   private val keyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
-  private val broadcasts = mutable.Map[String, (State[_, _], AtomicBoolean)]()
+  private val globals = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def global[K: ClassTag, V: ClassTag](broadcastName: String): State[K, V] = try {
-    broadcasts.get(broadcastName) match {
-      case Some((broadcastState, _)) => broadcastState.asInstanceOf[State[K, V]]
+  def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = try {
+    globals.get(globalStateStore) match {
+      case Some((globalState, _)) => globalState.asInstanceOf[State[K, V]]
       case None =>
-        val bc = state[K, V](broadcastName, conf.Broadcast(broadcastName))
-        broadcasts += (broadcastName -> (bc, new AtomicBoolean(true)))
+        val bc = state[K, V](globalStateStore, conf.Global(globalStateStore))
+        globals += (globalStateStore -> (bc, new AtomicBoolean(true)))
         bc
     }
   } catch {
@@ -97,7 +97,7 @@ trait Gateway extends ActorHandler with ActorState {
   abstract override def preStart(): Unit = {
     super.preStart()
     checkClusterStatus()
-    tailState() // any state store registered in the gateway layer is broadcast, so all are tailing
+    tailState() // any state store registered in the gateway layer is global, so all are tailing
     keyspaces.foreach {
       case (_, (coordinator, _, _)) => coordinator.watch(self, global = true)
     }

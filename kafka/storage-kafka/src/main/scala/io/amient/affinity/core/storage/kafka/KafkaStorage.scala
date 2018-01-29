@@ -80,6 +80,8 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
   private val conf = KafkaStorage.StateConf(stateConf).Storage
   final val readonly: Boolean = stateConf.External()
   final val topic = conf.Topic()
+  val keySubject: String = s"${topic}-key"
+  val valueSubject: String = s"${topic}-value"
   final val ttlMs = stateConf.TtlSeconds() * 1000L
   final val minTimestamp: Long = math.max(stateConf.MinTimestampUnixMs(),
     if (ttlMs < 0) 0L else EventTime.unix() - ttlMs)
@@ -303,7 +305,7 @@ class KafkaStorage(id: String, stateConf: StateConf, partition: Int, numPartitio
         log.debug(s"Checking that topic $topic has correct number of partitions: ${numPartitions}")
         val description = admin.describeTopics(List(topic)).values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
         if (description.partitions().size() != numPartitions) {
-          throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()}, expecting: $numPartitions")
+          throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()} partitions, expecting: $numPartitions")
         }
         log.debug(s"Checking that topic $topic has correct replication factor: ${replicationFactor}")
         val actualReplFactor = description.partitions().get(0).replicas().size()

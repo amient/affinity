@@ -131,11 +131,9 @@ allprojects {
         libsDirName = 'lib' //gradle's default is libs but CreateStartScripts needs this to be lib
 
         repositories {
-            mavenLocal()
             mavenCentral()
-            maven {
-                url "http://packages.confluent.io/maven/"
-            }
+            maven { url "http://packages.confluent.io/maven/" }
+            mavenLocal()
         }
 
         configurations {

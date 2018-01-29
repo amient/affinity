@@ -91,13 +91,13 @@ trait SystemTestBase {
             }
           }
 
-        val broadcastStores = if (!layer2.hasPath(Node.Conf.Affi.Broadcast.path())) List.empty else layer2
-          .getObject(Node.Conf.Affi.Broadcast.path()).keySet().asScala
+        val globalStores = if (!layer2.hasPath(Node.Conf.Affi.Global.path())) List.empty else layer2
+          .getObject(Node.Conf.Affi.Global.path()).keySet().asScala
           .map { ks =>
-            Node.Conf.Affi.Broadcast(ks).path
+            Node.Conf.Affi.Global(ks).path
           }
 
-        (keySpaceStores ++ broadcastStores).foldLeft(layer2) {
+        (keySpaceStores ++ globalStores).foldLeft(layer2) {
           case (c, stateStorePath) =>
             val stateConfig = c.getConfig(stateStorePath)
             if (!stateConfig.getString("storage.class").toLowerCase.contains("kafka")) c else {
