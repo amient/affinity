@@ -18,11 +18,12 @@
  */
 package io.amient.affinity.avro
 
-import java.nio.ByteBuffer
 import java.util.UUID
 
-import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.{Alias, AvroRecord}
 import io.amient.affinity.core.util.ByteUtils
+
+case class AliasedAvro(@Alias("old_name1", "old_name2") name: String) extends AvroRecord
 
 object SimpleEnum extends Enumeration {
   type SimpleEnum = Value

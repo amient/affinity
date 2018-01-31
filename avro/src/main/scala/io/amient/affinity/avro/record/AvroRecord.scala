@@ -33,10 +33,13 @@ import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
 import org.codehaus.jackson.annotate.JsonIgnore
 
+import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
+
+final class Alias(aliases: String*) extends StaticAnnotation
 
 object AvroRecord extends AvroExtractors {
 
@@ -353,7 +356,6 @@ object AvroRecord extends AvroExtractors {
         SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
       } else if (tpe <:< typeOf[AvroRecord]) {
         val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
-        //universe.runtimeMirror(Class.forName(tpe.typeSymbol.asClass.fullName).getClassLoader)
         val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
         val companionMirror = typeMirror.reflect(moduleMirror.instance)
         val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
@@ -361,7 +363,11 @@ object AvroRecord extends AvroExtractors {
         val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
           case (assembler, (symbol, i)) =>
             val fieldSchema = inferSchema(symbol.typeSignature)
-            val field = assembler.name(symbol.name.toString).`type`(fieldSchema)
+            val x = assembler.name(symbol.name.toString)
+            symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
+              a => x.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
+            }
+            val field = x.`type`(fieldSchema)
             val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
             if (defaultDef == NoSymbol) {
               field.noDefault()

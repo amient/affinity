@@ -1,6 +1,6 @@
 package io.amient.affinity.avro
 
-import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.{Alias, AvroJsonConverter, AvroRecord}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
@@ -134,6 +134,11 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     newSerde.register[Record_Current](v4schema)
     an[SchemaValidationException] should be thrownBy (newSerde.initialize())
 
+  }
+
+  "AvroRecord" should "use old fields when Alias annotation is used" in {
+    val schema = AvroRecord.inferSchema[AliasedAvro]
+    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":\"string\",\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
   }
 
   it should "have minimum read/write throughput" in {
