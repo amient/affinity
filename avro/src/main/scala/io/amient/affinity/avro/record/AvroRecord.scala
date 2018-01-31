@@ -363,11 +363,11 @@ object AvroRecord extends AvroExtractors {
         val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
           case (assembler, (symbol, i)) =>
             val fieldSchema = inferSchema(symbol.typeSignature)
-            val x = assembler.name(symbol.name.toString)
+            val builder = assembler.name(symbol.name.toString)
             symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
-              a => x.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
+              a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
             }
-            val field = x.`type`(fieldSchema)
+            val field = builder.`type`(fieldSchema)
             val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
             if (defaultDef == NoSymbol) {
               field.noDefault()
