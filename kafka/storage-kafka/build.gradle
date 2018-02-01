@@ -51,6 +51,7 @@ dependencies {
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: rootProject.kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':kafka:test-util-kafka')
+    testCompile group: 'org.apache.kafka', name: 'kafka-streams', version: rootProject.kafkaVersion
 }
 
 
