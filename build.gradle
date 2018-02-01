@@ -1,7 +1,7 @@
 import javafx.scene.effect.Shadow
 
 group = 'io.amient.affinity'
-version = '0.5.1'
+version = '0.5.2-SNAPSHOT'
 
 ext {
     javaVersion = '1.8'
