@@ -21,37 +21,72 @@ package io.amient.affinity.avro
 
 import java.util.concurrent.ConcurrentHashMap
 
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.record.AvroSerde
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
 import scala.collection.immutable.Seq
+import scala.collection.mutable
 
-class MemorySchemaRegistry extends AvroSerde with AvroSchemaRegistry {
 
-  protected val internal = new ConcurrentHashMap[Int, Schema]()
+object MemorySchemaRegistry {
 
-  protected val internal2 = new ConcurrentHashMap[String, List[Int]]()
+  final val ID = "schema.registry.id"
+
+  val multiverse = new mutable.HashMap[Int, Universe]()
+
+  def createUniverse(reuse: Option[Int] = None): Universe = reuse match {
+    case Some(id) if multiverse.contains(id) => multiverse(id)
+    case Some(id) =>
+      val universe = new Universe
+      multiverse += id -> universe
+      universe
+    case None =>
+      val universe = new Universe
+      multiverse += (if (multiverse.isEmpty) 1 else multiverse.keys.max + 1) -> universe
+      universe
+  }
+
+  class Universe {
+    val schemas = new ConcurrentHashMap[Int, Schema]()
+    val subjects = new ConcurrentHashMap[String, List[Int]]()
+    def getOrRegister(schema: Schema): Int = {
+      schemas.find(_._2 == schema) match {
+        case None =>
+          val newId = schemas.size
+          schemas.put(newId, schema)
+          newId
+        case Some((id, _)) => id
+      }
+    }
+    def updateSubject(subject: String, schemaId: Int): Unit = {
+      subjects.put(subject, (Option(subjects.get(subject)).getOrElse(List()) :+ schemaId))
+    }
+  }
+}
+
+class MemorySchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
+
+  def this() = this(ConfigFactory.empty)
+
+  import MemorySchemaRegistry._
+
+  val universe = if (config.hasPath(ID)) createUniverse(Some(config.getInt(ID))) else createUniverse()
 
   private val validator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
 
   override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
     validator.validate(schema, existing)
-    val schemaId: Int = internal.find(_._2 == schema) match {
-      case None =>
-        val newId = internal.size
-        internal.put(newId, schema)
-        newId
-      case Some((id, _)) => id
-    }
-    internal2.put(subject, (Option(internal2.get(subject)).getOrElse(List()) :+ schemaId))
+    val schemaId: Int = universe.getOrRegister(schema)
+    universe.updateSubject(subject, schemaId)
     schemaId
   }
 
   override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
-    internal2.flatMap {
+    universe.subjects.flatMap {
       case (subject: String, ids: Seq[Int]) => ids.map {
-        case id => (id, subject, internal.get(id))
+        case id => (id, subject, universe.schemas.get(id))
       }
     }.toList
   }
