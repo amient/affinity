@@ -36,6 +36,7 @@ import org.codehaus.jackson.annotate.JsonIgnore
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
+import scala.reflect.runtime._
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
@@ -180,8 +181,8 @@ object AvroRecord extends AvroExtractors {
     def getOrInitialize(tpe: Type): MethodMirror = getOrInitialize(tpe, {
       tpe match {
         case TypeRef(enumType, _, _) =>
-          val moduleMirror = rootMirror.reflectModule(enumType.termSymbol.asModule)
-          val instanceMirror = rootMirror.reflect(moduleMirror.instance)
+          val moduleMirror = currentMirror.reflectModule(enumType.termSymbol.asModule)
+          val instanceMirror = currentMirror.reflect(moduleMirror.instance)
           instanceMirror.reflectMethod(enumType.member(TermName("withName")).asMethod)
       }
     })
