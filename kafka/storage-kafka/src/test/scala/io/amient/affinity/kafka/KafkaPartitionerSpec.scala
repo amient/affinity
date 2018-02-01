@@ -42,9 +42,12 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
     val system = ActorSystem.create("test",
       ConfigFactory.parseMap(cfg.map { case (k, v) => ("affinity.avro." + k, v) })
         .withFallback(ConfigFactory.defaultReference()))
-    val serialization = SerializationExtension(system)
-    val akkaSerializedKey = serialization.serialize(key).get
-    system.terminate()
+    val akkaSerializedKey = try {
+      val serialization = SerializationExtension(system)
+      serialization.serialize(key).get
+    } finally {
+      system.terminate()
+    }
     val kafkaSerde = new KafkaAvroSerde()
     kafkaSerde.configure(cfg, true)
     val kafkaSerialized = kafkaSerde.serializer().serialize("test", key)
