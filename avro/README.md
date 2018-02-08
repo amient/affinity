@@ -185,7 +185,8 @@ There is also a separate module that provides class for the standard console con
 
     io.amient.affinity.kafka.AvroMessageFormatter implements kafka.common.MessageFormatter
 
-See [avro-formatter-kafka][../kafka/avro-formatter-kafka] for usage and options of the formatter.
+See [avro-formatter-kafka](../kafka/avro-formatter-kafka) for usage and options of the formatter.
+
 
 **NOTE: the above serde tools can be used interchangably with serializers and deserializers that
 ship with confluent schema registry - the wire format is the same, except with affinity tools
