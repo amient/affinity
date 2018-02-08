@@ -27,6 +27,7 @@ import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
 import io.amient.affinity.avro.{ConfluentSchemaRegistry, ZookeeperSchemaRegistry}
+import io.amient.affinity.core.util.EventTime
 import kafka.common.MessageFormatter
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.codehaus.jackson.JsonNode
@@ -38,9 +39,11 @@ import org.codehaus.jackson.map.ObjectMapper
   *
   * kafka-console-consumer.sh \
   *   --formatter io.amient.affinity.kafka.AvroMessageFormatter \
-  *  [--property schema.zookeeper.connect=localhost:2181 \]
+  *  [--property schema.registry.zookeeper.connect=localhost:2181 \]
   *  [--property schema.registry.url=http://localhost:8081 \]
   *  [--property pretty \]
+  *  [--property print.key \]
+  *  [--property print.timestamp \]
   *   --zookeeper ...\
   *   --topic ... \
   */
@@ -49,19 +52,27 @@ class AvroMessageFormatter extends MessageFormatter {
   private var serde: AvroSerde = null
 
   private var pretty = false
+  private var printKeys = false
+  private var printTimestamps = false
 
   override def init(props: Properties): Unit = {
-    if (props.containsKey("pretty")) {
-      pretty = true
-    }
+    if (props.containsKey("pretty")) pretty = true
+    if (props.containsKey("print.key")) printKeys = true
+    if (props.containsKey("print.timestamp")) printTimestamps = true
     if (props.containsKey("schema.registry.url")) {
       serde = new ConfluentSchemaRegistry(ConfigFactory.empty
         .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
-    } else if (props.containsKey("schema.zookeeper.connect")) {
-      serde = new ZookeeperSchemaRegistry(ConfigFactory.empty
+    } else if (props.containsKey("schema.registry.zookeeper.connect")) {
+      val config1 = ConfigFactory.empty
         .withValue(new ZkAvroConf().Connect.path,
-          ConfigValueFactory.fromAnyRef(props.getProperty("schema.zookeeper.connect"))))
+          ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.connect")))
+
+      val config2 = if (!props.containsKey("schema.registry.zookeeper.root")) config1 else {
+        config1.withValue(new ZkAvroConf().Root.path,
+          ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.root")))
+      }
+      serde = new ZookeeperSchemaRegistry(config2)
     } else {
       throw new IllegalArgumentException("Required --property schema.registry.url OR --property schema.zookeeper.connect")
     }
@@ -77,6 +88,18 @@ class AvroMessageFormatter extends MessageFormatter {
   val mapper = new ObjectMapper()
 
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
+
+    if (printTimestamps) {
+      output.print(EventTime.local(consumerRecord.timestamp()).toString)
+      output.print("\t")
+    }
+    if (printKeys) {
+      val key: Any = serde.fromBytes(consumerRecord.key)
+      val simpleJson: String = AvroJsonConverter.toJson(key)
+      output.print(simpleJson)
+      output.print("\t")
+    }
+
     val value: Any = serde.fromBytes(consumerRecord.value)
     val simpleJson: String = AvroJsonConverter.toJson(value)
     if (pretty) {
