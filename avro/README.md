@@ -193,5 +193,22 @@ you can work with type-safe case classes instead of generic avro records.**
 
 
 
+## Best Practices
 
+- the package coordinates of the case class should remain the same for the life of the definition
+    - this also applies to the actual name of the case class
+    - this is because there are no aliases for the top-level defintions, only for fields
+    - aliasing the case classes may be added later
+- try to avoid null as a default value if the field has a natrual or empty representation
+- if you think null is a natural default value, then use Option
+- try to use primitives where possible
+- if an exsting field needs to be renamed and at the same time should inherit the values the @Alias needs to be applied
+    - e.g. case class Example(@Alias(<old-field1>[, <old-field2>, [...]]) <new-field> <TYPE>
+- it's possbile and perfectly ok to use camel case or other cases containing capital leters
+    - however, there an issue with the existing connect hive stack where the field names are lowercased
+        in some situations and not in others which leads to "unkown field" field exceptiosn thrown by
+        hive partitioner code
+    - even though the above is a bug in the kafka connect hdfs connector, possibly hive internals there
+        may be other backends that may have issues with cases and since avro is meant to be cross-platform
+        serialization, using camel case needs some consideration
 
