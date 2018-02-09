@@ -173,7 +173,8 @@ serialization stack.
 ### Usage with provided Kafka serde tools
 
 All the functionality provided by the AvroRecord, AvroSerde and AvroSchemaRegistry
-is packaged within each kafka module to implement the following standard interfaces:
+is packaged in [avro-serde-kafka](../kafka/avro-serde-kafka) module which provides implementations 
+of the following standard kafka interfaces:
 
     io.amient.affinity.kafka.KafkaAvroSerializer implements org.apache.kafka.common.serialization.Serializer
     io.amient.affinity.kafka.KafkaAvroDeserializer implements org.apache.kafka.common.serialization.Deserializer
@@ -184,12 +185,14 @@ There is also a separate module that provides class for the standard console con
 
     io.amient.affinity.kafka.AvroMessageFormatter implements kafka.common.MessageFormatter
 
+See [avro-formatter-kafka](../kafka/avro-formatter-kafka) for usage and options of the formatter.
+
+
 **NOTE: the above serde tools can be used interchangably with serializers and deserializers that
 ship with confluent schema registry - the wire format is the same, except with affinity tools
 you can work with type-safe case classes instead of generic avro records.**
 
-- (avro-serde-scala)[kafka/avro-serde-kafka]
-- (avro-formatter-scala)[kafka/avro-formatter-kafka]
+
 
 
 
