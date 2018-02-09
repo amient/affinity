@@ -5,6 +5,7 @@ import java.util.Properties
 
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.kafka.KafkaStorage.KafkaStorageConf
+import io.amient.affinity.core.util.TimeRange
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
@@ -63,12 +64,16 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
     kafkaConsumer.subscribe(List(topic))
   }
 
-  override def subscribe(partition: Int): Unit = {
+  override def scan(partition: Int, range: TimeRange): Unit = {
     val tp = new TopicPartition(topic, partition)
     kafkaConsumer.assign(List(tp))
     val position = kafkaConsumer.position(tp)
-    val startOffset = kafkaConsumer.beginningOffsets(List(tp))(tp)
-    val endOffset = kafkaConsumer.endOffsets(List(tp))(tp)
+    val (startOffset: Long, endOffset: Long) = if (range == TimeRange.ALLTIME) {
+      (kafkaConsumer.beginningOffsets(List(tp))(tp), kafkaConsumer.endOffsets(List(tp))(tp))
+    } else {
+      (kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp).offset(),
+        kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp).offset())
+    }
     progress = (math.max(position, startOffset) - 1, endOffset - 1)
   }
 

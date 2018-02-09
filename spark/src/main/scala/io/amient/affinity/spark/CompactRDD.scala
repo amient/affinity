@@ -19,9 +19,8 @@
 
 package io.amient.util.spark
 
-import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.util.EventTime
+import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
@@ -35,10 +34,15 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
                                            keySerde: => AbstractSerde[_ >: K],
                                            valueSerde: => AbstractSerde[_ >: V],
                                            streamBinder: => BinaryStream,
-                                           compacted: Boolean) extends RDD[(K, V)](sc, Nil) {
+                                           compacted: Boolean,
+                                           range: TimeRange
+                                          ) extends RDD[(K, V)](sc, Nil) {
 
-  def this(sc: SparkContext, serde: => AbstractSerde[Any], streamBinder: => BinaryStream, compacted: Boolean = true) =
-    this(sc, serde, serde, streamBinder, compacted)
+  def this(sc: SparkContext,
+           serde: => AbstractSerde[Any],
+           streamBinder: => BinaryStream,
+           compacted: Boolean = true,
+           range: TimeRange = TimeRange.ALLTIME) = this(sc, serde, serde, streamBinder, compacted, range)
 
   val compactor = (m1: BinaryRecord, m2: BinaryRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
 
@@ -69,7 +73,7 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
       }
     }
 
-    stream.subscribe(split.index)
+    stream.scan(split.index, range)
 
     val binaryRecords: Iterator[BinaryRecord] = stream.iterator()
     val kvRecords: Iterator[(ByteKey, BinaryRecord)] = binaryRecords.map(record => (new ByteKey(record.key), record))

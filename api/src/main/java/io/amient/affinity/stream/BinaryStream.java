@@ -4,6 +4,7 @@ import com.typesafe.config.Config;
 import io.amient.affinity.core.Murmur2Partitioner;
 import io.amient.affinity.core.Partitioner;
 import io.amient.affinity.core.storage.Storage;
+import io.amient.affinity.core.util.TimeRange;
 
 import java.io.Closeable;
 import java.lang.reflect.InvocationTargetException;
@@ -46,7 +47,7 @@ public interface BinaryStream extends Closeable {
 
     void subscribe();
 
-    void subscribe(int partition);
+    void scan(int partition, TimeRange range);
 
     long lag();
 
