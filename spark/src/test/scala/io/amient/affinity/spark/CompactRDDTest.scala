@@ -1,7 +1,6 @@
 package io.amient.affinity.spark
 
-import java.time.temporal.TemporalAmount
-import java.time.{Duration, Instant, Period}
+import java.time.{Duration, Instant}
 
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
@@ -10,10 +9,9 @@ import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.storage.Storage
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.core.util.{EventTime, TimeRange}
+import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
 import io.amient.affinity.kafka.EmbeddedKafka
-import io.amient.affinity.spark.CompactRDDTestUniverse.{getSerdeConf, getStorageConf}
-import io.amient.affinity.stream.{BinaryRecord, BinaryStream}
+import io.amient.affinity.stream.BinaryStream
 import io.amient.util.spark.CompactRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
@@ -53,24 +51,6 @@ object CompactRDDTestUniverse {
 
 }
 
-class StreamOutput(kafkaBootstrap: String) {
-  lazy val stream: BinaryStream = BinaryStream.bindNewInstance(getStorageConf(kafkaBootstrap))
-  lazy val serde = AvroSerde.create(getSerdeConf)
-  private var active = false
-  def output(data: Iterator[Any]): Unit = {
-    active = true
-    stream.publish(data.map {
-      case event:Routed with EventTime => new BinaryRecord(serde.toBytes(event.key), serde.toBytes(event), event.eventTimeUnix)
-      case event:EventTime => new BinaryRecord(null, serde.toBytes(event), event.eventTimeUnix)
-      case event:Routed => new BinaryRecord(serde.toBytes(event.key), serde.toBytes(event), EventTime.unix)
-      case event:Any => new BinaryRecord(null, serde.toBytes(event), EventTime.unix)
-    })
-  }
-
-  def close() = if (active) {
-    try serde.close() finally try stream.flush() finally stream.close()
-  }
-}
 
 class CompactRDDTest extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
 
@@ -84,26 +64,26 @@ class CompactRDDTest extends FlatSpec with EmbeddedKafka with Matchers with Befo
     .setAppName("Affinity_Spark_Test")
     .set("spark.serializer", classOf[KryoSerializer].getName))
 
+
   override def beforeAll() {
     super.beforeAll()
 
-
-    val stream = new StreamOutput(kafkaBootstrap)
+    val stream = new OutputDataStream[Int, CompactionTestEvent](
+      AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap))
     try {
       stream.output((0 to 99).iterator.map { i =>
-        CompactionTestEvent(i, s"January($i)", JanuaryFirst2018.toEpochMilli + i * 1000)
+        (i, CompactionTestEvent(i, s"January($i)", JanuaryFirst2018.toEpochMilli + i * 1000))
       })
 
       stream.output((0 to 99).iterator.map { i =>
-        CompactionTestEvent(i, s"February($i)", FebruaryFirst2018.toEpochMilli + i * 1000)
+        (i, CompactionTestEvent(i, s"February($i)", FebruaryFirst2018.toEpochMilli + i * 1000))
       })
 
       stream.output((0 to 99).iterator.map { i =>
-        CompactionTestEvent(i, s"December($i)", DecemberFirst2017.toEpochMilli + i * 1000)
+        (i, CompactionTestEvent(i, s"December($i)", DecemberFirst2017.toEpochMilli + i * 1000))
       })
 
     } finally {
-
       stream.close
     }
   }

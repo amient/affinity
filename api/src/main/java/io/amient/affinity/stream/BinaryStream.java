@@ -96,14 +96,4 @@ public interface BinaryStream extends Closeable {
     }
 
 
-//    default <T> void output(Iterator<T> data, AbstractSerde<?> serde)  {
-//
-//        publish(data.map {
-//            case event:Routed with EventTime => new BinaryRecord(serde.toBytes(event.key), serde.toBytes(event), event.eventTimeUnix)
-//            case event:EventTime => new BinaryRecord(null, serde.toBytes(event), event.eventTimeUnix)
-//            case event:Routed => new BinaryRecord(serde.toBytes(event.key), serde.toBytes(event), EventTime.unix)
-//            case event:Any => new BinaryRecord(null, serde.toBytes(event), EventTime.unix)
-//        })
-//    }
-
 }

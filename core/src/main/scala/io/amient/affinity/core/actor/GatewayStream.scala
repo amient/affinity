@@ -6,7 +6,7 @@ import akka.event.Logging
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.Storage
 import io.amient.affinity.core.storage.Storage.StorageConf
-import io.amient.affinity.core.util.EventTime
+import io.amient.affinity.core.util.{EventTime, OutputDataStream}
 import io.amient.affinity.stream.{BinaryStream, Record}
 
 import scala.collection.JavaConversions._
@@ -29,13 +29,18 @@ trait GatewayStream extends Gateway {
 
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
 
-  //TODO def output[K: ClassTag, V: ClassTag](identifier: String)
-
-  def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$identifier"))
+  def output[K: ClassTag, V: ClassTag](streamIdentifier: String): OutputDataStream[K, V] = {
+    val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
-    declaredInputStreamProcessors += new RunnableInputStream[K, V](identifier, keySerde, valSerde, streamConfig, processor)
+    new OutputDataStream(keySerde, valSerde, streamConfig)
+  }
+
+  def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: Record[K, V] => Unit): Unit = {
+    val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
+    val keySerde: AbstractSerde[K] = Serde.of[K](config)
+    val valSerde: AbstractSerde[V] = Serde.of[V](config)
+    declaredInputStreamProcessors += new RunnableInputStream[K, V](streamIdentifier, keySerde, valSerde, streamConfig, processor)
   }
 
   val inputStreamManager = new Thread {
@@ -122,6 +127,8 @@ trait GatewayStream extends Gateway {
         case _: InterruptedException =>
       } finally {
         consumer.close()
+        keySerde.close()
+        valSerde.close()
         log.info(s"Finished input stream processor: $identifier (closed = $closed)")
       }
     }
