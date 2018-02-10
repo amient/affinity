@@ -10,7 +10,7 @@ class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: Abstract
 
   lazy val stream = BinaryStream.bindNewInstance(streamConf)
 
-  def output(data: Iterator[(K, V)]): Unit = {
+  def write(data: Iterator[(K, V)]): Unit = {
     stream.publish(data.map {
       case (k, v) if v.isInstanceOf[EventTime] => new BinaryRecord(keySerde.toBytes(k), valSerde.toBytes(v), v.asInstanceOf[EventTime].eventTimeUnix)
       case (k, v) => new BinaryRecord(keySerde.toBytes(k), valSerde.toBytes(v), EventTime.unix)

@@ -8,10 +8,8 @@ import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.serialize.ZkSerializer
-import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.security.auth.SecurityProtocol
-import org.apache.kafka.common.serialization.Serializer
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.slf4j.LoggerFactory
 
