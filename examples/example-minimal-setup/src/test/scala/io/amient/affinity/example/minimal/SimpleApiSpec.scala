@@ -21,6 +21,7 @@ package io.amient.affinity.example.minimal
 
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
@@ -38,7 +39,7 @@ class SimpleApiSpec extends FlatSpec with SystemTestBase with Matchers {
 
   it should "work without the http layer" in {
 
-    new TestGatewayNode(configure(config, None, None).withoutPath(Node.Conf.Affi.Gateway.Http.path)) {
+    new TestGatewayNode(configure(config, None, None).withoutPath(Conf.Affi.Node.Gateway.Http.path)) {
       awaitClusterReady {
         startContainer("simple-keyspace", List(0, 1), new MySimplePartition())
       }

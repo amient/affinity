@@ -4,6 +4,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
+import io.amient.affinity.core.storage.Storage
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.util.EventTime
 import io.amient.affinity.stream.{BinaryStream, Record}
@@ -28,8 +29,10 @@ trait GatewayStream extends Gateway {
 
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
 
+  //TODO def output[K: ClassTag, V: ClassTag](identifier: String)
+
   def stream[K: ClassTag, V: ClassTag](identifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = new StorageConf().apply(config.getConfig(s"affinity.node.gateway.stream.$identifier"))
+    val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$identifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
     declaredInputStreamProcessors += new RunnableInputStream[K, V](identifier, keySerde, valSerde, streamConfig, processor)
@@ -89,7 +92,7 @@ trait GatewayStream extends Gateway {
 
     override def run(): Unit = {
       try {
-        consumer.subscribe()
+        consumer.subscribe(minTimestamp)
         log.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommit = System.currentTimeMillis()
         while (!closed) {
@@ -101,7 +104,7 @@ trait GatewayStream extends Gateway {
             log.info(s"Resuming input stream processor: $identifier")
             processingPaused = false
           }
-          for (record <- consumer.fetch(minTimestamp)) {
+          for (record <- consumer.fetch()) {
             val key: K = keySerde.fromBytes(record.key)
             val value: V = valSerde.fromBytes(record.value)
             processor(new Record(key, value, record.timestamp))

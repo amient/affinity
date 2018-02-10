@@ -19,12 +19,12 @@
 
 package io.amient.affinity.core.storage;
 
+import com.typesafe.config.Config;
 import io.amient.affinity.core.Murmur2Partitioner;
 import io.amient.affinity.core.Partitioner;
 import io.amient.affinity.core.config.CfgCls;
 import io.amient.affinity.core.config.CfgLong;
 import io.amient.affinity.core.config.CfgStruct;
-import io.amient.affinity.stream.BinaryRecord;
 import io.amient.affinity.stream.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +46,13 @@ import java.util.concurrent.Future;
 public abstract class Storage implements Closeable {
 
     private final static Logger log = LoggerFactory.getLogger(Storage.class);
+
+    public static StorageConf Conf = new StorageConf() {
+        @Override
+        public StorageConf apply(Config config) {
+            return new StorageConf().apply(config);
+        }
+    };
 
     public static class StorageConf extends CfgStruct<StorageConf> {
         public CfgCls<Storage> Class = cls("class", Storage.class, true);

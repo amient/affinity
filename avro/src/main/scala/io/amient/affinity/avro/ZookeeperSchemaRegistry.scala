@@ -53,7 +53,7 @@ object ZookeeperSchemaRegistry {
 }
 
 class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
-  val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.Conf.Avro.path))
+  val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
   val conf = new ZkAvroConf().apply(merged)
   private val zkRoot = conf.Root()
 

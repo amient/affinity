@@ -25,10 +25,9 @@ import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.config.Config
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
-import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.KeyValueMediator
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.{ByteUtils, EventTime}
@@ -38,7 +37,6 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal
 
@@ -56,8 +54,8 @@ object State {
     val readonly = stateConf.External()
     val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(identifier, stateConf, partition, 1) else {
       if (!stateConf.MemStore.DataDir.isDefined) {
-        val conf = Node.Conf(system.settings.config)
-        if (conf.Affi.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.DataDir())
+        val conf = Conf(system.settings.config)
+        if (conf.Affi.Node.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.Node.DataDir())
       }
       val storageClass = stateConf.Storage.Class()
       val storageClassSymbol = rootMirror.classSymbol(storageClass)

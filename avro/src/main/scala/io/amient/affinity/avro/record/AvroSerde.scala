@@ -26,7 +26,7 @@ import java.util
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.avro.record.AvroSerde.MAGIC
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema
@@ -40,21 +40,26 @@ object AvroSerde {
 
   private val MAGIC: Byte = 0
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
+  object AbsConf extends AbsConf {
+    override def apply(config: Config): AbsConf = new AbsConf().apply(config)
   }
 
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+  class AbsConf extends CfgStruct[AbsConf](Cfg.Options.IGNORE_UNKNOWN) {
     val Avro = struct("affinity.avro", new AvroConf, false)
   }
+
+  object Conf extends AvroConf {
+    override def apply(config: Config): AvroConf = new AvroConf().apply(config)
+  }
+  
   class AvroConf extends CfgStruct[AvroConf] {
-    val Class = cls("schema.registry.class", classOf[AvroSerde], true)
+    val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], true)
     override protected def specializations(): util.Set[String] = {
       Set("schema.registry")
     }
   }
 
-  def create(config: Config): AvroSerde = create(Conf(config).Avro)
+  def create(config: Config): AvroSerde = create(AbsConf(config).Avro)
 
   def create(conf: AvroConf): AvroSerde = {
     val registryClass: Class[_ <: AvroSerde] = conf.Class()

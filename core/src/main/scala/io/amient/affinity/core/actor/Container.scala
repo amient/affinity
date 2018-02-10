@@ -22,12 +22,13 @@ package io.amient.affinity.core.actor
 import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
 import akka.util.Timeout
+import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.actor.Controller.{ContainerOnline, GracefulShutdown}
 import io.amient.affinity.core.actor.Partition.{BecomeMaster, BecomeStandby}
+import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
-import io.amient.affinity.core.cluster.{Coordinator, Node}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -44,8 +45,8 @@ class Container(group: String) extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val conf = Node.Conf(context.system.settings.config)
-  private val startupTimeout = conf.Affi.StartupTimeoutMs().toLong milliseconds
+  private val conf = Conf(context.system.settings.config)
+  private val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
 
   final private val akkaAddress = if (conf.Akka.Hostname() > "") {
     s"akka.tcp://${context.system.name}@${conf.Akka.Hostname()}:${conf.Akka.Port()}"

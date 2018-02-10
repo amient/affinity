@@ -36,6 +36,7 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway.GatewayClusterStatus
@@ -68,9 +69,9 @@ trait SystemTestBase {
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
     val layer1: Config = config
-      .withValue(Node.Conf.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
-      .withValue(Node.Conf.Affi.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
-      .withValue(Node.Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
+      .withValue(Conf.Affi.Node.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
+      .withValue(Conf.Affi.Node.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
+      .withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
 
     val layer2: Config = zkConnect match {
       case None => layer1
@@ -83,19 +84,17 @@ trait SystemTestBase {
     kafkaBootstrap match {
       case None => layer2
       case Some(kafkaBootstrapString) =>
-        val keySpaceStores = if (!layer2.hasPath(Node.Conf.Affi.Keyspace.path())) List.empty else layer2
-          .getObject(Node.Conf.Affi.Keyspace.path()).keySet().asScala
+        val keySpaceStores = if (!layer2.hasPath(Conf.Affi.Keyspace.path())) List.empty else layer2
+          .getObject(Conf.Affi.Keyspace.path()).keySet().asScala
           .flatMap { ks =>
-            layer2.getObject(Node.Conf.Affi.Keyspace(ks).State.path).keySet().asScala.map {
-              case stateName => Node.Conf.Affi.Keyspace(ks).State(stateName).path()
+            layer2.getObject(Conf.Affi.Keyspace(ks).State.path).keySet().asScala.map {
+              case stateName => Conf.Affi.Keyspace(ks).State(stateName).path()
             }
           }
 
-        val globalStores = if (!layer2.hasPath(Node.Conf.Affi.Global.path())) List.empty else layer2
-          .getObject(Node.Conf.Affi.Global.path()).keySet().asScala
-          .map { ks =>
-            Node.Conf.Affi.Global(ks).path
-          }
+        val globalStores = if (!layer2.hasPath(Conf.Affi.Global.path())) List.empty else layer2
+          .getObject(Conf.Affi.Global.path()).keySet().asScala
+          .map { ks => Conf.Affi.Global(ks).path }
 
         (keySpaceStores ++ globalStores).foldLeft(layer2) {
           case (c, stateStorePath) =>
@@ -135,9 +134,9 @@ trait SystemTestBase {
   }
 
   class TestGatewayNode(config: Config, gatewayCreator: => Gateway)
-    extends Node(config.withValue(Node.Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
+    extends Node(config.withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
 
-    def this(config: Config) = this(config, Node.Conf(config).Affi.Gateway.Class().newInstance())
+    def this(config: Config) = this(config, Conf(config).Affi.Node.Gateway.Class().newInstance())
 
     import system.dispatcher
 

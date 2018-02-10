@@ -5,11 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.{ByteUtils, SystemTestBase}
@@ -48,7 +48,7 @@ class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka w
   private val log = LoggerFactory.getLogger(classOf[KafkaStorageSpec])
 
   val config = configure(ConfigFactory.load("kafkastoragetest")
-    .withValue(new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
+    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = ActorSystem.create("KafkaEcoSystem", config)
@@ -65,17 +65,17 @@ class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka w
   }
 
   private def createStateStoreForPartition(keyspace: String, partition: Int, store: String): State[Int, TestRecord] = {
-    val conf = Node.Conf(config)
+    val conf = Conf(config)
     val stateConf = conf.Affi.Keyspace(keyspace).State(store)
     State.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
   }
 
   behavior of "KafkaStorage"
   it should "survive failing writes" in {
-    config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
-    system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     val stateStoreName = "failure-test"
-    val topic = KafkaStorage.StateConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
+    val topic = KafkaStorage.StateConf(Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
     val state = createStateStoreForPartition("keyspace1", partition = 0, stateStoreName)
     runTestWithState(state, topic, 100)
   }
@@ -99,11 +99,11 @@ class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka w
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
 
-    config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
-    system.settings.config.getString(new AvroSerde.Conf().Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
-    val topic = KafkaStorage.StateConf(Node.Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
+    val topic = KafkaStorage.StateConf(Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
     val state = createStateStoreForPartition("keyspace1", partition = 0, stateStoreName)
     runTestWithState(state, topic, 10)
   }

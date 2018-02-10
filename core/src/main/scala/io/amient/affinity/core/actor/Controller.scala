@@ -22,10 +22,10 @@ package io.amient.affinity.core.actor
 import akka.AkkaException
 import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
 import akka.event.Logging
-import akka.util.Timeout
 import akka.pattern.ask
+import akka.util.Timeout
+import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
@@ -51,8 +51,8 @@ class Controller extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val conf = Node.Conf(context.system.settings.config)
-  private val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds
+  private val conf = Conf(context.system.settings.config)
+  private val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
   import Controller._
 

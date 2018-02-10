@@ -27,6 +27,7 @@ publishing {
 dependencies {
     provided 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     compile project(':api')
+    testCompile project(':kafka:avro-serde-kafka')
     testCompile project(':kafka:storage-kafka')
     testCompile project(':kafka:test-util-kafka')
     provided group: 'org.apache.spark', name: 'spark-core_' + rootProject.baseScalaVersion, version: rootProject.sparkVersion

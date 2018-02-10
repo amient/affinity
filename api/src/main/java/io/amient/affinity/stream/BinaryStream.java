@@ -3,6 +3,7 @@ package io.amient.affinity.stream;
 import com.typesafe.config.Config;
 import io.amient.affinity.core.Murmur2Partitioner;
 import io.amient.affinity.core.Partitioner;
+import io.amient.affinity.core.serde.AbstractSerde;
 import io.amient.affinity.core.storage.Storage;
 import io.amient.affinity.core.util.TimeRange;
 
@@ -29,7 +30,7 @@ public interface BinaryStream extends Closeable {
             InvocationTargetException,
             InstantiationException,
             IllegalAccessException {
-        return bindNewInstance(new Storage.StorageConf().apply(config));
+        return bindNewInstance(Storage.Conf.apply(config));
     }
 
     static BinaryStream bindNewInstance(Storage.StorageConf conf)
@@ -45,17 +46,19 @@ public interface BinaryStream extends Closeable {
 
     int getNumPartitions();
 
-    void subscribe();
+    void subscribe(long minTimestamp);
 
     void scan(int partition, TimeRange range);
 
     long lag();
 
-    Iterator<BinaryRecord> fetch(long minTimestamp);
+    Iterator<BinaryRecord> fetch();
 
     void commit();
 
     long publish(Iterator<BinaryRecord> iter);
+
+    void flush();
 
     default Iterator<BinaryRecord> iterator() {
         return new Iterator<BinaryRecord>() {
@@ -84,7 +87,7 @@ public interface BinaryStream extends Closeable {
                 record = null;
                 while (i == null || !i.hasNext()) {
                     if (lag() <= 0) return;
-                    i = fetch(-1L);
+                    i = fetch();
                 }
                 if (i.hasNext()) record = i.next();
             }
@@ -92,5 +95,15 @@ public interface BinaryStream extends Closeable {
         };
     }
 
+
+//    default <T> void output(Iterator<T> data, AbstractSerde<?> serde)  {
+//
+//        publish(data.map {
+//            case event:Routed with EventTime => new BinaryRecord(serde.toBytes(event.key), serde.toBytes(event), event.eventTimeUnix)
+//            case event:EventTime => new BinaryRecord(null, serde.toBytes(event), event.eventTimeUnix)
+//            case event:Routed => new BinaryRecord(serde.toBytes(event.key), serde.toBytes(event), EventTime.unix)
+//            case event:Any => new BinaryRecord(null, serde.toBytes(event), EventTime.unix)
+//        })
+//    }
 
 }

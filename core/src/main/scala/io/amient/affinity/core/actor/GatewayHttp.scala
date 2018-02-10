@@ -40,11 +40,11 @@ import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http._
@@ -83,9 +83,9 @@ trait GatewayHttp extends Gateway {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val conf = Node.Conf(context.system.settings.config).Affi
+  private val conf = Conf(context.system.settings.config).Affi
 
-  private val suspendedQueueMaxSize = conf.Gateway.SuspendQueueMaxSize()
+  private val suspendedQueueMaxSize = conf.Node.Gateway.SuspendQueueMaxSize()
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
 
   import context.{dispatcher, system}
@@ -94,17 +94,17 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
-  val sslContext = if (!conf.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
+  val sslContext = if (!conf.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
     log.info("Configuring SSL Context")
-    val password = conf.Gateway.Http.Tls.KeyStorePassword().toCharArray
-    val ks = KeyStore.getInstance(conf.Gateway.Http.Tls.KeyStoreStandard())
-    val is = if (conf.Gateway.Http.Tls.KeyStoreResource.isDefined) {
-      val keystoreResource = conf.Gateway.Http.Tls.KeyStoreResource()
+    val password = conf.Node.Gateway.Http.Tls.KeyStorePassword().toCharArray
+    val ks = KeyStore.getInstance(conf.Node.Gateway.Http.Tls.KeyStoreStandard())
+    val is = if (conf.Node.Gateway.Http.Tls.KeyStoreResource.isDefined) {
+      val keystoreResource = conf.Node.Gateway.Http.Tls.KeyStoreResource()
       log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
       getClass.getClassLoader.getResourceAsStream(keystoreResource)
     } else {
-      val keystoreFileName = conf.Gateway.Http.Tls.KeyStoreFile()
+      val keystoreFileName = conf.Node.Gateway.Http.Tls.KeyStoreFile()
       log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
       new FileInputStream(keystoreFileName)
     }
@@ -119,7 +119,7 @@ trait GatewayHttp extends Gateway {
   }
 
   private val httpInterface: HttpInterface = new HttpInterface(
-    conf.Gateway.Http.Host(), conf.Gateway.Http.Port(), sslContext)
+    conf.Node.Gateway.Http.Host(), conf.Node.Gateway.Http.Port(), sslContext)
 
   abstract override def preStart(): Unit = {
     super.preStart()
@@ -478,9 +478,9 @@ trait WebSocketSupport extends GatewayHttp {
   }
 
   trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
-    val conf = Node.Conf(context.system.settings.config).Affi
+    val conf = Conf(context.system.settings.config).Affi
 
-    final val maxBufferSize = conf.Gateway.Http.MaxWebSocketQueueSize()
+    final val maxBufferSize = conf.Node.Gateway.Http.MaxWebSocketQueueSize()
 
     override def postStop(): Unit = {
       log.debug("WebSocket Upstream Actor Closing")

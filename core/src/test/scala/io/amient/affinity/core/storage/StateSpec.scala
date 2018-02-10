@@ -3,23 +3,23 @@ package io.amient.affinity.core.storage
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.EventTime
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
 class StateSpec extends TestKit(ActorSystem.create("test",
   ConfigFactory.parseMap(Map(
-    Node.Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
-    Node.Conf.Affi.Gateway.Http.Host.path -> "127.0.0.1",
-    Node.Conf.Affi.Gateway.Http.Port.path -> "0"
+    Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
+    Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
+    Conf.Affi.Node.Gateway.Http.Port.path -> "0"
   )).withFallback(ConfigFactory.defaultReference)))
   with ImplicitSender with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
