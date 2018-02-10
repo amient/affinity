@@ -21,6 +21,7 @@ package io.amient.affinity.spark
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.SystemTestBase
@@ -36,14 +37,15 @@ import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.reflect.ClassTag
+
 class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 4
 
   val config: Config = ConfigFactory.load("example")
-    .withValue(Node.Conf.Affi.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
-    .withValue(Node.Conf.Affi.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
-
+    .withValue(Conf.Affi.Node.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
+    .withValue(Conf.Affi.Node.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
   val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val gatewayNode = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)), new ExampleGatewayRoot
@@ -76,18 +78,15 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
     get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(1)
 
-    val sc = new SparkContext(new SparkConf()
+    implicit val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")
       .set("spark.driver.host", "localhost")
       .setAppName("Affinity_Spark")
       .set("spark.serializer", classOf[KryoSerializer].getName))
 
-    val broadcast = sc.broadcast(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+    implicit val conf = Conf(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-    val graphRdd = new CompactRDD[Int, VertexProps](
-      sc, AvroSerde.create(broadcast.value),
-      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.graph.storage")))
-
+    val graphRdd = SparkDriver.graphRdd
     val sortedGraph = graphRdd.repartition(1).sortByKey().collect().toList
     sortedGraph match {
       case (1, VertexProps(_, 1, _)) ::
@@ -98,17 +97,14 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
         throw new AssertionError(s"Graph should contain 4 vertices but was: $x")
     }
 
-    val componentRdd = new CompactRDD[Int, Component](
-      sc,
-      AvroSerde.create(broadcast.value),
-      BinaryStream.bindNewInstance(broadcast.value.getConfig("affinity.keyspace.graph.state.components.storage")))
-
+    val componentRdd = SparkDriver.componentRdd
     componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>
-      case _ => throw new AssertionError("Graph should contain 1 component")
+      case x => throw new AssertionError(s"Graph should contain 1 component, got: $x")
     }
+
     val updateBatch: RDD[(Int, Component)] = sc.parallelize(Array((1, null), (2, Component(0L, Set()))))
-    componentRdd.update(updateBatch)
+    SparkDriver.avroUpdate("graph", "components", updateBatch)
 
     componentRdd.collect.toList match {
       case (2, Component(0L, _)) :: Nil =>
@@ -119,3 +115,21 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
 
 }
 
+object SparkDriver {
+
+  def graphRdd(implicit conf: Conf, sc: SparkContext) = avroRdd[Int, VertexProps]("graph", "graph")
+
+  def componentRdd(implicit conf: Conf, sc: SparkContext) = avroRdd[Int, Component]("graph", "components")
+
+  def avroRdd[K: ClassTag, V: ClassTag](ks: String, store: String)(implicit conf: Conf, sc: SparkContext) = {
+    val avroConf = conf.Affi.Avro
+    val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
+    CompactRDD[K, V](AvroSerde.create(avroConf), BinaryStream.bindNewInstance(storageConf))
+  }
+
+  def avroUpdate[K: ClassTag, V: ClassTag](ks: String, store: String, data: RDD[(K, V)])(implicit conf: Conf, sc: SparkContext): Unit = {
+    val avroConf = conf.Affi.Avro
+    val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
+    CompactRDD(AvroSerde.create(avroConf), BinaryStream.bindNewInstance(storageConf), data)
+  }
+}

@@ -3,7 +3,8 @@ package io.amient.affinity.avro
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
+import io.amient.affinity.Conf
+import io.amient.affinity.avro.record.AvroRecord
 import org.scalatest.FlatSpec
 
 
@@ -15,7 +16,7 @@ class AkkaSerializationSystemTest extends FlatSpec with EmbeddedCfRegistry {
 
   val config = ConfigFactory.defaultReference
     .withValue(ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
-    .withValue(AvroSerde.Conf.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ConfluentSchemaRegistry].getName))
+    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ConfluentSchemaRegistry].getName))
 
   assert(config.getString(new ConfluentSchemaRegistry.Conf().Avro.ConfluentSchemaRegistryUrl.path) == registryUrl)
 

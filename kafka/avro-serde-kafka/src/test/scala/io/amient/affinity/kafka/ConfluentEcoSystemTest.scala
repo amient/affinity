@@ -22,10 +22,12 @@ package io.amient.affinity.kafka
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.ConfluentSchemaRegistry
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
@@ -68,7 +70,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
 
   val config = ConfigFactory.parseMap(Map(
       ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
-      AvroSerde.Conf.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName))
+      Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName))
     .withFallback(ConfigFactory.defaultReference)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {

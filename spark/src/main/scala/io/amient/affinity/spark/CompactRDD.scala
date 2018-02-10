@@ -19,83 +19,106 @@
 
 package io.amient.util.spark
 
-import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.util.EventTime
+import io.amient.affinity.core.util.{EventTime, TimeRange}
+import io.amient.affinity.spark.BinaryCompactRDD
 import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
-import org.apache.spark.util.collection.ExternalAppendOnlyMap
-import org.apache.spark.{Partition, SparkContext, TaskContext}
+import org.apache.spark.{SparkContext, TaskContext}
 
 import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
-class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
-                                           keySerde: => AbstractSerde[_ >: K],
-                                           valueSerde: => AbstractSerde[_ >: V],
-                                           streamBinder: => BinaryStream,
-                                           compacted: Boolean) extends RDD[(K, V)](sc, Nil) {
+object CompactRDD {
 
-  def this(sc: SparkContext, serde: => AbstractSerde[Any], streamBinder: => BinaryStream, compacted: Boolean = true) =
-    this(sc, serde, serde, streamBinder, compacted)
-
-  val compactor = (m1: BinaryRecord, m2: BinaryRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
-
-  protected def getPartitions: Array[Partition] = {
-    val stream = streamBinder
-    try {
-      (0 until stream.getNumPartitions()).map { p =>
-        new Partition {
-          override def index = p
-        }
-      }.toArray
-    } finally {
-      stream.close()
-    }
+  def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
+                                      streamBinder: => BinaryStream,
+                                      compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
+    apply[K,V](serdeBinder, serdeBinder, streamBinder, TimeRange.ALLTIME, compacted)
   }
 
-  override def compute(split: Partition, context: TaskContext): Iterator[(K, V)] = {
-    val stream = streamBinder
-    val keySerdeInstance = keySerde
-    val valueSerdeInstance = valueSerde
-    context.addTaskCompletionListener { _ =>
-      try {
-        keySerdeInstance.close()
-      } finally try {
-        valueSerdeInstance.close()
-      } finally {
-        stream.close()
+  def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
+                                      streamBinder: => BinaryStream,
+                                      range: TimeRange)(implicit sc: SparkContext): RDD[(K, V)] = {
+    apply[K,V](serdeBinder, serdeBinder, streamBinder, range, compacted = true)
+  }
+
+  def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
+                                      streamBinder: => BinaryStream)(implicit sc: SparkContext): RDD[(K, V)] = {
+    apply[K,V](serdeBinder, serdeBinder, streamBinder, TimeRange.ALLTIME, compacted = true)
+  }
+
+  /**
+    * Map underlying binary stream to typed RDD, either fully or from the given time range
+    * @param keySerdeBinder
+    * @param valueSerdeBinder
+    * @param streamBinder
+    * @param range
+    * @param compacted
+    * @param sc
+    * @tparam K
+    * @tparam V
+    * @return RDD[(K,V)]
+    */
+  def apply[K: ClassTag, V: ClassTag](keySerdeBinder: => AbstractSerde[_ >: K],
+                                      valueSerdeBinder: => AbstractSerde[_ >: V],
+                                      streamBinder: => BinaryStream,
+                                      range: TimeRange,
+                                      compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
+    new BinaryCompactRDD(sc, streamBinder, range, compacted).mapPartitions { partition =>
+      val keySerde = keySerdeBinder
+      val valueSerde = valueSerdeBinder
+      TaskContext.get.addTaskCompletionListener { _ =>
+        try keySerde.close finally valueSerde.close
+      }
+      partition.flatMap { case (key, record) =>
+        (keySerde.fromBytes(key.bytes), valueSerde.fromBytes(record.value)) match {
+          case (k: K, v: V) => Some((k, v))
+          case _ => None
+        }
       }
     }
-
-    stream.subscribe(split.index)
-
-    val binaryRecords: Iterator[BinaryRecord] = stream.iterator()
-    val kvRecords: Iterator[(ByteKey, BinaryRecord)] = binaryRecords.map(record => (new ByteKey(record.key), record))
-
-    val compactedRecords = if (!compacted) kvRecords else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, BinaryRecord, BinaryRecord]((v) => v, compactor, compactor)
-      spillMap.insertAll(kvRecords)
-      spillMap.iterator
-    }
-
-    compactedRecords.map { case (key, record) =>
-      (keySerdeInstance.fromBytes(key.bytes), valueSerdeInstance.fromBytes(record.value))
-    }.collect {
-      case (k: K, v: V) => (k, v)
-    }
   }
 
-  def update(data: RDD[(K,V)]): Unit = {
+  /**
+    * publish data into binary stream
+    *
+    * @param serdeBinder
+    * @param streamBinder
+    * @param data
+    * @param sc
+    * @tparam K
+    * @tparam V
+    */
+  def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
+                                      streamBinder: => BinaryStream,
+                                      data: RDD[(K,V)])(implicit sc: SparkContext): Unit = {
+    apply[K,V](serdeBinder, serdeBinder, streamBinder, data)
+  }
 
+  /**
+    * publish data into binary stream
+    * @param keySerdeBinder
+    * @param valueSerdeBinder
+    * @param streamBinder
+    * @param data
+    * @param sc
+    * @tparam K
+    * @tparam V
+    */
+  def apply[K: ClassTag, V: ClassTag](keySerdeBinder: => AbstractSerde[_ >: K],
+                                      valueSerdeBinder: => AbstractSerde[_ >: V],
+                                      streamBinder: => BinaryStream,
+                                      data: RDD[(K,V)])(implicit sc: SparkContext): Unit = {
     val produced = new LongAccumulator
-    context.register(produced)
+
+    sc.register(produced)
 
     def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
       val stream = streamBinder
-      val keySerdeInstance = keySerde
-      val valueSerdeInstance = valueSerde
+      val keySerde = keySerdeBinder
+      val valueSerde = valueSerdeBinder
 
       try {
         val iterator = partition.map { case (k, v) =>
@@ -103,23 +126,21 @@ class CompactRDD[K: ClassTag, V: ClassTag](sc: SparkContext,
             case e: EventTime => e.eventTimeUnix()
             case _ => System.currentTimeMillis()
           }
-          val serializedKey = keySerdeInstance.toBytes(k)
-          val serializedValue = valueSerdeInstance.toBytes(v)
+          val serializedKey = keySerde.toBytes(k)
+          val serializedValue = valueSerde.toBytes(v)
           new BinaryRecord(serializedKey, serializedValue, ts)
         }
-
         produced.add(stream.publish(iterator))
+        stream.flush
         stream.close()
       } finally try {
-        keySerdeInstance.close()
+        keySerde.close()
       } finally {
-        valueSerdeInstance.close()
+        valueSerde.close()
       }
     }
 
-    context.runJob(data, updatePartition _)
+    sc.runJob(data, updatePartition _)
 
-    log.info(s"Produced ${produced.value} messages")
   }
-
 }

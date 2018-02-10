@@ -1,6 +1,7 @@
 package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 
 import java.net.URL;
 import java.nio.file.Path;
@@ -49,6 +50,10 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     public final T apply(CfgStruct<?> conf) throws IllegalArgumentException {
         return apply(conf.config());
+    }
+
+    public final T apply(Map<String, ?> config) {
+        return apply(ConfigFactory.parseMap(config));
     }
 
     @Override

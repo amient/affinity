@@ -23,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor.Actor
 import akka.event.Logging
-import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.Conf
 import io.amient.affinity.core.storage.{State, StateConf}
 
 import scala.collection.JavaConverters._
@@ -43,7 +43,7 @@ trait ActorState extends Actor {
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
     state[K, V](store, {
       val identifier = if (partition < 0) store else s"$keyspace-$store-$partition"
-      val conf = Node.Conf(context.system.settings.config)
+      val conf = Conf(context.system.settings.config)
       val numPartitions = conf.Affi.Keyspace(keyspace).NumPartitions()
       val stateConf = conf.Affi.Keyspace(keyspace).State(store)
       State.create[K, V](identifier, partition, stateConf, numPartitions, context.system)

@@ -320,7 +320,5 @@ Affinity uses SLF4j and it also redirects all Akka logging to SLF4J.
 It doesn't provide any binding for compile configuration, that is left to applications - in one of the examples,
 logback is used, in another log4j.
 
-For all testing slf4j-jdk14 (Java Logging) binding is used and is configured for all modules in:
-api/src/test/resources/logging.properties
-
+For all testing slf4j-log4j (Java Logging) binding is used by default.
 

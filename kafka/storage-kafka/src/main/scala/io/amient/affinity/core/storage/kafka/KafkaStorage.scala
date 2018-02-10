@@ -50,16 +50,16 @@ object KafkaStorage {
   }
 
   class KafkaStateConf extends CfgStruct[KafkaStateConf](classOf[StateConf]) {
-    val Storage = struct("storage", new KafkaStorageConf, true)
+    val Storage = struct("storage", new Conf, true)
   }
 
-  object KafkaStorageConf extends KafkaStorageConf {
-    override def apply(config: Config): KafkaStorageConf = new KafkaStorageConf().apply(config)
+  object Conf extends Conf {
+    override def apply(config: Config): Conf = new Conf().apply(config)
   }
 
-  class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[StorageConf]) {
+  class Conf extends CfgStruct[Conf](classOf[StorageConf]) {
     val Topic = string("kafka.topic", true)
-    val ReplicationFactor = integer("kafka.topic.replication.factor", 1)
+    val ReplicationFactor = integer("kafka.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
     val Producer = struct("kafka.producer", new KafkaProducerConf, false)
     val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false)

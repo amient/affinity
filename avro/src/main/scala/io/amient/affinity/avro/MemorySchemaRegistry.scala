@@ -23,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.record.AvroSerde
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
+import io.amient.affinity.core.config.CfgStruct
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
@@ -32,7 +34,13 @@ import scala.collection.mutable
 
 object MemorySchemaRegistry {
 
-  final val ID = "schema.registry.id"
+  object Conf extends MemorySchemaRegistryConf {
+    override def apply(config: Config): MemorySchemaRegistryConf = new MemorySchemaRegistryConf().apply(config)
+  }
+
+  class MemorySchemaRegistryConf extends CfgStruct[MemorySchemaRegistryConf](classOf[AvroConf]) {
+    val ID = integer("schema.registry.id", false)
+  }
 
   val multiverse = new mutable.HashMap[Int, Universe]()
 
@@ -70,9 +78,13 @@ class MemorySchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegi
 
   def this() = this(ConfigFactory.empty)
 
-  import MemorySchemaRegistry._
+  val conf = MemorySchemaRegistry.Conf(config)
 
-  val universe = if (config.hasPath(ID)) createUniverse(Some(config.getInt(ID))) else createUniverse()
+  val universe = if (conf.ID.isDefined) {
+    MemorySchemaRegistry.createUniverse(Some(conf.ID()))
+  } else {
+    MemorySchemaRegistry.createUniverse()
+  }
 
   private val validator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
 

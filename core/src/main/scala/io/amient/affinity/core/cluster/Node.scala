@@ -24,14 +24,12 @@ import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.Config
-import io.amient.affinity.avro.record.AvroSerde.AvroConf
+import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor.Gateway.GatewayConf
-import io.amient.affinity.core.actor.Keyspace.KeyspaceConf
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
-import io.amient.affinity.core.storage.StateConf
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -42,42 +40,23 @@ import scala.util.control.NonFatal
 
 object Node {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
-  }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Akka = struct("akka", new AkkaConf, false)
-    val Affi = struct("affinity", new AffinityConf, true)
-  }
-
-  class AkkaConf extends CfgStruct[AkkaConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Hostname = string("remote.netty.tcp.hostname", false)
-    val Port = integer("remote.netty.tcp.port", false)
-  }
-
-
-  class AffinityConf extends CfgStruct[AffinityConf] {
-    val Avro = struct("avro", new AvroConf(), true)
-    val Coorinator = struct("coordinator", new Coordinator.CoorinatorConf, true)
-    val Keyspace = group("keyspace", classOf[KeyspaceConf], false)
-    val Global = group("global", classOf[StateConf], false)
-    val Containers = group("node.container", classOf[CfgIntList], false)
-    val Gateway = struct("node.gateway", new GatewayConf, false)
-    val StartupTimeoutMs = integer("node.startup.timeout.ms", true)
-    val ShutdownTimeoutMs = integer("node.shutdown.timeout.ms", true)
-    val DataDir = filepath("node.data.dir", false)
-    val SystemName = string("node.name", true)
+  class NodeConf extends CfgStruct[NodeConf] {
+    val Containers: CfgGroup[CfgIntList] = group("container", classOf[CfgIntList], false)
+    val Gateway: GatewayConf = struct("gateway", new GatewayConf, false)
+    val StartupTimeoutMs: CfgInt = integer("startup.timeout.ms", true)
+    val ShutdownTimeoutMs: CfgInt = integer("shutdown.timeout.ms", true)
+    val DataDir: CfgPath = filepath("data.dir", false)
+    val SystemName: CfgString = string("name", true)
   }
 
 }
 
 class Node(config: Config) {
 
-  val conf = Node.Conf(config)
-  private val actorSystemName: String = conf.Affi.SystemName()
-  val startupTimeout = conf.Affi.StartupTimeoutMs().toLong milliseconds
-  val shutdownTimeout = conf.Affi.ShutdownTimeoutMs().toLong milliseconds
+  val conf = Conf(config)
+  private val actorSystemName: String = conf.Affi.Node.SystemName()
+  val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
+  val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
   implicit val system = ActorSystem.create(actorSystemName, config)
 
@@ -108,14 +87,14 @@ class Node(config: Config) {
   }
 
   def start() = {
-    conf.Affi.Containers().foreach {
+    conf.Affi.Node.Containers().foreach {
       case (group: String, value: CfgIntList) =>
         val partitions = value().map(_.toInt).toList
         startContainer(group, partitions)
     }
-    if (conf.Affi.Gateway.Class.isDefined) {
+    if (conf.Affi.Node.Gateway.Class.isDefined) {
       //the gateway could be started programatically but in this case it is by config
-      startGateway(conf.Affi.Gateway.Class().newInstance())
+      startGateway(conf.Affi.Node.Gateway.Class().newInstance())
     }
   }
 

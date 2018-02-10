@@ -21,12 +21,12 @@ package io.amient.affinity.core.serde
 
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
-import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Partition.CreateKeyValueMediator
 import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.http.TestValue
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.util.Reply
@@ -35,6 +35,11 @@ import org.scalatest.Matchers
 import scala.collection.immutable.Seq
 
 case class Key(key: Int) extends AvroRecord with Routed with Reply[Option[TestValue]]
+
+case class TestValue(items: List[Int]) extends AvroRecord {
+  def withAddedItem(item: Int) = TestValue(items :+ item)
+  def withRemovedItem(item: Int) = TestValue(items.filter(_ != item))
+}
 
 class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
 
@@ -73,7 +78,7 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
       val in = CreateKeyValueMediator("state", 1)
       val bytes = SerializationExtension(system).serialize(in).get
 
-      bytes.mkString(".") should be ("-84.-19.0.5.115.114.0.62.105.111.46.97.109.105.101.110.116.46.97.102" +
+      bytes.mkString(".") should be("-84.-19.0.5.115.114.0.62.105.111.46.97.109.105.101.110.116.46.97.102" +
         ".102.105.110.105.116.121.46.99.111.114.101.46.97.99.116.111.114.46.80.97.114.116.105.116.105.111" +
         ".110.36.67.114.101.97.116.101.75.101.121.86.97.108.117.101.77.101.100.105.97.116.111.114.43.-91.19" +
         ".-42.-78.-73.-41.65.2.0.2.76.0.3.107.101.121.116.0.18.76.106.97.118.97.47.108.97.110.103.47.79.98" +
@@ -127,8 +132,8 @@ class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
 
     "be constructible from a simple Config" in {
       Serde.of[List[Long]](ConfigFactory.defaultReference.withValue(
-        new AvroSerde.Conf().Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName)))
-        .isInstanceOf[SeqSerde] should be (true)
+        Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName)))
+        .isInstanceOf[SeqSerde] should be(true)
     }
   }
 
