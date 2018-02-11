@@ -62,7 +62,8 @@ class CompactRDDTest extends FlatSpec with EmbeddedKafka with Matchers with Befo
     .setMaster("local[10]")
     .set("spark.driver.host", "localhost")
     .setAppName("Affinity_Spark_Test")
-    .set("spark.serializer", classOf[KryoSerializer].getName))
+    .set("spark.serializer", classOf[KryoSerializer].getName)
+    .set("spark.kryo.classesToRegister", "io.amient.affinity.spark.CompactionTestEvent"))
 
 
   override def beforeAll() {
