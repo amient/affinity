@@ -27,7 +27,6 @@ publishing {
 dependencies {
     provided 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     compile project(':api')
-    compile project(':avro')
     testCompile project(':kafka:avro-serde-kafka')
     testCompile project(':kafka:storage-kafka')
     testCompile project(':kafka:test-util-kafka')
