@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * Java Optional is not serializable so using this
- * @param <T>
+ * @param <T> option value type
  */
 public class JOption<T> implements Serializable {
     private static final JOption<?> EMPTY = new JOption<>();
