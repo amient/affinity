@@ -19,6 +19,7 @@
 
 package io.amient.affinity.avro
 
+import java.io.Closeable
 import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.{Config, ConfigFactory}
@@ -56,10 +57,10 @@ object MemorySchemaRegistry {
       universe
   }
 
-  class Universe {
+  class Universe extends Closeable {
     val schemas = new ConcurrentHashMap[Int, Schema]()
     val subjects = new ConcurrentHashMap[String, List[Int]]()
-    def getOrRegister(schema: Schema): Int = {
+    def getOrRegister(schema: Schema): Int = synchronized {
       schemas.find(_._2 == schema) match {
         case None =>
           val newId = schemas.size
@@ -68,8 +69,14 @@ object MemorySchemaRegistry {
         case Some((id, _)) => id
       }
     }
-    def updateSubject(subject: String, schemaId: Int): Unit = {
-      subjects.put(subject, (Option(subjects.get(subject)).getOrElse(List()) :+ schemaId))
+    def updateSubject(subject: String, schemaId: Int): Unit = synchronized {
+      val existing = Option(subjects.get(subject)).getOrElse(List())
+      if (!existing.contains(schemaId)) subjects.put(subject, (existing :+ schemaId))
+    }
+
+    override def close(): Unit = {
+      schemas.clear()
+      subjects.clear()
     }
   }
 }

@@ -1,0 +1,92 @@
+package io.amient.affinity.avro.util
+
+import java.io.DataOutputStream
+import java.net.{HttpURLConnection, URL}
+
+import org.apache.avro.Schema
+import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
+import scala.collection.JavaConversions._
+
+class ConfluentSchemaRegistryClient(baseUrl: URL) {
+
+    private val mapper = new ObjectMapper
+
+    def getSubjects: Iterator[String] = {
+      val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
+      if (!j.has("error_code")) {
+        j.getElements().map(_.getTextValue)
+      } else {
+        if (j.get("error_code").getIntValue == 40401) {
+          Iterator.empty
+        } else {
+          throw new RuntimeException(j.get("message").getTextValue)
+        }
+      }
+    }
+
+    def getVersions(subject: String): Iterator[Int] = {
+      val j = mapper.readValue(get(s"/subjects/$subject/versions"), classOf[JsonNode])
+      if (!j.has("error_code")) {
+        j.getElements().map(_.getIntValue)
+      } else {
+        if (j.get("error_code").getIntValue == 40401) {
+          Iterator.empty
+        } else {
+          throw new RuntimeException(j.get("message").getTextValue)
+        }
+      }
+    }
+
+    def getSchema(subject: String, version: Int): (Int, Schema) = {
+      val j = mapper.readValue(get(s"/subjects/$subject/versions/$version"), classOf[JsonNode])
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
+      (j.get("id").getIntValue, new Schema.Parser().parse(j.get("schema").getTextValue))
+    }
+
+    def getSchema(id: Int): Schema = {
+      val j = mapper.readValue(get(s"/schemas/ids/$id"), classOf[JsonNode])
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
+      new Schema.Parser().parse(j.get("schema").getTextValue)
+    }
+
+    def registerSchema(subject: String, schema: Schema): Int = {
+      val entity = mapper.createObjectNode()
+      entity.put("schema", schema.toString)
+      val j = mapper.readValue(post(s"/subjects/$subject/versions", entity.toString), classOf[JsonNode])
+      if (j.has("error_code")) throw new RuntimeException(subject + ": " + schema.getFullName + " - " + j.get("message").getTextValue)
+      if (j.has("id")) j.get("id").getIntValue else throw new IllegalArgumentException
+    }
+
+    private def get(path: String): String = http(path) { connection =>
+      connection.setRequestMethod("GET")
+    }
+
+    private def post(path: String, entity: String): String = http(path) { connection =>
+      connection.addRequestProperty("Content-Type", "application/json")
+      connection.addRequestProperty("Accept", "application/vnd.schemaregistry.v1+json, application/vnd.schemaregistry+json, application/json")
+      connection.setDoOutput(true)
+      connection.setRequestMethod("POST")
+      val output = new DataOutputStream( connection.getOutputStream())
+      output.write( entity.getBytes("UTF-8"))
+    }
+
+    private def http(path: String)(init: HttpURLConnection => Unit ): String = {
+      val url = new URL(baseUrl.toString + path)
+      val connection = url.openConnection.asInstanceOf[HttpURLConnection]
+      connection.setConnectTimeout(5000)
+      connection.setReadTimeout(5000)
+
+      init(connection)
+
+      val status = connection.getResponseCode()
+      val inputStream = if (status == HttpURLConnection.HTTP_OK) {
+        connection.getInputStream
+      } else {
+        connection.getErrorStream
+      }
+      val content = scala.io.Source.fromInputStream(inputStream).mkString
+      if (inputStream != null) inputStream.close
+      content
+    }
+  }

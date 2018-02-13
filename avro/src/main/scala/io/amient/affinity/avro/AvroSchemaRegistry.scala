@@ -127,6 +127,28 @@ trait AvroSchemaRegistry {
     registration += ((subject, schema))
   }
 
+  def getOrRegisterSchema(data: Any, subjectOption: String = null): (Schema, Int) = {
+    val schema = AvroRecord.inferSchema(data)
+    val subject = Option(subjectOption).getOrElse(schema.getFullName)
+    val schemaId = getCurrentSchema(schema.getFullName) match {
+      case Some((schemaId: Int, regSchema: Schema)) if regSchema == schema => schemaId
+      case _ =>
+        register(schema.getFullName, schema)
+        initialize()
+        getSchemaId(schema) match {
+          case None => throw new IllegalStateException(s"Failed to register schema for $subject")
+          case Some(id) => id
+        }
+    }
+    if (!getSchema(subject, schemaId).isDefined) {
+      register(subject, schema)
+      initialize()
+    }
+    (schema, schemaId)
+  }
+
+
+
   final def initialize(): List[Int] = initialize(None)
 
   final def initialize[K: ClassTag](subject: String): List[Int] = {

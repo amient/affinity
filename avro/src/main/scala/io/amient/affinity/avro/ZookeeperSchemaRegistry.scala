@@ -19,8 +19,6 @@
 
 package io.amient.affinity.avro
 
-import java.util
-
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
@@ -33,7 +31,7 @@ import org.apache.avro.{Schema, SchemaValidationException, SchemaValidatorBuilde
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConversions._
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 
 object ZookeeperSchemaRegistry {
 
@@ -68,7 +66,7 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
   private val schemas = mutable.Map[Schema, Int]()
   if (!zk.exists(zkSchemas)) zk.createPersistent(zkSchemas, true)
   updateSchemas(zk.subscribeChildChanges(zkSchemas, new IZkChildListener() {
-    override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
+    override def handleChildChange(parentPath: String, children: java.util.List[String]): Unit = {
       updateSchemas(children)
     }
   }))
@@ -77,7 +75,7 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
   private var subjects = mutable.Map[String, Set[Int]]()
   if (!zk.exists(zkSubjects)) zk.createPersistent(zkSubjects, true)
   updateSubjects(zk.subscribeChildChanges(zkSubjects, new IZkChildListener() {
-    override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
+    override def handleChildChange(parentPath: String, children: java.util.List[String]): Unit = {
       updateSubjects(children)
     }
   }))
@@ -133,7 +131,7 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
     try f finally zk.delete(lockPath)
   }
 
-  private def updateSchemas(ids: util.List[String]): Unit = {
+  private def updateSchemas(ids: java.util.List[String]): Unit = {
     ids.toList.foreach { id =>
       val schema = new Schema.Parser().parse(zk.readData[String](s"$zkSchemas/$id"))
       val FQN = schema.getFullName
@@ -142,7 +140,7 @@ class ZookeeperSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaR
     }
   }
 
-  private def updateSubjects(_subjects: util.List[String]): Unit = {
+  private def updateSubjects(_subjects: java.util.List[String]): Unit = {
     _subjects.toList.foreach { subject =>
       val ids = zk.readData[String](s"$zkSubjects/$subject").split(",").map(_.toInt).toSet
       subjects += subject -> ids

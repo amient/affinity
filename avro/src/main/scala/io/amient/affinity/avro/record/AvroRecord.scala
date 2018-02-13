@@ -21,8 +21,8 @@ package io.amient.affinity.avro.record
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
-import java.util
 
+import io.amient.affinity.avro.util.ThreadLocalCache
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
@@ -36,8 +36,7 @@ import org.codehaus.jackson.annotate.JsonIgnore
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
-import scala.reflect.runtime._
-import scala.reflect.runtime.universe
+import scala.reflect.runtime.{universe, _}
 import scala.reflect.runtime.universe._
 
 final class Alias(aliases: String*) extends StaticAnnotation
@@ -111,34 +110,19 @@ object AvroRecord extends AvroExtractors {
   }
 
 
-  class LocalCache[K, I] extends ThreadLocal[java.util.HashMap[K, I]] {
-    override def initialValue() = new util.HashMap[K, I]()
-
-    def getOrInitialize(key: K, initializer: => I) = {
-      get().get(key) match {
-        case null =>
-          val init = initializer
-          get().put(key, init)
-          init
-        case some =>
-          some
-      }
-    }
-  }
-
-  private object fqnMirrorCache extends LocalCache[String, universe.Mirror] {
+  private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
     def getOrInitialize(fqn: String): universe.Mirror = {
       getOrInitialize(fqn, runtimeMirror(Class.forName(fqn).getClassLoader))
     }
   }
 
-  private object fqnTypeCache extends LocalCache[String, Type] {
+  private object fqnTypeCache extends ThreadLocalCache[String, Type] {
     def getOrInitialize(fqn: String): Type = {
       getOrInitialize(fqn, fqnMirrorCache.getOrInitialize(fqn).staticClass(fqn).selfType)
     }
   }
 
-  private object fqnClassMirrorCache extends LocalCache[String, ClassMirror] {
+  private object fqnClassMirrorCache extends ThreadLocalCache[String, ClassMirror] {
     def getOrInitialize(fqn: String): ClassMirror = getOrInitialize(fqn, {
       val typeMirror = universe.runtimeMirror(Class.forName(fqn).getClassLoader)
       val tpe = fqnTypeCache.getOrInitialize(fqn)
@@ -146,7 +130,7 @@ object AvroRecord extends AvroExtractors {
     })
   }
 
-  private object classFieldsCache extends LocalCache[Class[_], Map[Int, Field]] {
+  private object classFieldsCache extends ThreadLocalCache[Class[_], Map[Int, Field]] {
     def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field] = getOrInitialize(cls, {
       val schemaFields = schema.getFields
       val params: Array[Parameter] = cls.getConstructors()(0).getParameters
@@ -166,7 +150,7 @@ object AvroRecord extends AvroExtractors {
     })
   }
 
-  private object fqnConstructorCache extends LocalCache[String, (Seq[Type], MethodMirror)] {
+  private object fqnConstructorCache extends ThreadLocalCache[String, (Seq[Type], MethodMirror)] {
     def getOrInitialize(fqn: String): (Seq[Type], MethodMirror) = getOrInitialize(fqn, {
       val tpe = fqnTypeCache.getOrInitialize(fqn)
       val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
@@ -177,7 +161,7 @@ object AvroRecord extends AvroExtractors {
     })
   }
 
-  private object enumCache extends LocalCache[Type, MethodMirror] {
+  private object enumCache extends ThreadLocalCache[Type, MethodMirror] {
     def getOrInitialize(tpe: Type): MethodMirror = getOrInitialize(tpe, {
       tpe match {
         case TypeRef(enumType, _, _) =>
@@ -188,7 +172,7 @@ object AvroRecord extends AvroExtractors {
     })
   }
 
-  private object iterableCache extends LocalCache[Type, (Iterable[Any]) => Iterable[Any]] {
+  private object iterableCache extends ThreadLocalCache[Type, (Iterable[Any]) => Iterable[Any]] {
     def getOrInitialize(tpe: Type): (Iterable[Any]) => Iterable[Any] = getOrInitialize(tpe, {
       if (tpe <:< typeOf[Set[_]]) {
         (iterable) => iterable.toSet
@@ -206,7 +190,7 @@ object AvroRecord extends AvroExtractors {
     })
   }
 
-  private object unionCache extends LocalCache[Type, (Any, Schema) => Any] {
+  private object unionCache extends ThreadLocalCache[Type, (Any, Schema) => Any] {
     def getOrInitialize(tpe: Type): (Any, Schema) => Any = getOrInitialize(tpe, {
       if (tpe <:< typeOf[Option[Any]]) {
         (datum, schema) =>
@@ -316,9 +300,9 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-  private object classTypeCache extends LocalCache[Class[_], Type]()
+  private object classTypeCache extends ThreadLocalCache[Class[_], Type]()
 
-  private object typeSchemaCache extends LocalCache[Type, Schema]()
+  private object typeSchemaCache extends ThreadLocalCache[Type, Schema]()
 
   def inferSchema(tpe: Type): Schema = {
     typeSchemaCache.getOrInitialize(tpe, {
