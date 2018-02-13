@@ -23,7 +23,7 @@ import java.io.Closeable
 import java.util.function.Supplier
 
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.util.ThreadLocalCache
+import io.amient.affinity.avro.util.ThreadLocalCache
 import org.apache.avro.Schema
 
 import scala.reflect.runtime.universe._
@@ -112,16 +112,20 @@ trait AvroSchemaRegistry extends Closeable {
     */
   protected def registerSchema(subject: String, schema: Schema): Int
 
-  implicit def closureToSupplier[V](closure: => V) = new Supplier[V] {
-    override def get() = closure
-  }
+//  implicit def closureToSupplier[V](closure: => V) = new Supplier[V] {
+//    override def get() = closure
+//  }
 
   private object Schemas extends ThreadLocalCache[Int, Schema] {
-    def getOrInitialize(id: Int): Schema = getOrInitialize(id, loadSchema(id))
+    def getOrInitialize(id: Int): Schema = getOrInitialize(id, {
+      //println(s"Loading schema $id")
+      loadSchema(id)
+    })
   }
 
   private object Versions extends ThreadLocalCache[(String, Schema), Int] {
     def getOrInitialize(subject: String, schema: Schema): Int = getOrInitialize((subject, schema), {
+      //println(s"initializeing schema $subject >> $schema")
       val sid = registerSchema(subject, schema)
       Schemas.initialize(sid, schema)
       sid

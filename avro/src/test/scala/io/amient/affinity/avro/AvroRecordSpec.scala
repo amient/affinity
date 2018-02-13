@@ -152,10 +152,10 @@ class AvroRecordSpec extends FlatSpec with Matchers {
       val now = System.currentTimeMillis()
       if (now - r > 5000) {
         r = now
-        log.info(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+        println(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
       }
     }
-    log.info(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+    println(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
 
   }
 
