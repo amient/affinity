@@ -352,14 +352,8 @@ trait WebSocketSupport extends GatewayHttp {
       override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
         case text: TextMessage =>
           val schemaFqn = text.getStrictText
-          avroSerde.getCurrentSchema(schemaFqn) match {
-            case Some((schemaId, _)) => upstream ! buildSchemaPushMessage(schemaId)
-            case None =>
-              avroSerde.initialize(schemaFqn, AvroRecord.inferSchema(schemaFqn)) match {
-                case schemaId :: Nil => upstream ! buildSchemaPushMessage(schemaId)
-                case _ => log.error(s"Invalid avro websocket schema type request: $schemaFqn")
-              }
-          }
+          val (schemaId, _) = avroSerde.getRuntimeSchema(schemaFqn)
+          upstream ! buildSchemaPushMessage(schemaId)
         case binary: BinaryMessage =>
           try {
             val buf = binary.getStrictData.asByteBuffer
@@ -380,7 +374,7 @@ trait WebSocketSupport extends GatewayHttp {
 
       def buildSchemaPushMessage(schemaId: Int): ByteString = {
         try {
-          val schemaBytes = avroSerde.schema(schemaId).get.toString(true).getBytes()
+          val schemaBytes = avroSerde.getSchema(schemaId).toString(true).getBytes()
           val echoBytes = new Array[Byte](schemaBytes.length + 5)
           echoBytes(0) = 123
           ByteUtils.putIntValue(schemaId, echoBytes, 1)

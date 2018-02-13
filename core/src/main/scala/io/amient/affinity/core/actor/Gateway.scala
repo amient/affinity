@@ -144,13 +144,13 @@ trait Gateway extends ActorHandler with ActorState {
       case KeyValueMediatorCreated(keyValueMediator) => keyValueMediator
     }
   }
-
-  def describeAvro: scala.collection.immutable.Map[String, String] = {
-    val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
-    serde.describeSchemas.map {
-      case (id, schema) => ((id.toString, schema.toString))
-    }
-  }
+//
+//  def describeAvro: scala.collection.immutable.Map[String, String] = {
+//    val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
+//    serde.describeSchemas.map {
+//      case (id, schema) => ((id.toString, schema.toString))
+//    }
+//  }
 
   def describeServices: scala.collection.immutable.Map[String, String] = {
     keyspaces.toMap.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }

@@ -19,11 +19,9 @@ class ZookeeperSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZo
   ))
   serde.register[SimpleKey]
   serde.register[SimpleRecord]
-  serde.register[Record_Current](v1schema)
-  serde.register[Record_Current]
-  serde.register[Record_Current](v3schema)
-
-  val List(_, _, _, _, _, _, _, _, _, _, backwardSchemaId, currentSchemaId, forwardSchemaId) = serde.initialize()
+  val backwardSchemaId = serde.register[Record_Current](v1schema)
+  val currentSchemaId = serde.register[Record_Current]
+  val forwardSchemaId = serde.register[Record_Current](v3schema)
 
   it should "work in a backward-compatibility scenario" in {
     val oldValue = Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.C)), 10)
@@ -42,9 +40,8 @@ class ZookeeperSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZo
 
   it should "reject incompatible schema registration" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-    serde.register[Record_Current](v4schema)
     val thrown = intercept[RuntimeException] {
-      serde.initialize()
+      serde.register[Record_Current](v4schema)
     }
     thrown.getMessage should include("validation error")
     thrown.getCause.isInstanceOf[SchemaValidationException] should be(true)

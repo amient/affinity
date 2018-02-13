@@ -1,37 +1,17 @@
-/*
- * Copyright 2016 Michal Harish, michal.harish@gmail.com
- *
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package io.amient.affinity.avro
 
 import java.io.Closeable
 import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.{Config, ConfigFactory}
+import io.amient.affinity.avro.MemorySchemaRegistry.MemorySchemaRegistryConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.CfgStruct
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
+import org.apache.avro.{Schema, SchemaValidator, SchemaValidatorBuilder}
 
 import scala.collection.JavaConversions._
-import scala.collection.immutable.Seq
 import scala.collection.mutable
-
 
 object MemorySchemaRegistry {
 
@@ -58,8 +38,10 @@ object MemorySchemaRegistry {
   }
 
   class Universe extends Closeable {
+    val validator: SchemaValidator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
     val schemas = new ConcurrentHashMap[Int, Schema]()
     val subjects = new ConcurrentHashMap[String, List[Int]]()
+
     def getOrRegister(schema: Schema): Int = synchronized {
       schemas.find(_._2 == schema) match {
         case None =>
@@ -69,8 +51,10 @@ object MemorySchemaRegistry {
         case Some((id, _)) => id
       }
     }
+
     def updateSubject(subject: String, schemaId: Int): Unit = synchronized {
       val existing = Option(subjects.get(subject)).getOrElse(List())
+      validator.validate(schemas(schemaId), existing.map(id => schemas(id)))
       if (!existing.contains(schemaId)) subjects.put(subject, (existing :+ schemaId))
     }
 
@@ -79,37 +63,34 @@ object MemorySchemaRegistry {
       subjects.clear()
     }
   }
+
 }
 
-class MemorySchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
+class MemorySchemaRegistry(universe: MemorySchemaRegistry.Universe) extends AvroSerde with AvroSchemaRegistry {
+
+  def this(conf: MemorySchemaRegistryConf) = this(MemorySchemaRegistry.createUniverse(if (conf.ID.isDefined) Some(conf.ID()) else None))
+
+  def this(config: Config) = this(MemorySchemaRegistry.Conf(config))
 
   def this() = this(ConfigFactory.empty)
 
-  val conf = MemorySchemaRegistry.Conf(config)
+  /**
+    * @param id
+    * @return schema
+    */
+  override protected def loadSchema(id: Int): Schema = universe.schemas.get(id)
 
-  val universe = if (conf.ID.isDefined) {
-    MemorySchemaRegistry.createUniverse(Some(conf.ID()))
-  } else {
-    MemorySchemaRegistry.createUniverse()
+  /**
+    *
+    * @param subject
+    * @param schema
+    * @return
+    */
+  override protected def registerSchema(subject: String, schema: Schema): Int = {
+    val id = universe.getOrRegister(schema)
+    universe.updateSubject(subject, id)
+    id
   }
 
-  private val validator = new SchemaValidatorBuilder().canReadStrategy().validateLatest()
-
-  override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
-    validator.validate(schema, existing)
-    val schemaId: Int = universe.getOrRegister(schema)
-    universe.updateSubject(subject, schemaId)
-    schemaId
-  }
-
-  override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
-    universe.subjects.flatMap {
-      case (subject: String, ids: Seq[Int]) => ids.map {
-        case id => (id, subject, universe.schemas.get(id))
-      }
-    }.toList
-  }
-
-  override private[avro] def hypersynchronized[X](f: => X): X = synchronized(f)
-
+  override def close() = universe.close()
 }

@@ -21,9 +21,9 @@ package io.amient.affinity.avro.record
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
+import java.util.function.Supplier
 
-import io.amient.affinity.avro.util.ThreadLocalCache
-import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.core.util.{ByteUtils, ThreadLocalCache}
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
@@ -36,8 +36,8 @@ import org.codehaus.jackson.annotate.JsonIgnore
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
-import scala.reflect.runtime.{universe, _}
 import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{universe, _}
 
 final class Alias(aliases: String*) extends StaticAnnotation
 
@@ -109,6 +109,9 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
+  implicit def closureToSupplier[V](closure: => V) = new Supplier[V] {
+    override def get() = closure
+  }
 
   private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
     def getOrInitialize(fqn: String): universe.Mirror = {
@@ -173,39 +176,46 @@ object AvroRecord extends AvroExtractors {
   }
 
   private object iterableCache extends ThreadLocalCache[Type, (Iterable[Any]) => Iterable[Any]] {
-    def getOrInitialize(tpe: Type): (Iterable[Any]) => Iterable[Any] = getOrInitialize(tpe, {
-      if (tpe <:< typeOf[Set[_]]) {
-        (iterable) => iterable.toSet
-      } else if (tpe <:< typeOf[List[Any]]) {
-        (iterable) => iterable.toList
-      } else if (tpe <:< typeOf[Vector[Any]]) {
-        (iterable) => iterable.toVector
-      } else if (tpe <:< typeOf[IndexedSeq[Any]]) {
-        (iterable) => iterable.toIndexedSeq
-      } else if (tpe <:< typeOf[Seq[Any]]) {
-        (iterable) => iterable.toSeq
-      } else {
-        (iterable) => iterable
-      }
-    })
+    def getOrInitialize(tpe: Type): (Iterable[Any]) => Iterable[Any] = {
+      getOrInitialize(tpe, new Supplier[(Iterable[Any]) => Iterable[Any]] {
+        override def get() = {
+          if (tpe <:< typeOf[Set[_]]) {
+            (iterable) => iterable.toSet
+          } else if (tpe <:< typeOf[List[Any]]) {
+            (iterable) => iterable.toList
+          } else if (tpe <:< typeOf[Vector[Any]]) {
+            (iterable) => iterable.toVector
+          } else if (tpe <:< typeOf[IndexedSeq[Any]]) {
+            (iterable) => iterable.toIndexedSeq
+          } else if (tpe <:< typeOf[Seq[Any]]) {
+            (iterable) => iterable.toSeq
+          } else {
+            (iterable) => iterable
+          }
+        }
+      })
+    }
   }
 
   private object unionCache extends ThreadLocalCache[Type, (Any, Schema) => Any] {
-    def getOrInitialize(tpe: Type): (Any, Schema) => Any = getOrInitialize(tpe, {
-      if (tpe <:< typeOf[Option[Any]]) {
-        (datum, schema) =>
-          datum match {
-            case null => None
-            case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
-          }
-      } else {
-        (_, _) => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $tpe")
+    def getOrInitialize(tpe: Type): (Any, Schema) => Any = getOrInitialize(tpe, new Supplier[(Any, Schema) => Any] {
+      override def get() = {
+        if (tpe <:< typeOf[Option[Any]]) {
+          (datum, schema) =>
+            datum match {
+              case null => None
+              case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
+            }
+        } else {
+          (_, _) => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $tpe")
+        }
       }
     })
   }
 
   /**
     * Read avro value, e.g. GenericRecord or primitive into scala case class or scala primitive
+    *
     * @param record
     * @param schema
     * @return
