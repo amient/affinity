@@ -20,9 +20,10 @@
 package io.amient.affinity.avro
 
 import java.io.Closeable
+import java.util.function.Supplier
 
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.avro.util.ThreadLocalCache
+import io.amient.affinity.core.util.ThreadLocalCache
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 
 import scala.reflect.runtime.universe._
@@ -114,24 +115,32 @@ trait AvroSchemaRegistry extends Closeable {
   protected def registerSchema(subject: String, schema: Schema): Int
 
   private object Schemas extends ThreadLocalCache[Int, Schema] {
-    def getOrInitialize(id: Int): Schema = getOrInitialize(id, {
-      loadSchema(id)
+    def getOrInitialize(id: Int): Schema = getOrInitialize(id, new Supplier[Schema] {
+      override def get(): Schema = loadSchema(id)
     })
   }
 
   private object Versions extends ThreadLocalCache[(String, Schema), Int] {
-    def getOrInitialize(subject: String, schema: Schema): Int = getOrInitialize((subject, schema), {
-      val sid = registerSchema(subject, schema)
-      Schemas.initialize(sid, schema)
-      sid
-    })
+    def getOrInitialize(subject: String, schema: Schema): Int = {
+      getOrInitialize((subject, schema), new Supplier[Int] {
+        override def get(): Int = {
+          val sid = registerSchema(subject, schema)
+          Schemas.initialize(sid, schema)
+          sid
+        }
+      })
+    }
   }
 
   private object FQNs extends ThreadLocalCache[String, (Int, Schema)] {
-    def getOrInitialize(fqn: String): (Int, Schema) = getOrInitialize(fqn, {
-      val schema = AvroRecord.inferSchema(fqn)
-      (Versions.getOrInitialize(schema.getFullName, schema), schema)
-    })
+    def getOrInitialize(fqn: String): (Int, Schema) = {
+      getOrInitialize(fqn, new Supplier[(Int, Schema)] {
+        override def get(): (Int, Schema) = {
+          val schema = AvroRecord.inferSchema(fqn)
+          (Versions.getOrInitialize(schema.getFullName, schema), schema)
+        }
+      })
+    }
   }
 
 
