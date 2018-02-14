@@ -137,15 +137,25 @@ See [Avro Module](/avro) for more details and examples
 
 ## Distributed coordination
 
+![Coordination](doc/Affinity_Coordination.jpg)
+
 Akka Cluster that comes with Akka is not used, instead a custom cluster
 management is implemented using a coordinator that allows for dynamic participation
-by multiple actor systems
+by multiple actor systems.
 
-Each Keyspace manages a  set of Partition actors. Keyspace has a precisely
-defined number of partitions but each partition can be served by multiple
-instances, typically on different nodes, at the same time. If there are multiple
-Partition Actors for the same physical partition Coordinator uses distributed
+Keyspace has a precisely defined number of partitions but each partition can be served by multiple
+instances, typically on different nodes. Each Keyspace Actor holds references to all Partition
+master actors. These references are updated dynamically by the Coordinator object which
+listens on ZooKeeper namespace where partitions are registered by their Containers.
+
+If multiple Partitions Actors register for the same physical partition, the Coordinator uses distributed
 logic to choose one of them as master and the others become standby.
+
+If any of the partitions hasn't been registered in the ZooKeeper the Keyspace puts the Gateway into a
+suspended mode until all partitions are online and registered. When all Keyspaces have all partitions
+registered as online, the Gateway is Resumed. Suspension and Resumption events affect the input
+traffic of the Gateway - input streams are paused and resumed and http traffic is put on hold for
+a configured timeout.
 
 On becoming a Master, the Partition Actor stops consuming (tailing) the the
 underlying topic, because the master receives all the writes, its in-memory
@@ -239,6 +249,7 @@ from the HOCON conf files. These type-safe configuration descriptors handle vali
 enforcement of requirements and messaging around invalid settings.
 
 TODO ..
+
 
 # Development 
 
