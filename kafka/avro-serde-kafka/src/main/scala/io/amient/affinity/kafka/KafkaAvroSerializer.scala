@@ -20,7 +20,7 @@ class KafkaAvroSerializer extends Serializer[Any] {
   override def serialize(topic: String, data: Any): Array[Byte] = {
     require(serde != null, "AvroSerde not configured")
     val subject = s"$topic-${if (isKey) "key" else "value"}"
-    val (objSchema, schemaId) = serde.getOrRegisterSchema(data, subject)
+    val (schemaId, objSchema) = serde.from(data, subject)
     serde.write(data, objSchema, schemaId)
   }
 

@@ -84,7 +84,6 @@ class KafkaAvroSpec extends FlatSpec with Suite
     object TestRegistry extends ConfluentSchemaRegistry(ConfigFactory.defaultReference
       .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))) {
       register[TestRecord]
-      initialize()
     }
 
     val topic = "test"
@@ -96,7 +95,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
       new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
-    ).mapValues(_.toString.asInstanceOf[AnyRef]))
+    ).mapValues(_.asInstanceOf[AnyRef]))
 
     val updates = for (i <- (1 to 10)) yield {
       producer.send(new ProducerRecord[Int, TestRecord](

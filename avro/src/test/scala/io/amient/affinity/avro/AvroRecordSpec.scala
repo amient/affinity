@@ -1,6 +1,6 @@
 package io.amient.affinity.avro
 
-import io.amient.affinity.avro.record.{Alias, AvroJsonConverter, AvroRecord}
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
@@ -18,7 +18,6 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     register[Record_V1] //Data version 1 is current from the point of view of oldSerde
     register[Record_V1](recordV2Schema) //"future" version of the Record is registered
     register[SimpleRecord]
-    initialize()
   }
 
   /**
@@ -30,7 +29,6 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     register[Record_Current](recordV1Schema) //in new serde, v1 is the previous version
     register[Record_Current] // current version the current compile-time version of the Record
     register[SimpleRecord]
-    initialize()
   }
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
@@ -131,9 +129,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "In-memory shema registry" should "reject backward-incompatible schema" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-    newSerde.register[Record_Current](v4schema)
-    an[SchemaValidationException] should be thrownBy (newSerde.initialize())
-
+    an[SchemaValidationException] should be thrownBy (newSerde.register[Record_Current](v4schema))
   }
 
   "AvroRecord" should "use old fields when Alias annotation is used" in {
@@ -156,10 +152,10 @@ class AvroRecordSpec extends FlatSpec with Matchers {
       val now = System.currentTimeMillis()
       if (now - r > 5000) {
         r = now
-        log.info(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+        println(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
       }
     }
-    log.info(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+    println(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
 
   }
 

@@ -21,9 +21,9 @@ package io.amient.affinity.avro.record
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
-import java.util
+import java.util.function.Supplier
 
-import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.core.util.{ByteUtils, ThreadLocalCache}
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
@@ -36,9 +36,8 @@ import org.codehaus.jackson.annotate.JsonIgnore
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
-import scala.reflect.runtime._
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{universe, _}
 
 final class Alias(aliases: String*) extends StaticAnnotation
 
@@ -110,118 +109,125 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-
-  class LocalCache[K, I] extends ThreadLocal[java.util.HashMap[K, I]] {
-    override def initialValue() = new util.HashMap[K, I]()
-
-    def getOrInitialize(key: K, initializer: => I) = {
-      get().get(key) match {
-        case null =>
-          val init = initializer
-          get().put(key, init)
-          init
-        case some =>
-          some
-      }
-    }
-  }
-
-  private object fqnMirrorCache extends LocalCache[String, universe.Mirror] {
+  private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
     def getOrInitialize(fqn: String): universe.Mirror = {
-      getOrInitialize(fqn, runtimeMirror(Class.forName(fqn).getClassLoader))
+      getOrInitialize(fqn, new Supplier[Mirror] {
+        override def get(): Mirror = runtimeMirror(Class.forName(fqn).getClassLoader)
+      })
     }
   }
 
-  private object fqnTypeCache extends LocalCache[String, Type] {
+  private object fqnTypeCache extends ThreadLocalCache[String, Type] {
     def getOrInitialize(fqn: String): Type = {
-      getOrInitialize(fqn, fqnMirrorCache.getOrInitialize(fqn).staticClass(fqn).selfType)
+      getOrInitialize(fqn, new Supplier[Type] {
+        override def get(): Type = fqnMirrorCache.getOrInitialize(fqn).staticClass(fqn).selfType
+      })
     }
   }
 
-  private object fqnClassMirrorCache extends LocalCache[String, ClassMirror] {
-    def getOrInitialize(fqn: String): ClassMirror = getOrInitialize(fqn, {
-      val typeMirror = universe.runtimeMirror(Class.forName(fqn).getClassLoader)
-      val tpe = fqnTypeCache.getOrInitialize(fqn)
-      typeMirror.reflectClass(tpe.typeSymbol.asClass)
-    })
-  }
-
-  private object classFieldsCache extends LocalCache[Class[_], Map[Int, Field]] {
-    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field] = getOrInitialize(cls, {
-      val schemaFields = schema.getFields
-      val params: Array[Parameter] = cls.getConstructors()(0).getParameters
-      require(params.length == schemaFields.size,
-        s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
-
-      val declaredFields = cls.getDeclaredFields
-      val fields: Map[Int, Field] = params.zipWithIndex.map { case (param, pos) => {
-        val field = declaredFields(pos)
-        require(param.getType == field.getType,
-          s"field `${field.getType}` at position $pos doesn't match expected `$param`")
-        field.setAccessible(true)
-        pos -> field
-      }
-      }.toMap
-      fields
-    })
-  }
-
-  private object fqnConstructorCache extends LocalCache[String, (Seq[Type], MethodMirror)] {
-    def getOrInitialize(fqn: String): (Seq[Type], MethodMirror) = getOrInitialize(fqn, {
-      val tpe = fqnTypeCache.getOrInitialize(fqn)
-      val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
-      val params = constructor.paramLists(0).map(_.typeSignature)
-      val classMirror = fqnClassMirrorCache.getOrInitialize(fqn)
-      val constructorMirror: MethodMirror = classMirror.reflectConstructor(constructor)
-      (params, constructorMirror)
-    })
-  }
-
-  private object enumCache extends LocalCache[Type, MethodMirror] {
-    def getOrInitialize(tpe: Type): MethodMirror = getOrInitialize(tpe, {
-      tpe match {
-        case TypeRef(enumType, _, _) =>
-          val moduleMirror = currentMirror.reflectModule(enumType.termSymbol.asModule)
-          val instanceMirror = currentMirror.reflect(moduleMirror.instance)
-          instanceMirror.reflectMethod(enumType.member(TermName("withName")).asMethod)
+  private object fqnClassMirrorCache extends ThreadLocalCache[String, ClassMirror] {
+    def getOrInitialize(fqn: String): ClassMirror = getOrInitialize(fqn, new Supplier[ClassMirror] {
+      override def get(): ClassMirror = {
+        val typeMirror = universe.runtimeMirror(Class.forName(fqn).getClassLoader)
+        val tpe = fqnTypeCache.getOrInitialize(fqn)
+        typeMirror.reflectClass(tpe.typeSymbol.asClass)
       }
     })
   }
 
-  private object iterableCache extends LocalCache[Type, (Iterable[Any]) => Iterable[Any]] {
-    def getOrInitialize(tpe: Type): (Iterable[Any]) => Iterable[Any] = getOrInitialize(tpe, {
-      if (tpe <:< typeOf[Set[_]]) {
-        (iterable) => iterable.toSet
-      } else if (tpe <:< typeOf[List[Any]]) {
-        (iterable) => iterable.toList
-      } else if (tpe <:< typeOf[Vector[Any]]) {
-        (iterable) => iterable.toVector
-      } else if (tpe <:< typeOf[IndexedSeq[Any]]) {
-        (iterable) => iterable.toIndexedSeq
-      } else if (tpe <:< typeOf[Seq[Any]]) {
-        (iterable) => iterable.toSeq
-      } else {
-        (iterable) => iterable
+  private object classFieldsCache extends ThreadLocalCache[Class[_], Map[Int, Field]] {
+    def getOrInitialize(cls: Class[_], schema: Schema): Map[Int, Field] = getOrInitialize(cls, new Supplier[Map[Int, Field]] {
+      override def get(): Map[Int, Field] = {
+        val schemaFields = schema.getFields
+        val params: Array[Parameter] = cls.getConstructors()(0).getParameters
+        require(params.length == schemaFields.size,
+          s"number of constructor arguments (${params.length}) is not equal to schema field count (${schemaFields.size})")
+
+        val declaredFields = cls.getDeclaredFields
+        val fields: Map[Int, Field] = params.zipWithIndex.map { case (param, pos) => {
+          val field = declaredFields(pos)
+          require(param.getType == field.getType,
+            s"field `${field.getType}` at position $pos doesn't match expected `$param`")
+          field.setAccessible(true)
+          pos -> field
+        }
+        }.toMap
+        fields
       }
     })
   }
 
-  private object unionCache extends LocalCache[Type, (Any, Schema) => Any] {
-    def getOrInitialize(tpe: Type): (Any, Schema) => Any = getOrInitialize(tpe, {
-      if (tpe <:< typeOf[Option[Any]]) {
-        (datum, schema) =>
-          datum match {
-            case null => None
-            case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
+  private object fqnConstructorCache extends ThreadLocalCache[String, (Seq[Type], MethodMirror)] {
+    def getOrInitialize(fqn: String): (Seq[Type], MethodMirror) = {
+      getOrInitialize(fqn, new Supplier[(Seq[Type], MethodMirror)] {
+        override def get(): (Seq[Type], MethodMirror) = {
+          val tpe = fqnTypeCache.getOrInitialize(fqn)
+          val constructor = tpe.decl(universe.termNames.CONSTRUCTOR).asMethod
+          val params = constructor.paramLists(0).map(_.typeSignature)
+          val classMirror = fqnClassMirrorCache.getOrInitialize(fqn)
+          val constructorMirror: MethodMirror = classMirror.reflectConstructor(constructor)
+          (params, constructorMirror)
+        }
+      })
+    }
+  }
+
+  private object enumCache extends ThreadLocalCache[Type, MethodMirror] {
+    def getOrInitialize(tpe: Type): MethodMirror = getOrInitialize(tpe, new Supplier[MethodMirror] {
+      override def get(): MethodMirror = {
+        tpe match {
+          case TypeRef(enumType, _, _) =>
+            val moduleMirror = currentMirror.reflectModule(enumType.termSymbol.asModule)
+            val instanceMirror = currentMirror.reflect(moduleMirror.instance)
+            instanceMirror.reflectMethod(enumType.member(TermName("withName")).asMethod)
+        }
+      }
+    })
+  }
+
+  private object iterableCache extends ThreadLocalCache[Type, (Iterable[Any]) => Iterable[Any]] {
+    def getOrInitialize(tpe: Type): (Iterable[Any]) => Iterable[Any] = {
+      getOrInitialize(tpe, new Supplier[Iterable[Any] => Iterable[Any]] {
+        override def get(): Iterable[Any] => Iterable[Any] = {
+          if (tpe <:< typeOf[Set[_]]) {
+            (iterable) => iterable.toSet
+          } else if (tpe <:< typeOf[List[Any]]) {
+            (iterable) => iterable.toList
+          } else if (tpe <:< typeOf[Vector[Any]]) {
+            (iterable) => iterable.toVector
+          } else if (tpe <:< typeOf[IndexedSeq[Any]]) {
+            (iterable) => iterable.toIndexedSeq
+          } else if (tpe <:< typeOf[Seq[Any]]) {
+            (iterable) => iterable.toSeq
+          } else {
+            (iterable) => iterable
           }
-      } else {
-        (_, _) => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $tpe")
-      }
-    })
+        }
+      })
+    }
+  }
+
+  private object unionCache extends ThreadLocalCache[Type, (Any, Schema) => Any] {
+    def getOrInitialize(tpe: Type): (Any, Schema) => Any = {
+      getOrInitialize(tpe, new Supplier[(Any, Schema) => Any] {
+        override def get(): (Any, Schema) => Any = {
+          if (tpe <:< typeOf[Option[Any]]) {
+            (datum, schema) =>
+              datum match {
+                case null => None
+                case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
+              }
+          } else {
+            (_, _) => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $tpe")
+          }
+        }
+      })
+    }
   }
 
   /**
     * Read avro value, e.g. GenericRecord or primitive into scala case class or scala primitive
+    *
     * @param record
     * @param schema
     * @return
@@ -279,9 +285,7 @@ object AvroRecord extends AvroExtractors {
 
   def inferSchema[T: TypeTag]: Schema = inferSchema(typeOf[T])
 
-  def inferSchema(cls: Class[_]): Schema = {
-    inferSchema(classTypeCache.getOrInitialize(cls, fqnTypeCache.getOrInitialize(cls.getName)))
-  }
+  def inferSchema(cls: Class[_]): Schema = inferSchema(cls.getName)
 
   def inferSchema(fqn: String): Schema = {
     fqn match {
@@ -316,70 +320,72 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-  private object classTypeCache extends LocalCache[Class[_], Type]()
+  private object classTypeCache extends ThreadLocalCache[Class[_], Type]()
 
-  private object typeSchemaCache extends LocalCache[Type, Schema]()
+  private object typeSchemaCache extends ThreadLocalCache[Type, Schema]()
 
   def inferSchema(tpe: Type): Schema = {
-    typeSchemaCache.getOrInitialize(tpe, {
-      if (tpe =:= definitions.IntTpe) {
-        SchemaBuilder.builder().intType()
-      } else if (tpe =:= definitions.LongTpe) {
-        SchemaBuilder.builder().longType()
-      } else if (tpe =:= definitions.BooleanTpe) {
-        SchemaBuilder.builder().booleanType()
-      } else if (tpe =:= definitions.FloatTpe) {
-        SchemaBuilder.builder().floatType()
-      } else if (tpe =:= definitions.DoubleTpe) {
-        SchemaBuilder.builder().doubleType()
-      } else if (tpe =:= typeOf[Array[Byte]]) {
-        SchemaBuilder.builder().bytesType()
-      } else if (tpe =:= typeOf[String]) {
-        SchemaBuilder.builder().stringType()
-      } else if (tpe =:= typeOf[Null]) {
-        SchemaBuilder.builder().nullType()
-      } else if (tpe <:< typeOf[Map[String, Any]]) {
-        SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
-      } else if (tpe <:< typeOf[Iterable[Any]]) {
-        SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
-      } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
-        tpe match {
-          case TypeRef(enumType, _, _) =>
-            val typeMirror = universe.runtimeMirror(Class.forName(enumType.typeSymbol.asClass.fullName).getClassLoader)
-            val moduleMirror = typeMirror.reflectModule(enumType.termSymbol.asModule)
-            val instanceMirror = typeMirror.reflect(moduleMirror.instance)
-            val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
-            val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
-            val args = enumSymbols.toSeq.map(_.toString)
-            SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
+    typeSchemaCache.getOrInitialize(tpe, new Supplier[Schema] {
+      override def get(): Schema = {
+        if (tpe =:= definitions.IntTpe) {
+          SchemaBuilder.builder().intType()
+        } else if (tpe =:= definitions.LongTpe) {
+          SchemaBuilder.builder().longType()
+        } else if (tpe =:= definitions.BooleanTpe) {
+          SchemaBuilder.builder().booleanType()
+        } else if (tpe =:= definitions.FloatTpe) {
+          SchemaBuilder.builder().floatType()
+        } else if (tpe =:= definitions.DoubleTpe) {
+          SchemaBuilder.builder().doubleType()
+        } else if (tpe =:= typeOf[Array[Byte]]) {
+          SchemaBuilder.builder().bytesType()
+        } else if (tpe =:= typeOf[String]) {
+          SchemaBuilder.builder().stringType()
+        } else if (tpe =:= typeOf[Null]) {
+          SchemaBuilder.builder().nullType()
+        } else if (tpe <:< typeOf[Map[String, Any]]) {
+          SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
+        } else if (tpe <:< typeOf[Iterable[Any]]) {
+          SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
+        } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
+          tpe match {
+            case TypeRef(enumType, _, _) =>
+              val typeMirror = universe.runtimeMirror(Class.forName(enumType.typeSymbol.asClass.fullName).getClassLoader)
+              val moduleMirror = typeMirror.reflectModule(enumType.termSymbol.asModule)
+              val instanceMirror = typeMirror.reflect(moduleMirror.instance)
+              val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
+              val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
+              val args = enumSymbols.toSeq.map(_.toString)
+              SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
+          }
+        } else if (tpe <:< typeOf[Option[Any]]) {
+          SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
+        } else if (tpe <:< typeOf[AvroRecord]) {
+          val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
+          val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
+          val companionMirror = typeMirror.reflect(moduleMirror.instance)
+          val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
+          val params = constructor.asMethod.paramLists(0)
+          val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
+            case (assembler, (symbol, i)) =>
+              val fieldSchema = inferSchema(symbol.typeSignature)
+              val builder = assembler.name(symbol.name.toString)
+              symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
+                a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
+              }
+              val field = builder.`type`(fieldSchema)
+              val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
+              if (defaultDef == NoSymbol) {
+                field.noDefault()
+              } else {
+                val defaultGetter = companionMirror.reflectMethod(defaultDef.asMethod)
+                field.withDefault(deriveValue(fieldSchema, defaultGetter()))
+              }
+          }
+          assembler.endRecord()
+        } else {
+          throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
         }
-      } else if (tpe <:< typeOf[Option[Any]]) {
-        SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
-      } else if (tpe <:< typeOf[AvroRecord]) {
-        val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
-        val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
-        val companionMirror = typeMirror.reflect(moduleMirror.instance)
-        val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
-        val params = constructor.asMethod.paramLists(0)
-        val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
-          case (assembler, (symbol, i)) =>
-            val fieldSchema = inferSchema(symbol.typeSignature)
-            val builder = assembler.name(symbol.name.toString)
-            symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
-              a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
-            }
-            val field = builder.`type`(fieldSchema)
-            val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
-            if (defaultDef == NoSymbol) {
-              field.noDefault()
-            } else {
-              val defaultGetter = companionMirror.reflectMethod(defaultDef.asMethod)
-              field.withDefault(deriveValue(fieldSchema, defaultGetter()))
-            }
-        }
-        assembler.endRecord()
-      } else {
-        throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
       }
     })
   }

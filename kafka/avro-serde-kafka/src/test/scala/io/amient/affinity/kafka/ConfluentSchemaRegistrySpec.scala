@@ -42,11 +42,9 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCf
   serde.register[SimpleRecord]
   val v1schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"removed\",\"type\":\"int\",\"default\":0}]}")
   serde.register[CompositeRecord](v1schema)
-  serde.initialize()
 
   it should "allow compatible version of previously registered schema" in {
-    serde.register[CompositeRecord]
-    serde.initialize() should be(List(12))
+    serde.register[CompositeRecord] should be(12)
   }
 
   it should "reject incompatible schema registration" in {
@@ -54,7 +52,6 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCf
     val thrown = intercept[RuntimeException]{
       val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.kafka\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
       serde.register[CompositeRecord](v3schema)
-      serde.initialize()
     }
     thrown.getMessage should include("incompatible")
 
@@ -63,19 +60,12 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCf
   it should "registerd topic subject when fqn subject is already registered" in {
     val data = SimpleRecord()
     //fqn should be already registered
-    serde.getCurrentSchema(classOf[SimpleRecord].getName) should be(Some((10, data.getSchema)))
+    serde.getRuntimeSchema(classOf[SimpleRecord].getName) should be((10, data.getSchema))
     //now simulate what KafkaAvroSerde would do
-    val (objSchema, schemaId) = try {
-      serde.getOrRegisterSchema(data, "topic-simple")
-    } catch {
-      case e: RuntimeException =>
-        e.printStackTrace()
-        fail("could not register schema with topic-simple")
-    }
+    val (schemaId, objSchema) = serde.from(data, "topic-simple")
     schemaId should be(10)
     objSchema should be(data.getSchema)
     //and check the additional subject was registered with the same schema
-    val versions = serde.getVersions("topic-simple")
-    versions should be (Some(Map(10 -> data.getSchema)))
+    serde.register("topic-simple", data.getSchema) should be(10)
   }
 }

@@ -1,35 +1,17 @@
-/*
- * Copyright 2016 Michal Harish, michal.harish@gmail.com
- *
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package io.amient.affinity.avro
 
-import java.nio.file._
-import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.Files
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
-import org.apache.avro.{Schema, SchemaValidationException, SchemaValidatorBuilder}
+import org.apache.avro.Schema
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
+import scala.io.Source
+
 
 object LocalSchemaRegistry {
 
@@ -47,32 +29,51 @@ object LocalSchemaRegistry {
 
 }
 
-class LocalSchemaRegistry(config: Config) extends AvroSerde {
+
+class LocalSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
+
   val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
   val conf = new LocalAvroConf().apply(merged)
   val dataPath = conf.DataPath()
 
-  private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
-
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
 
-  override def close(): Unit = ()
+  override def close() = ()
 
-  override private[avro] def registerSchema(subject: String, schema: Schema, existing: List[Schema]): Int = synchronized {
-    try {
-      validator.validate(schema, existing)
-    } catch {
-      case e: SchemaValidationException =>
-        throw new RuntimeException(s"subject: $subject, schema: ${schema.getFullName} validation error", e)
-    }
-    val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
-    val schemaPath = dataPath.resolve(s"$id.avsc")
-    Files.createFile(schemaPath)
-    Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
-    id
+  /**
+    * @param id
+    * @return schema
+    */
+  override protected def loadSchema(id: Int): Schema = {
+    new Schema.Parser().parse(dataPath.resolve(s"$id.avsc").toFile)
   }
 
-  override private[avro] def hypersynchronized[X](f: => X) = synchronized {
+  /**
+    *
+    * @param subject
+    * @param schema
+    * @return
+    */
+  override protected def registerSchema(subject: String, schema: Schema): Int = hypersynchronized {
+    val s = dataPath.resolve(s"$subject.dat")
+    val versions: Map[Schema, Int] = if (Files.exists(s)) {
+      Source.fromFile(s.toFile).mkString.split(",").toList.map(_.toInt).map {
+        case id => getSchema(id) -> id
+      }.toMap
+    } else {
+      Map.empty
+    }
+    versions.get(schema).getOrElse {
+      validator.validate(schema, versions.map(_._1).asJava)
+      val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
+      val schemaPath = dataPath.resolve(s"$id.avsc")
+      Files.createFile(schemaPath)
+      Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
+      id
+    }
+  }
+
+  private def hypersynchronized[X](func: => X) = synchronized {
     val file = dataPath.resolve(".lock").toFile
 
     def getLock(countDown: Int = 30): Unit = {
@@ -84,26 +85,10 @@ class LocalSchemaRegistry(config: Config) extends AvroSerde {
 
     getLock()
     try {
-      f
+      func
     } finally {
       file.delete()
     }
   }
 
-
-  override private[avro] def getAllRegistered: List[(Int, String, Schema)] = {
-    val builder = List.newBuilder[(Int, String, Schema)]
-    Files.walkFileTree(dataPath, new SimpleFileVisitor[Path]() {
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        val filename = file.getFileName.toString
-        if (filename.matches("^[0-9]+\\.avsc$")) {
-          val id = filename.split("\\.")(0).toInt
-          val schema = new Schema.Parser().parse(file.toFile)
-          builder += ((id, schema.getFullName, schema))
-        }
-        super.visitFile(file, attrs)
-      }
-    })
-    builder.result()
-  }
 }

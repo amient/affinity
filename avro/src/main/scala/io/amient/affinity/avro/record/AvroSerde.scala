@@ -30,7 +30,7 @@ import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema
-import org.apache.avro.generic.{GenericDatumReader, GenericRecord, IndexedRecord}
+import org.apache.avro.generic.{GenericDatumReader, IndexedRecord}
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory}
 import org.apache.avro.util.ByteBufferInputStream
 
@@ -51,9 +51,10 @@ object AvroSerde {
   object Conf extends AvroConf {
     override def apply(config: Config): AvroConf = new AvroConf().apply(config)
   }
-  
+
   class AvroConf extends CfgStruct[AvroConf] {
     val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], true)
+
     override protected def specializations(): util.Set[String] = {
       Set("schema.registry")
     }
@@ -63,13 +64,11 @@ object AvroSerde {
 
   def create(conf: AvroConf): AvroSerde = {
     val registryClass: Class[_ <: AvroSerde] = conf.Class()
-    val instance = try {
+    try {
       registryClass.getConstructor(classOf[Config]).newInstance(conf.config())
     } catch {
       case _: NoSuchMethodException => registryClass.newInstance()
     }
-    instance.initialize()
-    instance
   }
 }
 
@@ -79,6 +78,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
 
   /**
     * Deserialize bytes to a concrete instance
+    *
     * @param bytes
     * @return AvroRecord for registered Type
     *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
@@ -93,29 +93,9 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
   override def toBytes(obj: Any): Array[Byte] = {
     if (obj == null) null
     else {
-      val (s, schemaId) = getOrRegisterSchema(obj)
-      write(obj, s, schemaId)
+      val (schemaId, schema) = from(obj)
+      write(obj, schema, schemaId)
     }
-  }
-
-  def getOrRegisterSchema(data: Any, subjectOption: String = null): (Schema, Int) = {
-    val schema = AvroRecord.inferSchema(data)
-    val subject = Option(subjectOption).getOrElse(schema.getFullName)
-    val schemaId = getCurrentSchema(schema.getFullName) match {
-      case Some((schemaId: Int, regSchema: Schema)) if regSchema == schema => schemaId
-      case _ =>
-        register(schema.getFullName, schema)
-        initialize()
-        getSchemaId(schema) match {
-          case None => throw new IllegalStateException(s"Failed to register schema for $subject")
-          case Some(id) => id
-        }
-    }
-    if (!getSchema(subject, schemaId).isDefined) {
-      register(subject, schema)
-      initialize()
-    }
-    (schema, schemaId)
   }
 
   def write(x: IndexedRecord, schemaId: Int): Array[Byte] = {
@@ -126,7 +106,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     require(schemaId >= 0)
     value match {
       case null => null
-      case record:AvroRecord if record._serializedInstanceBytes != null => record._serializedInstanceBytes
+      case record: AvroRecord if record._serializedInstanceBytes != null => record._serializedInstanceBytes
       case any: Any =>
         val valueOut = new ByteArrayOutputStream()
         try {
@@ -143,7 +123,6 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
   /**
     *
     * @param buf ByteBuffer version of the registered avro reader
-    *
     * @return AvroRecord for registered Type
     *         GenericRecord if no type is registered for the schema retrieved from the schemaRegistry
     *         null if bytes are null
@@ -160,7 +139,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     *         null if bytes are null
     */
   def read(bytes: Array[Byte]): Any = {
-    if (bytes == null) null else read(new ByteArrayInputStream(bytes))  match {
+    if (bytes == null) null else read(new ByteArrayInputStream(bytes)) match {
       case a: AvroRecord => a._serializedInstanceBytes = bytes; a
       case other => other
     }
@@ -179,21 +158,12 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     val schemaId = ByteUtils.readIntValue(bytesIn)
     require(schemaId >= 0)
     val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
-    schema(schemaId) match {
-      case None => throw new IllegalArgumentException(s"Schema $schemaId doesn't exist")
-      case Some(writerSchema) =>
-        getCurrentSchema(writerSchema.getFullName) match {
-          case None =>
-            //case classes are not present in this runtime, just use GenericRecord
-            val reader = new GenericDatumReader[GenericRecord](writerSchema, writerSchema)
-            reader.read(null, decoder)
-          case Some((_, readerSchema)) =>
-            //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
-            val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-            val record = reader.read(null, decoder)
-            AvroRecord.read(record, readerSchema)
-        }
-    }
+    val writerSchema = getSchema(schemaId)
+    val (_, readerSchema) = getRuntimeSchema(writerSchema)
+    //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
+    val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
+    val record = reader.read(null, decoder)
+    AvroRecord.read(record, readerSchema)
   }
 
 

@@ -81,13 +81,13 @@ object State {
       for (registry <- asAvroRegistry(keySerde)) {
         storage.keySubject match {
           case null =>
-          case some => registry.initialize[K](some)
+          case some => registry.register(implicitly[ClassTag[K]].runtimeClass, some)
         }
       }
       for (registry <- asAvroRegistry(valueSerde)) {
         storage.valueSubject match {
           case null =>
-          case some => registry.initialize[V](some)
+          case some => registry.register(implicitly[ClassTag[V]].runtimeClass, some)
         }
       }
     }
