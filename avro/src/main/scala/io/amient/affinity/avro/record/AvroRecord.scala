@@ -110,10 +110,6 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-  //  implicit def closureToSupplier[V](closure: => V) = new Supplier[V] {
-  //    override def get() = closure
-  //  }
-
   private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
     def getOrInitialize(fqn: String): universe.Mirror = {
       getOrInitialize(fqn, runtimeMirror(Class.forName(fqn).getClassLoader))
@@ -270,9 +266,7 @@ object AvroRecord extends AvroExtractors {
 
   def inferSchema[T: TypeTag]: Schema = inferSchema(typeOf[T])
 
-  def inferSchema(cls: Class[_]): Schema = {
-    inferSchema(classTypeCache.getOrInitialize(cls, fqnTypeCache.getOrInitialize(cls.getName)))
-  }
+  def inferSchema(cls: Class[_]): Schema = inferSchema(cls.getName)
 
   def inferSchema(fqn: String): Schema = {
     fqn match {

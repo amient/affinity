@@ -2,7 +2,6 @@ package io.amient.affinity.avro
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
-import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.kafka.EmbeddedZooKeeper
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
@@ -40,11 +39,9 @@ class ZookeeperSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZo
 
   it should "reject incompatible schema registration" in {
     val v4schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"data\",\"type\":\"string\"}]}")
-    val thrown = intercept[RuntimeException] {
+    an[SchemaValidationException] should be thrownBy {
       serde.register[Record_Current](v4schema)
     }
-    thrown.getMessage should include("validation error")
-    thrown.getCause.isInstanceOf[SchemaValidationException] should be(true)
   }
 
 }

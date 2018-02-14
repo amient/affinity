@@ -7,8 +7,9 @@ import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
+import org.apache.avro.Schema
 
+import scala.collection.JavaConverters._
 import scala.io.Source
 
 
@@ -34,8 +35,6 @@ class LocalSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegis
   val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
   val conf = new LocalAvroConf().apply(merged)
   val dataPath = conf.DataPath()
-
-  private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateLatest()
 
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
 
@@ -64,14 +63,13 @@ class LocalSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegis
     } else {
       Map.empty
     }
-    versions.get(schema) match {
-      case Some(id) => id
-      case None =>
-        val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
-        val schemaPath = dataPath.resolve(s"$id.avsc")
-        Files.createFile(schemaPath)
-        Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
-        id
+    versions.get(schema).getOrElse {
+      validator.validate(schema, versions.map(_._1).asJava)
+      val id = (0 until Int.MaxValue).find(i => !Files.exists(dataPath.resolve(s"$i.avsc"))).max
+      val schemaPath = dataPath.resolve(s"$id.avsc")
+      Files.createFile(schemaPath)
+      Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
+      id
     }
   }
 
