@@ -30,7 +30,7 @@ import scala.collection.JavaConversions._
 class BinaryCompactRDD(sc: SparkContext, streamBinder: => BinaryStream, range: TimeRange, compacted: Boolean)
   extends RDD[(ByteKey, BinaryRecord)](sc, Nil) {
 
-  val compactor = (m1: BinaryRecord, m2: BinaryRecord) => if (m1.timestamp > m2.timestamp) m1 else m2
+  val compactor = (m1: BinaryRecordAndOffset, m2: BinaryRecordAndOffset) => if (m1.offset > m2.offset) m1 else m2
 
   protected def getPartitions: Array[Partition] = {
     val stream = streamBinder
@@ -53,11 +53,11 @@ class BinaryCompactRDD(sc: SparkContext, streamBinder: => BinaryStream, range: T
 
     stream.scan(split.index, range)
 
-    val binaryRecords: Iterator[BinaryRecord] = stream.iterator()
-    val kvRecords: Iterator[(ByteKey, BinaryRecord)] = binaryRecords.map(record => (new ByteKey(record.key), record))
+    val binaryRecords: Iterator[BinaryRecordAndOffset] = stream.iterator()
+    val kvRecords: Iterator[(ByteKey, BinaryRecordAndOffset)] = binaryRecords.map(record => (new ByteKey(record.key), record))
 
-    val compactedRecords: Iterator[(ByteKey, BinaryRecord)] = if (!compacted) kvRecords else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, BinaryRecord, BinaryRecord]((v) => v, compactor, compactor)
+    val compactedRecords: Iterator[(ByteKey, BinaryRecordAndOffset)] = if (!compacted) kvRecords else {
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, BinaryRecordAndOffset, BinaryRecordAndOffset]((v) => v, compactor, compactor)
       spillMap.insertAll(kvRecords)
       spillMap.iterator
     }

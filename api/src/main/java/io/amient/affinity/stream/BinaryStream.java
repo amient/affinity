@@ -62,10 +62,10 @@ public interface BinaryStream extends Closeable {
 
     void flush();
 
-    default Iterator<BinaryRecord> iterator() {
-        return new Iterator<BinaryRecord>() {
+    default Iterator<BinaryRecordAndOffset> iterator() {
+        return new Iterator<BinaryRecordAndOffset>() {
 
-            private BinaryRecord record = null;
+            private BinaryRecordAndOffset record = null;
             private Iterator<BinaryRecordAndOffset> i = null;
 
             @Override
@@ -75,11 +75,11 @@ public interface BinaryStream extends Closeable {
             }
 
             @Override
-            public BinaryRecord next() {
+            public BinaryRecordAndOffset next() {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 } else {
-                    BinaryRecord result = record;
+                    BinaryRecordAndOffset result = record;
                     seek();
                     return result;
                 }
