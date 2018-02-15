@@ -1,8 +1,6 @@
 package io.amient.affinity.stream;
 
 import com.typesafe.config.Config;
-import io.amient.affinity.core.Murmur2Partitioner;
-import io.amient.affinity.core.Partitioner;
 import io.amient.affinity.core.storage.Storage;
 import io.amient.affinity.core.util.TimeRange;
 
@@ -10,6 +8,7 @@ import java.io.Closeable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.concurrent.Future;
 
 /**
  * BinaryStream represents any stream of data which consists of binary key-value pairs.
@@ -39,25 +38,27 @@ public interface BinaryStream extends Closeable {
         return bindClass().getConstructor(Storage.StorageConf.class).newInstance(conf);
     }
 
-    default Partitioner getDefaultPartitioner()  {
-        return new Murmur2Partitioner();
-    }
-
     int getNumPartitions();
 
     void subscribe(long minTimestamp);
 
     void scan(int partition, TimeRange range);
 
+    void seek(int partition, long startOffset);
+
+    String keySubject();
+
+    String valueSubject();
+
     /**
      *
      * @return iterator of records which may be empty, or null if the maximum offset was reached
      */
-    Iterator<BinaryRecord> fetch();
+    Iterator<BinaryRecordAndOffset> fetch() throws InterruptedException;
 
     void commit();
 
-    long publish(Iterator<BinaryRecord> iter);
+    Future<Long> append(BinaryRecord record);
 
     void flush();
 
@@ -65,7 +66,7 @@ public interface BinaryStream extends Closeable {
         return new Iterator<BinaryRecord>() {
 
             private BinaryRecord record = null;
-            private Iterator<BinaryRecord> i = null;
+            private Iterator<BinaryRecordAndOffset> i = null;
 
             @Override
             public boolean hasNext() {
@@ -87,8 +88,13 @@ public interface BinaryStream extends Closeable {
             void seek() {
                 record = null;
                 while (i == null || !i.hasNext()) {
-                    i = fetch();
-                    if (i == null) return;
+                    try {
+                        i = fetch();
+                        if (i == null) return;
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+
                 }
                 if (i.hasNext()) record = i.next();
             }

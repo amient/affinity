@@ -31,7 +31,7 @@ import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.{ByteUtils, EventTime}
-import io.amient.affinity.stream.Record
+import io.amient.affinity.stream.{BinaryRecord, Record}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -307,7 +307,7 @@ class State[K, V](val storage: Storage,
       delete(key)
     } else {
       val valueBytes = valueSerde.toBytes(value)
-      val record = new Record(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
+      val record = new BinaryRecord(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
       storage.write(record) map { offset =>
         val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
         storage.memstore.put(key, memStoreValue, offset)

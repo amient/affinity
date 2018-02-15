@@ -26,7 +26,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.{SparkContext, TaskContext}
 
-import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
 object CompactRDD {
@@ -88,7 +87,7 @@ object CompactRDD {
   }
 
   /**
-    * publish data into binary stream
+    * append data into binary stream
     *
     * @param serdeBinder
     * @param streamBinder
@@ -104,7 +103,7 @@ object CompactRDD {
   }
 
   /**
-    * publish data into binary stream
+    * append data into binary stream
     * @param keySerdeBinder
     * @param valueSerdeBinder
     * @param streamBinder
@@ -136,7 +135,10 @@ object CompactRDD {
           val serializedValue = valueSerde.toBytes(v)
           new BinaryRecord(serializedKey, serializedValue, ts)
         }
-        produced.add(stream.publish(iterator))
+        iterator.foreach { record =>
+          stream.append(record)
+          produced.add(1)
+        }
         stream.flush
         stream.close()
       } finally try {

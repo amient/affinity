@@ -1,14 +1,15 @@
 package io.amient.affinity.stream
 
-import java.util
+import java.{lang, util}
 import java.util.Properties
 
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.core.util.{EventTime, TimeRange}
+import io.amient.affinity.core.util.{EventTime, MappedJavaFuture, TimeRange}
 import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsumer}
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.WakeupException
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
@@ -22,6 +23,8 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream with ConsumerReba
   val kafkaStorageConf = KafkaStorage.Conf(conf)
 
   val topic = kafkaStorageConf.Topic()
+  val keySubject: String = s"${topic}-key"
+  val valueSubject: String = s"${topic}-value"
 
   private val producerConfig = new Properties() {
     if (kafkaStorageConf.BootstrapServers.isDefined()) put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
@@ -65,12 +68,15 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream with ConsumerReba
     kafkaConsumer.subscribe(List(topic))
   }
 
-  override def scan(partition: Int, range: TimeRange): Unit = {
+  override def seek(partition: Int, startOffset: Long): Unit = {
     val tp = new TopicPartition(topic, partition)
-    this.range = new TimeRange(range.start, math.min(range.end, EventTime.unix))
+    this.range = TimeRange.ALLTIME
     kafkaConsumer.assign(List(tp))
-    onPartitionsAssigned(List(tp))
+    log.info(s"Seeking $topic/$partition by offset range $startOffset")
+    kafkaConsumer.seek(tp, startOffset)
+    partitionProgress.put(tp.partition, Long.MaxValue)
   }
+
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
     partitions.foreach(tp => partitionProgress.remove(tp.partition))
@@ -98,14 +104,20 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream with ConsumerReba
         if (stopOffset >= startOffset) {
           kafkaConsumer.seek(tp, startOffset)
           partitionProgress.put(tp.partition, stopOffset)
-          log.debug(s"Scanning partition=${tp.partition()}, range=${range.start}:${range.end} ==> offsets=$startOffset:$stopOffset")
+          log.debug(s"Scanning partition=${tp.partition()} by time range ${range.getLocalStart}:${range.getLocalEnd} ==> offsets=$startOffset:$stopOffset")
         }
     }
   }
 
-  override def fetch(): util.Iterator[BinaryRecord] = {
+  override def fetch(): util.Iterator[BinaryRecordAndOffset] = {
     if (partitionProgress.isEmpty) return null
-    val kafkaRecords = kafkaConsumer.poll(6000)
+
+    val kafkaRecords = try {
+      kafkaConsumer.poll(6000)
+    } catch {
+      case _: WakeupException => throw new InterruptedException
+    }
+
     kafkaRecords.iterator.filter { record =>
       if (!partitionProgress.contains(record.partition)) {
         false
@@ -114,7 +126,7 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream with ConsumerReba
         record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {
-      case r => new BinaryRecord(r.key, r.value, r.timestamp)
+      case r => new BinaryRecordAndOffset(r.key, r.value, r.timestamp, r.offset)
     }
   }
 
@@ -124,25 +136,16 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream with ConsumerReba
 
   lazy private val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
 
-  override def publish(iter: util.Iterator[BinaryRecord]): Long = {
+  override def append(record: BinaryRecord): java.util.concurrent.Future[lang.Long] = {
     producerActive = true
-    val partitioner = getDefaultPartitioner()
-    val numPartitions = getNumPartitions()
-
-    var messages = 0L
-    while (iter.hasNext) {
-      val record = iter.next()
-      val producerRecord: ProducerRecord[Array[Byte], Array[Byte]] = if (record.key == null) {
-        new ProducerRecord(topic, null, record.timestamp, null, record.value)
-      } else {
-        val partition = partitioner.partition(record.key, numPartitions)
-        new ProducerRecord(topic, partition, record.timestamp, record.key, record.value)
-      }
-      producer.send(producerRecord)
-      messages += 1
+    val producerRecord: ProducerRecord[Array[Byte], Array[Byte]] = if (record.key == null) {
+      new ProducerRecord(topic, null, record.timestamp, null, record.value)
+    } else {
+      new ProducerRecord(topic, null, record.timestamp, record.key, record.value)
     }
-    messages
-
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](producer.send(producerRecord)) {
+      override def map(result: RecordMetadata): java.lang.Long = result.offset()
+    }
   }
 
   override def flush() = if (producerActive) {

@@ -36,6 +36,13 @@ trait GatewayStream extends Gateway {
     new OutputDataStream(keySerde, valSerde, streamConfig)
   }
 
+  /**
+    * Create an input stream handler which will be managed by the gateway by giving it a processor function
+    * @param streamIdentifier id of the stream configuration object
+    * @param processor a function that takes (Record[K,V]) and returns Boolean signal that informs the committer
+    * @tparam K
+    * @tparam V
+    */
   def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: Record[K, V] => Unit): Unit = {
     val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
@@ -114,13 +121,14 @@ trait GatewayStream extends Gateway {
             val value: V = valSerde.fromBytes(record.value)
             processor(new Record(key, value, record.timestamp))
           }
-          //FIXME this type of processing has at-most-once guarantees
+          //FIXME hardcoded commit interval
           val now = System.currentTimeMillis()
-          // TODO configurable commit interval, currently 10s hard-coded
           if (now - lastCommit > 10000) {
             lastCommit = now
+            //FIXME at-most-once processing guarantees: here should be a call to the processor to flush if has something to
             consumer.commit()
           }
+
         }
       } catch {
         case NonFatal(e) => log.error(e, s"Input stream processor: $identifier")
