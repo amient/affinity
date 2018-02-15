@@ -12,7 +12,6 @@ import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
 import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.stream.BinaryStream
-import io.amient.util.spark.CompactRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}

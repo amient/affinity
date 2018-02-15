@@ -3,7 +3,6 @@ package io.amient.affinity.stream;
 import com.typesafe.config.Config;
 import io.amient.affinity.core.Murmur2Partitioner;
 import io.amient.affinity.core.Partitioner;
-import io.amient.affinity.core.serde.AbstractSerde;
 import io.amient.affinity.core.storage.Storage;
 import io.amient.affinity.core.util.TimeRange;
 
@@ -50,8 +49,10 @@ public interface BinaryStream extends Closeable {
 
     void scan(int partition, TimeRange range);
 
-    long lag();
-
+    /**
+     *
+     * @return iterator of records which may be empty, or null if the maximum offset was reached
+     */
     Iterator<BinaryRecord> fetch();
 
     void commit();
@@ -86,8 +87,8 @@ public interface BinaryStream extends Closeable {
             void seek() {
                 record = null;
                 while (i == null || !i.hasNext()) {
-                    if (lag() <= 0) return;
                     i = fetch();
+                    if (i == null) return;
                 }
                 if (i.hasNext()) record = i.next();
             }

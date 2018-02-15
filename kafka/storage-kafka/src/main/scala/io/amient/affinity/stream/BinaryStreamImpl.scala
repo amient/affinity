@@ -5,8 +5,8 @@ import java.util.Properties
 
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.storage.kafka.KafkaStorage
-import io.amient.affinity.core.util.TimeRange
-import org.apache.kafka.clients.consumer.KafkaConsumer
+import io.amient.affinity.core.util.{EventTime, TimeRange}
+import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsumer}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
+class BinaryStreamImpl(conf: StorageConf) extends BinaryStream with ConsumerRebalanceListener {
 
   private val log = LoggerFactory.getLogger(classOf[BinaryStreamImpl])
 
@@ -23,7 +23,7 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
 
   val topic = kafkaStorageConf.Topic()
 
-  val producerConfig = new Properties() {
+  private val producerConfig = new Properties() {
     if (kafkaStorageConf.BootstrapServers.isDefined()) put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
     if (kafkaStorageConf.Producer.isDefined) {
       val producerConfig = kafkaStorageConf.Producer.config()
@@ -52,10 +52,9 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
   }
 
   private val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
-  private val partitionProgress = new mutable.HashMap[TopicPartition, Long]()
+  private val partitionProgress = new mutable.HashMap[Int, Long]()
   private var closed = false
   private var range: TimeRange = TimeRange.ALLTIME
-  private var progress: (Long, Long) = (0, -1)
 
   override def getNumPartitions(): Int = {
     kafkaConsumer.partitionsFor(topic).size()
@@ -68,58 +67,58 @@ class BinaryStreamImpl(conf: StorageConf) extends BinaryStream {
 
   override def scan(partition: Int, range: TimeRange): Unit = {
     val tp = new TopicPartition(topic, partition)
+    this.range = new TimeRange(range.start, math.min(range.end, EventTime.unix))
     kafkaConsumer.assign(List(tp))
-    val (minOffset, maxOffset) = (kafkaConsumer.beginningOffsets(List(tp))(tp), kafkaConsumer.endOffsets(List(tp))(tp))
-    val (startOffset: Long, endOffset: Long) = if (range == TimeRange.ALLTIME) {
-      (minOffset, maxOffset)
-    } else {
-      this.range = range
-      (kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp) match {
-        case null => minOffset
-        case some => some.offset()
-      }, kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp) match {
-        case null => maxOffset
-        case some => some.offset()
-      })
-    }
-    kafkaConsumer.seek(tp, startOffset)
-    log.debug(s"Scanning partition=$partition, range=${range.start}:${range.end} ==> offsets=$startOffset:$endOffset")
-    progress = (startOffset - 1, endOffset - 1)
+    onPartitionsAssigned(List(tp))
   }
 
-  override def lag(): Long = {
-    progress._2 - progress._1
+  override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
+    partitions.foreach(tp => partitionProgress.remove(tp.partition))
+  }
+
+  override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]) = {
+    partitions.foreach {
+      tp =>
+        val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp))(tp)
+        val nextOffset: Long = Option(kafkaConsumer.committed(tp)).map(_.offset() + 1).getOrElse(0)
+        val minOffset: Long = math.max(nextOffset, beginOffset)
+        val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp) - 1
+        val (startOffset: Long, stopOffset: Long) = if (range == TimeRange.ALLTIME) {
+          (minOffset, Long.MaxValue)
+        } else {
+          this.range = range
+          (kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp) match {
+            case null => minOffset
+            case some => some.offset() // inclusive of the time range start
+          }, kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp) match {
+            case null => maxOffset
+            case some => some.offset() - 1 //exclusive of the time range end
+          })
+        }
+        if (stopOffset >= startOffset) {
+          kafkaConsumer.seek(tp, startOffset)
+          partitionProgress.put(tp.partition, stopOffset)
+          log.debug(s"Scanning partition=${tp.partition()}, range=${range.start}:${range.end} ==> offsets=$startOffset:$stopOffset")
+        }
+    }
   }
 
   override def fetch(): util.Iterator[BinaryRecord] = {
+    if (partitionProgress.isEmpty) return null
     val kafkaRecords = kafkaConsumer.poll(6000)
-    var fastForwarded = false
-    val filteredKafkaRecords = kafkaRecords.iterator().filter { record =>
-      val isAfterMinTimestamp = record.timestamp() >= range.start
-      val isBeforeMaxTimestamp = record.timestamp() <= range.end
-      if (record.offset > progress._1) progress = (record.offset, progress._2)
-      if (!isAfterMinTimestamp && !fastForwarded) {
-        kafkaConsumer.offsetsForTimes(Map(new TopicPartition(record.topic(), record.partition()) -> new java.lang.Long(range.start))).foreach {
-          case (tp, oat) => if (oat.offset > record.offset) {
-            log.info(s"Fast forward partition ${record.topic()}/${record.partition()} because record.timestamp(${record.timestamp()}) < ${range.start}")
-            kafkaConsumer.seek(tp, oat.offset())
-          }
-        }
-        fastForwarded = true
+    kafkaRecords.iterator.filter { record =>
+      if (!partitionProgress.contains(record.partition)) {
+        false
+      } else {
+        if (record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
+        record.timestamp >= range.start && record.timestamp <= range.end
       }
-      isAfterMinTimestamp && isBeforeMaxTimestamp
-    }
-
-    filteredKafkaRecords.map {
-      case r => new BinaryRecord(r.key(), r.value(), r.timestamp())
+    }.map {
+      case r => new BinaryRecord(r.key, r.value, r.timestamp)
     }
   }
 
-  def commit() = {
-    kafkaConsumer.commitAsync()
-  }
-
-  def active() = !closed
+  def commit() = kafkaConsumer.commitAsync()
 
   private var producerActive = false
 

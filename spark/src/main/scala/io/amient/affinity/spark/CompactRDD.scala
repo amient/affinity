@@ -33,6 +33,13 @@ object CompactRDD {
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
                                       streamBinder: => BinaryStream,
+                                      range: TimeRange,
+                                      compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
+    apply[K,V](serdeBinder, serdeBinder, streamBinder, range, compacted)
+  }
+
+  def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
+                                      streamBinder: => BinaryStream,
                                       compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
     apply[K,V](serdeBinder, serdeBinder, streamBinder, TimeRange.ALLTIME, compacted)
   }

@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.spark
+package io.amient.affinity.example
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
@@ -30,8 +30,8 @@ import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.EmbeddedKafka
+import io.amient.affinity.spark.CompactRDD
 import io.amient.affinity.stream.BinaryStream
-import io.amient.util.spark.CompactRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
