@@ -219,14 +219,17 @@ in case of completely new assignment or checkpoint corruption.
 
 ### Notes on consistency
 
-In cases where eventual read consistency is sufficient, standby(s)
-can also be used as read replicas (this is currently not implemented
-but the design is expecting this to come in future).
-
 The State described above applies to Keyspaces - these are represented
 by a Keyspace actor that routes all messages to all of its Partition
 actors. Since actors are single-threaded and there is only one master
 actor per partition the integrity of reads and writes is guaranteed.
+
+Since master takes all reads and writes, the system is always
+fully consistent but relies solely on partitioning for scaling out.
+The replicas server only as hot standbys providing high availability.
+
+In cases where eventual read consistency is sufficient, standby(s)
+could also be used as read replicas but this is currently not implemented.
 
 Sometimes it is necessary to use global state rather than partitioned
 Keyspace. In this case all gateways that hold reference to a global
