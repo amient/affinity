@@ -171,6 +171,9 @@ horizontally by the means of partitioning - read-replicas would break the possib
 
 ## State Management
 
+![State_Management](doc/Affinity_State_Management.jpg)
+
+
 All data is stored 1) in the persistent storage in the form
 of change log, e.g. Kafka compacted topic and 2) in a memstore implementation
 which like SimpleMap or RocksDb. Each physical partition has one exclusive owner
