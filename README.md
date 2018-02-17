@@ -175,11 +175,19 @@ horizontally by the means of partitioning - read-replicas would break the possib
 
 
 All data is stored 1) in the persistent storage in the form
-of change log, e.g. Kafka compacted topic and 2) in a memstore implementation
-which like SimpleMap or RocksDb. Each physical partition has one exclusive owner
-- master - for both reads and writes which is then tailed by all standby replicas.
-So a single Storage Partition can have multiple active Affinity Partitions, one of which is
-always a master and the remainder are standby(s).
+of change log, e.g. Kafka compacted topic and 2) in a memstore implementation, e.g. RocksDb.
+Each physical partition has one exclusive owner - master - for both reads and writes which
+is then tailed by all standby replicas. A single Storage Partition can have multiple active
+Affinity Partitions, one of which is always a master and the remainder are standby(s).
+
+Each Affinity Partition, whether master or standby, maintains a checkpoint for a
+concrete storage layer which says how far is the memstore up to date with the storage log.
+Upon startup or when a partition becomes a master, the memstore is bootstrapped
+from the last recorded checkpoint up to the end of the log available in the storage layer.
+The checkpoints are periodically stored on a local disk giving the system at-least-once
+guarantee in terms of durability - in terms of end-to-end processing it is also
+possible to maintain at-least-once guarantee by using the futures returned by write
+operations.
 
 As mentioned elsewhere, Keyspace (Actor) manages a set of Partitions (also Actors)
 and each Partition can hold multilple state stores whose partitioning scheme will
