@@ -4,10 +4,10 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.storage.Storage
+import io.amient.affinity.core.storage.{LogStorage, Record, Storage}
 import io.amient.affinity.core.storage.Storage.StorageConf
 import io.amient.affinity.core.util.{EventTime, OutputDataStream}
-import io.amient.affinity.stream.{BinaryStream, Record}
+import io.amient.affinity.stream.Record
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -100,11 +100,11 @@ trait GatewayStream extends Gateway {
                                   processor: InputStreamProcessor[K, V]) extends Runnable {
 
     val minTimestamp = streamConfig.MinTimestamp()
-    val consumer: BinaryStream = BinaryStream.bindNewInstance(streamConfig)
+    val consumer: LogStorage = LogStorage.newInstance(streamConfig)
 
     override def run(): Unit = {
       try {
-        consumer.subscribe(minTimestamp)
+        consumer.reset(minTimestamp)
         log.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommit = System.currentTimeMillis()
         while (!closed) {

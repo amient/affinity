@@ -19,7 +19,10 @@
 
 package io.amient.affinity.core.storage;
 
-import io.amient.affinity.core.config.*;
+import io.amient.affinity.core.config.CfgCls;
+import io.amient.affinity.core.config.CfgPath;
+import io.amient.affinity.core.config.CfgStruct;
+import io.amient.affinity.core.util.CloseableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +54,7 @@ public abstract class MemStore implements Closeable {
     }
     private final static Logger log = LoggerFactory.getLogger(MemStore.class);
 
-    final private MemStoreManager manager;
+    final private CheckpointManager manager;
 
     final private boolean checkpointsEnable;
     final protected int ttlSecs;
@@ -69,7 +72,7 @@ public abstract class MemStore implements Closeable {
             dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(identifier));
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
         }
-        manager = new MemStoreManager();
+        manager = new CheckpointManager();
     }
 
     protected abstract boolean isPersistent();
@@ -78,7 +81,7 @@ public abstract class MemStore implements Closeable {
         manager.start();
     }
 
-    public Checkpoint getCheckpoint() {
+    public <C> LogCheckpoint<C> getCheckpoint(LogStorage<C> forStorage) {
         return manager.checkpoint.get();
     }
 
@@ -98,14 +101,24 @@ public abstract class MemStore implements Closeable {
     public abstract long numKeys();
 
     /**
+     * Store value with checkpointing semantics
      * @param key       ByteBuffer representation
      * @param value     ByteBuffer which will be associated with the given key
-     * @param offset    checkpoint offset
+     * @param position    checkpoint position
      * @return new Checkpoint after the operation
      */
-    public final Checkpoint put(ByteBuffer key, ByteBuffer value, long offset) {
+    public final LogCheckpoint put(ByteBuffer key, ByteBuffer value, Object position) {
         putImpl(key, value);
-        return manager.updateCheckpoint(offset);
+        return manager.updateCheckpoint(position);
+    }
+
+    /**
+     * Store value without checkpointing semantics
+     * @param key
+     * @param value
+     */
+    public final void put(ByteBuffer key, ByteBuffer value) {
+        putImpl(key, value);
     }
 
     /**
@@ -115,13 +128,23 @@ public abstract class MemStore implements Closeable {
     protected abstract void putImpl(ByteBuffer key, ByteBuffer value);
 
     /**
+     * remove key with checkpointing semantics
      * @param key ByteBuffer representation whose value will be removed
      * @return new Checkpoint valid after the operation
-     * @param offset    checkpoint offset
+     * @param position  checkpoint position in the related log stream
      */
-    public final Checkpoint remove(ByteBuffer key, long offset) {
+    public final LogCheckpoint remove(ByteBuffer key, Object position) {
         removeImpl(key);
-        return manager.updateCheckpoint(offset);
+        return manager.updateCheckpoint(position);
+    }
+
+    /**
+     * remove key without checkpointing semantics
+     * @param key ByteBuffer representation whose value will be removed
+     * @return new Checkpoint valid after the operation
+     */
+    public final void remove(ByteBuffer key) {
+        removeImpl(key);
     }
 
     /**
@@ -189,10 +212,10 @@ public abstract class MemStore implements Closeable {
      * boostrapping methods: load()
      *
      * @param key    record key
-     * @param offset checkpoint offset
+     * @param position checkpoint position in the related log stream
      */
-    final public void unload(byte[] key, long offset) {
-        remove(ByteBuffer.wrap(key), offset);
+    final public void unload(byte[] key, Object position) {
+        remove(ByteBuffer.wrap(key), position);
     }
 
     /**
@@ -200,17 +223,17 @@ public abstract class MemStore implements Closeable {
      *
      * @param key       record key to be loaded
      * @param value     record value to be wrapped
-     * @param offset    checkpoint offset
+     * @param position    checkpoint position in the related log stream
      * @param timestamp event time to be wrapped
      */
-    final public void load(byte[] key, byte[] value, long offset, long timestamp) {
+    final public void load(byte[] key, byte[] value, Object position, long timestamp) {
         ByteBuffer valueBuffer = wrap(value, timestamp);
-        put(ByteBuffer.wrap(key), valueBuffer, offset);
+        put(ByteBuffer.wrap(key), valueBuffer, position);
     }
 
-    private class MemStoreManager extends Thread implements Closeable {
+    private class CheckpointManager extends Thread implements Closeable {
 
-        final private AtomicReference<Checkpoint> checkpoint = new AtomicReference<>(new Checkpoint(-1L));
+        final private AtomicReference<LogCheckpoint> checkpoint = new AtomicReference<>(new LogCheckpoint());
 
         volatile private boolean checkpointModified = false;
 
@@ -225,7 +248,7 @@ public abstract class MemStore implements Closeable {
 
             if (checkpointsEnable) try {
                 Path file = getFile();
-                if (Files.exists(file)) checkpoint.set(Checkpoint.readFromFile(file));
+                if (Files.exists(file)) checkpoint.set(LogCheckpoint.readFromFile(file));
                 log.info("Initialized " + checkpoint + " from " + file);
 
             } catch (IOException e) {
@@ -252,23 +275,19 @@ public abstract class MemStore implements Closeable {
 
         private void writeCheckpoint() throws IOException {
             Path file = getFile();
-            Checkpoint chk = checkpoint.get();
+            LogCheckpoint chk = checkpoint.get();
             log.debug("Writing checkpoint " + chk + " to file: " + file);
             chk.writeToFile(file);
             checkpointModified = false;
         }
 
-        private Checkpoint updateCheckpoint(long offset) {
+        private LogCheckpoint updateCheckpoint(Object position) {
             return checkpoint.updateAndGet(chk -> {
                 if (log.isTraceEnabled()) {
-                    log.trace("updating checkpoint, offset: " + offset);
+                    log.trace("updating checkpoint, offset: " + position);
                 }
-                if (offset > chk.offset) {
-                    if (checkpointsEnable) checkpointModified = true;
-                    return new Checkpoint(offset);
-                } else {
-                    return chk;
-                }
+                if (checkpointsEnable) checkpointModified = true;
+                return new LogCheckpoint(position);
             });
         }
 

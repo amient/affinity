@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.stream;
+package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.util.ByteUtils;
 

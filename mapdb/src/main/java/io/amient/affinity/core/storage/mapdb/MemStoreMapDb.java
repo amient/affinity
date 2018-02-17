@@ -21,7 +21,7 @@ package io.amient.affinity.core.storage.mapdb;
 
 import io.amient.affinity.core.config.CfgBool;
 import io.amient.affinity.core.config.CfgStruct;
-import io.amient.affinity.core.storage.CloseableIterator;
+import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;

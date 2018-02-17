@@ -24,6 +24,8 @@ import java.util.Map.Entry
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
+import io.amient.affinity.core.util.CloseableIterator
+
 
 class MemStoreSimpleMap(identifier: String, conf: StateConf) extends MemStore(identifier, conf) {
 

@@ -19,21 +19,22 @@
 
 package io.amient.affinity.spark
 
+import io.amient.affinity.core.storage.{ByteKey, LogStorage, Record}
 import io.amient.affinity.core.util.TimeRange
-import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.collection.JavaConversions._
 
-class BinaryCompactRDD(sc: SparkContext, streamBinder: => BinaryStream, range: TimeRange, compacted: Boolean)
-  extends RDD[(ByteKey, BinaryRecord)](sc, Nil) {
+class BinaryCompactRDD(sc: SparkContext, storageBinder: => LogStorage[_], range: TimeRange, compacted: Boolean)
+  extends RDD[(ByteKey, Record[Array[Byte], Array[Byte]])](sc, Nil) {
 
-  val compactor = (m1: BinaryRecordAndOffset, m2: BinaryRecordAndOffset) => if (m1.offset > m2.offset) m1 else m2
+  type R = Record[Array[Byte], Array[Byte]]
+  val compactor = (r1: R, r2: R) => if (r1.timestamp > r2.timestamp) r1 else r2
 
   protected def getPartitions: Array[Partition] = {
-    val stream = streamBinder
+    val stream = storageBinder
     try {
       (0 until stream.getNumPartitions()).map { p =>
         new Partition {
@@ -45,20 +46,15 @@ class BinaryCompactRDD(sc: SparkContext, streamBinder: => BinaryStream, range: T
     }
   }
 
-  override def compute(split: Partition, context: TaskContext): Iterator[(ByteKey, BinaryRecord)] = {
-    val stream = streamBinder
-    context.addTaskCompletionListener { _ =>
-      stream.close()
-    }
+  override def compute(split: Partition, context: TaskContext): Iterator[(ByteKey, R)] = {
+    val storage = storageBinder
+    storage.reset(split.index, range)
+    context.addTaskCompletionListener(_ =>  storage.close)
 
-    stream.scan(split.index, range)
-
-    val binaryRecords: Iterator[BinaryRecordAndOffset] = stream.iterator()
-    val kvRecords: Iterator[(ByteKey, BinaryRecordAndOffset)] = binaryRecords.map(record => (new ByteKey(record.key), record))
-
-    val compactedRecords: Iterator[(ByteKey, BinaryRecordAndOffset)] = if (!compacted) kvRecords else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, BinaryRecordAndOffset, BinaryRecordAndOffset]((v) => v, compactor, compactor)
-      spillMap.insertAll(kvRecords)
+    val logRecords = storage.iterator().map(record => (new ByteKey(record.key), record))
+    val compactedRecords: Iterator[(ByteKey, R)] = if (!compacted) logRecords else {
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, R, R]((v) => v, compactor, compactor)
+      spillMap.insertAll(logRecords)
       spillMap.iterator
     }
     compactedRecords

@@ -2,10 +2,9 @@ package io.amient.affinity.kafka
 
 import java.util.concurrent.Future
 
-import io.amient.affinity.core.storage.StateConf
+import io.amient.affinity.core.storage.{Record, StateConf}
 import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.MappedJavaFuture
-import io.amient.affinity.stream.Record
 import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
 
 /**

@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.storage.rocksdb;
 
-import io.amient.affinity.core.storage.CloseableIterator;
+import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;

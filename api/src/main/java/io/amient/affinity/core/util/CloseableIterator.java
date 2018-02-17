@@ -1,4 +1,4 @@
-package io.amient.affinity.core.storage;
+package io.amient.affinity.core.util;
 
 import java.io.Closeable;
 import java.io.IOException;

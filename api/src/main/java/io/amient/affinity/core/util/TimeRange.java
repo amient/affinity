@@ -38,6 +38,23 @@ public class TimeRange implements Serializable {
         return EventTime.local(end);
     }
 
+    public static TimeRange since(OffsetDateTime datetime) {
+        return since(datetime.toInstant().toEpochMilli());
+    }
+
+    public static TimeRange since(long unixtimestamp) {
+        return new TimeRange(unixtimestamp, Long.MAX_VALUE);
+    }
+
+    public static TimeRange until(OffsetDateTime datetime) {
+        return until(datetime.toInstant().toEpochMilli());
+    }
+
+    public static TimeRange until(long unixtimestamp) {
+        return new TimeRange(0, unixtimestamp);
+    }
+
+
     public static TimeRange prev(Duration length) {
         return prev(length, Instant.ofEpochMilli(EventTime.unix()));
     }

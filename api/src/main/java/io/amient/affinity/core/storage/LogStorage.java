@@ -1,7 +1,6 @@
-package io.amient.affinity.stream;
+package io.amient.affinity.core.storage;
 
 import com.typesafe.config.Config;
-import io.amient.affinity.core.storage.Storage;
 import io.amient.affinity.core.util.TimeRange;
 
 import java.io.Closeable;
@@ -11,62 +10,71 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.Future;
 
 /**
- * BinaryStream represents any stream of data which consists of binary key-value pairs.
- * It is used by GatewayStream, Repartitioner Tool and a CompactRDD.
- * One of the modules must be included that provides io.amient.affinity.stream.BinaryStreamImpl
+ * LogStorage represents a partitioned key-value stream of data
+ * It is used by State, GatewayStream, Repartitioner and a CompactRDD.
+ *
+ * @param <C> Coordinate type that describes a position in the log stream
  */
-public interface BinaryStream extends Closeable {
+public interface LogStorage<C> extends Closeable {
 
-    static Class<? extends BinaryStream> bindClass() throws ClassNotFoundException {
-        Class<?> cls = Class.forName("io.amient.affinity.stream.BinaryStreamImpl");
-        return cls.asSubclass(BinaryStream.class);
-    }
+    LogStorageConf Conf = new LogStorageConf() {
+        @Override
+        public LogStorageConf apply(Config config) {
+            return new LogStorageConf().apply(config);
+        }
+    };
 
-    static BinaryStream bindNewInstance(Config config)
+    static LogStorage newInstance(Config config)
             throws ClassNotFoundException,
             NoSuchMethodException,
             InvocationTargetException,
             InstantiationException,
             IllegalAccessException {
-        return bindNewInstance(Storage.Conf.apply(config));
+        return newInstance(LogStorage.Conf.apply(config));
     }
 
-    static BinaryStream bindNewInstance(Storage.StorageConf conf)
+    static LogStorage newInstance(LogStorageConf conf)
             throws ClassNotFoundException,
             NoSuchMethodException, IllegalAccessException,
             InvocationTargetException, InstantiationException {
-        return bindClass().getConstructor(Storage.StorageConf.class).newInstance(conf);
+
+        Class<? extends LogStorage> cls = conf.Class.apply();
+        return cls.getConstructor(LogStorageConf.class).newInstance(conf);
     }
 
     int getNumPartitions();
 
-    void subscribe(long minTimestamp);
+    void reset(TimeRange range);
 
-    void scan(int partition, TimeRange range);
+    void reset(int partition, TimeRange range);
 
-    void seek(int partition, long startOffset);
+    void seek(int partition, C position);
 
     String keySubject();
 
     String valueSubject();
 
+    void ensureCorrectConfiguration(long ttlMs, int numPartitions, boolean readonly);
+
     /**
      *
      * @return iterator of records which may be empty, or null if the maximum offset was reached
      */
-    Iterator<BinaryRecordAndOffset> fetch() throws InterruptedException;
+    Iterator<LogEntry<C>> fetch() throws InterruptedException;
 
     void commit();
 
-    Future<Long> append(BinaryRecord record);
+    Future<C> append(Record<byte[], byte[]> record);
+
+    Future<C> delete(byte[] key);
 
     void flush();
 
-    default Iterator<BinaryRecordAndOffset> iterator() {
-        return new Iterator<BinaryRecordAndOffset>() {
+    default Iterator<LogEntry<C>> iterator() {
+        return new Iterator<LogEntry<C>>() {
 
-            private BinaryRecordAndOffset record = null;
-            private Iterator<BinaryRecordAndOffset> i = null;
+            private LogEntry<C> record = null;
+            private Iterator<LogEntry<C>> i = null;
 
             @Override
             public boolean hasNext() {
@@ -75,11 +83,11 @@ public interface BinaryStream extends Closeable {
             }
 
             @Override
-            public BinaryRecordAndOffset next() {
+            public LogEntry<C> next() {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 } else {
-                    BinaryRecordAndOffset result = record;
+                    LogEntry<C> result = record;
                     seek();
                     return result;
                 }
@@ -101,6 +109,5 @@ public interface BinaryStream extends Closeable {
 
         };
     }
-
 
 }

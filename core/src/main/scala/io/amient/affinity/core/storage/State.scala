@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage
 
+import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
@@ -30,14 +31,12 @@ import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.{ByteUtils, EventTime}
-import io.amient.affinity.stream.{BinaryRecord, Record}
+import io.amient.affinity.core.util.{ByteUtils, CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
 import scala.util.control.NonFatal
 
 object State {
@@ -51,20 +50,30 @@ object State {
 
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
-    val readonly = stateConf.External()
-    val storage = try if (!stateConf.Storage.isDefined) new NoopStorage(identifier, stateConf, partition, 1) else {
-      if (!stateConf.MemStore.DataDir.isDefined) {
-        val conf = Conf(system.settings.config)
-        if (conf.Affi.Node.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(conf.Affi.Node.DataDir())
-      }
-      val storageClass = stateConf.Storage.Class()
-      val storageClassSymbol = rootMirror.classSymbol(storageClass)
-      val storageClassMirror = rootMirror.reflectClass(storageClassSymbol)
-      val constructor = storageClassSymbol.asClass.primaryConstructor.asMethod
-      val constructorMirror = storageClassMirror.reflectConstructor(constructor)
-      constructorMirror(identifier, stateConf, partition, numPartitions).asInstanceOf[Storage]
+    val minTimestamp = Math.max(stateConf.MinTimestampUnixMs.apply, if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
+    val external = stateConf.External()
+
+    val storageOption: Option[LogStorage[_]] = try if (!stateConf.Storage.isDefined) None else Some {
+      val storage = LogStorage.newInstance(stateConf.Storage)
+      storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
+      storage.reset(partition, TimeRange.since(minTimestamp))
+      storage
     } catch {
       case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
+    }
+
+    val memstoreClass = stateConf.MemStore.Class.apply
+    val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf])
+    if (!stateConf.MemStore.DataDir.isDefined) {
+      val nodeConf = Conf(system.settings.config).Affi.Node
+      if (nodeConf.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(nodeConf.DataDir())
+    }
+    val memstore = memstoreConstructor.newInstance(identifier, stateConf)
+    storageOption.foreach { storage =>
+      val chk = memstore.getCheckpoint()
+      if (!chk.isEmpty) {
+        storage.seek(partition, chk.position)
+      }
     }
 
     def asAvroRegistry[S](serde: AbstractSerde[S]): Option[AvroSchemaRegistry] = {
@@ -77,7 +86,7 @@ object State {
 
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
-    if (!readonly) {
+    if (!external) storageOption.foreach { storage =>
       for (registry <- asAvroRegistry(keySerde)) {
         storage.keySubject match {
           case null =>
@@ -91,20 +100,28 @@ object State {
         }
       }
     }
-    new State[K, V](storage, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly)
+    new State[K, V](memstore, storageOption, numPartitions, keySerde, valueSerde, ttlMs, lockTimeoutMs)
   }
 
 }
 
 
-class State[K, V](val storage: Storage,
+class State[K, V](val memstore: MemStore,
+                  val storageOption: Option[LogStorage[_]],
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
-                  val lockTimeoutMs: Int = 10000,
-                  val external: Boolean = false) extends ObservableState[K] {
+                  val lockTimeoutMs: Int = 10000) extends ObservableState[K] with Closeable {
 
   self =>
+
+  memstore.open()
+
+  val synchronizer: Option[StateSynchronizer] = storageOption.map { storage: LogStorage[_] =>
+    new StateSynchronizer(storage, memstore)
+  }
+
+  synchronizer.foreach(_.start(this))
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -116,14 +133,18 @@ class State[K, V](val storage: Storage,
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
   }
 
+  def converge(): Unit = {
+    ???
+  }
+
   /**
     * @return a weak iterator that doesn't block read and write operations
     */
   def iterator: CloseableIterator[(K, V)] = new CloseableIterator[(K, V)] {
-    val underlying = storage.memstore.iterator
+    val underlying = memstore.iterator
     val mapped = underlying.asScala.flatMap { entry =>
       val key = keySerde.fromBytes(entry.getKey.array())
-      option(storage.memstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
+      option(memstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
         bytes => (key, valueSerde.fromBytes(bytes))
       }
     }
@@ -164,15 +185,15 @@ class State[K, V](val storage: Storage,
 
   private def apply(key: ByteBuffer): Option[V] = {
     for (
-      cell: ByteBuffer <- option(storage.memstore(key));
-      bytes: Array[Byte] <- option(storage.memstore.unwrap(key, cell, ttlMs))
+      cell: ByteBuffer <- option(memstore(key));
+      bytes: Array[Byte] <- option(memstore.unwrap(key, cell, ttlMs))
     ) yield valueSerde.fromBytes(bytes)
   }
 
   /**
     * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
-  def numKeys: Long = storage.memstore.numKeys()
+  def numKeys: Long = memstore.numKeys()
 
   /**
     * replace is a faster operation than update because it doesn't look at the existing value
@@ -297,7 +318,7 @@ class State[K, V](val storage: Storage,
     * @param value new value for the key
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def put(key: ByteBuffer, value: V): Future[Checkpoint] = {
+  private def put(key: ByteBuffer, value: V): Future[Unit] = {
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
       case e: EventTime => e.eventTimeUnix()
@@ -307,11 +328,15 @@ class State[K, V](val storage: Storage,
       delete(key)
     } else {
       val valueBytes = valueSerde.toBytes(value)
-      val record = new BinaryRecord(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
-      storage.write(record) map { offset =>
-        val memStoreValue = storage.memstore.wrap(valueBytes, recordTimestamp)
-        storage.memstore.put(key, memStoreValue, offset)
+      val record = new Record(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
+      lazy val memStoreValue = memstore.wrap(valueBytes, recordTimestamp)
+      storageOption match {
+        case None => Future.successful(memstore.put(key, memStoreValue))
+        case Some(storage) => storage.append(record) map {
+          position => memstore.put(key, memStoreValue, position)
+        }
       }
+
     }
   }
 
@@ -325,9 +350,12 @@ class State[K, V](val storage: Storage,
     * @param key serialized key to delete
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def delete(key: ByteBuffer): Future[Checkpoint] = {
-    storage.delete(ByteUtils.bufToArray(key)) map { offset =>
-      storage.memstore.remove(key, offset)
+  private def delete(key: ByteBuffer): Future[Unit] = {
+    storageOption match {
+      case None => Future.successful(memstore.remove(key))
+      case Some(storage) => storage.delete(ByteUtils.bufToArray(key)) map { offset =>
+        memstore.remove(key, offset)
+      }
     }
   }
 
@@ -342,7 +370,7 @@ class State[K, V](val storage: Storage,
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
         case entry: java.util.Map.Entry[K, _] => pf.lift((entry.getKey, entry.getValue))
-        case (key: Any, event: Any) => pf.lift(key.asInstanceOf[K], event)
+        case (key: Any, event: Any) => pf.lift((key.asInstanceOf[K], event))
         case illegal => throw new RuntimeException(s"Can't send $illegal to observers")
       }
     })
@@ -385,4 +413,14 @@ class State[K, V](val storage: Storage,
       push(keySerde.fromBytes(key), None)
     }
   }
+
+  override def close() = {
+    try {
+      storageOption.foreach(_.close())
+    } finally {
+      synchronizer.foreach(_.close())
+      memstore.close()
+    }
+  }
+
 }
