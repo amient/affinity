@@ -51,9 +51,9 @@ object KafkaStorage {
 
 }
 
-class LogStorageImpl(conf: LogStorageConf) extends LogStorage[java.lang.Long] with ConsumerRebalanceListener {
+class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] with ConsumerRebalanceListener {
 
-  private val log = LoggerFactory.getLogger(classOf[LogStorageImpl])
+  private val log = LoggerFactory.getLogger(classOf[KafkaLogStorage])
 
   val kafkaStorageConf = KafkaStorage.Conf(conf)
 
@@ -119,7 +119,7 @@ class LogStorageImpl(conf: LogStorageConf) extends LogStorage[java.lang.Long] wi
     val tp = new TopicPartition(topic, partition)
     this.range = TimeRange.ALLTIME
     kafkaConsumer.assign(List(tp))
-    log.info(s"Seeking $topic/$partition by offset range $position")
+    log.debug(s"Seeking $topic/$partition by offset range $position")
     kafkaConsumer.seek(tp, position)
     partitionProgress.put(tp.partition, Long.MaxValue)
   }
@@ -156,7 +156,7 @@ class LogStorageImpl(conf: LogStorageConf) extends LogStorage[java.lang.Long] wi
     }
   }
 
-  override def fetch(): util.Iterator[LogEntry[Long]] = {
+  override def fetch(): util.Iterator[LogEntry[java.lang.Long]] = {
     if (partitionProgress.isEmpty) return null
 
     val kafkaRecords = try {
@@ -173,7 +173,7 @@ class LogStorageImpl(conf: LogStorageConf) extends LogStorage[java.lang.Long] wi
         record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {
-      case r => new LogEntry(r.offset, r.key, r.value, r.timestamp)
+      case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)
     }
   }
 
@@ -181,21 +181,21 @@ class LogStorageImpl(conf: LogStorageConf) extends LogStorage[java.lang.Long] wi
 
   private var producerActive = false
 
-  lazy private val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
+  lazy protected val producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
 
-  override def append(record: Record[Array[Byte], Array[Byte]]): java.util.concurrent.Future[Long] = {
+  override def append(record: Record[Array[Byte], Array[Byte]]): java.util.concurrent.Future[java.lang.Long] = {
     producerActive = true
     val producerRecord: ProducerRecord[Array[Byte], Array[Byte]] = if (record.key == null) {
       new ProducerRecord(topic, null, record.timestamp, null, record.value)
     } else {
       new ProducerRecord(topic, null, record.timestamp, record.key, record.value)
     }
-    new MappedJavaFuture[RecordMetadata, Long](producer.send(producerRecord)) {
-      override def map(result: RecordMetadata): Long = result.offset()
+    new MappedJavaFuture[RecordMetadata, java.lang.Long](producer.send(producerRecord)) {
+      override def map(result: RecordMetadata): java.lang.Long = result.offset()
     }
   }
 
-  override def delete(key: Array[Byte]): Future[Long] = {
+  override def delete(key: Array[Byte]): Future[java.lang.Long] = {
     //kafka uses null value as a delete tombstone
     append(new Record[Array[Byte], Array[Byte]](key, null, EventTime.unix));
   }

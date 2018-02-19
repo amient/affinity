@@ -32,7 +32,7 @@ class MemStoreSimpleMap(identifier: String, conf: StateConf) extends MemStore(id
   //TODO implementation of ExpiringConcurrentHashMap or simply a cleaner Thread
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()
 
-  override def close(): Unit = try internal.clear() finally super.close()
+  override def close(): Unit = internal.clear()
 
   override def iterator(): CloseableIterator[Entry[ByteBuffer, ByteBuffer]] = {
     CloseableIterator.apply(internal.entrySet().iterator())

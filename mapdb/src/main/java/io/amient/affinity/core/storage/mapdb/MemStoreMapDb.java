@@ -133,11 +133,6 @@ public class MemStoreMapDb extends MemStore {
 
     @Override
     public void close() {
-        try {
-            releaseDbInstance(pathToData);
-        } finally {
-            super.close();
-        }
-
+        releaseDbInstance(pathToData);
     }
 }

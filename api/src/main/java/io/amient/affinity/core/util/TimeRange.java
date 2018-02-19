@@ -16,6 +16,14 @@ public class TimeRange implements Serializable {
 
     public static final TimeRange ALLTIME = new TimeRange(0, Long.MAX_VALUE);
 
+    public static TimeRange ALLHISTORY() {
+        return new TimeRange(0, EventTime.unix());
+    }
+
+    public static TimeRange ALLFUTURE() {
+        return new TimeRange(EventTime.unix(), Long.MAX_VALUE);
+    }
+
     @Override
     public boolean equals(Object other) {
         if (!(other instanceof TimeRange)) {

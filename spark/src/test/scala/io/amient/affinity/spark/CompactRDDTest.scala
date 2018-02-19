@@ -6,11 +6,9 @@ import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.storage.{LogStorage, Storage}
-import io.amient.affinity.core.storage.Storage.StorageConf
-import io.amient.affinity.core.storage.kafka.KafkaStorage
+import io.amient.affinity.core.storage.{LogStorage, LogStorageConf}
 import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
-import io.amient.affinity.kafka.EmbeddedKafka
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaLogStorage, KafkaStorage}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
@@ -36,13 +34,13 @@ object CompactRDDTestUniverse {
     MemorySchemaRegistry.Conf.ID.path -> schemaRegistryId
   ))
 
-  def getStorageConf(kafkaBootstrap: String) = new StorageConf().apply(Map(
-    Storage.Conf.Class.path -> classOf[KafkaStorage].getName,
+  def getStorageConf(kafkaBootstrap: String) = new LogStorageConf().apply(Map(
+    LogStorage.Conf.Class.path -> classOf[KafkaLogStorage].getName,
     KafkaStorage.Conf.BootstrapServers.path -> kafkaBootstrap,
     KafkaStorage.Conf.Topic.path -> topic
   ))
 
-  def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: StorageConf, range: TimeRange = TimeRange.ALLTIME)
+  def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.ALLTIME)
                                               (implicit sc: SparkContext): RDD[(K, V)] = {
     CompactRDD(AvroSerde.create(avroConf), LogStorage.newInstance(storageConf), range)
   }

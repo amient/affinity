@@ -45,83 +45,72 @@ object State {
     override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem)
-  : State[K, V] = {
+  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem) = {
 
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
-    val minTimestamp = Math.max(stateConf.MinTimestampUnixMs.apply, if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
+    val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
     val external = stateConf.External()
+    val keySerde = Serde.of[K](system.settings.config)
+    val valueSerde = Serde.of[V](system.settings.config)
 
-    val storageOption: Option[LogStorage[_]] = try if (!stateConf.Storage.isDefined) None else Some {
-      val storage = LogStorage.newInstance(stateConf.Storage)
-      storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
-      storage.reset(partition, TimeRange.since(minTimestamp))
-      storage
-    } catch {
-      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
-    }
-
-    val memstoreClass = stateConf.MemStore.Class.apply
-    val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf])
+    val kvstoreClass = stateConf.MemStore.Class()
+    val kvstoreConstructor = kvstoreClass.getConstructor(classOf[String], classOf[StateConf])
     if (!stateConf.MemStore.DataDir.isDefined) {
       val nodeConf = Conf(system.settings.config).Affi.Node
       if (nodeConf.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(nodeConf.DataDir())
     }
-    val memstore = memstoreConstructor.newInstance(identifier, stateConf)
-    storageOption.foreach { storage =>
-      val chk = memstore.getCheckpoint()
-      if (!chk.isEmpty) {
-        storage.seek(partition, chk.position)
-      }
-    }
+    val kvstore = kvstoreConstructor.newInstance(identifier, stateConf)
 
-    def asAvroRegistry[S](serde: AbstractSerde[S]): Option[AvroSchemaRegistry] = {
-      serde match {
-        case proxy: AvroSerdeProxy => Some(proxy.internal)
-        case registry: AvroSchemaRegistry => Some(registry)
-        case _ => None
-      }
-    }
-
-    val keySerde = Serde.of[K](system.settings.config)
-    val valueSerde = Serde.of[V](system.settings.config)
-    if (!external) storageOption.foreach { storage =>
-      for (registry <- asAvroRegistry(keySerde)) {
-        storage.keySubject match {
-          case null =>
-          case some => registry.register(implicitly[ClassTag[K]].runtimeClass, some)
+    val logOption = try if (!stateConf.Storage.isDefined) None else Some {
+      val storage = LogStorage.newInstance(stateConf.Storage)
+      storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
+      if (!external) {
+        //if this storage is not managed externally, register key and value subjects in the registry
+        for (registry <- asAvroRegistry(keySerde)) {
+          Option(storage.keySubject).foreach(some => registry.register(implicitly[ClassTag[K]].runtimeClass, some))
+        }
+        for (registry <- asAvroRegistry(valueSerde)) {
+          Option(storage.valueSubject).foreach(some => registry.register(implicitly[ClassTag[V]].runtimeClass, some))
         }
       }
-      for (registry <- asAvroRegistry(valueSerde)) {
-        storage.valueSubject match {
-          case null =>
-          case some => registry.register(implicitly[ClassTag[V]].runtimeClass, some)
-        }
-      }
+      storage.reset(partition, TimeRange.since(minTimestamp))
+      val checkpointFile = stateConf.MemStore.DataDir().resolve(kvstore.getClass().getSimpleName() + ".checkpoint")
+      storage.createManager(checkpointFile, partition, kvstore.isPersistent)
+    } catch {
+      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
-    new State[K, V](memstore, storageOption, numPartitions, keySerde, valueSerde, ttlMs, lockTimeoutMs)
+
+    new State(kvstore, logOption, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly = external)
+  }
+
+  private def asAvroRegistry[S](serde: AbstractSerde[S]): Option[AvroSchemaRegistry] = {
+    serde match {
+      case proxy: AvroSerdeProxy => Some(proxy.internal)
+      case registry: AvroSchemaRegistry => Some(registry)
+      case _ => None
+    }
   }
 
 }
 
 
-class State[K, V](val memstore: MemStore,
-                  val storageOption: Option[LogStorage[_]],
+class State[K, V](val kvstore: MemStore,
+                  val logOption: Option[Log[_ <: Comparable[_]]],
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
-                  val lockTimeoutMs: Int = 10000) extends ObservableState[K] with Closeable {
+                  val lockTimeoutMs: Int = 10000,
+                  val readonly: Boolean = false) extends ObservableState[K] with Closeable {
 
   self =>
 
-  memstore.open()
-
-  val synchronizer: Option[StateSynchronizer] = storageOption.map { storage: LogStorage[_] =>
-    new StateSynchronizer(storage, memstore)
-  }
-
-  synchronizer.foreach(_.start(this))
+  //
+  //  val synchronizer: Option[StateSynchronizer] = storageOption.map { storage: LogStorage[_] =>
+  //    new StateSynchronizer(storage, memstore)
+  //  }
+  //
+  //  synchronizer.foreach(_.start(this))
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -133,18 +122,23 @@ class State[K, V](val memstore: MemStore,
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
   }
 
-  def converge(): Unit = {
-    ???
+  private[core] def boot(): Unit = {
+    //TODO #115 get log end offset
+    //TODO # fetch until log end offset reached
+  }
+
+  private[core] def tail(): Unit = {
+    //TODO #115 create StateSynchronizer
   }
 
   /**
     * @return a weak iterator that doesn't block read and write operations
     */
   def iterator: CloseableIterator[(K, V)] = new CloseableIterator[(K, V)] {
-    val underlying = memstore.iterator
+    val underlying = kvstore.iterator
     val mapped = underlying.asScala.flatMap { entry =>
       val key = keySerde.fromBytes(entry.getKey.array())
-      option(memstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
+      option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
         bytes => (key, valueSerde.fromBytes(bytes))
       }
     }
@@ -185,15 +179,15 @@ class State[K, V](val memstore: MemStore,
 
   private def apply(key: ByteBuffer): Option[V] = {
     for (
-      cell: ByteBuffer <- option(memstore(key));
-      bytes: Array[Byte] <- option(memstore.unwrap(key, cell, ttlMs))
+      cell: ByteBuffer <- option(kvstore(key));
+      bytes: Array[Byte] <- option(kvstore.unwrap(key, cell, ttlMs))
     ) yield valueSerde.fromBytes(bytes)
   }
 
   /**
     * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
-  def numKeys: Long = memstore.numKeys()
+  def numKeys: Long = kvstore.numKeys()
 
   /**
     * replace is a faster operation than update because it doesn't look at the existing value
@@ -309,16 +303,17 @@ class State[K, V](val memstore: MemStore,
 
   /**
     * An asynchronous non-blocking put operation which inserts or updates the value
-    * at the given key. The value is first updated in the memstore and then a future is created
+    * at the given key. The value is first updated in the kvstore and then a future is created
     * for reflecting the modification in the underlying storage. If the storage write fails
-    * the previous value is rolled back in the memstore and the failure is propagated into
+    * the previous value is rolled back in the kvstore and the failure is propagated into
     * the result future.
     *
     * @param key   serielized key wrapped in a ByteBuffer
     * @param value new value for the key
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def put(key: ByteBuffer, value: V): Future[Unit] = {
+  private def put(key: ByteBuffer, value: V): Future[_] = {
+    if (readonly) throw new IllegalStateException("put() called on a read-only state")
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
       case e: EventTime => e.eventTimeUnix()
@@ -329,33 +324,29 @@ class State[K, V](val memstore: MemStore,
     } else {
       val valueBytes = valueSerde.toBytes(value)
       val record = new Record(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
-      lazy val memStoreValue = memstore.wrap(valueBytes, recordTimestamp)
-      storageOption match {
-        case None => Future.successful(memstore.put(key, memStoreValue))
-        case Some(storage) => storage.append(record) map {
-          position => memstore.put(key, memStoreValue, position)
-        }
+      lazy val kvStoreValue = kvstore.wrap(valueBytes, recordTimestamp)
+      logOption match {
+        case None => Future.successful(kvstore.put(key, kvStoreValue))
+        case Some(log) => log.append(kvstore, key, valueBytes, recordTimestamp)
       }
-
     }
   }
 
   /**
     * An asynchronous non-blocking removal operation which deletes the value
-    * at the given key. The value is first removed from the memstore and then a future is created
+    * at the given key. The value is first removed from the kvstore and then a future is created
     * for reflecting the modification in the underlying storage. If the storage write fails
-    * the previous value is rolled back in the memstore and the failure is propagated into
+    * the previous value is rolled back in the kvstore and the failure is propagated into
     * the result future.
     *
     * @param key serialized key to delete
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def delete(key: ByteBuffer): Future[Unit] = {
-    storageOption match {
-      case None => Future.successful(memstore.remove(key))
-      case Some(storage) => storage.delete(ByteUtils.bufToArray(key)) map { offset =>
-        memstore.remove(key, offset)
-      }
+  private def delete(key: ByteBuffer): Future[_] = {
+    if (readonly) throw new IllegalStateException("delete() called on a read-only state")
+    logOption match {
+      case None => Future.successful(kvstore.remove(key))
+      case Some(log) => log.delete(kvstore, key)
     }
   }
 
@@ -416,10 +407,10 @@ class State[K, V](val memstore: MemStore,
 
   override def close() = {
     try {
-      storageOption.foreach(_.close())
+      logOption.foreach(_.close())
     } finally {
-      synchronizer.foreach(_.close())
-      memstore.close()
+      //      synchronizer.foreach(_.close())
+      kvstore.close()
     }
   }
 

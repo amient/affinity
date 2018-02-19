@@ -32,7 +32,9 @@ import java.util.Optional
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
 
-final class StateSynchronizer(storage: LogStorage[_], memstore: MemStore) extends Thread with Closeable {
+final class StateSynchronizer[P <: Comparable[P]](storage: LogStorage[P], checkpointer: Log[P], memstore: MemStore) extends Thread with Closeable {
+
+  final private val log = LoggerFactory.getLogger(this.getClass)
 
   private var state: ObservableState[_] = null
 
@@ -40,9 +42,6 @@ final class StateSynchronizer(storage: LogStorage[_], memstore: MemStore) extend
     this.state = state
     start()
   }
-
-
-  final val log = LoggerFactory.getLogger(classOf[StateSynchronizer])
 
   //    final public String id;
   //    final public int partition;
@@ -75,6 +74,7 @@ final class StateSynchronizer(storage: LogStorage[_], memstore: MemStore) extend
       //              BinaryRecordAndOffset r = records.next();
       //              //for tailing state it means either it is a) replica b) external
       //              if (r.value == null) {
+      // TODO updated checkpointer
       //                memstore.unload(r.key, r.offset);
       //                if (tailing) state.internalPush(r.key, Optional.empty());
       //              } else {

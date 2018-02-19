@@ -50,12 +50,14 @@ trait ActorState extends Actor {
     })
   }
 
-  private[core] def state[K: ClassTag, V: ClassTag](globalStore: String, conf: StateConf): State[K, V] = state[K, V](globalStore, {
-    State.create[K, V](globalStore, 0, conf, 1, context.system)
-  })
+  private[core] def state[K: ClassTag, V: ClassTag](globalStore: String, conf: StateConf): State[K, V] = {
+    state[K, V](globalStore, {
+      State.create[K, V](globalStore, 0, conf, 1, context.system)
+    })
+  }
 
   private[core] def state[K, V](name: String, creator: => State[K, V]): State[K, V] = {
-    val result: State[K, V] = creator
+    val result = creator
     storageRegistry.add((name, result))
     result
   }
@@ -64,13 +66,17 @@ trait ActorState extends Actor {
     storageRegistry.asScala.find(_._1 == stateStoreName).get._2
   }
 
-  private[core] def convergeState(): Unit = storageRegistry.asScala.foreach { case (name, s) =>
-    s.converge()
+  private[core] def bootState(): Unit = storageRegistry.asScala.foreach { case (_, state) =>
+    state.boot()
+  }
+
+  private[core] def tailState(): Unit = storageRegistry.asScala.foreach { case (_, state) =>
+    state.tail()
   }
 
   private[core] def closeState(): Unit = {
     storageRegistry.asScala.foreach { case (_, store) =>
-      store.storageOption.foreach(_.close)
+      store.logOption.foreach(_.close)
     }
     storageRegistry.clear()
   }

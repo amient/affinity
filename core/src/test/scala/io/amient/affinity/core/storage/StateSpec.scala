@@ -36,19 +36,17 @@ class StateSpec extends TestKit(ActorSystem.create("test",
   it should "not allow writes and deletes in read-only state" in {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      State.StateConf.Storage.Class.path -> classOf[NoopStorage].getName,
       State.StateConf.External.path -> "true"
     )))
     val state = State.create[Long, ExpirableValue]("read-only-store", 0, stateConf, 1, system)
-    an[RuntimeException] should be thrownBy (Await.result(state.insert(1L, ExpirableValue("one", 1)), specTimeout))
-    an[RuntimeException] should be thrownBy (Await.result(state.delete(1L), specTimeout))
+    an[IllegalStateException] should be thrownBy (Await.result(state.insert(1L, ExpirableValue("one", 1)), specTimeout))
+    an[IllegalStateException] should be thrownBy (Await.result(state.delete(1L), specTimeout))
   }
 
   it should "work without ttl" in {
 
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      State.StateConf.Storage.Class.path -> classOf[NoopStorage].getName
+      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName
     )))
     val state = State.create[Long, ExpirableValue]("no-ttl-store", 0, stateConf, 1, system)
 
@@ -67,7 +65,6 @@ class StateSpec extends TestKit(ActorSystem.create("test",
   it should "clean expired entries when ttl set" in {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      State.StateConf.Storage.Class.path -> classOf[NoopStorage].getName,
       State.StateConf.TtlSeconds.path -> 5
     )))
 

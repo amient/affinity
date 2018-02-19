@@ -5,6 +5,7 @@ import io.amient.affinity.core.util.TimeRange;
 
 import java.io.Closeable;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Future;
@@ -13,9 +14,9 @@ import java.util.concurrent.Future;
  * LogStorage represents a partitioned key-value stream of data
  * It is used by State, GatewayStream, Repartitioner and a CompactRDD.
  *
- * @param <C> Coordinate type that describes a position in the log stream
+ * @param <P> Coordinate type that describes a position in the log stream
  */
-public interface LogStorage<C> extends Closeable {
+public interface LogStorage<P extends Comparable<P>> extends Closeable {
 
     LogStorageConf Conf = new LogStorageConf() {
         @Override
@@ -42,13 +43,22 @@ public interface LogStorage<C> extends Closeable {
         return cls.getConstructor(LogStorageConf.class).newInstance(conf);
     }
 
+    default Log<P> createManager(Path checkpointFile, int partition, boolean enabled) {
+        Log<P> instance = new Log<>(this, checkpointFile, enabled);
+        P checkpoint = instance.getCheckpoint();
+        if (checkpoint != null) {
+            seek(partition, checkpoint);
+        }
+        return instance;
+    }
+
     int getNumPartitions();
 
     void reset(TimeRange range);
 
     void reset(int partition, TimeRange range);
 
-    void seek(int partition, C position);
+    void seek(int partition, P position);
 
     String keySubject();
 
@@ -60,21 +70,21 @@ public interface LogStorage<C> extends Closeable {
      *
      * @return iterator of records which may be empty, or null if the maximum offset was reached
      */
-    Iterator<LogEntry<C>> fetch() throws InterruptedException;
+    Iterator<LogEntry<P>> fetch() throws InterruptedException;
 
     void commit();
 
-    Future<C> append(Record<byte[], byte[]> record);
+    Future<P> append(Record<byte[], byte[]> record);
 
-    Future<C> delete(byte[] key);
+    Future<P> delete(byte[] key);
 
     void flush();
 
-    default Iterator<LogEntry<C>> iterator() {
-        return new Iterator<LogEntry<C>>() {
+    default Iterator<LogEntry<P>> iterator() {
+        return new Iterator<LogEntry<P>>() {
 
-            private LogEntry<C> record = null;
-            private Iterator<LogEntry<C>> i = null;
+            private LogEntry<P> record = null;
+            private Iterator<LogEntry<P>> i = null;
 
             @Override
             public boolean hasNext() {
@@ -83,11 +93,11 @@ public interface LogStorage<C> extends Closeable {
             }
 
             @Override
-            public LogEntry<C> next() {
+            public LogEntry<P> next() {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 } else {
-                    LogEntry<C> result = record;
+                    LogEntry<P> result = record;
                     seek();
                     return result;
                 }
@@ -109,5 +119,6 @@ public interface LogStorage<C> extends Closeable {
 
         };
     }
+
 
 }

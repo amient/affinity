@@ -4,10 +4,8 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.storage.{LogStorage, Record, Storage}
-import io.amient.affinity.core.storage.Storage.StorageConf
-import io.amient.affinity.core.util.{EventTime, OutputDataStream}
-import io.amient.affinity.stream.Record
+import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
+import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -30,7 +28,7 @@ trait GatewayStream extends Gateway {
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
 
   def output[K: ClassTag, V: ClassTag](streamIdentifier: String): OutputDataStream[K, V] = {
-    val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
+    val streamConfig = LogStorage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
     new OutputDataStream(keySerde, valSerde, streamConfig)
@@ -44,7 +42,7 @@ trait GatewayStream extends Gateway {
     * @tparam V
     */
   def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: Record[K, V] => Unit): Unit = {
-    val streamConfig = Storage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
+    val streamConfig = LogStorage.Conf.apply(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
     declaredInputStreamProcessors += new RunnableInputStream[K, V](streamIdentifier, keySerde, valSerde, streamConfig, processor)
@@ -96,15 +94,15 @@ trait GatewayStream extends Gateway {
   class RunnableInputStream[K, V](identifier: String,
                                   keySerde: AbstractSerde[K],
                                   valSerde: AbstractSerde[V],
-                                  streamConfig: StorageConf,
+                                  streamConfig: LogStorageConf,
                                   processor: InputStreamProcessor[K, V]) extends Runnable {
 
     val minTimestamp = streamConfig.MinTimestamp()
-    val consumer: LogStorage = LogStorage.newInstance(streamConfig)
+    val consumer = LogStorage.newInstance(streamConfig)
 
     override def run(): Unit = {
       try {
-        consumer.reset(minTimestamp)
+        consumer.reset(TimeRange.since(minTimestamp))
         log.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommit = System.currentTimeMillis()
         while (!closed) {

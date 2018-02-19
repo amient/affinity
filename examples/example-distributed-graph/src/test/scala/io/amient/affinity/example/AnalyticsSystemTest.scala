@@ -97,8 +97,8 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
         throw new AssertionError(s"Graph should contain 4 vertices but was: $x")
     }
 
-    val componentRdd = SparkDriver.componentRdd
-    componentRdd.collect.toList match {
+
+    SparkDriver.componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>
       case x => throw new AssertionError(s"Graph should contain 1 component, got: $x")
     }
@@ -106,9 +106,9 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     val updateBatch: RDD[(Int, Component)] = sc.parallelize(Array((1, null), (2, Component(0L, Set()))))
     SparkDriver.avroUpdate("graph", "components", updateBatch)
 
-    componentRdd.collect.toList match {
+    SparkDriver.componentRdd.collect.toList match {
       case (2, Component(0L, _)) :: Nil =>
-      case _ => throw new AssertionError("Graph should contain 1 component")
+      case other => throw new AssertionError("Graph should contain 1 component")
     }
 
   }

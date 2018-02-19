@@ -157,12 +157,8 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    public void close() {
-        try {
-            releaseDbInstance(pathToData);
-        } finally {
-            super.close();
-        }
+    public void close() throws IOException {
+        releaseDbInstance(pathToData);
     }
 
     private Optional<ByteBuffer> get(byte[] key) {
