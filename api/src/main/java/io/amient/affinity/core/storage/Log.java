@@ -79,7 +79,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         };
     }
 
-    public void bootstrap(final MemStore kvstore, int partition) throws IOException {
+    public void bootstrap(final MemStore kvstore, int partition) {
         stopSynchronizerIfRunning();
         POS checkpoint = getCheckpoint();
         if (checkpoint != null) storage.reset(partition, checkpoint);
@@ -153,11 +153,15 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         }
     }
 
-    private void stopSynchronizerIfRunning() throws IOException {
+    private void stopSynchronizerIfRunning() {
         LogSync sync = synchronizer.get();
         if (sync != null) {
             synchronizer.compareAndSet(sync, null);
-            sync.close();
+            try {
+                sync.close();
+            } catch (IOException e) {
+                log.warn("could not close LogSync thread", e);
+            }
         }
     }
 

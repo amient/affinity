@@ -132,16 +132,16 @@ class State[K, V](kvstore: MemStore,
   /**
     * @return a weak iterator that doesn't block read and write operations
     */
-  def iterator: CloseableIterator[(K, V)] = new CloseableIterator[(K, V)] {
+  def iterator: CloseableIterator[Record[K, V]] = new CloseableIterator[Record[K, V]] {
     val underlying = kvstore.iterator
     val mapped = underlying.flatMap { entry =>
       val key = keySerde.fromBytes(entry.getKey.array())
       option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
-        bytes => (key, valueSerde.fromBytes(bytes))
+        byteRecord => new Record(key, valueSerde.fromBytes(byteRecord.value), byteRecord.timestamp)
       }
     }
 
-    override def next(): (K, V) = mapped.next()
+    override def next(): Record[K, V] = mapped.next()
 
     override def hasNext: Boolean = mapped.hasNext
 
@@ -178,8 +178,8 @@ class State[K, V](kvstore: MemStore,
   private def apply(key: ByteBuffer): Option[V] = {
     for (
       cell: ByteBuffer <- option(kvstore(key));
-      bytes: Array[Byte] <- option(kvstore.unwrap(key, cell, ttlMs))
-    ) yield valueSerde.fromBytes(bytes)
+      byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
+    ) yield valueSerde.fromBytes(byteRecord.value)
   }
 
   /**
@@ -353,6 +353,7 @@ class State[K, V](kvstore: MemStore,
   /**
     * State listeners can be instantiated at the partition level and are notified for any change in this State.
     */
+  //FIXMe this has to become listen(state)(pf) of the ActorState
   def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {

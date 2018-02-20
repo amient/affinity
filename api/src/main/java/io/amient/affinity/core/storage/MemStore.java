@@ -22,6 +22,7 @@ package io.amient.affinity.core.storage;
 import io.amient.affinity.core.config.CfgCls;
 import io.amient.affinity.core.config.CfgPath;
 import io.amient.affinity.core.config.CfgStruct;
+import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,9 +129,10 @@ public abstract class MemStore implements Closeable {
      * @param key              record key
      * @param valueAndMetadata wrapped value and event time metadata
      * @param ttlMs            time to live of the owner State
-     * @return unwrapped byte array of the raw value without metadata if not expired, otherwise none
+     * @return unwrapped byte record if not expired, otherwise none
      */
-    final public Optional<byte[]> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
+    final public Optional<Record<byte[], byte[]>> unwrap(ByteBuffer key, ByteBuffer valueAndMetadata, long ttlMs) {
+        long ts = valueAndMetadata.getLong(0);
         if (ttlMs > 0 && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
             //this is the magic that expires key-value pairs based on their create timestamp
             //State.iterator also invokes unwrap for each entry therefore simply iterating cleans up expired entries
@@ -138,10 +140,10 @@ public abstract class MemStore implements Closeable {
             return Optional.empty();
         } else {
             int len = valueAndMetadata.limit();
-            byte[] result = new byte[len - 8];
+            byte[] value = new byte[len - 8];
             valueAndMetadata.position(8);
-            valueAndMetadata.get(result);
-            return Optional.of(result);
+            valueAndMetadata.get(value);
+            return Optional.of(new Record<>(ByteUtils.bufToArray(key), value, ts));
         }
     }
 

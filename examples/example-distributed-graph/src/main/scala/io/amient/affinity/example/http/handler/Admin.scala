@@ -50,7 +50,7 @@ trait Admin extends ExampleGatewayRoot {
         Future.successful {
           Encoder.json(OK, Map(
             "credentials" -> user,
-            "settings" -> settings.iterator.toMap
+            "settings" -> settings.iterator.map(record => (record.key, record.value)).toMap
           ))
         }
       } catch {
