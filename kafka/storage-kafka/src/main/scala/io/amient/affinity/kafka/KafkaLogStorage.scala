@@ -166,6 +166,8 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
   }
 
+  def cancel() = kafkaConsumer.wakeup()
+
   def commit() = kafkaConsumer.commitAsync()
 
   private var producerActive = false

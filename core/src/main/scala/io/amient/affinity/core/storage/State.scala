@@ -127,9 +127,7 @@ class State[K, V](kvstore: MemStore,
 
   private[affinity] def boot(): Unit = logOption.foreach(_.bootstrap(kvstore, partition))
 
-  private[affinity] def tail(): Unit = {
-    //TODO #115 create and start StateSynchronizer which should also (probably) call internalPush
-  }
+  private[affinity] def tail(): Unit = logOption.foreach(_.tail(kvstore, partition))
 
   /**
     * @return a weak iterator that doesn't block read and write operations
@@ -377,7 +375,6 @@ class State[K, V](kvstore: MemStore,
     try {
       logOption.foreach(_.close())
     } finally {
-      //TODO #115      synchronizer.foreach(_.close())
       kvstore.close()
     }
   }

@@ -28,6 +28,7 @@ import io.amient.affinity.core.storage.{State, StateConf}
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 trait ActorState extends Actor {
 
@@ -38,6 +39,7 @@ trait ActorState extends Actor {
   abstract override def postStop(): Unit = {
     super.postStop()
     closeState()
+    storageRegistry.clear()
   }
 
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
@@ -70,9 +72,10 @@ trait ActorState extends Actor {
 
   private[core] def tailState(): Unit = storageRegistry.asScala.foreach(_._2.tail)
 
-  private[core] def closeState(): Unit = {
-    storageRegistry.asScala.foreach(_._2.close)
-    storageRegistry.clear()
+  private[core] def closeState(): Unit = storageRegistry.asScala.foreach {
+    case (id, state) => try state.close catch {
+      case NonFatal(e) => log.error(e, s"Could not close store $id")
+    }
   }
 
 }

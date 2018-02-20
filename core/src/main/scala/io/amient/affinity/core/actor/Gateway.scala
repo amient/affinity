@@ -58,7 +58,7 @@ trait Gateway extends ActorHandler with ActorState {
   private val globals = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = try {
+  def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     globals.get(globalStateStore) match {
       case Some((globalState, _)) => globalState.asInstanceOf[State[K, V]]
       case None =>
@@ -66,15 +66,9 @@ trait Gateway extends ActorHandler with ActorState {
         globals += (globalStateStore -> (bc, new AtomicBoolean(true)))
         bc
     }
-  } catch {
-    case NonFatal(e) =>
-      try closeState() catch {
-        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
-      }
-      throw e
   }
 
-  def keyspace(group: String): ActorRef = try {
+  def keyspace(group: String): ActorRef = {
     keyspaces.get(group) match {
       case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
@@ -87,12 +81,6 @@ trait Gateway extends ActorHandler with ActorState {
         keyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
         ks
     }
-  } catch {
-    case NonFatal(e) =>
-      try closeState() catch {
-        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
-      }
-      throw e
   }
 
   abstract override def preStart(): Unit = {
@@ -105,8 +93,7 @@ trait Gateway extends ActorHandler with ActorState {
   }
 
   abstract override def postStop(): Unit = {
-    super.postStop()
-    try closeState() finally keyspaces.values.foreach(_._1.unwatch(self))
+    try super.postStop() finally keyspaces.values.foreach(_._1.unwatch(self))
   }
 
   abstract override def manage = super.manage orElse {
