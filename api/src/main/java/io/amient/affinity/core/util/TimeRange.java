@@ -14,15 +14,9 @@ public class TimeRange implements Serializable {
     final public long end;
     final public long duration;
 
-    public static final TimeRange ALLTIME = new TimeRange(0, Long.MAX_VALUE);
+    private static final Long UNBOUNDED_MAX_TIME = Long.MAX_VALUE;
 
-    public static TimeRange ALLHISTORY() {
-        return new TimeRange(0, EventTime.unix());
-    }
-
-    public static TimeRange ALLFUTURE() {
-        return new TimeRange(EventTime.unix(), Long.MAX_VALUE);
-    }
+    public static final TimeRange UNBOUNDED = new TimeRange(0, UNBOUNDED_MAX_TIME);
 
     @Override
     public boolean equals(Object other) {
@@ -38,6 +32,10 @@ public class TimeRange implements Serializable {
         return Duration.ofMillis(duration);
     }
 
+    public boolean isUnbounded() {
+        return end == TimeRange.UNBOUNDED_MAX_TIME;
+    }
+
     public OffsetDateTime getLocalStart() {
         return EventTime.local(start);
     }
@@ -51,7 +49,7 @@ public class TimeRange implements Serializable {
     }
 
     public static TimeRange since(long unixtimestamp) {
-        return new TimeRange(unixtimestamp, Long.MAX_VALUE);
+        return new TimeRange(unixtimestamp, UNBOUNDED_MAX_TIME);
     }
 
     public static TimeRange until(OffsetDateTime datetime) {
@@ -151,7 +149,7 @@ public class TimeRange implements Serializable {
 
     public TimeRange(long startEpochMs, long endEpochMs) {
         this.start = Math.max(0, startEpochMs);
-        this.end = endEpochMs;
+        this.end = Math.max(start, endEpochMs);
         this.duration = endEpochMs - startEpochMs;
     }
 

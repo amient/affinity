@@ -92,8 +92,8 @@ public class MemStoreMapDb extends MemStore {
         return true;
     }
 
-    public MemStoreMapDb(String identifier, StateConf conf) throws IOException {
-        super(identifier, conf);
+    public MemStoreMapDb(StateConf conf) throws IOException {
+        super(conf);
         MemStoreMapDbConf config = new MemStoreMapDbConf().apply(conf.MemStore);
         pathToData = dataDir.resolve(this.getClass().getSimpleName() + ".data");
         log.info("Opening MapDb MemStore: " + pathToData);

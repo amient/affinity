@@ -49,7 +49,7 @@ public class MemStoreRocksDbTest {
                 .withValue(template.MemStore.DataDir.path(), ConfigValueFactory.fromAnyRef(tmp))
                 .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreRocksDb.class.getName()));
 
-        MemStore instance = new MemStoreRocksDb("test", new StateConf().apply(config));
+        MemStore instance = new MemStoreRocksDb(new StateConf().apply(config));
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

@@ -66,18 +66,12 @@ trait ActorState extends Actor {
     storageRegistry.asScala.find(_._1 == stateStoreName).get._2
   }
 
-  private[core] def bootState(): Unit = storageRegistry.asScala.foreach { case (_, state) =>
-    state.boot()
-  }
+  private[core] def bootState(): Unit = storageRegistry.asScala.foreach(_._2.boot)
 
-  private[core] def tailState(): Unit = storageRegistry.asScala.foreach { case (_, state) =>
-    state.tail()
-  }
+  private[core] def tailState(): Unit = storageRegistry.asScala.foreach(_._2.tail)
 
   private[core] def closeState(): Unit = {
-    storageRegistry.asScala.foreach { case (_, store) =>
-      store.logOption.foreach(_.close)
-    }
+    storageRegistry.asScala.foreach(_._2.close)
     storageRegistry.clear()
   }
 

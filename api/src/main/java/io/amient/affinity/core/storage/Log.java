@@ -9,6 +9,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -28,9 +29,9 @@ public class Log<P extends Comparable<P>> extends Thread implements Closeable {
     //TODO #115 storage should be private
     final public LogStorage<P> storage;
 
-    public Log(LogStorage<P> storage, Path file, boolean enabled) {
+    public Log(LogStorage<P> storage, Path file) {
         this.storage = storage;
-        this.enabled = enabled;
+        this.enabled = file != null;
         this.file = file;
         if (enabled) {
             if (Files.exists(file)) try {
@@ -73,6 +74,16 @@ public class Log<P extends Comparable<P>> extends Thread implements Closeable {
                 return position;
             }
         };
+    }
+
+    public void bootstrap(final MemStore kvstore, int partition) {
+        if (getCheckpoint() != null) storage.reset(partition, getCheckpoint());
+        Iterator<LogEntry<P>> i = storage.boundedIterator();
+        while (i.hasNext()) {
+            LogEntry<P> entry = i.next();
+            kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
+            updateCheckpoint(entry.position);
+        }
     }
 
     @Override

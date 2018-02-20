@@ -83,6 +83,14 @@ class StateSpec extends TestKit(ActorSystem.create("test",
     state.numKeys should be(2L)
   }
 
+  it should "boot from the beginning if not checkpoint is found" ignore {
+    //TODO #110
+  }
+
+  it should "boot from the last checkpoint" ignore {
+    //TODO #110
+  }
+
 
 }
 

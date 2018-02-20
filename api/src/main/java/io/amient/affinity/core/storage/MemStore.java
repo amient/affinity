@@ -26,14 +26,13 @@ import io.amient.affinity.core.util.CloseableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The implementing class must provide a constructor that takes two arguments:
@@ -59,16 +58,13 @@ public abstract class MemStore implements Closeable {
     final protected int ttlSecs;
     final protected Path dataDir;
 
-    public MemStore(String identifier, StateConf conf) throws IOException {
+    public MemStore(StateConf conf) throws IOException {
         checkpointsEnable = isPersistent();
         ttlSecs = conf.TtlSeconds.apply();
         if (!checkpointsEnable) {
             dataDir = null;
         } else {
-            if (!conf.MemStore.DataDir.isDefined()) {
-                throw new IllegalArgumentException(conf.MemStore.DataDir.path() + " must be provided via affinity.node config for store: " + identifier);
-            }
-            dataDir = conf.MemStore.DataDir.apply().resolve(Paths.get(identifier));
+            dataDir = conf.MemStore.DataDir.apply();
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
         }
     }

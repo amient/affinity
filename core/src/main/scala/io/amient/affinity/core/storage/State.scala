@@ -31,9 +31,9 @@ import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.{ByteUtils, CloseableIterator, EventTime, TimeRange}
+import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConversions._
 import scala.concurrent.Future
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
@@ -45,24 +45,33 @@ object State {
     override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem) = {
+  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
+    val keySerde = Serde.of[K](system.settings.config)
+    val valueSerde = Serde.of[V](system.settings.config)
+    val kvstoreClass = stateConf.MemStore.Class()
+    val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])
+    if (!stateConf.MemStore.DataDir.isDefined) {
+      val nodeConf = Conf(system.settings.config).Affi.Node
+      if (nodeConf.DataDir.isDefined) {
+        stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
+      } else {
+        throw new IllegalArgumentException(stateConf.MemStore.DataDir.path + " could not be derived for state: " + identifier)
+      }
+    }
+    val kvstore = kvstoreConstructor.newInstance(stateConf)
+    try {
+      create(partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
+    } catch {
+      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
+    }
+  }
 
+  def create[K: ClassTag, V: ClassTag](partition: Int, stateConf: StateConf, numPartitions: Int, kvstore: MemStore, keySerde: AbstractSerde[K], valueSerde: AbstractSerde[V]): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
     val external = stateConf.External()
-    val keySerde = Serde.of[K](system.settings.config)
-    val valueSerde = Serde.of[V](system.settings.config)
-
-    val kvstoreClass = stateConf.MemStore.Class()
-    val kvstoreConstructor = kvstoreClass.getConstructor(classOf[String], classOf[StateConf])
-    if (!stateConf.MemStore.DataDir.isDefined) {
-      val nodeConf = Conf(system.settings.config).Affi.Node
-      if (nodeConf.DataDir.isDefined) stateConf.MemStore.DataDir.setValue(nodeConf.DataDir())
-    }
-    val kvstore = kvstoreConstructor.newInstance(identifier, stateConf)
-
-    val logOption = try if (!stateConf.Storage.isDefined) None else Some {
+    val logOption = if (!stateConf.Storage.isDefined) None else Some {
       val storage = LogStorage.newInstance(stateConf.Storage)
       storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
       if (!external) {
@@ -75,14 +84,14 @@ object State {
         }
       }
       storage.reset(partition, TimeRange.since(minTimestamp))
-      val checkpointFile = stateConf.MemStore.DataDir().resolve(kvstore.getClass().getSimpleName() + ".checkpoint")
-      storage.createManager(checkpointFile, partition, kvstore.isPersistent)
-    } catch {
-      case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
+      val checkpointFile = if (!kvstore.isPersistent) null else {
+        stateConf.MemStore.DataDir().resolve(kvstore.getClass().getSimpleName() + ".checkpoint")
+      }
+      storage.open(checkpointFile)
     }
-
-    new State(kvstore, logOption, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly = external)
+    new State(kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly = external)
   }
+
 
   private def asAvroRegistry[S](serde: AbstractSerde[S]): Option[AvroSchemaRegistry] = {
     serde match {
@@ -95,8 +104,9 @@ object State {
 }
 
 
-class State[K, V](val kvstore: MemStore,
-                  val logOption: Option[Log[_ <: Comparable[_]]],
+class State[K, V](kvstore: MemStore,
+                  logOption: Option[Log[_]],
+                  partition: Int,
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
@@ -122,12 +132,9 @@ class State[K, V](val kvstore: MemStore,
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
   }
 
-  private[core] def boot(): Unit = {
-    //TODO #115 get log end offset
-    //TODO # fetch until log end offset reached
-  }
+  private[affinity] def boot(): Unit = logOption.foreach(_.bootstrap(kvstore, partition))
 
-  private[core] def tail(): Unit = {
+  private[affinity] def tail(): Unit = {
     //TODO #115 create StateSynchronizer
   }
 
@@ -136,7 +143,7 @@ class State[K, V](val kvstore: MemStore,
     */
   def iterator: CloseableIterator[(K, V)] = new CloseableIterator[(K, V)] {
     val underlying = kvstore.iterator
-    val mapped = underlying.asScala.flatMap { entry =>
+    val mapped = underlying.flatMap { entry =>
       val key = keySerde.fromBytes(entry.getKey.array())
       option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
         bytes => (key, valueSerde.fromBytes(bytes))
@@ -323,10 +330,8 @@ class State[K, V](val kvstore: MemStore,
       delete(key)
     } else {
       val valueBytes = valueSerde.toBytes(value)
-      val record = new Record(ByteUtils.bufToArray(key), valueBytes, recordTimestamp)
-      lazy val kvStoreValue = kvstore.wrap(valueBytes, recordTimestamp)
       logOption match {
-        case None => Future.successful(kvstore.put(key, kvStoreValue))
+        case None => Future.successful(kvstore.put(key, kvstore.wrap(valueBytes, recordTimestamp)))
         case Some(log) => log.append(kvstore, key, valueBytes, recordTimestamp)
       }
     }
@@ -409,7 +414,7 @@ class State[K, V](val kvstore: MemStore,
     try {
       logOption.foreach(_.close())
     } finally {
-      //      synchronizer.foreach(_.close())
+      //TODO #115      synchronizer.foreach(_.close())
       kvstore.close()
     }
   }

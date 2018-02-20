@@ -40,7 +40,7 @@ object CompactRDDTestUniverse {
     KafkaStorage.Conf.Topic.path -> topic
   ))
 
-  def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.ALLTIME)
+  def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.UNBOUNDED)
                                               (implicit sc: SparkContext): RDD[(K, V)] = {
     CompactRDD(AvroSerde.create(avroConf), LogStorage.newInstance(storageConf), range)
   }

@@ -28,7 +28,7 @@ import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.storage.{LogStorage, MemStoreSimpleMap, State}
+import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
@@ -150,12 +150,10 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
       KafkaStorage.StateConf.Storage.Producer.path -> Map().asJava,
       KafkaStorage.StateConf.Storage.Consumer.path -> Map().asJava
     )))
-    val storage = new KafkaLogStorage(stateConf.Storage)
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
-    val kvstore = new MemStoreSimpleMap("kv", stateConf)
-    val log = storage.createManager(null, 0, false)
-    new State[Int, Test](kvstore, Some(log), keySerde, valueSerde)
+    val kvstore = new MemStoreSimpleMap(stateConf)
+    State.create(partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
@@ -192,13 +190,10 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
     //now bootstrap the state
     val state0 = createStateStoreForPartition(topic, 0)
     val state1 = createStateStoreForPartition(topic, 1)
-    //TODO #115
-//    state0.logOption.init(state0)
-//    state1.logOption.init(state1)
-//    state0.logOption.storage.boot()
-//    state1.logOption.storage.boot()
+    state0.boot()
+    state1.boot()
 //    //TODO #75 test that kafka default partitioner + confluent avro serde partitions as expected
-//    (state0.numKeys + state1.numKeys) should equal(numWrites.get)
+    (state0.numKeys + state1.numKeys) should equal(numWrites.get)
   }
 
 }

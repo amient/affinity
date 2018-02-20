@@ -32,11 +32,13 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.storage.{LogStorage, State}
 import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.collection.immutable.ListMap
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -45,6 +47,8 @@ import scala.util.Random
 class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 2
+
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
@@ -58,6 +62,9 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
     val keyspace1 = keyspace("keyspace1")
 
     override def handle: Receive = {
+      case HTTP(GET, PATH("status"), _, response) =>
+        handleAsJson(response, describeKeyspaces)
+
       case HTTP(GET, PATH(key), _, response) =>
         implicit val timeout = Timeout(500 milliseconds)
         delegateAndHandleErrors(response, keyspace1 ack GetValue(key)) {
@@ -77,20 +84,19 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
 
   import gateway._
 
-  val region1 = new Node(config) {
-    startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test") {
-      import scala.concurrent.ExecutionContext.Implicits.global
-      override def preStart(): Unit = {
-        super.preStart()
-        Await.result(Future.sequence(List(
-          data.replace("A", "initialValueA"),
-          data.replace("B", "initialValueB"))), 1 second)
-      }
-    })
-  }
-
+  val region1 = new Node(config)
   val region2 = new Node(config)
   gateway.awaitClusterReady {
+    val stateConf = Conf(config).Affi.Keyspace("keyspace1").State("consistency-test")
+    val p0 = State.create[String, String]("consistency-test", 0, stateConf, 2, system)
+    val p1 = State.create[String, String]("consistency-test", 1, stateConf, 2, system)
+    Await.result(Future.sequence(List(
+      p0.replace("A", "initialValueA"),
+      p0.replace("B", "initialValueB"),
+      p1.replace("A", "initialValueA"),
+      p1.replace("B", "initialValueB"))), 1 second)
+
+    region1.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
     region2.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
   }
 
@@ -105,52 +111,50 @@ class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with Embe
   }
 
   "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
-//FIXME #115
-//    http_get(uri("/A")).entity should be(jsonStringEntity("initialValueA"))
-//    http_get(uri("/B")).entity should be(jsonStringEntity("initialValueB"))
-//    http_post(uri("/A/updatedValueA")).status.intValue should be(303)
-//    http_get(uri("/A")).entity should be(jsonStringEntity("updatedValueA"))
 
-//    val errorCount = new AtomicLong(0L)
-//    val stopSignal = new AtomicBoolean(false)
-//
-//    import scala.concurrent.ExecutionContext.Implicits.global
-//
-//    val client = new Thread {
-//
-//      override def run: Unit = {
-//        val random = new Random()
-//        val requests = scala.collection.mutable.ListBuffer[Future[String]]()
-//        while (!stopSignal.get) {
-//          Thread.sleep(1)
-//          if (isInterrupted) throw new InterruptedException
-//          val uri = gateway.uri(if (random.nextBoolean()) "/A" else "/B")
-//          requests += http(GET, uri) map {
-//            case response => response.status.value
-//          } recover {
-//            case e: Throwable => e.getMessage
-//          }
-//        }
-//        try {
-//          val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
-//            case (status, list) => (status, list.length)
-//          }
-//          statuses.foreach(println)
-//          errorCount.set(requests.size - statuses("200 OK"))
-//        } catch {
-//          case e: Throwable =>
-//            e.printStackTrace()
-//            errorCount.set(requests.size)
-//        }
-//
-//      }
-//    }
-//    client.start
-//    Thread.sleep(100)
-//    region1.shutdown()
-//    stopSignal.set(true)
-//    client.join()
-//    errorCount.get should be(0L)
+    http_get(uri("/A")).entity should be(jsonStringEntity("initialValueA"))
+    http_get(uri("/B")).entity should be(jsonStringEntity("initialValueB"))
+    http_post(uri("/A/updatedValueA")).status.intValue should be(303)
+    http_get(uri("/A")).entity should be(jsonStringEntity("updatedValueA"))
+
+    val errorCount = new AtomicLong(0L)
+    val stopSignal = new AtomicBoolean(false)
+
+    val client = new Thread {
+
+      override def run: Unit = {
+        val random = new Random()
+        val requests = scala.collection.mutable.ListBuffer[Future[String]]()
+        while (!stopSignal.get) {
+          Thread.sleep(1)
+          if (isInterrupted) throw new InterruptedException
+          val uri = gateway.uri(if (random.nextBoolean()) "/A" else "/B")
+          requests += http(GET, uri) map {
+            case response => response.status.value
+          } recover {
+            case e: Throwable => e.getMessage
+          }
+        }
+        try {
+          val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
+            case (status, list) => (status, list.length)
+          }
+          statuses.foreach(println)
+          errorCount.set(requests.size - statuses("200 OK"))
+        } catch {
+          case e: Throwable =>
+            e.printStackTrace()
+            errorCount.set(requests.size)
+        }
+
+      }
+    }
+    client.start
+    Thread.sleep(100)
+    region1.shutdown()
+    stopSignal.set(true)
+    client.join()
+    errorCount.get should be(0L)
   }
 
 

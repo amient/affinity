@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 import io.amient.affinity.core.util.CloseableIterator
 
 
-class MemStoreSimpleMap(identifier: String, conf: StateConf) extends MemStore(identifier, conf) {
+class MemStoreSimpleMap(conf: StateConf) extends MemStore(conf) {
 
   //TODO implementation of ExpiringConcurrentHashMap or simply a cleaner Thread
   private val internal = new ConcurrentHashMap[ByteBuffer, ByteBuffer]()

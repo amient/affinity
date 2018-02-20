@@ -97,7 +97,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   private val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
   private val partitionProgress = new mutable.HashMap[Int, java.lang.Long]()
   private var closed = false
-  private var range: TimeRange = TimeRange.ALLTIME
+  private var range: TimeRange = TimeRange.UNBOUNDED
 
   override def getNumPartitions(): Int = {
     kafkaConsumer.partitionsFor(topic).size()
@@ -115,15 +115,19 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     onPartitionsAssigned(List(tp))
   }
 
-  override def seek(partition: Int, position: java.lang.Long): Unit = {
+  override def reset(partition: Int, startPosition: java.lang.Long): Unit = {
     val tp = new TopicPartition(topic, partition)
-    this.range = TimeRange.ALLTIME
-    kafkaConsumer.assign(List(tp))
-    log.debug(s"Seeking $topic/$partition by offset range $position")
-    kafkaConsumer.seek(tp, position)
-    partitionProgress.put(tp.partition, Long.MaxValue)
+    kafkaConsumer.seek(tp, startPosition)
+    val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
+    // exclusive of the time range end
+    val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
+    log.debug(s"Reset partition=${tp.partition()} limit $startPosition:$stopOffset")
+    if (stopOffset >= startPosition) {
+      partitionProgress.put(tp.partition, stopOffset)
+    } else {
+      partitionProgress.remove(tp.partition)
+    }
   }
-
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
     partitions.foreach(tp => partitionProgress.remove(tp.partition))
@@ -135,28 +139,13 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp))(tp)
         val nextOffset: Long = Option(kafkaConsumer.committed(tp)).map(_.offset() + 1).getOrElse(0)
         val minOffset: Long = math.max(nextOffset, beginOffset)
-        val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp) - 1
-        val (startOffset: Long, stopOffset: Long) = if (range == TimeRange.ALLTIME) {
-          (minOffset, Long.MaxValue)
-        } else {
-          this.range = range
-          (kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp) match {
-            case null => minOffset
-            case some => some.offset() // inclusive of the time range start
-          }, kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp) match {
-            case null => maxOffset
-            case some => some.offset() - 1 //exclusive of the time range end
-          })
-        }
-        if (stopOffset >= startOffset) {
-          kafkaConsumer.seek(tp, startOffset)
-          partitionProgress.put(tp.partition, stopOffset)
-          log.debug(s"Scanning partition=${tp.partition()} by time range ${range.getLocalStart}:${range.getLocalEnd} ==> offsets=$startOffset:$stopOffset")
-        }
+        val startOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp)).map(_.offset).getOrElse(minOffset)
+        log.debug(s"Reset partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}")
+        reset(tp.partition, startOffset)
     }
   }
 
-  override def fetch(): util.Iterator[LogEntry[java.lang.Long]] = {
+  override def fetch(unbounded: Boolean): util.Iterator[LogEntry[java.lang.Long]] = {
     if (partitionProgress.isEmpty) return null
 
     val kafkaRecords = try {
@@ -169,7 +158,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       if (!partitionProgress.contains(record.partition)) {
         false
       } else {
-        if (record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
+        if (!unbounded && record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
         record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {
@@ -199,6 +188,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     //kafka uses null value as a delete tombstone
     append(new Record[Array[Byte], Array[Byte]](key, null, EventTime.unix));
   }
+
   override def flush() = if (producerActive) {
     producer.flush()
   }
@@ -251,18 +241,18 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         }
         log.debug(s"Checking that topic $topic has correct replication factor: ${replicationFactor}")
         val actualReplFactor = description.partitions().get(0).replicas().size()
-        if ( actualReplFactor < replicationFactor) {
+        if (actualReplFactor < replicationFactor) {
           throw new IllegalStateException(s"Kafka topic $topic has $actualReplFactor, expecting: $replicationFactor")
         }
         log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
         val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
         val actualConfig = admin.describeConfigs(List(topicConfigResource))
           .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-        val configOutOfSync = topicConfigs.exists { case (k,v) => actualConfig.get(k).value() != v }
+        val configOutOfSync = topicConfigs.exists { case (k, v) => actualConfig.get(k).value() != v }
         if (readonly) {
           if (configOutOfSync) log.warn(s"External State configuration doesn't match the state configuration: $topicConfigs")
         } else if (configOutOfSync) {
-          val entries: util.Collection[ConfigEntry] = topicConfigs.map { case (k,v) => new ConfigEntry(k,v) }
+          val entries: util.Collection[ConfigEntry] = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }
           admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
             .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
           log.info(s"Topic $topic configuration altered successfully")

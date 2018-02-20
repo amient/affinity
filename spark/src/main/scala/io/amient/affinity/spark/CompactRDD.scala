@@ -40,7 +40,7 @@ object CompactRDD {
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
                                       storageBinder: => LogStorage[_],
                                       compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
-    apply[K,V](serdeBinder, serdeBinder, storageBinder, TimeRange.ALLHISTORY, compacted)
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, TimeRange.UNBOUNDED, compacted)
   }
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
@@ -51,7 +51,7 @@ object CompactRDD {
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
                                       storageBinder: => LogStorage[_])(implicit sc: SparkContext): RDD[(K, V)] = {
-    apply[K,V](serdeBinder, serdeBinder, storageBinder, TimeRange.ALLHISTORY, compacted = true)
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, TimeRange.UNBOUNDED, compacted = true)
   }
 
   /**

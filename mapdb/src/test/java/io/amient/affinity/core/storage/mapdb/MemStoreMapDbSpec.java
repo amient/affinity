@@ -49,7 +49,7 @@ public class MemStoreMapDbSpec {
                 .withValue(template.MemStore.DataDir.path(), ConfigValueFactory.fromAnyRef(tmp))
                 .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreMapDb.class.getName()))
                 .withValue(template.MemStore.path(new MemStoreMapDb.MemStoreMapDbConf().MemoryMapEnabled.path()), ConfigValueFactory.fromAnyRef(false));
-        MemStore instance = new MemStoreMapDb("test", new StateConf().apply(config));
+        MemStore instance = new MemStoreMapDb(new StateConf().apply(config));
         try {
             ByteBuffer key1 = ByteBuffer.wrap("key1".getBytes());
             ByteBuffer key2 = ByteBuffer.wrap("key2".getBytes());

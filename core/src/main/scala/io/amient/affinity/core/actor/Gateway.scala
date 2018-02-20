@@ -19,7 +19,7 @@ import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.storage.State
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
@@ -144,27 +144,15 @@ trait Gateway extends ActorHandler with ActorState {
       case KeyValueMediatorCreated(keyValueMediator) => keyValueMediator
     }
   }
-//
-//  def describeAvro: scala.collection.immutable.Map[String, String] = {
-//    val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
-//    serde.describeSchemas.map {
-//      case (id, schema) => ((id.toString, schema.toString))
-//    }
-//  }
 
-  def describeServices: scala.collection.immutable.Map[String, String] = {
-    keyspaces.toMap.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
-  }
-
-  def describeRegions: scala.collection.immutable.List[String] = {
+  def describeKeyspaces: Map[String, Seq[String]] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
-    val routeeSets = Future.sequence {
-      keyspaces.toMap.map { case (group, (_, actorRef, _)) =>
-        actorRef ? GetRoutees map (_.asInstanceOf[Routees])
-      }
+    keyspaces.toMap.map {
+      case (group, (_, actorRef, _)) =>
+        val x = Await.result(actorRef ? GetRoutees map (_.asInstanceOf[Routees]), t)
+        (group, x.routees.map(_.toString))
     }
-    Await.result(routeeSets, t).map(_.routees).flatten.map(_.toString).toList.sorted
   }
 
 

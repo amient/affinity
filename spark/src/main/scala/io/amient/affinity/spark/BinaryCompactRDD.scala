@@ -31,6 +31,7 @@ class BinaryCompactRDD(sc: SparkContext, storageBinder: => LogStorage[_], range:
   extends RDD[(ByteKey, Record[Array[Byte], Array[Byte]])](sc, Nil) {
 
   type R = Record[Array[Byte], Array[Byte]]
+
   val compactor = (r1: R, r2: R) => if (r1.timestamp > r2.timestamp) r1 else r2
 
   protected def getPartitions: Array[Partition] = {
@@ -51,7 +52,7 @@ class BinaryCompactRDD(sc: SparkContext, storageBinder: => LogStorage[_], range:
     storage.reset(split.index, range)
     context.addTaskCompletionListener(_ =>  storage.close)
 
-    val logRecords = storage.iterator().map(record => (new ByteKey(record.key), record))
+    val logRecords = storage.boundedIterator().map(record => (new ByteKey(record.key), record))
     val compactedRecords: Iterator[(ByteKey, R)] = if (!compacted) logRecords else {
       val spillMap = new ExternalAppendOnlyMap[ByteKey, R, R]((v) => v, compactor, compactor)
       spillMap.insertAll(logRecords)

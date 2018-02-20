@@ -43,13 +43,8 @@ public interface LogStorage<P extends Comparable<P>> extends Closeable {
         return cls.getConstructor(LogStorageConf.class).newInstance(conf);
     }
 
-    default Log<P> createManager(Path checkpointFile, int partition, boolean enabled) {
-        Log<P> instance = new Log<>(this, checkpointFile, enabled);
-        P checkpoint = instance.getCheckpoint();
-        if (checkpoint != null) {
-            seek(partition, checkpoint);
-        }
-        return instance;
+    default Log<P> open(Path checkpointFile) {
+        return new Log<>(this, checkpointFile);
     }
 
     int getNumPartitions();
@@ -58,7 +53,7 @@ public interface LogStorage<P extends Comparable<P>> extends Closeable {
 
     void reset(int partition, TimeRange range);
 
-    void seek(int partition, P position);
+    void reset(int partition, P startPosition);
 
     String keySubject();
 
@@ -70,7 +65,7 @@ public interface LogStorage<P extends Comparable<P>> extends Closeable {
      *
      * @return iterator of records which may be empty, or null if the maximum offset was reached
      */
-    Iterator<LogEntry<P>> fetch() throws InterruptedException;
+    Iterator<LogEntry<P>> fetch(boolean unbounded) throws InterruptedException;
 
     void commit();
 
@@ -80,7 +75,15 @@ public interface LogStorage<P extends Comparable<P>> extends Closeable {
 
     void flush();
 
-    default Iterator<LogEntry<P>> iterator() {
+    default Iterator<LogEntry<P>> boundedIterator() {
+        return iterator(false);
+    }
+
+    default Iterator<LogEntry<P>> unboundedIterator() {
+        return iterator(true);
+    }
+
+    default Iterator<LogEntry<P>> iterator(boolean unbounded) {
         return new Iterator<LogEntry<P>>() {
 
             private LogEntry<P> record = null;
@@ -107,7 +110,7 @@ public interface LogStorage<P extends Comparable<P>> extends Closeable {
                 record = null;
                 while (i == null || !i.hasNext()) {
                     try {
-                        i = fetch();
+                        i = fetch(unbounded);
                         if (i == null) return;
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
