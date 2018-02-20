@@ -115,13 +115,6 @@ class State[K, V](kvstore: MemStore,
 
   self =>
 
-  //
-  //  val synchronizer: Option[StateSynchronizer] = storageOption.map { storage: LogStorage[_] =>
-  //    new StateSynchronizer(storage, memstore)
-  //  }
-  //
-  //  synchronizer.foreach(_.start(this))
-
   import scala.concurrent.ExecutionContext.Implicits.global
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
@@ -135,7 +128,7 @@ class State[K, V](kvstore: MemStore,
   private[affinity] def boot(): Unit = logOption.foreach(_.bootstrap(kvstore, partition))
 
   private[affinity] def tail(): Unit = {
-    //TODO #115 create StateSynchronizer
+    //TODO #115 create and start StateSynchronizer which should also (probably) call internalPush
   }
 
   /**
@@ -205,7 +198,7 @@ class State[K, V](kvstore: MemStore,
     * @return Unit Future which may be failed if the operation didn't succeed
     */
   def replace(key: K, value: V): Future[Unit] = {
-    put(ByteBuffer.wrap(keySerde.toBytes(key)), value).map(__ => push(key, value))
+    put(keySerde.toBytes(key), value).map(_ => push(key, value))
   }
 
   /**
@@ -215,7 +208,7 @@ class State[K, V](kvstore: MemStore,
     * @return Unit Future which may be failed if the operation didn't succeed
     */
   def delete(key: K): Future[Unit] = {
-    delete(ByteBuffer.wrap(keySerde.toBytes(key))).map(_ => push(key, null))
+    delete(keySerde.toBytes(key)).map(_ => push(key, null))
   }
 
   /**
@@ -272,10 +265,10 @@ class State[K, V](kvstore: MemStore,
     */
   def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
-      val k = ByteBuffer.wrap(keySerde.toBytes(key))
+      val k = keySerde.toBytes(key)
       val l = lock(key)
       try {
-        pf(apply(k)) match {
+        pf(apply(ByteBuffer.wrap(k))) match {
           case (None, _, result) =>
             unlock(key, l)
             Future.successful(result)
@@ -315,11 +308,11 @@ class State[K, V](kvstore: MemStore,
     * the previous value is rolled back in the kvstore and the failure is propagated into
     * the result future.
     *
-    * @param key   serielized key wrapped in a ByteBuffer
+    * @param key serialized key
     * @param value new value for the key
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def put(key: ByteBuffer, value: V): Future[_] = {
+  private def put(key: Array[Byte], value: V): Future[_] = {
     if (readonly) throw new IllegalStateException("put() called on a read-only state")
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
@@ -331,7 +324,7 @@ class State[K, V](kvstore: MemStore,
     } else {
       val valueBytes = valueSerde.toBytes(value)
       logOption match {
-        case None => Future.successful(kvstore.put(key, kvstore.wrap(valueBytes, recordTimestamp)))
+        case None => Future.successful(kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp)))
         case Some(log) => log.append(kvstore, key, valueBytes, recordTimestamp)
       }
     }
@@ -347,10 +340,10 @@ class State[K, V](kvstore: MemStore,
     * @param key serialized key to delete
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def delete(key: ByteBuffer): Future[_] = {
+  private def delete(key: Array[Byte]): Future[_] = {
     if (readonly) throw new IllegalStateException("delete() called on a read-only state")
     logOption match {
-      case None => Future.successful(kvstore.remove(key))
+      case None => Future.successful(kvstore.remove(ByteBuffer.wrap(key)))
       case Some(log) => log.delete(kvstore, key)
     }
   }
@@ -370,6 +363,23 @@ class State[K, V](kvstore: MemStore,
         case illegal => throw new RuntimeException(s"Can't send $illegal to observers")
       }
     })
+  }
+
+  override def internalPush(key: Array[Byte], value: Optional[Array[Byte]]) = {
+    if (value.isPresent) {
+      push(keySerde.fromBytes(key), Some(valueSerde.fromBytes(value.get)))
+    } else {
+      push(keySerde.fromBytes(key), None)
+    }
+  }
+
+  override def close() = {
+    try {
+      logOption.foreach(_.close())
+    } finally {
+      //TODO #115      synchronizer.foreach(_.close())
+      kvstore.close()
+    }
   }
 
   /**
@@ -400,23 +410,6 @@ class State[K, V](kvstore: MemStore,
       }
     }
     l
-  }
-
-  override def internalPush(key: Array[Byte], value: Optional[Array[Byte]]) = {
-    if (value.isPresent) {
-      push(keySerde.fromBytes(key), Some(valueSerde.fromBytes(value.get)))
-    } else {
-      push(keySerde.fromBytes(key), None)
-    }
-  }
-
-  override def close() = {
-    try {
-      logOption.foreach(_.close())
-    } finally {
-      //TODO #115      synchronizer.foreach(_.close())
-      kvstore.close()
-    }
   }
 
 }

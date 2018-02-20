@@ -1,6 +1,5 @@
 package io.amient.affinity.core.storage;
 
-import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.MappedJavaFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,23 +52,23 @@ public class Log<P extends Comparable<P>> extends Thread implements Closeable {
         return checkpoint.get();
     }
 
-    public Future<P> append(final MemStore kvstore, final ByteBuffer key, byte[] valueBytes, final long recordTimestamp) {
-        Record record = new Record(ByteUtils.bufToArray(key), valueBytes, recordTimestamp);
+    public Future<P> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) {
+        Record record = new Record(key, valueBytes, recordTimestamp);
         return new MappedJavaFuture<P, P>(storage.append(record)) {
             @Override
             public P map(P position) {
-                kvstore.put(key, kvstore.wrap(valueBytes, recordTimestamp));
+                kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp));
                 updateCheckpoint(position);
                 return position;
             }
         };
     }
 
-    public Future<P> delete(final MemStore kvstore, final ByteBuffer key) {
-        return new MappedJavaFuture<P,P>(storage.delete(ByteUtils.bufToArray(key))) {
+    public Future<P> delete(final MemStore kvstore, final byte[] key) {
+        return new MappedJavaFuture<P,P>(storage.delete(key)) {
             @Override
             public P map(P position) {
-                kvstore.remove(key);
+                kvstore.remove(ByteBuffer.wrap(key));
                 updateCheckpoint(position);
                 return position;
             }
