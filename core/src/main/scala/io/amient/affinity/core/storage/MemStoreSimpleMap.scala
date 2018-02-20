@@ -42,11 +42,11 @@ class MemStoreSimpleMap(conf: StateConf) extends MemStore(conf) {
     Optional.ofNullable(internal.get(key))
   }
 
-  override def putImpl(key: ByteBuffer, value: ByteBuffer) {
+  override def put(key: ByteBuffer, value: ByteBuffer) {
     internal.put(key, value)
   }
 
-  override def removeImpl(key: ByteBuffer) {
+  override def remove(key: ByteBuffer) {
     internal.remove(key)
   }
 

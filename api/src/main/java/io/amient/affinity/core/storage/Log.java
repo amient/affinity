@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -27,7 +28,9 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
 
     final private LogStorage<POS> storage;
 
-    private AtomicReference<LogSynchronizer<POS>> synchronizer = new AtomicReference<>();
+    private abstract class LogSync extends Thread implements Closeable {}
+
+    private AtomicReference<LogSync> synchronizer = new AtomicReference<>();
 
     public Log(LogStorage<POS> storage, Path checkpointFile) {
         this.storage = storage;
@@ -89,8 +92,40 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         }
     }
 
-    public void tail(final MemStore kvstore, int partition) {
-        synchronizer.set(new LogSynchronizer(kvstore, storage));
+    public <K> void tail(final MemStore kvstore, ObservableState<K> state) {
+        synchronizer.set(new LogSync() {
+            @Override
+            public void run() {
+                try {
+                    while (!interrupted()) {
+                        Iterator<LogEntry<POS>> entries = storage.fetch(true);
+                        if (entries == null) {
+                            throw new IllegalStateException("unbounded fetch operation should block instead of returning null");
+                        } else while (entries.hasNext()) {
+                            LogEntry<POS> entry = entries.next();
+                            if (storage.isTombstone(entry)) {
+                                kvstore.remove(ByteBuffer.wrap(entry.key));
+                                state.internalPush(entry.key, Optional.empty());
+                            } else {
+                                kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
+                                state.internalPush(entry.key, Optional.of(entry.value));
+                            }
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    interrupted();
+                } catch (Throwable e) {
+                    log.error("Failure in the LogSync Thread, interrupting thread group", e);
+                    Thread.currentThread().getThreadGroup().interrupt();
+                }
+            }
+
+            @Override
+            public void close() throws IOException {
+                this.interrupt();
+                storage.cancel();
+            }
+        });
     }
 
     @Override
@@ -119,7 +154,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     }
 
     private void stopSynchronizerIfRunning() throws IOException {
-        LogSynchronizer<POS> sync = synchronizer.get();
+        LogSync sync = synchronizer.get();
         if (sync != null) {
             synchronizer.compareAndSet(sync, null);
             sync.close();

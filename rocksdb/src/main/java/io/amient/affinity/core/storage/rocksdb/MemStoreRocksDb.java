@@ -128,7 +128,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    synchronized public void putImpl(ByteBuffer key, ByteBuffer value) {
+    synchronized public void put(ByteBuffer key, ByteBuffer value) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         try {
             internal.put(keyBytes, ByteUtils.bufToArray(value));
@@ -147,7 +147,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    synchronized public void removeImpl(ByteBuffer key) {
+    synchronized public void remove(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         try {
             internal.remove(keyBytes);

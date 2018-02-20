@@ -122,12 +122,12 @@ public class MemStoreMapDb extends MemStore {
     }
 
     @Override
-    public void putImpl(ByteBuffer key, ByteBuffer value) {
+    public void put(ByteBuffer key, ByteBuffer value) {
         internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value));
     }
 
     @Override
-    public void removeImpl(ByteBuffer key) {
+    public void remove(ByteBuffer key) {
         internal.remove(ByteUtils.bufToArray(key));
     }
 

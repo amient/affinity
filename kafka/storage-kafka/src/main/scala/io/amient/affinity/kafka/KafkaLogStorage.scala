@@ -1,6 +1,6 @@
 package io.amient.affinity.kafka
 
-import java.util
+import java.{lang, util}
 import java.util.Properties
 import java.util.concurrent.{ExecutionException, Future, TimeUnit}
 
@@ -200,6 +200,8 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       closed = true
     }
   }
+
+  override def isTombstone(entry: LogEntry[lang.Long]) = entry.value == null
 
   override def ensureCorrectConfiguration(ttlMs: Long, numPartitions: Int, readonly: Boolean) {
     val adminProps = new Properties() {

@@ -94,15 +94,7 @@ public abstract class MemStore implements Closeable {
      * @param value    ByteBuffer which will be associated with the given key
      * @return new Checkpoint after the operation
      */
-    public final void put(ByteBuffer key, ByteBuffer value) {
-        putImpl(key, value);
-    }
-
-    /**
-     * @param key   ByteBuffer representation
-     * @param value ByteBuffer which will be associated with the given key
-     */
-    protected abstract void putImpl(ByteBuffer key, ByteBuffer value);
+    public abstract void put(ByteBuffer key, ByteBuffer value);
 
     /**
      * remove key
@@ -110,15 +102,7 @@ public abstract class MemStore implements Closeable {
      * @param key      ByteBuffer representation whose value will be removed
      * @return new Checkpoint valid after the operation
      */
-    public final void remove(ByteBuffer key) {
-        removeImpl(key);
-    }
-
-    /**
-     * @param key key to remove
-     */
-    protected abstract void removeImpl(ByteBuffer key);
-
+    public abstract void remove(ByteBuffer key);
 
 
     /**
@@ -150,7 +134,7 @@ public abstract class MemStore implements Closeable {
         if (ttlMs > 0 && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
             //this is the magic that expires key-value pairs based on their create timestamp
             //State.iterator also invokes unwrap for each entry therefore simply iterating cleans up expired entries
-            removeImpl(key);
+            remove(key);
             return Optional.empty();
         } else {
             int len = valueAndMetadata.limit();

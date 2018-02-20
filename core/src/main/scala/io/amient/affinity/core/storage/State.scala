@@ -127,7 +127,7 @@ class State[K, V](kvstore: MemStore,
 
   private[affinity] def boot(): Unit = logOption.foreach(_.bootstrap(kvstore, partition))
 
-  private[affinity] def tail(): Unit = logOption.foreach(_.tail(kvstore, partition))
+  private[affinity] def tail(): Unit = logOption.foreach(_.tail(kvstore, this))
 
   /**
     * @return a weak iterator that doesn't block read and write operations
