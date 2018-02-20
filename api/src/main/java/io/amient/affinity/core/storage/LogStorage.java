@@ -82,7 +82,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      *  the end of the log.
      *
      * @param partition partition number [0 - (numPartitions-1)]
-     * @param startPosition position to seek
+     * @param startPosition position to seek or null if resetting to the beginning of the log
      */
     void reset(int partition, POS startPosition);
 
@@ -117,9 +117,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      *                  if true the fetch will block when no more records are available
      *                  even if the upper limit set by reset is reached
      *
-     * @return iterator of records which may be empty, or null if the maximum offset was reached
-     *
-     * @throws InterruptedException if a blocking operation was interrupted, e.g. by calling cancel()
+     * @return iterator of records which may be empty, or null if the maximum offset was reached or cancel() was called
      */
     Iterator<LogEntry<POS>> fetch(boolean unbounded) throws InterruptedException;
 
@@ -132,7 +130,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
 
 
     /**
-     * Cancel any polling operation, whether fetch or iterator.hasNext etc.
+     * Cancel any ongoing blocking operation, whether fetch or iterator.hasNext etc.
      */
     void cancel();
 
@@ -151,6 +149,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
     /**
      * Append a tombstone to the end of the log for the given record key
      * @param key
+     * //TODO delete should also take a custom timestamp
      * @return future with the new log position checkpoint
      */
     Future<POS> delete(byte[] key);

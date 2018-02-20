@@ -14,9 +14,18 @@ public class TimeRange implements Serializable {
     final public long end;
     final public long duration;
 
+    private static final Long UNBOUNDED_MIN_TIME = 0L;
+
     private static final Long UNBOUNDED_MAX_TIME = Long.MAX_VALUE;
 
-    public static final TimeRange UNBOUNDED = new TimeRange(0, UNBOUNDED_MAX_TIME);
+    public static final TimeRange UNBOUNDED = new TimeRange(UNBOUNDED_MIN_TIME, UNBOUNDED_MAX_TIME);
+
+    @Override
+    public String toString() {
+        String from = start == UNBOUNDED_MIN_TIME ? "∞" : getLocalStart().toString();
+        String to = end == UNBOUNDED_MAX_TIME ? "∞" : getLocalEnd().toString();
+        return from + " .. " + to;
+    }
 
     @Override
     public boolean equals(Object other) {
@@ -30,10 +39,6 @@ public class TimeRange implements Serializable {
 
     public Duration getDuration() {
         return Duration.ofMillis(duration);
-    }
-
-    public boolean isUnbounded() {
-        return end == TimeRange.UNBOUNDED_MAX_TIME;
     }
 
     public OffsetDateTime getLocalStart() {

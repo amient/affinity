@@ -117,12 +117,13 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def reset(partition: Int, startPosition: java.lang.Long): Unit = {
     val tp = new TopicPartition(topic, partition)
-    kafkaConsumer.seek(tp, startPosition)
+    val startOffset: Long = if (startPosition == null) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
+    kafkaConsumer.seek(tp, startOffset)
     val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
     // exclusive of the time range end
     val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
-    log.debug(s"Reset partition=${tp.partition()} limit $startPosition:$stopOffset")
-    if (stopOffset >= startPosition) {
+    log.debug(s"Reset partition=${tp.partition()} limit $startOffset:$stopOffset")
+    if (stopOffset >= startOffset) {
       partitionProgress.put(tp.partition, stopOffset)
     } else {
       partitionProgress.remove(tp.partition)
@@ -146,19 +147,22 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   }
 
   override def fetch(unbounded: Boolean): util.Iterator[LogEntry[java.lang.Long]] = {
-    if (partitionProgress.isEmpty) return null
+
+    if (!unbounded && partitionProgress.isEmpty) return null
 
     val kafkaRecords = try {
       kafkaConsumer.poll(6000)
     } catch {
-      case _: WakeupException => throw new InterruptedException
+      case _: WakeupException => return null
     }
 
     kafkaRecords.iterator.filter { record =>
-      if (!partitionProgress.contains(record.partition)) {
+      if (unbounded) {
+        record.timestamp >= range.start && record.timestamp <= range.end
+      } else if (!partitionProgress.contains(record.partition)) {
         false
       } else {
-        if (!unbounded && record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
+        if (record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
         record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {

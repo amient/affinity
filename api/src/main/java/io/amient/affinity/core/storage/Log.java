@@ -28,7 +28,8 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
 
     final private LogStorage<POS> storage;
 
-    private abstract class LogSync extends Thread implements Closeable {}
+    private abstract class LogSync extends Thread implements Closeable {
+    }
 
     private AtomicReference<LogSync> synchronizer = new AtomicReference<>();
 
@@ -79,17 +80,22 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         };
     }
 
-    public void bootstrap(final MemStore kvstore, int partition) {
+    public long bootstrap(final MemStore kvstore, int partition) {
         stopSynchronizerIfRunning();
         POS checkpoint = getCheckpoint();
-        if (checkpoint != null) storage.reset(partition, checkpoint);
+        storage.reset(partition, checkpoint);
 
         Iterator<LogEntry<POS>> i = storage.boundedIterator();
+        long numRecordsProcessed = 0L;
         while (i.hasNext()) {
             LogEntry<POS> entry = i.next();
-            kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
-            updateCheckpoint(entry.position);
+            if (checkpoint == null || entry.position.compareTo(checkpoint) > 0) {
+                kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
+                updateCheckpoint(entry.position);
+                numRecordsProcessed += 1;
+            }
         }
+        return numRecordsProcessed;
     }
 
     public <K> void tail(final MemStore kvstore, ObservableState<K> state) {
@@ -97,35 +103,33 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             @Override
             public void run() {
                 try {
-                    while (!interrupted()) {
+                    while (!isInterrupted()) {
                         Iterator<LogEntry<POS>> entries = storage.fetch(true);
                         if (entries == null) {
-                            throw new IllegalStateException("unbounded fetch operation should block instead of returning null");
+                            return;
                         } else while (entries.hasNext()) {
                             LogEntry<POS> entry = entries.next();
                             if (storage.isTombstone(entry)) {
                                 kvstore.remove(ByteBuffer.wrap(entry.key));
-                                state.internalPush(entry.key, Optional.empty());
+                                if (state != null) state.internalPush(entry.key, Optional.empty());
                             } else {
                                 kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
-                                state.internalPush(entry.key, Optional.of(entry.value));
+                                if (state != null) state.internalPush(entry.key, Optional.of(entry.value));
                             }
+                            updateCheckpoint(entry.position);
                         }
                     }
-                } catch (InterruptedException e) {
-                    interrupted();
                 } catch (Throwable e) {
-                    log.error("Failure in the LogSync Thread, interrupting thread group", e);
-                    Thread.currentThread().getThreadGroup().interrupt();
+                    log.error("Failure in the LogSync Thread", e);
                 }
             }
 
             @Override
             public void close() throws IOException {
-                this.interrupt();
                 storage.cancel();
             }
         });
+        synchronizer.get().start();
     }
 
     @Override
