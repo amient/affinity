@@ -158,23 +158,6 @@ class State[K, V](kvstore: MemStore,
     */
   def apply(key: K): Option[V] = apply(ByteBuffer.wrap(keySerde.toBytes(key)))
 
-  /**
-    * This is similar to apply(key) except it also applies row lock which is useful if the client
-    * wants to make sure that the returned value incorporates all changes applied to it in update operations
-    * with in the same sequence.
-    *
-    * @param key
-    * @return
-    */
-  def get(key: K): Option[V] = {
-    val l = lock(key)
-    try {
-      apply(key)
-    } finally {
-      unlock(key, l)
-    }
-  }
-
   private def apply(key: ByteBuffer): Option[V] = {
     for (
       cell: ByteBuffer <- option(kvstore(key));
@@ -195,9 +178,7 @@ class State[K, V](kvstore: MemStore,
     * @param value new value to be associated with the key
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def replace(key: K, value: V): Future[Unit] = {
-    put(keySerde.toBytes(key), value).map(_ => push(key, value))
-  }
+  def replace(key: K, value: V): Future[Unit] = put(keySerde.toBytes(key), value).map(_ => push(key, value))
 
   /**
     * delete the given key
@@ -205,22 +186,16 @@ class State[K, V](kvstore: MemStore,
     * @param key to delete
     * @return Unit Future which may be failed if the operation didn't succeed
     */
-  def delete(key: K): Future[Unit] = {
-    delete(keySerde.toBytes(key)).map(_ => push(key, null))
-  }
+  def delete(key: K): Future[Unit] = delete(keySerde.toBytes(key)).map(_ => push(key, null))
 
   /**
-    * update is a syntactic sugar for update where the value is always overriden
+    * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
     *
     * @param key   to updateImpl
     * @param value new value to be associated with the key
     * @return Future Optional of the value previously held at the key position
     */
-  def update(key: K, value: V): Future[Option[V]] = update(key) {
-    case Some(prev) if prev == value => (None, Some(prev), Some(prev))
-    case Some(prev) => (Some(value), Some(value), Some(prev))
-    case None => (Some(value), Some(value), None)
-  }
+  def update(key: K, value: V): Future[Option[V]] = getAndUpdate(key, _ => Some(value))
 
   /**
     * remove is a is a syntactic sugar for update where None is used as Value
@@ -231,28 +206,116 @@ class State[K, V](kvstore: MemStore,
     * @param command is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */
-  def remove(key: K, command: Any): Future[Option[V]] = update(key) {
-    case None => (None, None, None)
-    case Some(component) => (Some(command), None, Some(component))
-  }
+  def remove(key: K, command: Any): Future[Option[V]] = getAndUpdate(key, x => None)
 
   /**
-    * insert is a syntactic sugar for putImpl where the value is overriden if it doesn't exist
-    * and the command is the value itself
+    * insert is a syntactic sugar for update which is only executed if the key doesn't exist yet
     *
     * @param key   to insert
     * @param value new value to be associated with the key
-    * @return Future Optional of the value previously held at the key position
+    * @return Future value newly inserted if the key did not exist and operation succeeded, failed future otherwise
     */
-  def insert(key: K, value: V): Future[V] = {
-    update(key) {
-      case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
-      case None => (Some(value), Some(value), value)
+  def insert(key: K, value: V): Future[V] = updateAndGet(key, x => x match {
+    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
+    case None => Some(value)
+  }).map(_.get)
+
+  /**
+    * This is similar to apply(key) except it also applies row lock which is useful if the client
+    * wants to make sure that the returned value incorporates all changes applied to it in update operations
+    * within the same sequence.
+    *
+    * @param key
+    * @return
+    */
+  def get(key: K): Option[V] = {
+    val l = lock(key)
+    try {
+      apply(key)
+    } finally {
+      unlock(key, l)
     }
   }
 
   /**
-    * update enables per-key observer pattern for incremental updates.
+    * atomic get-and-update if the current and updated value are the same the no modifications are made to
+    * the underlying stores and the returned future is completed immediately.
+    *
+    * @param key to updateImpl
+    * @param f   function which given a current value returns an updated value or empty if the key is to be removed
+    *            as a result of the update
+    * @return Future Optional of the value previously held at the key position
+    */
+  def getAndUpdate(key: K, f: Option[V] => Option[V]): Future[Option[V]] = try {
+    val k = keySerde.toBytes(key)
+    val l = lock(key)
+    try {
+      val currentValue = apply(ByteBuffer.wrap(k))
+      val updatedValue = f(currentValue)
+      if (currentValue == updatedValue) {
+        unlock(key, l)
+        Future.successful(currentValue)
+      } else {
+        val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
+        f.transform({
+          s => unlock(key, l); s
+        }, {
+          e => unlock(key, l); e
+        }) andThen {
+          case _ => push(key, updatedValue)
+        } map (_ => currentValue)
+      }
+    } catch {
+      case e: Throwable =>
+        unlock(key, l)
+        throw e
+    }
+  } catch {
+    case NonFatal(e) => Future.failed(e)
+  }
+
+  /**
+    * atomic update-and-get - if the current and updated value are the same the no modifications are made to
+    * the underlying stores and the returned future is completed immediately.
+    *
+    * @param key key which is going to be updated
+    * @param f function which given a current value returns an updated value or empty if the key is to be removed
+    *          as a result of the update
+    * @return Future optional value which will be successful if the put operation succeeded and will hold the updated value
+    */
+  def updateAndGet(key: K, f: Option[V] => Option[V]): Future[Option[V]] = {
+    try {
+      val k = keySerde.toBytes(key)
+      val l = lock(key)
+      try {
+        val currentValue = apply(ByteBuffer.wrap(k))
+        val updatedValue = f(currentValue)
+        if (currentValue == updatedValue) {
+            unlock(key, l)
+            Future.successful(updatedValue)
+        } else {
+            val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
+            f.transform({
+              s => unlock(key, l); s
+            }, {
+              e => unlock(key, l); e
+            }) andThen {
+              case _ => push(key, updatedValue)
+            } map (_ => updatedValue)
+        }
+      } catch {
+        case e: Throwable =>
+          unlock(key, l)
+          throw e
+      }
+    } catch {
+      case NonFatal(e) => Future.failed(e)
+    }
+  }
+
+
+  /**
+    * update enables per-key observer pattern for incremental updates
     *
     * @param key  key which is going to be updated
     * @param pf   putImpl function which maps the current value Option[V] at the given key to 3 values:
@@ -261,7 +324,7 @@ class State[K, V](kvstore: MemStore,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
-  def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
+  def updatedAndMap[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       val k = keySerde.toBytes(key)
       val l = lock(key)
@@ -306,7 +369,7 @@ class State[K, V](kvstore: MemStore,
     * the previous value is rolled back in the kvstore and the failure is propagated into
     * the result future.
     *
-    * @param key serialized key
+    * @param key   serialized key
     * @param value new value for the key
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */

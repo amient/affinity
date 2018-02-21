@@ -120,23 +120,6 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         return apply(ByteBuffer.wrap(keySerde.toBytes(key)));
     }
 
-    /**
-     * This is similar to apply(key) except it also applies row lock which is useful if the client
-     * wants to make sure that the returned value incorporates all changes applied to it in update operations
-     * with in the same sequence.
-     *
-     * @param key
-     * @return
-     */
-    Optional<V> get(K key) throws TimeoutException, InterruptedException {
-        Long l = lock(key);
-        try {
-            return apply(key);
-        } finally {
-            unlock(key, l);
-        }
-    }
-
     private Optional<V> apply(ByteBuffer key) {
         return kvstore.apply(key).flatMap((cell) ->
                 kvstore.unwrap(key, cell, ttlMs).map((byteRecord) -> valueSerde.fromBytes(byteRecord.value))
@@ -177,23 +160,15 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         };
     }
 
-
     /**
-     * update is a syntactic sugar for update where the value is always overriden
+     * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
      *
      * @param key   to updateImpl
      * @param value new value to be associated with the key
      * @return Future Optional of the value previously held at the key position
      */
     public Future<Optional<V>> update(K key, V value) {
-//        update(key) {
-//            case Some(prev)
-//                if prev == value =>(None, Some(prev), Some(prev))
-//            case Some(prev) =>(Some(value), Some(value), Some(prev))
-//            case None =>(Some(value), Some(value), None)
-//        }
-        //TODO
-        return null;
+        return getAndUpdate(key, current -> Optional.of(value));
     }
 
     /**
@@ -201,91 +176,146 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * it is different from delete in that it returns the removed value
      * which is more costly.
      *
-     * @param key     to remove
-     * @param command is the message that will be pushed to key-value observers
-     * @return Future Optional of the value previously held at the key position
+     * @param key to remove
+     * @return Future optional value that was removed
+     * @throws RuntimeException if any of the future failed
      */
-    public Future<Optional<V>>  remove(K key, Object command) {
-//        update(key) {
-//            case None =>(None, None, None)
-//            case Some(component) =>(Some(command), None, Some(component))
-//        }
-        //TODO
-        return null;
+    public Future<Optional<V>> remove(K key) {
+        return getAndUpdate(key, current -> Optional.empty());
     }
 
-
     /**
-     * insert is a syntactic sugar for putImpl where the value is overriden if it doesn't exist
-     * and the command is the value itself
+     * insert is a syntactic sugar for update which is only executed if the key doesn't exist yet
      *
      * @param key   to insert
      * @param value new value to be associated with the key
-     * @return Future Optional of the value previously held at the key position
+     * @return Future value newly inserted if the key did not exist and operation succeeded, failed future otherwise
+     * @throws RuntimeException if any of the future failed
      */
-    public Future<V> insert(K key, V value){
-//        update(key) {
-//            case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
-//            case None => (Some(value), Some(value), value)
-//        }
-        //TODO
-        return null;
+    public Future<V> insert(K key, V value) {
+        return new MappedJavaFuture<Optional<V>, V>(updateAndGet(key, current -> {
+            if (current.isPresent()) {
+                throw new IllegalArgumentException(key + " already exists in state store");
+            } else {
+                return Optional.of(value);
+            }
+        })) {
+            @Override
+            public V map(Optional<V> result) {
+                return result.get();
+            }
+        };
     }
 
     /**
-     * update enables per-key observer pattern for incremental updates.
+     * This is similar to apply(key) except it also applies row lock which is useful if the client
+     * wants to make sure that the returned value incorporates all changes applied to it in update operations
+     * with in the same sequence.
      *
-     * @param <R> result type
-     * @param key  key which is going to be updated
-     * @param readBeforeWrite a function which takes an existing value of the key and returns a result type
-     * TODO param pf   putImpl function which maps the current value Option[V] at the given key to 3 values:
-     *             1. Option[Any] is the incremental putImpl event
-     *             2. Option[V] is the new state for the given key as a result of the incremntal putImpl
-     *             3. R which is the result value expected by the caller
-     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
+     * @param key
+     * @return
      */
-    public <R> Future<R> update(K key, Function<Optional<V>, R> readBeforeWrite) {
-        //TODO
-        return null;
+    public Optional<V> get(K key) throws TimeoutException, InterruptedException {
+        Long l = lock(key);
+        try {
+            return apply(key);
+        } finally {
+            unlock(key, l);
+        }
     }
-//    def update[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
-//        try {
-//            val k = keySerde.toBytes(key)
-//            val l = lock(key)
-//            try {
-//                pf(apply(ByteBuffer.wrap(k))) match {
-//                    case (None, _, result) =>
-//                        unlock(key, l)
-//                        Future.successful(result)
-//                    case (Some(increment), changed, result) => changed match {
-//                        case Some(updatedValue) =>
-//                            put(k, updatedValue) transform( {
-//                                s => unlock(key, l); s
-//              }, {
-//                            e => unlock(key, l); e
-//                        }) andThen {
-//                            case _ => push(key, increment)
-//                        } map (_ => result)
-//                        case None =>
-//                            delete(k) transform( {
-//                                s => unlock(key, l); s
-//              }, {
-//                            e => unlock(key, l); e
-//                        }) andThen {
-//                            case _ => push(key, increment)
-//                        } map (_ => result)
-//                    }
-//                }
-//            } catch {
-//                case e: Throwable =>
-//                    unlock(key, l)
-//                    throw e
-//            }
-//        } catch {
-//            case NonFatal(e) => Future.failed(e)
-//        }
-//    }
 
+    /**
+     * atomic get-and-update if the current and updated value are the same the no modifications are made to
+     * the underlying stores and the returned future is completed immediately.
+     *
+     * @param key   to updateImpl
+     * @param f function which given a current value returns an updated value or empty if the key is to be removed
+     *          as a result of the update
+     * @return Future Optional of the value previously held at the key position
+     */
+    public Future<Optional<V>> getAndUpdate(K key, Function<Optional<V>, Optional<V>> f) {
+        try {
+            byte[] k = keySerde.toBytes(key);
+            Long l = lock(key);
+            try {
+                Optional<V> currentValue = apply(ByteBuffer.wrap(k));
+                Optional<V> updatedValue = f.apply(currentValue);
+                if (currentValue.equals(updatedValue)) {
+                    unlock(key, l);
+                    return new CompletedJavaFuture<>(() -> currentValue);
+                } else {
+                    return new MappedJavaFuture(updatedValue.isPresent() ? put(k, updatedValue.get()) : delete(k)) {
+                        @Override
+                        public Optional<V> map(Object position) {
+                            unlock(key, l);
+                            push(key, updatedValue);
+                            return currentValue;
+                        }
+
+                        @Override
+                        public Boolean recover(Throwable e) throws Throwable {
+                            unlock(key, l);
+                            throw e;
+                        }
+                    };
+                }
+            } catch (Throwable e) {
+                unlock(key, l);
+                throw e;
+            }
+        } catch (Throwable e) {
+            return new CompletedJavaFuture<>(() -> {
+                throw new RuntimeException(e);
+            });
+        }
+    }
+
+    /**
+     * atomic update-and-get - if the current and updated value are the same the no modifications are made to
+     * the underlying stores and the returned future is completed immediately.
+     *
+     * @param key key which is going to be updated
+     * @param f function which given a current value returns an updated value or empty if the key is to be removed
+     *          as a result of the update
+     * @return Future optional value which will be successful if the put operation succeeded and will hold the updated value
+     */
+    public Future<Optional<V>> updateAndGet(K key, Function<Optional<V>, Optional<V>> f) {
+        try {
+            byte[] k = keySerde.toBytes(key);
+            Long l = lock(key);
+            try {
+                Optional<V> currentValue = apply(ByteBuffer.wrap(k));
+                Optional<V> updatedValue = f.apply(currentValue);
+                if (currentValue.equals(updatedValue)) {
+                    unlock(key, l);
+                    return new CompletedJavaFuture<>(() -> currentValue);
+                } else {
+                    return new MappedJavaFuture(updatedValue.isPresent() ? put(k, updatedValue.get()) : delete(k)) {
+                        @Override
+                        public Optional<V> map(Object position) {
+                            unlock(key, l);
+                            push(key, updatedValue);
+                            return updatedValue;
+                        }
+
+                        @Override
+                        public Boolean recover(Throwable e) throws Throwable {
+                            unlock(key, l);
+                            throw e;
+                        }
+                    };
+                }
+            } catch (Throwable e) {
+                unlock(key, l);
+                throw e;
+            }
+        } catch (Throwable e) {
+            return new CompletedJavaFuture<>(() -> {
+                throw new RuntimeException(e);
+            });
+        }
+
+    }
 
     /**
      * An asynchronous non-blocking put operation which inserts or updates the value

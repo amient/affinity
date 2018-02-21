@@ -20,8 +20,20 @@ abstract public class MappedJavaFuture<A, T> implements Future<T> {
 
     public abstract T map(A result);
 
+    public T recover(Throwable e) throws Throwable {
+        throw e;
+    }
+
     public T get() throws ExecutionException, InterruptedException {
-        return map(f.get());
+        try {
+            return map(f.get());
+        } catch (Throwable e) {
+            try {
+                return recover(e);
+            } catch (Throwable e1) {
+                throw new RuntimeException(e1);
+            }
+        }
     }
 
     @Override

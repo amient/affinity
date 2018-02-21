@@ -4,13 +4,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 final public class CompletedJavaFuture<T> implements Future<T> {
 
-    private final T result;
+    private final Supplier<T> resultSupplier;
 
-    public CompletedJavaFuture(T result) {
-        this.result = result;
+    public CompletedJavaFuture(Supplier<T> resultSupplier) {
+        this.resultSupplier = resultSupplier;
     }
 
     @Override
@@ -19,12 +21,12 @@ final public class CompletedJavaFuture<T> implements Future<T> {
     }
 
     public T get() throws ExecutionException, InterruptedException {
-        return result;
+        return resultSupplier.get();
     }
 
     @Override
     public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        return result;
+        return resultSupplier.get();
     }
 
     @Override
