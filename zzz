@@ -53,6 +53,11 @@ variant() {
             echo $MESSAGE
             ./gradlew $C
             continue $? $MESSAGE
+        elif [ $SETS == "spark" ]; then
+            MESSAGE="$BRANCH/:spark:$C"
+            echo $MESSAGE
+            ./gradlew :kafka:avro-formatter-kafka:$C
+            continue $? $MESSAGE
         elif [ $SETS == "kafka" ]; then
             MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
             echo $MESSAGE
@@ -173,6 +178,7 @@ fi
 if [ "$RUN_ON_VARIANTS" == "true" ]; then
     variant "kafka_0.10" "$SETS" $C
     variant "kafka_0.11" "$SETS" $C
+    variant "spark_2.0" "$SETS" $C
 fi
 
 git checkout "$ROOT"
