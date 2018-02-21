@@ -86,9 +86,10 @@ trait Partition extends ActorHandler with ActorState {
   }
 
   override def postStop(): Unit = {
-    log.debug(s"Stopping keyspace: $keyspace, partition: $partition")
-    context.parent ! PartitionOffline(self)
-    try closeState() finally super.postStop()
+    try {
+      log.debug(s"Stopping keyspace: $keyspace, partition: $partition")
+      context.parent ! PartitionOffline(self)
+    } finally super.postStop()
   }
 
   abstract override def manage: Receive = super.manage orElse {

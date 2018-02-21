@@ -25,11 +25,9 @@ import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ConfluentSchemaRegistry
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -145,17 +143,17 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
 
   private def createStateStoreForPartition(topic: String, partition: Int) = {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.Storage.Class.path -> classOf[KafkaStorage].getName,
+      State.StateConf.Storage.Class.path -> classOf[KafkaLogStorage].getName,
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
       KafkaStorage.StateConf.Storage.Topic.path -> topic,
       KafkaStorage.StateConf.Storage.BootstrapServers.path -> kafkaBootstrap,
       KafkaStorage.StateConf.Storage.Producer.path -> Map().asJava,
       KafkaStorage.StateConf.Storage.Consumer.path -> Map().asJava
     )))
-    val storage = new KafkaStorage(topic, stateConf, partition, numPartitions)
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
-    new State[Int, Test](storage, keySerde, valueSerde)
+    val kvstore = new MemStoreSimpleMap(stateConf)
+    State.create(partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
@@ -192,11 +190,9 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCf
     //now bootstrap the state
     val state0 = createStateStoreForPartition(topic, 0)
     val state1 = createStateStoreForPartition(topic, 1)
-    state0.storage.init(state0)
-    state1.storage.init(state1)
-    state0.storage.boot()
-    state1.storage.boot()
-    //TODO #75 test that kafka default partitioner + confluent avro serde partitions as expected
+    state0.boot()
+    state1.boot()
+//    //TODO #75 test that kafka default partitioner + confluent avro serde partitions as expected
     (state0.numKeys + state1.numKeys) should equal(numWrites.get)
   }
 

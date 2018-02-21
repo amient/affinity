@@ -1,26 +1,24 @@
 package io.amient.affinity.core.util
 
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.storage.Storage.StorageConf
-import io.amient.affinity.stream.{BinaryRecord, BinaryStream}
+import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 
-import scala.collection.JavaConversions._
+class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
 
-class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], streamConf: StorageConf) {
-
-  lazy val stream = BinaryStream.bindNewInstance(streamConf)
+  lazy val storage = LogStorage.newInstance(conf)
 
   def write(data: Iterator[(K, V)]): Unit = {
-    stream.publish(data.map {
-      case (k, v) if v.isInstanceOf[EventTime] => new BinaryRecord(keySerde.toBytes(k), valSerde.toBytes(v), v.asInstanceOf[EventTime].eventTimeUnix)
-      case (k, v) => new BinaryRecord(keySerde.toBytes(k), valSerde.toBytes(v), EventTime.unix)
-    })
+    val records = data.map {
+      case (k, v) if v.isInstanceOf[EventTime] => new Record(keySerde.toBytes(k), valSerde.toBytes(v), v.asInstanceOf[EventTime].eventTimeUnix)
+      case (k, v) => new Record(keySerde.toBytes(k), valSerde.toBytes(v), EventTime.unix)
+    }
+    records.foreach(storage.append)
   }
 
-  def flush() = stream.flush()
+  def flush() = storage.flush()
 
   def close() = {
-    try flush() finally try stream.close() finally {
+    try flush() finally try storage.close() finally {
       keySerde.close()
       valSerde.close()
     }

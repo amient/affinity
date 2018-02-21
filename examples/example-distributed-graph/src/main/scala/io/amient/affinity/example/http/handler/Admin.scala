@@ -50,7 +50,7 @@ trait Admin extends ExampleGatewayRoot {
         Future.successful {
           Encoder.json(OK, Map(
             "credentials" -> user,
-            "settings" -> settings.iterator.toMap
+            "settings" -> settings.iterator.map(record => (record.key, record.value)).toMap
           ))
         }
       } catch {
@@ -80,8 +80,7 @@ trait Admin extends ExampleGatewayRoot {
 
     case http@HTTP(GET, PATH("status"), _, response) => AUTH_ADMIN(http)(user => Future.successful {
       Encoder.json(OK, Map(
-        "singleton-services" -> describeServices,
-        "partition-masters" -> describeRegions
+        "keyspaces" -> describeKeyspaces
       ))
     })
 

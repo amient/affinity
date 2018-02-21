@@ -11,7 +11,6 @@ import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.storage.kafka.KafkaStorage
 import io.amient.affinity.core.util.{ByteUtils, SystemTestBase}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}

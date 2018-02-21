@@ -14,7 +14,18 @@ public class TimeRange implements Serializable {
     final public long end;
     final public long duration;
 
-    public static final TimeRange ALLTIME = new TimeRange(0, Long.MAX_VALUE);
+    private static final Long UNBOUNDED_MIN_TIME = 0L;
+
+    private static final Long UNBOUNDED_MAX_TIME = Long.MAX_VALUE;
+
+    public static final TimeRange UNBOUNDED = new TimeRange(UNBOUNDED_MIN_TIME, UNBOUNDED_MAX_TIME);
+
+    @Override
+    public String toString() {
+        String from = start == UNBOUNDED_MIN_TIME ? "∞" : getLocalStart().toString();
+        String to = end == UNBOUNDED_MAX_TIME ? "∞" : getLocalEnd().toString();
+        return from + " .. " + to;
+    }
 
     @Override
     public boolean equals(Object other) {
@@ -37,6 +48,23 @@ public class TimeRange implements Serializable {
     public OffsetDateTime getLocalEnd() {
         return EventTime.local(end);
     }
+
+    public static TimeRange since(OffsetDateTime datetime) {
+        return since(datetime.toInstant().toEpochMilli());
+    }
+
+    public static TimeRange since(long unixtimestamp) {
+        return new TimeRange(unixtimestamp, UNBOUNDED_MAX_TIME);
+    }
+
+    public static TimeRange until(OffsetDateTime datetime) {
+        return until(datetime.toInstant().toEpochMilli());
+    }
+
+    public static TimeRange until(long unixtimestamp) {
+        return new TimeRange(0, unixtimestamp);
+    }
+
 
     public static TimeRange prev(Duration length) {
         return prev(length, Instant.ofEpochMilli(EventTime.unix()));
@@ -126,7 +154,7 @@ public class TimeRange implements Serializable {
 
     public TimeRange(long startEpochMs, long endEpochMs) {
         this.start = Math.max(0, startEpochMs);
-        this.end = endEpochMs;
+        this.end = Math.max(start, endEpochMs);
         this.duration = endEpochMs - startEpochMs;
     }
 

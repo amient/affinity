@@ -28,6 +28,7 @@ import io.amient.affinity.core.storage.{State, StateConf}
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 trait ActorState extends Actor {
 
@@ -38,6 +39,7 @@ trait ActorState extends Actor {
   abstract override def postStop(): Unit = {
     super.postStop()
     closeState()
+    storageRegistry.clear()
   }
 
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
@@ -50,15 +52,14 @@ trait ActorState extends Actor {
     })
   }
 
-  private[core] def state[K: ClassTag, V: ClassTag](globalStore: String, conf: StateConf): State[K, V] = state[K, V](globalStore, {
-    State.create[K, V](globalStore, 0, conf, 1, context.system)
-  })
+  private[core] def state[K: ClassTag, V: ClassTag](globalStore: String, conf: StateConf): State[K, V] = {
+    state[K, V](globalStore, {
+      State.create[K, V](globalStore, 0, conf, 1, context.system)
+    })
+  }
 
   private[core] def state[K, V](name: String, creator: => State[K, V]): State[K, V] = {
-    val result: State[K, V] = creator
-    result.storage.init(result)
-    if (!result.external) result.storage.boot()
-    result.storage.tail()
+    val result = creator
     storageRegistry.add((name, result))
     result
   }
@@ -67,23 +68,14 @@ trait ActorState extends Actor {
     storageRegistry.asScala.find(_._1 == stateStoreName).get._2
   }
 
-  private[core] def bootState(): Unit = storageRegistry.asScala.foreach { case (name, s) =>
-    log.info(s"state store: '${name}', partition: ${s.storage.partition} booted, estimated num. keys=${s.numKeys}")
-    if (s.external) s.storage.tail() else s.storage.boot()
-  }
+  private[core] def bootState(): Unit = storageRegistry.asScala.foreach(_._2.boot)
 
+  private[core] def tailState(): Unit = storageRegistry.asScala.foreach(_._2.tail)
 
-  private[core] def tailState(): Unit = {
-    storageRegistry.asScala.foreach { case (_, s) =>
-      s.storage.tail()
+  private[core] def closeState(): Unit = storageRegistry.asScala.foreach {
+    case (id, state) => try state.close catch {
+      case NonFatal(e) => log.error(e, s"Could not close store $id")
     }
-  }
-
-  private[core] def closeState(): Unit = {
-    storageRegistry.asScala.foreach { case (name, store) =>
-      store.storage.close()
-    }
-    storageRegistry.clear()
   }
 
 }

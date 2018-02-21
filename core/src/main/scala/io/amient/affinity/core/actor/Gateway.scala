@@ -19,7 +19,7 @@ import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.storage.State
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
@@ -58,7 +58,7 @@ trait Gateway extends ActorHandler with ActorState {
   private val globals = mutable.Map[String, (State[_, _], AtomicBoolean)]()
   private var handlingSuspended = true
 
-  def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = try {
+  def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     globals.get(globalStateStore) match {
       case Some((globalState, _)) => globalState.asInstanceOf[State[K, V]]
       case None =>
@@ -66,15 +66,9 @@ trait Gateway extends ActorHandler with ActorState {
         globals += (globalStateStore -> (bc, new AtomicBoolean(true)))
         bc
     }
-  } catch {
-    case NonFatal(e) =>
-      try closeState() catch {
-        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
-      }
-      throw e
   }
 
-  def keyspace(group: String): ActorRef = try {
+  def keyspace(group: String): ActorRef = {
     keyspaces.get(group) match {
       case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
@@ -87,12 +81,6 @@ trait Gateway extends ActorHandler with ActorState {
         keyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
         ks
     }
-  } catch {
-    case NonFatal(e) =>
-      try closeState() catch {
-        case NonFatal(e) => log.error("Failed to close state during emergency shutdown", e)
-      }
-      throw e
   }
 
   abstract override def preStart(): Unit = {
@@ -105,8 +93,7 @@ trait Gateway extends ActorHandler with ActorState {
   }
 
   abstract override def postStop(): Unit = {
-    super.postStop()
-    try closeState() finally keyspaces.values.foreach(_._1.unwatch(self))
+    try super.postStop() finally keyspaces.values.foreach(_._1.unwatch(self))
   }
 
   abstract override def manage = super.manage orElse {
@@ -144,27 +131,15 @@ trait Gateway extends ActorHandler with ActorState {
       case KeyValueMediatorCreated(keyValueMediator) => keyValueMediator
     }
   }
-//
-//  def describeAvro: scala.collection.immutable.Map[String, String] = {
-//    val serde = SerializationExtension(context.system).serializerByIdentity(200).asInstanceOf[AvroSerdeProxy].internal
-//    serde.describeSchemas.map {
-//      case (id, schema) => ((id.toString, schema.toString))
-//    }
-//  }
 
-  def describeServices: scala.collection.immutable.Map[String, String] = {
-    keyspaces.toMap.map { case (group, (_, actorRef, _)) => (group, actorRef.path.toString) }
-  }
-
-  def describeRegions: scala.collection.immutable.List[String] = {
+  def describeKeyspaces: Map[String, Seq[String]] = {
     val t = 60 seconds
     implicit val timeout = Timeout(t)
-    val routeeSets = Future.sequence {
-      keyspaces.toMap.map { case (group, (_, actorRef, _)) =>
-        actorRef ? GetRoutees map (_.asInstanceOf[Routees])
-      }
+    keyspaces.toMap.map {
+      case (group, (_, actorRef, _)) =>
+        val x = Await.result(actorRef ? GetRoutees map (_.asInstanceOf[Routees]), t)
+        (group, x.routees.map(_.toString))
     }
-    Await.result(routeeSets, t).map(_.routees).flatten.map(_.toString).toList.sorted
   }
 
 

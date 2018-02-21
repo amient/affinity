@@ -20,46 +20,45 @@
 package io.amient.affinity.spark
 
 import io.amient.affinity.core.serde.AbstractSerde
+import io.amient.affinity.core.storage.{LogStorage, Record}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
-import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.{SparkContext, TaskContext}
 
-import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
 object CompactRDD {
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
-                                      streamBinder: => BinaryStream,
+                                      storageBinder: => LogStorage[_],
                                       range: TimeRange,
                                       compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
-    apply[K,V](serdeBinder, serdeBinder, streamBinder, range, compacted)
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, range, compacted)
   }
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
-                                      streamBinder: => BinaryStream,
+                                      storageBinder: => LogStorage[_],
                                       compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
-    apply[K,V](serdeBinder, serdeBinder, streamBinder, TimeRange.ALLTIME, compacted)
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, TimeRange.UNBOUNDED, compacted)
   }
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
-                                      streamBinder: => BinaryStream,
+                                      storageBinder: => LogStorage[_],
                                       range: TimeRange)(implicit sc: SparkContext): RDD[(K, V)] = {
-    apply[K,V](serdeBinder, serdeBinder, streamBinder, range, compacted = true)
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, range, compacted = true)
   }
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
-                                      streamBinder: => BinaryStream)(implicit sc: SparkContext): RDD[(K, V)] = {
-    apply[K,V](serdeBinder, serdeBinder, streamBinder, TimeRange.ALLTIME, compacted = true)
+                                      storageBinder: => LogStorage[_])(implicit sc: SparkContext): RDD[(K, V)] = {
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, TimeRange.UNBOUNDED, compacted = true)
   }
 
   /**
     * Map underlying binary stream to typed RDD, either fully or from the given time range
     * @param keySerdeBinder
     * @param valueSerdeBinder
-    * @param streamBinder
+    * @param storageBinder
     * @param range
     * @param compacted
     * @param sc
@@ -69,10 +68,10 @@ object CompactRDD {
     */
   def apply[K: ClassTag, V: ClassTag](keySerdeBinder: => AbstractSerde[_ >: K],
                                       valueSerdeBinder: => AbstractSerde[_ >: V],
-                                      streamBinder: => BinaryStream,
+                                      storageBinder: => LogStorage[_],
                                       range: TimeRange,
                                       compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
-    new BinaryCompactRDD(sc, streamBinder, range, compacted).mapPartitions { partition =>
+    new BinaryCompactRDD(sc, storageBinder, range, compacted).mapPartitions { partition =>
       val keySerde = keySerdeBinder
       val valueSerde = valueSerdeBinder
       TaskContext.get.addTaskCompletionListener { _ =>
@@ -88,26 +87,26 @@ object CompactRDD {
   }
 
   /**
-    * publish data into binary stream
+    * append data into binary stream
     *
     * @param serdeBinder
-    * @param streamBinder
+    * @param storageBinder
     * @param data
     * @param sc
     * @tparam K
     * @tparam V
     */
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
-                                      streamBinder: => BinaryStream,
+                                      storageBinder: => LogStorage[_],
                                       data: RDD[(K,V)])(implicit sc: SparkContext): Unit = {
-    apply[K,V](serdeBinder, serdeBinder, streamBinder, data)
+    apply[K,V](serdeBinder, serdeBinder, storageBinder, data)
   }
 
   /**
-    * publish data into binary stream
+    * append data into binary stream
     * @param keySerdeBinder
     * @param valueSerdeBinder
-    * @param streamBinder
+    * @param storageBinder
     * @param data
     * @param sc
     * @tparam K
@@ -115,14 +114,14 @@ object CompactRDD {
     */
   def apply[K: ClassTag, V: ClassTag](keySerdeBinder: => AbstractSerde[_ >: K],
                                       valueSerdeBinder: => AbstractSerde[_ >: V],
-                                      streamBinder: => BinaryStream,
+                                      storageBinder: => LogStorage[_],
                                       data: RDD[(K,V)])(implicit sc: SparkContext): Unit = {
     val produced = new LongAccumulator
 
     sc.register(produced)
 
     def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
-      val stream = streamBinder
+      val storage = storageBinder
       val keySerde = keySerdeBinder
       val valueSerde = valueSerdeBinder
 
@@ -134,11 +133,14 @@ object CompactRDD {
           }
           val serializedKey = keySerde.toBytes(k)
           val serializedValue = valueSerde.toBytes(v)
-          new BinaryRecord(serializedKey, serializedValue, ts)
+          new Record(serializedKey, serializedValue, ts)
         }
-        produced.add(stream.publish(iterator))
-        stream.flush
-        stream.close()
+        iterator.foreach { record =>
+          storage.append(record)
+          produced.add(1)
+        }
+        storage.flush
+        storage.close()
       } finally try {
         keySerde.close()
       } finally {

@@ -21,7 +21,7 @@ package io.amient.affinity.core.storage.mapdb;
 
 import io.amient.affinity.core.config.CfgBool;
 import io.amient.affinity.core.config.CfgStruct;
-import io.amient.affinity.core.storage.CloseableIterator;
+import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
@@ -92,8 +92,8 @@ public class MemStoreMapDb extends MemStore {
         return true;
     }
 
-    public MemStoreMapDb(String identifier, StateConf conf) throws IOException {
-        super(identifier, conf);
+    public MemStoreMapDb(StateConf conf) throws IOException {
+        super(conf);
         MemStoreMapDbConf config = new MemStoreMapDbConf().apply(conf.MemStore);
         pathToData = dataDir.resolve(this.getClass().getSimpleName() + ".data");
         log.info("Opening MapDb MemStore: " + pathToData);
@@ -122,22 +122,17 @@ public class MemStoreMapDb extends MemStore {
     }
 
     @Override
-    public void putImpl(ByteBuffer key, ByteBuffer value) {
+    public void put(ByteBuffer key, ByteBuffer value) {
         internal.put(ByteUtils.bufToArray(key), ByteUtils.bufToArray(value));
     }
 
     @Override
-    public void removeImpl(ByteBuffer key) {
+    public void remove(ByteBuffer key) {
         internal.remove(ByteUtils.bufToArray(key));
     }
 
     @Override
     public void close() {
-        try {
-            releaseDbInstance(pathToData);
-        } finally {
-            super.close();
-        }
-
+        releaseDbInstance(pathToData);
     }
 }

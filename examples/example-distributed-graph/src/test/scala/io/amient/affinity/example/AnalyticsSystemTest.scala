@@ -24,6 +24,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.storage.LogStorage
 import io.amient.affinity.core.util.SystemTestBase
 import io.amient.affinity.example.graph.message.{Component, VertexProps}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
@@ -31,7 +32,6 @@ import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.spark.CompactRDD
-import io.amient.affinity.stream.BinaryStream
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
@@ -97,8 +97,8 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
         throw new AssertionError(s"Graph should contain 4 vertices but was: $x")
     }
 
-    val componentRdd = SparkDriver.componentRdd
-    componentRdd.collect.toList match {
+
+    SparkDriver.componentRdd.collect.toList match {
       case (1, Component(_, _)) :: Nil =>
       case x => throw new AssertionError(s"Graph should contain 1 component, got: $x")
     }
@@ -106,9 +106,9 @@ class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafk
     val updateBatch: RDD[(Int, Component)] = sc.parallelize(Array((1, null), (2, Component(0L, Set()))))
     SparkDriver.avroUpdate("graph", "components", updateBatch)
 
-    componentRdd.collect.toList match {
+    SparkDriver.componentRdd.collect.toList match {
       case (2, Component(0L, _)) :: Nil =>
-      case _ => throw new AssertionError("Graph should contain 1 component")
+      case other => throw new AssertionError("Graph should contain 1 component")
     }
 
   }
@@ -124,12 +124,12 @@ object SparkDriver {
   def avroRdd[K: ClassTag, V: ClassTag](ks: String, store: String)(implicit conf: Conf, sc: SparkContext) = {
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
-    CompactRDD[K, V](AvroSerde.create(avroConf), BinaryStream.bindNewInstance(storageConf))
+    CompactRDD[K, V](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf))
   }
 
   def avroUpdate[K: ClassTag, V: ClassTag](ks: String, store: String, data: RDD[(K, V)])(implicit conf: Conf, sc: SparkContext): Unit = {
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
-    CompactRDD(AvroSerde.create(avroConf), BinaryStream.bindNewInstance(storageConf), data)
+    CompactRDD(AvroSerde.create(avroConf), LogStorage.newInstance(storageConf), data)
   }
 }

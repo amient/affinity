@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.storage.rocksdb;
 
-import io.amient.affinity.core.storage.CloseableIterator;
+import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.storage.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
@@ -77,8 +77,8 @@ public class MemStoreRocksDb extends MemStore {
         return true;
     }
 
-    public MemStoreRocksDb(String identifier, StateConf conf) throws IOException {
-        super(identifier, conf);
+    public MemStoreRocksDb(StateConf conf) throws IOException {
+        super(conf);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
         log.info("Opening RocksDb MemStore: " + pathToData);
         Files.createDirectories(pathToData);
@@ -128,7 +128,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    synchronized public void putImpl(ByteBuffer key, ByteBuffer value) {
+    synchronized public void put(ByteBuffer key, ByteBuffer value) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         try {
             internal.put(keyBytes, ByteUtils.bufToArray(value));
@@ -147,7 +147,7 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    synchronized public void removeImpl(ByteBuffer key) {
+    synchronized public void remove(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         try {
             internal.remove(keyBytes);
@@ -157,12 +157,8 @@ public class MemStoreRocksDb extends MemStore {
     }
 
     @Override
-    public void close() {
-        try {
-            releaseDbInstance(pathToData);
-        } finally {
-            super.close();
-        }
+    public void close() throws IOException {
+        releaseDbInstance(pathToData);
     }
 
     private Optional<ByteBuffer> get(byte[] key) {
