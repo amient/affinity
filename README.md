@@ -305,8 +305,7 @@ all master branches.
     Spark **2.0.2**
 
 The `zzz` script uses git and gradle to switch between the maintained master branches
-but the   root project properties scalaVersion, kafkaVersion and sparkVersion the projecct can
-be used to create a custom enivironment.
+and different variants of scala, kafka and spark.
 
 #### Scala 2.11
     - core-scala_2.11
