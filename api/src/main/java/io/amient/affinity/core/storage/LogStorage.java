@@ -118,6 +118,8 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      *                  even if the upper limit set by reset is reached
      *
      * @return iterator of records which may be empty, or null if the maximum offset was reached or cancel() was called
+     *
+     * @throws InterruptedException if the underlying blocking operation is interrupted
      */
     Iterator<LogEntry<POS>> fetch(boolean unbounded) throws InterruptedException;
 
@@ -141,14 +143,14 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
 
     /**
      * Append a record to the end of the log
-     * @param record
+     * @param record record to append to the log
      * @return future with the new log position checkpoint
      */
     Future<POS> append(Record<byte[], byte[]> record);
 
     /**
      * Append a tombstone to the end of the log for the given record key
-     * @param key
+     * @param key which will be marked as deleted
      * //TODO delete should also take a custom timestamp
      * @return future with the new log position checkpoint
      */

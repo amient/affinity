@@ -235,7 +235,9 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
     /**
      * update enables per-key observer pattern for incremental updates.
      *
+     * @param <R> result type
      * @param key  key which is going to be updated
+     * @param readBeforeWrite a function which takes an existing value of the key and returns a result type
      * TODO param pf   putImpl function which maps the current value Option[V] at the given key to 3 values:
      *             1. Option[Any] is the incremental putImpl event
      *             2. Option[V] is the new state for the given key as a result of the incremntal putImpl

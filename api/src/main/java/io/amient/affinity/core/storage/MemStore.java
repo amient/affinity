@@ -93,7 +93,6 @@ public abstract class MemStore implements Closeable {
      *
      * @param key      ByteBuffer representation
      * @param value    ByteBuffer which will be associated with the given key
-     * @return new Checkpoint after the operation
      */
     public abstract void put(ByteBuffer key, ByteBuffer value);
 
@@ -101,7 +100,6 @@ public abstract class MemStore implements Closeable {
      * remove key
      *
      * @param key      ByteBuffer representation whose value will be removed
-     * @return new Checkpoint valid after the operation
      */
     public abstract void remove(ByteBuffer key);
 
