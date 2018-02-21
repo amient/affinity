@@ -23,6 +23,8 @@ ext {
 
 }
 
+task compile {}
+
 task wrapper(type: Wrapper) {
     gradleVersion = '3.5'
 }
@@ -125,6 +127,8 @@ allprojects {
 
         libsDirName = 'lib' //gradle's default is libs but CreateStartScripts needs this to be lib
 
+        compile.dependsOn compileJava
+
         repositories {
             mavenCentral()
             maven { url "http://packages.confluent.io/maven/" }
@@ -161,6 +165,8 @@ allprojects {
     }
 
     plugins.withType(ScalaPlugin).whenPluginAdded {
+
+        compile.dependsOn compileScala
 
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'

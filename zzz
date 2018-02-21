@@ -115,7 +115,7 @@ ROOT="$1"
 
 case "$2" in
     compile)
-        C="compileScala"
+        C="compile"
         RUN_ON_ROOT="true"
         RUN_ON_VARIANTS="true"
         ;;
