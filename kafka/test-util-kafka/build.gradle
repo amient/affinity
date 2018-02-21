@@ -8,7 +8,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    artefact = 'test-util-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
+    artefact = 'test-util-kafka_' + project(':kafka').baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
 }
 if (rootProject.hasProperty('maven-central')) {
     uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
@@ -30,7 +30,10 @@ dependencies {
     compile group: 'org.scalatest', name: 'scalatest_' + rootProject.baseScalaVersion, version: rootProject.scalaTestVersion
     compile group: 'org.scalacheck', name: 'scalacheck_' + rootProject.baseScalaVersion, version: rootProject.scalaCheckVersion
     compile group: 'com.101tec', name: 'zkclient', version: rootProject.zkClientVersion
-    compile (group: 'org.apache.kafka', name: 'kafka_'+ rootProject.baseScalaVersion, version: rootProject.kafkaVersion) {
+    compile (group: 'org.apache.kafka', name: 'kafka_'+ rootProject.baseScalaVersion, version: project(':kafka').kafkaVersion) {
+        exclude group: 'com.fasterxml.jackson.core'
+    }
+    compile (group: 'io.confluent', name: 'kafka-schema-registry', version: project(':kafka').confluentVersion) {
         exclude group: 'com.fasterxml.jackson.core'
     }
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: rootProject.jacksonVersion

@@ -5,6 +5,7 @@ import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.kafka.EmbeddedCfRegistry
 import org.scalatest.FlatSpec
 
 

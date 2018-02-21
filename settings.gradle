@@ -5,6 +5,7 @@ include ':api',
         ':ws-client',
         ':spark',
 
+        ':kafka',
         ':kafka:storage-kafka',
         ':kafka:avro-serde-kafka',
         ':kafka:avro-formatter-kafka',

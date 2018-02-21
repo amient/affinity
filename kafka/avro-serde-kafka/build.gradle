@@ -8,7 +8,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    artefact = 'avro-serde-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
+    artefact = 'avro-serde-kafka_' + project(':kafka').baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
     avroArtefact = 'avro-scala_'+ rootProject.baseScalaVersion
 }
 if (rootProject.hasProperty('maven-central')) {
@@ -46,12 +46,12 @@ assemble.dependsOn shadowJar
 dependencies {
     compile project(':api')
     compile project(':avro')
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: rootProject.kafkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':kafka:storage-kafka')
     testCompile project(':kafka:test-util-kafka')
-    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: rootProject.confluentVersion)
-    testCompile (group: 'io.confluent', name: 'kafka-avro-serializer', version: rootProject.confluentVersion)
+    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: project(':kafka').confluentVersion)
+    testCompile (group: 'io.confluent', name: 'kafka-avro-serializer', version: project(':kafka').confluentVersion)
 }
 
 

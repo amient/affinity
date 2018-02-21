@@ -18,10 +18,7 @@ ext {
     avroVersion = '1.8.2' // avro version provides also org.codehouse.jackson transitively
     jacksonVersion = '2.6.5' // com.fasterxml.jackson - spark 2.x uses 2.6.5 while the newer kafka 2.9.1, as usually testing with embedded instances has conflicts
     zkClientVersion = '0.10' // zkclient provides zookeeper server transitively
-    kafkaVersion = '1.0.0'
-    confluentVersion = '4.0.0'
     //
-    baseKafkaVersion = kafkaVersion.split("\\.")[0] + '.' + kafkaVersion.split("\\.")[1]
     baseScalaVersion = scalaVersion.split("\\.")[0] + '.' + scalaVersion.split("\\.")[1]
 
 }

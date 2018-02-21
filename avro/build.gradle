@@ -33,6 +33,5 @@ dependencies {
     compile group: 'org.apache.avro', name: 'avro', version: rootProject.avroVersion
     testCompile project(':core')
     testCompile project(':kafka:test-util-kafka')
-    testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: confluentVersion)
 }
 

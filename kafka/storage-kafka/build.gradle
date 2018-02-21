@@ -8,8 +8,8 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    artefact = 'storage-kafka_' + rootProject.baseKafkaVersion + '-scala_' + baseScalaVersion
-    serdeArtefact = 'avro-serde-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
+    artefact = 'storage-kafka_' + project(':kafka').baseKafkaVersion + '-scala_' + baseScalaVersion
+    serdeArtefact = 'avro-serde-kafka_' + project(':kafka').baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
     coreArtefact = 'core-scala_'+ rootProject.baseScalaVersion
 }
 if (rootProject.hasProperty('maven-central')) {
@@ -48,10 +48,10 @@ assemble.dependsOn shadowJar
 dependencies {
     compile project(':core')
     compile project(':kafka:avro-serde-kafka')
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: rootProject.kafkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':kafka:test-util-kafka')
-    testCompile group: 'org.apache.kafka', name: 'kafka-streams', version: rootProject.kafkaVersion
+    testCompile group: 'org.apache.kafka', name: 'kafka-streams', version: project(':kafka').kafkaVersion
 }
 
 

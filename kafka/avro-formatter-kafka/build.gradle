@@ -8,8 +8,8 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    artefact = 'avro-formatter-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
-    serdeArtefact = 'avro-serde-kafka_' + rootProject.baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
+    artefact = 'avro-formatter-kafka_' + project(':kafka').baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
+    serdeArtefact = 'avro-serde-kafka_' + project(':kafka').baseKafkaVersion + '-scala_' + rootProject.baseScalaVersion
 }
 if (rootProject.hasProperty('maven-central')) {
     uploadArchives.repositories.mavenDeployer.pom.artifactId = artefact
@@ -45,7 +45,7 @@ assemble.dependsOn shadowJar
 
 dependencies {
     compile project(':kafka:avro-serde-kafka')
-    provided group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: rootProject.kafkaVersion
+    provided group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: project(':kafka').kafkaVersion
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
 }
 
