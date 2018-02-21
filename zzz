@@ -95,6 +95,7 @@ Usage() {
     echo "      spark               - run for all spark submodules"
     echo ""
     echo "  TASK: "
+    echo "      compile             - run compile on all variants"
     echo "      test                - run test on branches only"
     echo "      test-all            - run all tests on root and all variants"
     echo "      merge               - only merge root into all variants"
@@ -113,8 +114,8 @@ fi
 ROOT="$1"
 
 case "$2" in
-    clean)
-        C="clean"
+    compile)
+        C="compile"
         RUN_ON_ROOT="true"
         RUN_ON_VARIANTS="true"
         ;;
