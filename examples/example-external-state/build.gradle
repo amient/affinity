@@ -1,0 +1,18 @@
+group = rootProject.group
+version = rootProject.version
+
+apply plugin: 'java'
+apply plugin: 'scala'
+
+dependencies {
+    compile project(':core')
+    compile project(':kafka:storage-kafka')
+    compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
+    compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
+    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    testCompile project(':kafka:avro-serde-kafka')
+    testCompile project(':kafka:test-util-kafka')
+}
+
+
+

@@ -26,16 +26,14 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
   private val kafkaConfig = new KafkaConfig(new Properties {
-    {
-      put("broker.id", "1")
-      put("host.name", "localhost")
-      put("port", "0")
-      put("log.dir", embeddedKafkaPath.toString)
-      put("num.partitions", numPartitions.toString)
-      put("auto.create.topics.enable", "true")
-      put("zookeeper.connect", zkConnect)
-      put("offsets.topic.replication.factor", "1")
-    }
+    put("broker.id", "1")
+    put("host.name", "localhost")
+    put("port", "0")
+    put("log.dir", embeddedKafkaPath.toString)
+    put("num.partitions", numPartitions.toString)
+    put("auto.create.topics.enable", "true")
+    put("zookeeper.connect", zkConnect)
+    put("offsets.topic.replication.factor", "1")
   })
 
   private val kafka = new KafkaServerStartable(kafkaConfig)
@@ -43,6 +41,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 
   val tmpZkClient = new ZkClient(zkConnect, 5000, 6000, new ZkSerializer {
     def serialize(o: Object): Array[Byte] = o.toString.getBytes
+
     override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
   })
 
@@ -58,6 +57,7 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
       case e: IllegalStateException => //
     } finally {
       def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
+
       if (testDir.exists()) getRecursively(testDir).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
     }
     super.afterAll()

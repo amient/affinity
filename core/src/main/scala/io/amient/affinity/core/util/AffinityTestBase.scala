@@ -52,11 +52,11 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-object SystemTestBase {
+object AffinityTestBase {
   val akkaPort = new AtomicInteger(15001)
 }
 
-trait SystemTestBase {
+trait AffinityTestBase {
 
   final def configure(): Config = configure(ConfigFactory.defaultReference)
 
@@ -71,7 +71,7 @@ trait SystemTestBase {
     val layer1: Config = config
       .withValue(Conf.Affi.Node.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
       .withValue(Conf.Affi.Node.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
-      .withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(SystemTestBase.akkaPort.getAndIncrement()))
+      .withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(AffinityTestBase.akkaPort.getAndIncrement()))
 
     val layer2: Config = zkConnect match {
       case None => layer1
@@ -156,6 +156,10 @@ trait SystemTestBase {
       val context = SSLContext.getInstance("TLS")
       context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
       ConnectionContext.https(context)
+    }
+
+    def awaitClusterReady(): Unit = awaitClusterReady {
+      startContainers()
     }
 
     def awaitClusterReady(startUpSequence: => Unit): Unit = {

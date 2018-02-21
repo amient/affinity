@@ -32,6 +32,7 @@ import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.{implicitConversions, postfixOps}
@@ -86,16 +87,20 @@ class Node(config: Config) {
     Props(creator)
   }
 
-  def start() = {
-    conf.Affi.Node.Containers().foreach {
-      case (group: String, value: CfgIntList) =>
-        val partitions = value().map(_.toInt).toList
-        startContainer(group, partitions)
-    }
+  def start(): Unit = {
+    startContainers()
     if (conf.Affi.Node.Gateway.Class.isDefined) {
       //the gateway could be started programatically but in this case it is by config
       startGateway(conf.Affi.Node.Gateway.Class().newInstance())
     }
+  }
+
+  def startContainers() = {
+    Future.sequence(conf.Affi.Node.Containers().map {
+      case (group: String, value: CfgIntList) =>
+        val partitions = value().map(_.toInt).toList
+        startContainer(group, partitions)
+    })
   }
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {

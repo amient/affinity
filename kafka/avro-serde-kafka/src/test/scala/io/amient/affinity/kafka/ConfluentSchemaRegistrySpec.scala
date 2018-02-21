@@ -28,11 +28,11 @@ case class CompositeRecord(
                    val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord
 
 
-class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCfRegistry {
+class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedConfluentRegistry {
 
   override def numPartitions = 1
 
-  behavior of "CfAvroSchemaRegistry"
+  behavior of "ConfluentSchemaRegistry"
 
   val serde = new ConfluentSchemaRegistry(ConfigFactory.parseMap(Map(
     new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl

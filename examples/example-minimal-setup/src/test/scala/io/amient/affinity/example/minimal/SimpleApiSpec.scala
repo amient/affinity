@@ -24,14 +24,14 @@ import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.core.util.AffinityTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 
-class SimpleApiSpec extends FlatSpec with SystemTestBase with Matchers {
+class SimpleApiSpec extends FlatSpec with AffinityTestBase with Matchers {
 
   val config = ConfigFactory.load("minimal-example-test")
 

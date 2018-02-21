@@ -11,7 +11,7 @@ import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.util.{ByteUtils, SystemTestBase}
+import io.amient.affinity.core.util.{ByteUtils, AffinityTestBase}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
@@ -38,7 +38,7 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
   override def hashCode(): Int = key.hashCode()
 }
 
-class KafkaStorageSpec extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   val specTimeout = 15 seconds
 

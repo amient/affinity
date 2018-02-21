@@ -212,8 +212,10 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * wants to make sure that the returned value incorporates all changes applied to it in update operations
      * with in the same sequence.
      *
-     * @param key
-     * @return
+     * @param key to get value for
+     * @return optional value or empty if no value is present
+     * @throws TimeoutException if the lock could not be acquired within lockTimeoutMs
+     * @throws InterruptedException if waiting for the lock was interrupted
      */
     public Optional<V> get(K key) throws TimeoutException, InterruptedException {
         Long l = lock(key);

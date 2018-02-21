@@ -25,7 +25,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.LogStorage
-import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.example.graph.message.{Component, VertexProps}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
@@ -39,7 +39,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.reflect.ClassTag
 
-class AnalyticsSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+class AnalyticsSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 4
 

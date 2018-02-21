@@ -28,7 +28,7 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.util.{Scatter, SystemTestBase}
+import io.amient.affinity.core.util.{Scatter, AffinityTestBase}
 import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -39,7 +39,7 @@ case class ClustrPing() extends Scatter[String] {
   override def gather(r1: String, r2: String) = r2
 }
 
-class PingPongSystemTest extends FlatSpec with SystemTestBase with BeforeAndAfterAll with Matchers {
+class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAfterAll with Matchers {
 
   val config = configure("pingpong")
 

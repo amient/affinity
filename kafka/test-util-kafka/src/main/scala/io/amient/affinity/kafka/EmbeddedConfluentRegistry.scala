@@ -8,11 +8,11 @@ import io.confluent.kafka.schemaregistry.rest.{SchemaRegistryConfig, SchemaRegis
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.slf4j.LoggerFactory
 
-trait EmbeddedCfRegistry extends EmbeddedKafka with BeforeAndAfterAll {
+trait EmbeddedConfluentRegistry extends EmbeddedKafka with BeforeAndAfterAll {
 
   self: Suite =>
 
-  private val log = LoggerFactory.getLogger(classOf[EmbeddedCfRegistry])
+  private val log = LoggerFactory.getLogger(classOf[EmbeddedConfluentRegistry])
 
   private val registryConfig: SchemaRegistryConfig = new SchemaRegistryConfig(new Properties() {
     put("listeners", s"http://127.0.0.1:0")

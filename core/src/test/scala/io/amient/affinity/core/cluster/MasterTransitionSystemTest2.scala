@@ -33,7 +33,7 @@ import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
-import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -43,7 +43,7 @@ import scala.language.postfixOps
 import scala.util.Random
 
 
-class MasterTransitionSystemTest2 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   val specTimeout = 15 seconds
 

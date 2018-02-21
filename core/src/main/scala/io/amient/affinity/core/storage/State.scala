@@ -203,10 +203,10 @@ class State[K, V](kvstore: MemStore,
     * which is more costly.
     *
     * @param key     to remove
-    * @param command is the message that will be pushed to key-value observers
+    * @param event is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */
-  def remove(key: K, command: Any): Future[Option[V]] = getAndUpdate(key, x => None)
+  def remove(key: K, event: Any): Future[Option[V]] = getAndUpdate(key, x => None)
 
   /**
     * insert is a syntactic sugar for update which is only executed if the key doesn't exist yet
@@ -279,8 +279,8 @@ class State[K, V](kvstore: MemStore,
     * the underlying stores and the returned future is completed immediately.
     *
     * @param key key which is going to be updated
-    * @param f function which given a current value returns an updated value or empty if the key is to be removed
-    *          as a result of the update
+    * @param f   function which given a current value returns an updated value or empty if the key is to be removed
+    *            as a result of the update
     * @return Future optional value which will be successful if the put operation succeeded and will hold the updated value
     */
   def updateAndGet(key: K, f: Option[V] => Option[V]): Future[Option[V]] = {
@@ -291,17 +291,17 @@ class State[K, V](kvstore: MemStore,
         val currentValue = apply(ByteBuffer.wrap(k))
         val updatedValue = f(currentValue)
         if (currentValue == updatedValue) {
-            unlock(key, l)
-            Future.successful(updatedValue)
+          unlock(key, l)
+          Future.successful(updatedValue)
         } else {
-            val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
-            f.transform({
-              s => unlock(key, l); s
-            }, {
-              e => unlock(key, l); e
-            }) andThen {
-              case _ => push(key, updatedValue)
-            } map (_ => updatedValue)
+          val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
+          f.transform({
+            s => unlock(key, l); s
+          }, {
+            e => unlock(key, l); e
+          }) andThen {
+            case _ => push(key, updatedValue)
+          } map (_ => updatedValue)
         }
       } catch {
         case e: Throwable =>
@@ -315,7 +315,7 @@ class State[K, V](kvstore: MemStore,
 
 
   /**
-    * update enables per-key observer pattern for incremental updates
+    * update enables per-key observer pattern for incremental updates with transformed return value
     *
     * @param key  key which is going to be updated
     * @param pf   putImpl function which maps the current value Option[V] at the given key to 3 values:
@@ -324,7 +324,7 @@ class State[K, V](kvstore: MemStore,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
-  def updatedAndMap[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
+  def transform[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       val k = keySerde.toBytes(key)
       val l = lock(key)
@@ -333,24 +333,15 @@ class State[K, V](kvstore: MemStore,
           case (None, _, result) =>
             unlock(key, l)
             Future.successful(result)
-          case (Some(increment), changed, result) => changed match {
-            case Some(updatedValue) =>
-              put(k, updatedValue) transform( {
-                s => unlock(key, l); s
-              }, {
-                e => unlock(key, l); e
-              }) andThen {
-                case _ => push(key, increment)
-              } map (_ => result)
-            case None =>
-              delete(k) transform( {
-                s => unlock(key, l); s
-              }, {
-                e => unlock(key, l); e
-              }) andThen {
-                case _ => push(key, increment)
-              } map (_ => result)
-          }
+          case (Some(increment), changed, result) =>
+            val f = if (changed.isDefined) put(k, changed.get) else delete(k)
+            f.transform({
+              s => unlock(key, l); s
+            }, {
+              e => unlock(key, l); e
+            }) andThen {
+              case _ => push(key, increment)
+            } map (_ => result)
         }
       } catch {
         case e: Throwable =>

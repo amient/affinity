@@ -5,7 +5,7 @@ import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.kafka.EmbeddedCfRegistry
+import io.amient.affinity.kafka.EmbeddedConfluentRegistry
 import org.scalatest.FlatSpec
 
 
@@ -13,7 +13,7 @@ case class ExampleType(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
-class AkkaSerializationSystemTest extends FlatSpec with EmbeddedCfRegistry {
+class AkkaSerializationSystemTest extends FlatSpec with EmbeddedConfluentRegistry {
 
   val config = ConfigFactory.defaultReference
     .withValue(ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))

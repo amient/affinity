@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.{GatewayHttp, Routed}
-import io.amient.affinity.core.util.{Reply, SystemTestBase}
+import io.amient.affinity.core.util.{Reply, AffinityTestBase}
 import io.amient.affinity.kafka.EmbeddedZooKeeper
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -16,7 +16,7 @@ case class ZkTestKey(val id: Int) extends AvroRecord with Routed with Reply[Opti
 
 case class ZkTestValue(items: List[Int]) extends AvroRecord
 
-class ZkCoordinatorTest extends FlatSpec with SystemTestBase with EmbeddedZooKeeper with Matchers {
+class ZkCoordinatorTest extends FlatSpec with AffinityTestBase with EmbeddedZooKeeper with Matchers {
 
   def config = configure("distributedit", zkConnect = Some(zkConnect))
 

@@ -20,7 +20,7 @@ case class TestRecord(key: Int, ts: Long = 0L, text: String = "") extends AvroRe
 }
 
 class KafkaAvroSpec extends FlatSpec with Suite
-  with EmbeddedZooKeeper with EmbeddedKafka with EmbeddedCfRegistry with Matchers {
+  with EmbeddedZooKeeper with EmbeddedKafka with EmbeddedConfluentRegistry with Matchers {
 
   //TODO test produce with confluent registry serializer, read with affinity case classes
 

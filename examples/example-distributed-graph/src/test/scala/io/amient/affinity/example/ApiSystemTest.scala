@@ -30,7 +30,7 @@ import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.util.{SystemTestBase, TimeCryptoProofSHA256}
+import io.amient.affinity.core.util.{AffinityTestBase, TimeCryptoProofSHA256}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
@@ -46,7 +46,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ApiSystemTest extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 2
 

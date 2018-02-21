@@ -63,7 +63,7 @@ class GraphPartition extends Partition {
     }
 
     case command@UpdateVertexComponent(vid, cid) => sender.replyWith(command) {
-      graph.updatedAndMap(vid) {
+      graph.transform(vid) {
         case None => throw new NoSuchElementException
         case Some(props) if (props.component == cid) => (None, Some(props), cid)
         case Some(props) => (Some(command), Some(props.withComponent(cid)), props.component)
@@ -77,7 +77,7 @@ class GraphPartition extends Partition {
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
     case command@ModifyGraph(vertex, edge, GOP.ADD) => sender.replyWith(command) {
-      graph.updatedAndMap(vertex) {
+      graph.transform(vertex) {
         case Some(existing) if (existing.edges.exists(_.target == edge.target)) =>
           (None, Some(existing), existing)
         case None =>
@@ -96,7 +96,7 @@ class GraphPartition extends Partition {
       * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
       */
     case command@ModifyGraph(vertex, edge, GOP.REMOVE) => sender.replyWith(command) {
-      graph.updatedAndMap(vertex) {
+      graph.transform(vertex) {
         case None => throw new NoSuchElementException
         case Some(existing) if !existing.edges.exists(_.target == edge.target) =>
           throw new IllegalArgumentException("not connected")

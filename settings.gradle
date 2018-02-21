@@ -13,4 +13,5 @@ include ':api',
 
         ':examples:example-distributed-graph',
         ':examples:example-minimal-setup',
-        ':examples:example-stateful-stream-process'
+        ':examples:example-stateful-stream-process',
+        ':examples:example-external-state'

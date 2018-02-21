@@ -34,7 +34,7 @@ import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.storage.{LogStorage, State}
 import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
-import io.amient.affinity.core.util.SystemTestBase
+import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -44,7 +44,7 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.Random
 
-class MasterTransitionSystemTest1 extends FlatSpec with SystemTestBase with EmbeddedKafka with Matchers {
+class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 2
 

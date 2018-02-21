@@ -60,7 +60,7 @@ case class Test(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends 
   override def hashCode(): Int = key.hashCode()
 }
 
-class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCfRegistry with Matchers {
+class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedConfluentRegistry with Matchers {
 
   override def numPartitions = 2
 
