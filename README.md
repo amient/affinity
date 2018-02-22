@@ -315,7 +315,6 @@ and different variants of scala, kafka and spark.
     - kafka_0.11-scala_2.11 (Kafka 0.11.0.2, Confluent 3.3.1)
     - kafka_1.0-scala_2.11 (Kafka 1.0.0, Confluent 4.0.0)
     - spark_2.0-scala_2.11 (Spark 2.0.2)
-    - spark_1.6-scala_2.11 (Spark 1.6.3)
 
 ## JavaScript (affinity.js)
 
