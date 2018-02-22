@@ -102,9 +102,9 @@ object AvroRecord extends AvroExtractors {
         case None => null
         case Some(x) => deriveValue(schemaField.getTypes.get(1), x)
       }
-      case _ => value match {
+      case otherAvroType => value match {
         case ref: AnyRef => ref
-        case any => throw new NotImplementedError(s"Unsupported avro type conversion for $any")
+        case any => throw new NotImplementedError(s"Unsupported type conversion from scala $any to avro $otherAvroType")
       }
     }
   }
