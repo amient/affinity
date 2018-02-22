@@ -1,6 +1,4 @@
-# Build Status
-
-![CircleCI](https://circleci.com/gh/amient/affinity/tree/master.png?circle-token=:circle-token)
+# Build Status ![CircleCI](https://circleci.com/gh/amient/affinity/tree/master.png?circle-token=:circle-token)
 
 # Design Goals
 
