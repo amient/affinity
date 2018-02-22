@@ -74,7 +74,7 @@ class AnalyticsSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKa
   }
 
   //FIXME #154
-  "Spark Module" should "be able to see avro-serialised state in kafka" ignore {
+  "Spark Module" should "be able to see avro-serialised state in kafka" in {
 
     get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
     get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(1)
