@@ -5,11 +5,12 @@ import org.I0Itec.zkclient.serialize.ZkSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ZkClients {
 
     volatile private static Map<ZkConf, ZkClient> clients = new HashMap<>();
-    volatile private static Map<ZkClient, Integer> refs = new HashMap<>();
+    volatile private static Map<ZkConf, Integer> refs = new HashMap<>();
 
     synchronized public static ZkClient get(ZkConf conf) {
         ZkClient client = clients.get(conf);
@@ -22,29 +23,38 @@ public class ZkClients {
                 public byte[] serialize(Object o) {
                     return o.toString().getBytes();
                 }
+
                 @Override
                 public Object deserialize(byte[] bytes) {
                     return new String(bytes);
                 }
             });
             clients.put(conf, client);
-            refs.put(client, 0);
+            refs.put(conf, 0);
         }
-        ZkClient result = clients.get(conf);
-        if (!refs.containsKey(result)) throw new IllegalStateException();
-        refs.put(result, refs.get(client) + 1);
-        return result;
+        if (!refs.containsKey(conf)) throw new IllegalStateException();
+        int refCount = refs.get(conf) + 1;
+        System.err.println("Opening zkClient refCount=" + refCount + " refs=" + refs.size() + ", conf" + conf);
+        refs.put(conf, refCount);
+        return client;
     }
 
     synchronized public static void close(ZkClient client) {
-        if (!refs.containsKey(client)) {
+        final AtomicReference<ZkConf> _conf = new AtomicReference();
+        clients.forEach((a, b) -> {
+            if (client == b) _conf.set(a);
+        });
+        ZkConf conf = _conf.get();
+        if (conf == null || (!refs.containsKey(conf))) {
             throw new IllegalStateException();
-        } else if (refs.get(client) > 0){
-            int refCount = refs.get(client) - 1;
-            refs.put(client, refCount);
+        } else if (refs.get(conf) > 0) {
+            int refCount = refs.get(conf) - 1;
+            refs.put(conf, refCount);
             if (refCount == 0) {
+                refs.remove(conf);
+                System.err.println("Closing zkClient refCount=" + refCount + " refs=" + refs.size() + ", conf" + conf);
                 client.close();
-                refs.remove(client);
+                clients.remove(conf);
             }
         } else {
             throw new IllegalStateException();

@@ -80,14 +80,17 @@ abstract public class Cfg<T> implements Serializable {
         } else {
             Cfg that = (Cfg) other;
             if (!this.getClass().equals(that.getClass())) return false;
-            if (that.isDefined() && this.isDefined() && apply().equals(((Cfg)other).apply())) {
-                return true;
-            } else if (that.isDefined() == that.isDefined()) {
+            if (that.isDefined() && this.isDefined() && apply().equals(that.apply())) {
                 return true;
             } else {
-                return false;
+                return !that.isDefined() && !this.isDefined();
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        return isDefined() ? apply().toString() : "undefined";
     }
 
 

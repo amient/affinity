@@ -107,7 +107,7 @@ public class CfgTest {
 
 
     @Test
-    public void differentCfgStructInstancesWithSameValuesEqual() {
+    public void cfgStructEqualityIsBasedOnEqualityOfProperties() {
         Config config = ConfigFactory.parseMap(new HashMap<String, Object>() {{
             put(NodeConfig.StartupTimeoutMs.path(), 100L);
             put(NodeConfig.Services.apply("service1").Class.path(), TimeCryptoProofSHA256.class.getName());
@@ -115,24 +115,48 @@ public class CfgTest {
         NodeConfig conf1 = NodeConfig.apply(config);
         NodeConfig conf2 = NodeConfig.apply(config);
         NodeConfig conf3 = new NodeConfig();
-        conf3.ShutdownTimeoutMs.setValue(100L);
+        conf3.StartupTimeoutMs.setValue(100L);
         conf3.Services.setValue(new HashMap<String, ServiceConfig>(){{
             ServiceConfig serviceConf = new ServiceConfig();
             serviceConf.Class.setValue(TimeCryptoProofSHA256.class);
             put("service1", serviceConf);
         }});
+
+        NodeConfig diffConf = NodeConfig.apply(ConfigFactory.parseMap(new HashMap<String, Object>() {{
+            put(NodeConfig.StartupTimeoutMs.path(), 666L);
+            put(NodeConfig.Services.apply("service1").Class.path(), TimeCryptoProofSHA256.class.getName());
+        }}));
+        assert(conf1 != conf2);
         assert(conf1.equals(conf2));
+        assert(conf2 != conf3);
         assert(conf2.equals(conf3));
+        assert(conf3 != diffConf);
+        assert(!conf3.equals(diffConf));
 
         HashMap<NodeConfig, Integer> map = new HashMap<CfgTest.NodeConfig, Integer>() {{
             put(conf1, 1);
             put(conf2, 2);
             put(conf3, 3);
+            put(diffConf, 4);
         }};
 
-        assert(map.size() == 1);
+        assert(map.size() == 2);
         assert(map.get(conf3) == 3);
+        assert(map.get(diffConf) == 4);
 
+
+    }
+
+    @Test
+    public void specializeConfig() {
+        ServiceConfig serviceConf = new ServiceConfig();
+        assert(!serviceConf.isDefined()); //structs can never be undefined
+        assert(serviceConf.Class.path().equals("class"));
+        NodeConfig nodeConfig = new NodeConfig();
+        assert(!nodeConfig.isDefined()); //structs can never be undefined
+        assert(nodeConfig.Services.path().equals("service"));
+        serviceConf.apply(nodeConfig.Services.apply("x"));
+        assert(serviceConf.Class.path().equals("service.x.class"));
     }
 
 }

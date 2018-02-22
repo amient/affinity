@@ -57,7 +57,10 @@ import scala.util.control.NonFatal
 
 object GatewayHttp {
 
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
+  object GatewayConf extends GatewayConf {
+    override def apply(config: Config) = new GatewayConf().apply(config)
+  }
+  class GatewayConf extends CfgStruct[GatewayConf](Cfg.Options.IGNORE_UNKNOWN) {
     val Http = struct("affinity.node.gateway.http", new HttpConf, false)
     val Tls = struct("affinity.node.gateway.tls", new TlsConf, false)
   }

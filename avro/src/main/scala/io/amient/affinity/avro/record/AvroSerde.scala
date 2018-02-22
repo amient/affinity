@@ -48,7 +48,7 @@ object AvroSerde {
     val Avro = struct("affinity.avro", new AvroConf, false)
   }
 
-  object Conf extends AvroConf {
+  object AvroConf extends AvroConf {
     override def apply(config: Config): AvroConf = new AvroConf().apply(config)
   }
 

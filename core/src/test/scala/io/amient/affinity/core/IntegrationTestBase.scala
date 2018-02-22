@@ -26,8 +26,10 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Keyspace.ServiceAvailability
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
+import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.http.HttpExchange
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
@@ -40,7 +42,7 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
 
   def this() = this(ActorSystem.create("IntegrationTestSystem",
     ConfigFactory.load("integrationtests").withValue(
-      new CoordinatorEmbedded.Conf().Embedded.ID.path,
+      EmbedConf(Conf.Affi.Coordinator).ID.path,
       ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet()))
   ))
 

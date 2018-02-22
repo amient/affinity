@@ -15,14 +15,9 @@ import scala.io.Source
 
 object LocalSchemaRegistry {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
+  object LocalAvroConf extends LocalAvroConf {
+    override def apply(config: Config) = new LocalAvroConf().apply(config)
   }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Avro = struct("affinity.avro", new LocalAvroConf, false)
-  }
-
   class LocalAvroConf extends CfgStruct[LocalAvroConf](classOf[AvroConf]) {
     val DataPath = filepath("schema.registry.path", true)
   }

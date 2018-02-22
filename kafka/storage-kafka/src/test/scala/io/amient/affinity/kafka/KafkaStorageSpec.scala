@@ -132,7 +132,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       new AvroConf().Class.path -> classOf[ZookeeperSchemaRegistry].getName,
-      new ZkAvroConf().Connect.path -> zkConnect
+      new ZkAvroConf().ZooKeeper.Connect.path -> zkConnect
     )
 
     val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))

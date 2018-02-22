@@ -23,7 +23,10 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.Conf
+import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
+import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.IZkChildListener
 import org.apache.zookeeper.CreateMode
@@ -32,19 +35,19 @@ import scala.collection.JavaConverters._
 
 object CoordinatorZk {
 
-  object Conf extends Conf
+  object CoordinatorZkConf extends CoordinatorZkConf {
+    override def apply(config: Config) = new CoordinatorZkConf()(config)
+  }
 
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val ZooKeeper = struct("affinity.coordinator.zookeeper", new ZkConf, false)
+  class CoordinatorZkConf extends CfgStruct[CoordinatorZkConf](classOf[CoorinatorConf]) {
+    val ZooKeeper = struct("zookeeper", new ZkConf, false)
   }
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  val conf = CoordinatorZk.Conf(system.settings.config).ZooKeeper
-
+  val conf = CoordinatorZkConf(Conf(system.settings.config).Affi.Coordinator).ZooKeeper
   val zkRoot = conf.Root()
-
   val groupRoot = s"$zkRoot/$group"
 
   private val zk = ZkClients.get(conf)

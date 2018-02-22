@@ -32,6 +32,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        setDefaultValue((T)this);
     }
 
     public CfgStruct(Options... options) {
@@ -49,7 +50,15 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     public final T apply(CfgStruct<?> conf) throws IllegalArgumentException {
-        return apply(conf.config());
+        if (conf.path() == null) throw new IllegalArgumentException();
+        T self;
+        if (conf.config() == null) {
+            self = (T) this;
+        } else {
+            self = apply(conf.config());
+        }
+        self.setPath(conf.path());
+        return self;
     }
 
     public final T apply(Map<String, ?> config) {
@@ -183,12 +192,12 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
 
-    private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required, Optional<Y> defaultValue) {
-        cfg.setRelPath(path);
-        cfg.setPath(path);
+    private <Y, X extends Cfg<Y>> X add(String itemRelPath, X cfg, boolean required, Optional<Y> defaultValue) {
+        cfg.setRelPath(itemRelPath);
+        cfg.setPath(path() + itemRelPath);
         if (defaultValue.isPresent()) cfg.setDefaultValue(defaultValue.get());
         if (!required) cfg.setOptional();
-        properties.add(new AbstractMap.SimpleEntry<>(path, cfg));
+        properties.add(new AbstractMap.SimpleEntry<>(itemRelPath, cfg));
         return cfg;
 
     }
@@ -201,13 +210,27 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             CfgStruct<T> that = (CfgStruct<T>) other;
             if (this.properties.size() != that.properties.size()) return false;
             for (int i = 0; i < this.properties.size(); i++) {
-                if (!this.properties.get(i).equals(that.properties.get(i))) {
-                    System.out.println(this.properties.get(i));
-                    return false;
-                }
+                Map.Entry<String, Cfg<?>> left = this.properties.get(i);
+                Map.Entry<String, Cfg<?>> right = that.properties.get(i);
+                boolean same = left.getKey().equals(right.getKey()) && left.getValue().equals(right.getValue());
+                if (!same) return false;
             }
             return true;
         }
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder result = new StringBuilder();
+        result.append("{");
+        properties.forEach(entry -> {
+            if (result.length()>1) result.append(", ");
+            result.append(entry.getKey());
+            result.append(": ");
+            result.append(entry.getValue());
+        });
+        result.append("}");
+        return result.toString();
     }
 
 }

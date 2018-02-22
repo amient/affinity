@@ -24,8 +24,10 @@ import java.util.{Observable, Observer}
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
+import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
+import io.amient.affinity.core.config.CfgStruct
 
 import scala.collection.mutable
 
@@ -33,16 +35,12 @@ object CoordinatorEmbedded extends Observable {
 
   final val AutoCoordinatorId = new AtomicInteger(1000000)
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
-  }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Embedded = struct("affinity.coordinator.embedded", new EmbedConf, false)
+  object EmbedConf extends EmbedConf {
+    override def apply(config: Config): EmbedConf = new EmbedConf().apply(config)
   }
 
   class EmbedConf extends CfgStruct[EmbedConf](classOf[CoorinatorConf]) {
-    val ID = integer("id", true)
+    val ID = integer("embedded.id", true)
   }
 
   private val services = mutable.Map[String, mutable.Map[String, String]]()
@@ -80,8 +78,8 @@ object CoordinatorEmbedded extends Observable {
 
 class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
 
-  val conf = CoordinatorEmbedded.Conf(system.settings.config)
-  val id = conf.Embedded.ID()
+  val conf = EmbedConf(Conf(system.settings.config).Affi.Coordinator)
+  val id = conf.ID()
   val space = s"$id:$group"
 
   CoordinatorEmbedded.addObserver(this)

@@ -67,7 +67,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCo
   private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemTest])
 
   val config = ConfigFactory.parseMap(Map(
-      ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
+      CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path -> registryUrl,
       Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName))
     .withFallback(ConfigFactory.defaultReference)
 
@@ -115,8 +115,8 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCo
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+      AvroConf.Class.path -> classOf[ConfluentSchemaRegistry].getName,
+      CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 
     val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))

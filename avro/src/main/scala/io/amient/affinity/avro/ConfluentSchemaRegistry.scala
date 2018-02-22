@@ -7,7 +7,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import org.apache.avro.Schema
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
@@ -16,12 +16,8 @@ import scala.collection.JavaConversions._
 
 object ConfluentSchemaRegistry {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
-  }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Avro = struct("affinity.avro", new CfAvroConf, false)
+  object CfAvroConf extends CfAvroConf {
+    override def apply(config: Config) = new CfAvroConf().apply(config)
   }
 
   class CfAvroConf extends CfgStruct[CfAvroConf](classOf[AvroConf]) {
@@ -35,7 +31,7 @@ class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends Avr
 
   def this(config: Config) = this {
     val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
-    val conf = new CfAvroConf().apply(merged)
+    val conf = CfAvroConf(merged)
     new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
   }
 

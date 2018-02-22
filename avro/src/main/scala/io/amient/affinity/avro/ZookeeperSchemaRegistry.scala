@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
@@ -15,10 +15,8 @@ import scala.collection.JavaConverters._
 
 object ZookeeperSchemaRegistry {
 
-  object Conf extends Conf
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Avro = struct("affinity.avro", new ZkAvroConf, false)
+  object ZkAvroConf extends ZkAvroConf {
+    override def apply(config: Config) = new ZkAvroConf().apply(config)
   }
 
   class ZkAvroConf extends CfgStruct[ZkAvroConf](classOf[AvroConf]) {
