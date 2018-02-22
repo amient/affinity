@@ -171,7 +171,7 @@ allprojects {
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'
             //jvmArgs = ['-Djava.util.logging.config.file=' + rootProject.projectDir + '/api/src/test/resources/logging.properties']
-            args = ['-R', 'build/classes/test', '-o']
+            args = ['-R', 'build/classes/test', '-o', '-P1']
             classpath = sourceSets.test.runtimeClasspath
         }
         test.dependsOn scalaTest
