@@ -70,7 +70,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
   }
 
   behavior of "KafkaStorage"
-  it should "survive failing writes" in {
+  //FIXME #155
+  it should "survive failing writes" ignore {
     config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     val stateStoreName = "failure-test"
