@@ -36,7 +36,10 @@ jobs:
       - save_cache:
           paths:
             - ~/.gradle
-            - ~/gradle
+            - ./gradle
+            - ./.gradle
+            - ~/.m2
+            - ~/.ivy2
           key: v1-dependencies-{{ checksum "build.gradle" }}
         
       # run tests!
