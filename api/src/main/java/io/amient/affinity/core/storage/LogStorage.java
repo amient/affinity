@@ -18,7 +18,7 @@ import java.util.concurrent.Future;
  */
 public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
 
-    LogStorageConf Conf = new LogStorageConf() {
+    LogStorageConf StorageConf = new LogStorageConf() {
         @Override
         public LogStorageConf apply(Config config) {
             return new LogStorageConf().apply(config);
@@ -31,7 +31,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
             InvocationTargetException,
             InstantiationException,
             IllegalAccessException {
-        return newInstance(LogStorage.Conf.apply(config));
+        return newInstance(LogStorage.StorageConf.apply(config));
     }
 
     static LogStorage newInstance(LogStorageConf conf)

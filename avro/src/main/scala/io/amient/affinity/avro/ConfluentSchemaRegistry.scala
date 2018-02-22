@@ -3,11 +3,11 @@ package io.amient.affinity.avro
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import org.apache.avro.Schema
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
@@ -16,16 +16,12 @@ import scala.collection.JavaConversions._
 
 object ConfluentSchemaRegistry {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
-  }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Avro = struct("affinity.avro", new CfAvroConf, false)
+  object CfAvroConf extends CfAvroConf {
+    override def apply(config: Config) = new CfAvroConf().apply(config)
   }
 
   class CfAvroConf extends CfgStruct[CfAvroConf](classOf[AvroConf]) {
-    val ConfluentSchemaRegistryUrl= url("schema.registry.url", true)
+    val ConfluentSchemaRegistryUrl= url("schema.registry.url", new URL("http://localhost:8081"))
   }
 
 }
@@ -35,7 +31,7 @@ class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends Avr
 
   def this(config: Config) = this {
     val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
-    val conf = new CfAvroConf().apply(merged)
+    val conf = CfAvroConf(merged)
     new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
   }
 
@@ -100,7 +96,11 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
   }
 
   private def get(path: String): String = http(path) { connection =>
-    connection.setRequestMethod("GET")
+    try {
+      connection.setRequestMethod("GET")
+    } catch {
+      case _: java.net.ConnectException => throw new java.net.ConnectException(baseUrl + path)
+    }
   }
 
   private def post(path: String, entity: String): String = http(path) { connection =>
@@ -108,7 +108,11 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
     connection.addRequestProperty("Accept", "application/vnd.schemaregistry.v1+json, application/vnd.schemaregistry+json, application/json")
     connection.setDoOutput(true)
     connection.setRequestMethod("POST")
-    val output = new DataOutputStream( connection.getOutputStream())
+    val output = try {
+      new DataOutputStream( connection.getOutputStream())
+    } catch {
+      case _: java.net.ConnectException => throw new java.net.ConnectException(baseUrl + path)
+    }
     output.write( entity.getBytes("UTF-8"))
   }
 

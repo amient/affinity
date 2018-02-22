@@ -60,15 +60,15 @@ case class Test(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") extends 
   override def hashCode(): Int = key.hashCode()
 }
 
-class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedConfluentRegistry with Matchers {
+class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedConfluentRegistry with Matchers {
 
   override def numPartitions = 2
 
-  private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemTest])
+  private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemSpec])
 
   val config = ConfigFactory.parseMap(Map(
-      ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path -> registryUrl,
-      Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName))
+      Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName,
+      CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path -> registryUrl))
     .withFallback(ConfigFactory.defaultReference)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
@@ -101,6 +101,7 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCo
         e
       })
     }
+
     updates.size should be(numToWrite)
     Await.result(Future.sequence(updates), 10 seconds)
     val spentMs = System.currentTimeMillis() - l
@@ -115,9 +116,11 @@ class ConfluentEcoSystemTest extends FlatSpec with EmbeddedKafka with EmbeddedCo
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+      AvroConf.Class.path -> classOf[ConfluentSchemaRegistry].getName,
+      CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
     )
+
+    println(consumerProps)
 
     val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
 

@@ -2,12 +2,15 @@ package io.amient.affinity.spark
 
 import java.time.{Duration, Instant}
 
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
+import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf}
 import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
+import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
 import io.amient.affinity.kafka.{EmbeddedKafka, KafkaLogStorage, KafkaStorage}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
@@ -21,7 +24,7 @@ case class CompactionTestEvent(key: Int, data: String, ts: Long) extends AvroRec
   override def eventTimeUnix() = ts
 }
 
-object CompactRDDTestUniverse {
+object CompactRDDSpecUniverse {
 
   val topic = "test-topic"
   val DecemberFirst2017 = Instant.ofEpochMilli(1512086401000L)
@@ -29,15 +32,15 @@ object CompactRDDTestUniverse {
   val FebruaryFirst2018 = Instant.ofEpochMilli(1517443201000L)
   val schemaRegistryId = "345"
 
-  def getSerdeConf = new AvroConf().apply(Map(
-    AvroSerde.Conf.Class.path -> classOf[MemorySchemaRegistry].getName,
-    MemorySchemaRegistry.Conf.ID.path -> schemaRegistryId
+  def getSerdeConf = AvroConf(Map(
+    AvroConf.Class.path -> classOf[MemorySchemaRegistry].getName,
+    MemAvroConf(AvroConf).ID.path -> schemaRegistryId
   ))
 
   def getStorageConf(kafkaBootstrap: String) = new LogStorageConf().apply(Map(
-    LogStorage.Conf.Class.path -> classOf[KafkaLogStorage].getName,
-    KafkaStorage.Conf.BootstrapServers.path -> kafkaBootstrap,
-    KafkaStorage.Conf.Topic.path -> topic
+    LogStorage.StorageConf.Class.path -> classOf[KafkaLogStorage].getName,
+    KafkaStorageConf.BootstrapServers.path -> kafkaBootstrap,
+    KafkaStorageConf.Topic.path -> topic
   ))
 
   def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.UNBOUNDED)
@@ -48,11 +51,11 @@ object CompactRDDTestUniverse {
 }
 
 
-class CompactRDDTest extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
+class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
 
   override def numPartitions = 10
 
-  import CompactRDDTestUniverse._
+  import CompactRDDSpecUniverse._
 
   implicit val sc = new SparkContext(new SparkConf()
     .setMaster("local[10]")

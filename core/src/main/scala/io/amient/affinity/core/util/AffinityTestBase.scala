@@ -38,9 +38,11 @@ import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry
+import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway.GatewayClusterStatus
 import io.amient.affinity.core.actor.{Gateway, Partition, Routed}
+import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
 import io.amient.affinity.core.http.Encoder
 import org.apache.avro.util.ByteBufferInputStream
@@ -77,8 +79,8 @@ trait AffinityTestBase {
       case None => layer1
       case Some(zkConnectString) =>
         layer1
-          .withValue(CoordinatorZk.Conf.ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(ZookeeperSchemaRegistry.Conf.Avro.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(CoordinatorZkConf(Conf.Affi.Coordinator).ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(ZkAvroConf(Conf.Affi.Avro).ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {

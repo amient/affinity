@@ -23,15 +23,17 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorSystem, Props}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
+import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import org.scalatest.{FlatSpec, Matchers}
 
 class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
 
   "CoordinatorEmbedded instances" should "share the underlying space for the same id and group" in {
     val config = ConfigFactory.empty()
-      .withValue(new Coordinator.Conf().Coordinator.Class.path, ConfigValueFactory.fromAnyRef(classOf[CoordinatorEmbedded].getName))
-      .withValue(new CoordinatorEmbedded.Conf().Embedded.ID.path, ConfigValueFactory.fromAnyRef("101"))
+      .withValue(Conf.Affi.Coordinator.Class.path, ConfigValueFactory.fromAnyRef(classOf[CoordinatorEmbedded].getName))
+      .withValue(EmbedConf(Conf.Affi.Coordinator).ID.path, ConfigValueFactory.fromAnyRef("101"))
     val system = ActorSystem.create("test", config)
     try {
       val coordinator1 = Coordinator.create(system, "group1")

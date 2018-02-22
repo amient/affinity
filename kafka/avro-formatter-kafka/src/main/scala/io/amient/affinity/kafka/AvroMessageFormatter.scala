@@ -61,15 +61,15 @@ class AvroMessageFormatter extends MessageFormatter {
     if (props.containsKey("print.timestamp")) printTimestamps = true
     if (props.containsKey("schema.registry.url")) {
       serde = new ConfluentSchemaRegistry(ConfigFactory.empty
-        .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path,
+        .withValue(CfAvroConf.ConfluentSchemaRegistryUrl.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
     } else if (props.containsKey("schema.registry.zookeeper.connect")) {
       val config1 = ConfigFactory.empty
-        .withValue(new ZkAvroConf().Connect.path,
+        .withValue(ZkAvroConf.ZooKeeper.Connect.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.connect")))
 
       val config2 = if (!props.containsKey("schema.registry.zookeeper.root")) config1 else {
-        config1.withValue(new ZkAvroConf().Root.path,
+        config1.withValue(ZkAvroConf.ZkRoot.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.root")))
       }
       serde = new ZookeeperSchemaRegistry(config2)

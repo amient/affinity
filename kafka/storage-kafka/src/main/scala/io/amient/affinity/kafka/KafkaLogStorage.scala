@@ -1,13 +1,14 @@
 package io.amient.affinity.kafka
 
-import java.{lang, util}
 import java.util.Properties
 import java.util.concurrent.{ExecutionException, Future, TimeUnit}
+import java.{lang, util}
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util.{EventTime, MappedJavaFuture, TimeRange}
+import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
 import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsumer}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
@@ -28,19 +29,19 @@ object KafkaStorage {
   }
 
   class KafkaStateConf extends CfgStruct[KafkaStateConf](classOf[StateConf]) {
-    val Storage = struct("storage", new Conf, true)
+    val Storage = struct("storage", new KafkaStorageConf)
   }
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
+  object KafkaStorageConf extends KafkaStorageConf {
+    override def apply(config: Config): KafkaStorageConf = new KafkaStorageConf().apply(config)
   }
 
-  class Conf extends CfgStruct[Conf](classOf[LogStorageConf]) {
+  class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[LogStorageConf]) {
     val Topic = string("kafka.topic", true)
     val ReplicationFactor = integer("kafka.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
-    val Producer = struct("kafka.producer", new KafkaProducerConf, false)
-    val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false)
+    val Producer = struct("kafka.producer", new KafkaProducerConf)
+    val Consumer = struct("kafka.consumer", new KafkaConsumerConf)
   }
 
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)
@@ -55,7 +56,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   private val log = LoggerFactory.getLogger(classOf[KafkaLogStorage])
 
-  val kafkaStorageConf = KafkaStorage.Conf(conf)
+  val kafkaStorageConf = KafkaStorageConf(conf)
 
   val topic = kafkaStorageConf.Topic()
   val keySubject: String = s"${topic}-key"

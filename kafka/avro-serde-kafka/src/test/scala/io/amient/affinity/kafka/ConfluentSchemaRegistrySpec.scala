@@ -35,7 +35,7 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCo
   behavior of "ConfluentSchemaRegistry"
 
   val serde = new ConfluentSchemaRegistry(ConfigFactory.parseMap(Map(
-    new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+    CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
   )))
 
   serde.register[SimpleKey]

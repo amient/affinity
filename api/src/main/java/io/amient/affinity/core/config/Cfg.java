@@ -12,7 +12,7 @@ abstract public class Cfg<T> implements Serializable {
         STRICT, IGNORE_UNKNOWN
     }
 
-    private String path;
+    private String path = "";
 
     protected String relPath;
 
@@ -37,11 +37,11 @@ abstract public class Cfg<T> implements Serializable {
     }
 
     final public String path() {
-        return path == null ? "" : path;
+        return path;
     }
 
     final public String path(String relativePathToRsolve) {
-        return (path == null ? "" : path + ".") + relativePathToRsolve;
+        return (path.isEmpty() ? "" : path + ".") + relativePathToRsolve;
     }
 
     final public boolean isDefined() {
@@ -66,6 +66,31 @@ abstract public class Cfg<T> implements Serializable {
 
     final void setDefaultValue(T value) {
         defaultValue = JOption.of(value);
+    }
+
+    @Override
+    public int hashCode() {
+        return this.getClass().hashCode() + (isDefined() && apply() != this ? apply().hashCode() : -1);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!(other instanceof Cfg)) {
+            return false;
+        } else {
+            Cfg that = (Cfg) other;
+            if (!this.getClass().equals(that.getClass())) return false;
+            if (that.isDefined() && this.isDefined() && apply().equals(that.apply())) {
+                return true;
+            } else {
+                return !that.isDefined() && !this.isDefined();
+            }
+        }
+    }
+
+    @Override
+    public String toString() {
+        return isDefined() ? apply().toString() : "undefined";
     }
 
 

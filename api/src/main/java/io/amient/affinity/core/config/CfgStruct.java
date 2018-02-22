@@ -32,6 +32,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        setDefaultValue((T) this);
     }
 
     public CfgStruct(Options... options) {
@@ -49,7 +50,10 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     public final T apply(CfgStruct<?> conf) throws IllegalArgumentException {
-        return apply(conf.config());
+        if (conf.path() == null) throw new IllegalArgumentException();
+        T self = apply(conf.config());
+        self.setPath(conf.path());
+        return self;
     }
 
     public final T apply(Map<String, ?> config) {
@@ -58,46 +62,47 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     @Override
     public T apply(Config config) throws IllegalArgumentException {
-        if (config == null) throw new IllegalArgumentException("null config passed (" + path() + ")");
-        this.config = path().isEmpty() ? config : listPos > -1
-                ? config.getConfigList(relPath).get(listPos) : config.getConfig(relPath);
-        final StringBuilder errors = new StringBuilder();
-        properties.forEach(entry -> {
-            String propPath = entry.getKey();
-            Cfg<?> cfg = entry.getValue();
-            try {
-                if (propPath == null || propPath.isEmpty()) {
-                    cfg.apply(this.config);
-                } else if (this.config.hasPath(propPath)) {
-                    cfg.apply(this.config);
-                }
-                if (cfg.required && !cfg.isDefined()) {
-                    throw new IllegalArgumentException(propPath + " is required" + (path().isEmpty() ? "" : " in " + path()));
-                }
-            } catch (IllegalArgumentException e) {
-                errors.append(e.getMessage() + "\n");
-            }
-        });
-        if (!options.contains(Options.IGNORE_UNKNOWN)) {
-            this.config.entrySet().forEach(entry -> {
-                boolean existingProperty = properties.stream().filter((p) ->
-                        p.getKey().equals(entry.getKey())
-                                || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey() + "."))
-                ).count() > 0;
-                boolean allowedViaExtensions = extensions.stream().filter( (s) ->
-                        s.equals(entry.getKey()) || entry.getKey().startsWith(s + ".")
-                ).count() > 0;
-                if (!existingProperty && !allowedViaExtensions) {
-                    errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()) + "\n");
+        if (config != null) {
+            this.config = path().isEmpty() ? config : listPos > -1
+                    ? config.getConfigList(relPath).get(listPos) : config.getConfig(relPath);
+            final StringBuilder errors = new StringBuilder();
+            properties.forEach(entry -> {
+                String propPath = entry.getKey();
+                Cfg<?> cfg = entry.getValue();
+                try {
+                    if (propPath == null || propPath.isEmpty()) {
+                        cfg.apply(this.config);
+                    } else if (this.config.hasPath(propPath)) {
+                        cfg.apply(this.config);
+                    }
+                    if (cfg.required && !cfg.isDefined()) {
+                        throw new IllegalArgumentException(propPath + " is required" + (path().isEmpty() ? "" : " in " + path()));
+                    }
+                } catch (IllegalArgumentException e) {
+                    errors.append(e.getMessage() + "\n");
                 }
             });
+            if (!options.contains(Options.IGNORE_UNKNOWN)) {
+                this.config.entrySet().forEach(entry -> {
+                    boolean existingProperty = properties.stream().filter((p) ->
+                            p.getKey().equals(entry.getKey())
+                                    || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey() + "."))
+                    ).count() > 0;
+                    boolean allowedViaExtensions = extensions.stream().filter((s) ->
+                            s.equals(entry.getKey()) || entry.getKey().startsWith(s + ".")
+                    ).count() > 0;
+                    if (!existingProperty && !allowedViaExtensions) {
+                        errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()) + "\n");
+                    }
+                });
+            }
+            String errorMessage = errors.toString();
+            if (!errorMessage.isEmpty()) {
+                throw new IllegalArgumentException(errorMessage);
+            }
+            return (T) setValue((T) this);
         }
-        String errorMessage = errors.toString();
-        if (!errorMessage.isEmpty()) {
-            throw new IllegalArgumentException(errorMessage);
-        }
-        return (T) setValue((T) this);
-
+        return (T) this;
     }
 
     public Config config() {
@@ -161,8 +166,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return add(path, new CfgCls<>(c), true, Optional.of(defaultVal));
     }
 
-    public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
-        return add(path, obj, required, Optional.empty());
+    public <X extends CfgStruct<X>> X struct(String path, X obj) {
+        return add(path, obj, false, Optional.empty());
     }
 
     public <X extends CfgStruct<X>> X ref(X obj, boolean required) {
@@ -183,14 +188,45 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
 
-    private <Y, X extends Cfg<Y>> X add(String path, X cfg, boolean required, Optional<Y> defaultValue) {
-        cfg.setRelPath(path);
-        cfg.setPath(path);
+    private <Y, X extends Cfg<Y>> X add(String itemRelPath, X cfg, boolean required, Optional<Y> defaultValue) {
+        cfg.setRelPath(itemRelPath);
+        cfg.setPath(path() + itemRelPath);
         if (defaultValue.isPresent()) cfg.setDefaultValue(defaultValue.get());
         if (!required) cfg.setOptional();
-        properties.add(new AbstractMap.SimpleEntry<>(path, cfg));
+        properties.add(new AbstractMap.SimpleEntry<>(itemRelPath, cfg));
         return cfg;
 
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!(other instanceof CfgStruct)) {
+            return false;
+        } else {
+            CfgStruct<T> that = (CfgStruct<T>) other;
+            if (this.properties.size() != that.properties.size()) return false;
+            for (int i = 0; i < this.properties.size(); i++) {
+                Map.Entry<String, Cfg<?>> left = this.properties.get(i);
+                Map.Entry<String, Cfg<?>> right = that.properties.get(i);
+                boolean same = left.getKey().equals(right.getKey()) && left.getValue().equals(right.getValue());
+                if (!same) return false;
+            }
+            return true;
+        }
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder result = new StringBuilder();
+        result.append("{");
+        properties.forEach(entry -> {
+            if (result.length() > 1) result.append(", ");
+            result.append(entry.getKey());
+            result.append(": ");
+            result.append(entry.getValue());
+        });
+        result.append("}");
+        return result.toString();
     }
 
 }

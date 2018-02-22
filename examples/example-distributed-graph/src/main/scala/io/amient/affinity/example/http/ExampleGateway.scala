@@ -24,13 +24,14 @@ import java.util.NoSuchElementException
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.{ActorState, GatewayHttp}
+import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.actor.GatewayHttp.GatewayConf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.storage.State
+import io.amient.affinity.example.graph.message.ConfigEntry
 import io.amient.affinity.example.http.handler._
 import io.amient.affinity.example.rest.handler._
-import io.amient.affinity.example.graph.message.ConfigEntry
 
 import scala.util.control.NonFatal
 
@@ -40,7 +41,7 @@ object ExampleGatewayRoot {
     require(args.length == 1, "Gateway Node requires 1 argument: <http-port>")
     val httpPort = args(0).toInt
     val config = ConfigFactory.load("example")
-      .withValue(new GatewayHttp.Conf().Http.Port().toString, ConfigValueFactory.fromAnyRef(httpPort))
+      .withValue(GatewayConf.Http.Port().toString, ConfigValueFactory.fromAnyRef(httpPort))
 
     new Node(config) {
       startGateway(new ExampleGateway)

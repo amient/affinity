@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.kafka.EmbeddedConfluentRegistry
 import org.scalatest.FlatSpec
@@ -16,10 +17,11 @@ case class ExampleType(val id: Int) extends AvroRecord {
 class AkkaSerializationSystemTest extends FlatSpec with EmbeddedConfluentRegistry {
 
   val config = ConfigFactory.defaultReference
-    .withValue(ConfluentSchemaRegistry.Conf.Avro.ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ConfluentSchemaRegistry].getName))
+    .withValue(CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
 
-  assert(config.getString(new ConfluentSchemaRegistry.Conf().Avro.ConfluentSchemaRegistryUrl.path) == registryUrl)
+
+  assert(config.getString(CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path) == registryUrl)
 
   override def numPartitions = 2
 

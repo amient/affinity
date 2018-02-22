@@ -26,8 +26,9 @@ import akka.actor.{ActorPath, ActorRef, ActorSystem}
 import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.Config
+import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConversions._
@@ -40,16 +41,12 @@ import scala.util.{Failure, Success}
 
 object Coordinator {
 
-  object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
-  }
-
-  class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Coordinator = struct("affinity.coordinator", new CoorinatorConf, true)
+  object CoorinatorConf extends CoorinatorConf {
+    override def apply(config: Config): CoorinatorConf = new CoorinatorConf().apply(config)
   }
 
   class CoorinatorConf extends CfgStruct[CoorinatorConf] {
-    val Class = cls("class", classOf[Coordinator], true)
+    val Class = cls("class", classOf[Coordinator], classOf[CoordinatorZk])
 
     override protected def specializations(): util.Set[String] = Set("zookeeper", "embedded")
   }
@@ -66,7 +63,7 @@ object Coordinator {
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
-    val cls = Conf(config).Coordinator.Class()
+    val cls = Conf(config).Affi.Coordinator.Class()
     val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Config])
     constructor.newInstance(system, group, config)
   }

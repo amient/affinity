@@ -75,6 +75,7 @@ class Container(group: String) extends Actor {
         log.debug(s"Unregistering partition: handle=${handle}, path=${ref.path}")
         coordinator.unregister(handle)
       }
+      coordinator.close()
     }
     super.postStop()
   }

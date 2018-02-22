@@ -20,6 +20,8 @@
 package io.amient.affinity.core.cluster
 
 
+import java.nio.file.Paths
+
 import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.util.Timeout
@@ -32,7 +34,6 @@ import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 
 import scala.collection.JavaConversions._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.{implicitConversions, postfixOps}
@@ -43,11 +44,11 @@ object Node {
 
   class NodeConf extends CfgStruct[NodeConf] {
     val Containers: CfgGroup[CfgIntList] = group("container", classOf[CfgIntList], false)
-    val Gateway: GatewayConf = struct("gateway", new GatewayConf, false)
-    val StartupTimeoutMs: CfgInt = integer("startup.timeout.ms", true)
-    val ShutdownTimeoutMs: CfgInt = integer("shutdown.timeout.ms", true)
-    val DataDir: CfgPath = filepath("data.dir", false)
-    val SystemName: CfgString = string("name", true)
+    val Gateway: GatewayConf = struct("gateway", new GatewayConf)
+    val StartupTimeoutMs: CfgInt = integer("startup.timeout.ms", Integer.MAX_VALUE)
+    val ShutdownTimeoutMs: CfgInt = integer("shutdown.timeout.ms", 30000)
+    val DataDir: CfgPath = filepath("data.dir", Paths.get("./.data")) //TODO #107 is this a reasonable default
+    val SystemName: CfgString = string("name", "AffinityNode")
   }
 
 }

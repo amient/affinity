@@ -3,7 +3,7 @@ package io.amient.affinity.avro
 import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.{Config, ConfigFactory}
-import io.amient.affinity.avro.MemorySchemaRegistry.MemorySchemaRegistryConf
+import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.CfgStruct
@@ -13,11 +13,10 @@ import scala.collection.JavaConversions._
 
 object MemorySchemaRegistry {
 
-  object Conf extends MemorySchemaRegistryConf {
-    override def apply(config: Config): MemorySchemaRegistryConf = new MemorySchemaRegistryConf().apply(config)
+  object MemAvroConf extends MemAvroConf {
+    override def apply(config: Config) = new MemAvroConf().apply(config)
   }
-
-  class MemorySchemaRegistryConf extends CfgStruct[MemorySchemaRegistryConf](classOf[AvroConf]) {
+  class MemAvroConf extends CfgStruct[MemAvroConf](classOf[AvroConf]) {
     val ID = integer("schema.registry.id", false)
   }
 
@@ -65,11 +64,11 @@ object MemorySchemaRegistry {
 
 class MemorySchemaRegistry(universe: MemorySchemaRegistry.Universe) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(conf: MemorySchemaRegistryConf) = this {
+  def this(conf: MemAvroConf) = this {
     MemorySchemaRegistry.createUniverse(if (conf.ID.isDefined) Some(conf.ID()) else None)
   }
 
-  def this(config: Config) = this(MemorySchemaRegistry.Conf(config))
+  def this(config: Config) = this(MemAvroConf(AvroSerde.AbsConf).apply(config))
 
   def this() = this(ConfigFactory.empty)
 
