@@ -1,4 +1,8 @@
-# Design Goals 
+# Build Status
+
+![CircleCI](https://circleci.com/gh/:owner/:repo/tree/:branch.png?circle-token=:circle-token)
+
+# Design Goals
 
  - library for building stateful, scalable Data APIs on top of streaming foundation
  - can be attached to stream-processing pipelines based around kafka and participate
