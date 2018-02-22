@@ -23,7 +23,7 @@ trait EmbeddedZooKeeper extends BeforeAndAfterAll {
   private val zookeeper = new ZooKeeperServer(new File(embeddedZkPath, "snapshots"), new File(embeddedZkPath, "logs"), 3000)
   private val zkFactory = new NIOServerCnxnFactory
   zkFactory.configure(new InetSocketAddress(0), 10)
-  val zkConnect = "localhost:" + zkFactory.getLocalPort
+  val zkConnect = "127.0.0.1:" + zkFactory.getLocalPort
   log.info(s"Embedded ZooKeeper $zkConnect, data directory: $testDir")
   zkFactory.startup(zookeeper)
 
