@@ -34,7 +34,7 @@ object CompactRDDTestUniverse {
 
   def getSerdeConf = AvroConf(Map(
     AvroConf.Class.path -> classOf[MemorySchemaRegistry].getName,
-    MemAvroConf(Conf.Affi.Avro).ID.path -> schemaRegistryId
+    MemAvroConf(AvroConf).ID.path -> schemaRegistryId
   ))
 
   def getStorageConf(kafkaBootstrap: String) = new LogStorageConf().apply(Map(

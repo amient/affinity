@@ -153,6 +153,10 @@ public class CfgTest {
         assert(!serviceConf.isDefined()); //structs can never be undefined
         assert(serviceConf.Class.path().equals("class"));
         NodeConfig nodeConfig = new NodeConfig();
+        //attaching to en empty node
+        serviceConf.apply(nodeConfig);
+        assert(serviceConf.Class.path().equals("class"));
+        //attaching to a non-empty path
         assert(!nodeConfig.isDefined()); //structs can never be undefined
         assert(nodeConfig.Services.path().equals("service"));
         serviceConf.apply(nodeConfig.Services.apply("x"));

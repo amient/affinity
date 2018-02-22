@@ -12,7 +12,7 @@ abstract public class Cfg<T> implements Serializable {
         STRICT, IGNORE_UNKNOWN
     }
 
-    private String path;
+    private String path = "";
 
     protected String relPath;
 
@@ -37,11 +37,11 @@ abstract public class Cfg<T> implements Serializable {
     }
 
     final public String path() {
-        return path == null ? "" : path;
+        return path;
     }
 
     final public String path(String relativePathToRsolve) {
-        return (path == null ? "" : path + ".") + relativePathToRsolve;
+        return (path.isEmpty() ? "" : path + ".") + relativePathToRsolve;
     }
 
     final public boolean isDefined() {
