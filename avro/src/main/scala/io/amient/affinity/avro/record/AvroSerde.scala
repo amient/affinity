@@ -24,7 +24,7 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.typesafe.config.Config
-import io.amient.affinity.avro.AvroSchemaRegistry
+import io.amient.affinity.avro.{AvroSchemaRegistry, MemorySchemaRegistry}
 import io.amient.affinity.avro.record.AvroSerde.MAGIC
 import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
@@ -53,7 +53,7 @@ object AvroSerde {
   }
 
   class AvroConf extends CfgStruct[AvroConf] {
-    val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], true)
+    val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], classOf[MemorySchemaRegistry])
 
     override protected def specializations(): util.Set[String] = {
       Set("schema.registry")

@@ -69,7 +69,7 @@ class AvroMessageFormatter extends MessageFormatter {
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.connect")))
 
       val config2 = if (!props.containsKey("schema.registry.zookeeper.root")) config1 else {
-        config1.withValue(ZkAvroConf.ZooKeeper.Root.path,
+        config1.withValue(ZkAvroConf.ZkRoot.path,
           ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.root")))
       }
       serde = new ZookeeperSchemaRegistry(config2)

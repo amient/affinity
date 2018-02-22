@@ -26,7 +26,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
-import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.config.{CfgString, CfgStruct}
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.IZkChildListener
 import org.apache.zookeeper.CreateMode
@@ -41,16 +41,18 @@ object CoordinatorZk {
 
   class CoordinatorZkConf extends CfgStruct[CoordinatorZkConf](classOf[CoorinatorConf]) {
     val ZooKeeper = struct("zookeeper", new ZkConf, false)
+    val ZkRoot = string("zookeeper.root", "/affinity")
   }
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
 
-  val conf = CoordinatorZkConf(Conf(system.settings.config).Affi.Coordinator).ZooKeeper
-  val zkRoot = conf.Root()
+  val conf = CoordinatorZkConf(Conf(system.settings.config).Affi.Coordinator)
+  val zkConf = conf.ZooKeeper()
+  val zkRoot = conf.ZkRoot()
   val groupRoot = s"$zkRoot/$group"
 
-  private val zk = ZkClients.get(conf)
+  private val zk = ZkClients.get(zkConf)
 
   private var currentState = Map[String, String]()
 

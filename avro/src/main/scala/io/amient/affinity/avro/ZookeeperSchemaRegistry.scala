@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.config.{CfgString, CfgStruct}
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
@@ -21,6 +21,7 @@ object ZookeeperSchemaRegistry {
 
   class ZkAvroConf extends CfgStruct[ZkAvroConf](classOf[AvroConf]) {
     val ZooKeeper = struct("schema.registry.zookeeper", new ZkConf, false)
+    val ZkRoot: CfgString = string("schema.registry.zookeeper.root", "/affinity-schema-registry")
   }
   
 }
@@ -28,9 +29,9 @@ object ZookeeperSchemaRegistry {
 
 class ZookeeperSchemaRegistry(zkRoot: String, zk: ZkClient) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(conf: ZkAvroConf) = this(conf.ZooKeeper.Root(), {
+  def this(conf: ZkAvroConf) = this(conf.ZkRoot(), {
     val zk = ZkClients.get(conf.ZooKeeper)
-    val zkRoot = conf.ZooKeeper.Root()
+    val zkRoot = conf.ZkRoot()
     if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot)
     val zkSchemas = s"$zkRoot/schemas"
     if (!zk.exists(zkSchemas)) zk.createPersistent(zkSchemas)

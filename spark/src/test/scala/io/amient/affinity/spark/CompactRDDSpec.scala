@@ -24,7 +24,7 @@ case class CompactionTestEvent(key: Int, data: String, ts: Long) extends AvroRec
   override def eventTimeUnix() = ts
 }
 
-object CompactRDDTestUniverse {
+object CompactRDDSpecUniverse {
 
   val topic = "test-topic"
   val DecemberFirst2017 = Instant.ofEpochMilli(1512086401000L)
@@ -51,11 +51,11 @@ object CompactRDDTestUniverse {
 }
 
 
-class CompactRDDTest extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
+class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
 
   override def numPartitions = 10
 
-  import CompactRDDTestUniverse._
+  import CompactRDDSpecUniverse._
 
   implicit val sc = new SparkContext(new SparkConf()
     .setMaster("local[10]")
