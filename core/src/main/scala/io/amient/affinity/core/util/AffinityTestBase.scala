@@ -78,7 +78,7 @@ trait AffinityTestBase {
       case Some(zkConnectString) =>
         layer1
           .withValue(CoordinatorZk.Conf.ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(ZookeeperSchemaRegistry.Conf.Avro.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
+          .withValue(ZookeeperSchemaRegistry.Conf.Avro.ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {

@@ -14,7 +14,7 @@ class ZookeeperSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedZo
   val v3schema = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Record_Current\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"items\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"SimpleRecord\",\"fields\":[{\"name\":\"id\",\"type\":{\"type\":\"record\",\"name\":\"SimpleKey\",\"fields\":[{\"name\":\"id\",\"type\":\"int\"}]},\"default\":{\"id\":0}},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"SimpleEnum\",\"symbols\":[\"A\",\"B\",\"C\"]},\"default\":\"A\"},{\"name\":\"seq\",\"type\":{\"type\":\"array\",\"items\":\"SimpleKey\"},\"default\":[]}]}},\"default\":[]},{\"name\":\"index\",\"type\":{\"type\":\"map\",\"values\":\"SimpleRecord\"},\"default\":{}}]}")
 
   val serde = new ZookeeperSchemaRegistry(ConfigFactory.empty().withValue(
-    new ZkAvroConf().Connect.path, ConfigValueFactory.fromAnyRef(zkConnect)
+    new ZkAvroConf().ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnect)
   ))
   serde.register[SimpleKey]
   serde.register[SimpleRecord]

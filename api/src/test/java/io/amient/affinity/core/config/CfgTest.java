@@ -8,8 +8,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import javax.xml.soap.Node;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -26,7 +28,7 @@ public class CfgTest {
 
     public static class NodeConfig extends CfgStruct<NodeConfig> {
         private CfgLong StartupTimeoutMs = longint("startup.timeout.ms", true);
-        private CfgLong ShutdownTimeoutMs = longint("shutdown.timeout.ms", true);
+        private CfgLong ShutdownTimeoutMs = longint("shutdown.timeout.ms", 60000L);
         private CfgGroup<ServiceConfig> Services = group("service", ServiceConfig.class, false);
 
     }
@@ -51,8 +53,7 @@ public class CfgTest {
     @Test
     public void reportMissingPropertiesOnlyIfRequired() {
         ex.expect(IllegalArgumentException.class);
-        ex.expectMessage("startup.timeout.ms is required\n" +
-                "shutdown.timeout.ms is required\n");
+        ex.expectMessage("startup.timeout.ms is required\n");
         NodeConfig.apply(ConfigFactory.empty());
     }
 
@@ -102,6 +103,36 @@ public class CfgTest {
         assertTrue(applied.Services.apply("myservice").Class.isDefined());
         assertTrue(applied.Services.apply("myservice").IntList.isDefined());
         assertFalse(applied.Services.apply("myservice").Undefined.isDefined());
+    }
+
+
+    @Test
+    public void differentCfgStructInstancesWithSameValuesEqual() {
+        Config config = ConfigFactory.parseMap(new HashMap<String, Object>() {{
+            put(NodeConfig.StartupTimeoutMs.path(), 100L);
+            put(NodeConfig.Services.apply("service1").Class.path(), TimeCryptoProofSHA256.class.getName());
+        }});
+        NodeConfig conf1 = NodeConfig.apply(config);
+        NodeConfig conf2 = NodeConfig.apply(config);
+        NodeConfig conf3 = new NodeConfig();
+        conf3.ShutdownTimeoutMs.setValue(100L);
+        conf3.Services.setValue(new HashMap<String, ServiceConfig>(){{
+            ServiceConfig serviceConf = new ServiceConfig();
+            serviceConf.Class.setValue(TimeCryptoProofSHA256.class);
+            put("service1", serviceConf);
+        }});
+        assert(conf1.equals(conf2));
+        assert(conf2.equals(conf3));
+
+        HashMap<NodeConfig, Integer> map = new HashMap<CfgTest.NodeConfig, Integer>() {{
+            put(conf1, 1);
+            put(conf2, 2);
+            put(conf3, 3);
+        }};
+
+        assert(map.size() == 1);
+        assert(map.get(conf3) == 3);
+
     }
 
 }

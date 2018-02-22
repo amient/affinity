@@ -68,5 +68,27 @@ abstract public class Cfg<T> implements Serializable {
         defaultValue = JOption.of(value);
     }
 
+    @Override
+    public int hashCode() {
+        return this.getClass().hashCode() + (isDefined() && apply() != this ? apply().hashCode() : -1);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!(other instanceof Cfg)) {
+            return false;
+        } else {
+            Cfg that = (Cfg) other;
+            if (!this.getClass().equals(that.getClass())) return false;
+            if (that.isDefined() && this.isDefined() && apply().equals(((Cfg)other).apply())) {
+                return true;
+            } else if (that.isDefined() == that.isDefined()) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
 
 }

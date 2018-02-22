@@ -193,4 +193,21 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     }
 
+    @Override
+    public boolean equals(Object other) {
+        if (!(other instanceof CfgStruct)) {
+            return false;
+        } else {
+            CfgStruct<T> that = (CfgStruct<T>) other;
+            if (this.properties.size() != that.properties.size()) return false;
+            for (int i = 0; i < this.properties.size(); i++) {
+                if (!this.properties.get(i).equals(that.properties.get(i))) {
+                    System.out.println(this.properties.get(i));
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
 }

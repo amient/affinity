@@ -5,10 +5,10 @@ import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException
-import org.I0Itec.zkclient.serialize.ZkSerializer
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
+import org.apache.avro.Schema
 import org.apache.zookeeper.CreateMode
 
 import scala.collection.JavaConverters._
@@ -22,10 +22,7 @@ object ZookeeperSchemaRegistry {
   }
 
   class ZkAvroConf extends CfgStruct[ZkAvroConf](classOf[AvroConf]) {
-    val Connect = string("schema.registry.zookeeper.connect", true)
-    val Root = string("schema.registry.zookeeper.root", true)
-    val ConnectTimeoutMs = integer("schema.registry.zookeeper.timeout.connect.ms", true)
-    val SessionTimeoutMs = integer("schema.registry.zookeeper.timeout.session.ms", true)
+    val ZooKeeper = struct("schema.registry.zookeeper", new ZkConf, false)
   }
   
 }
@@ -33,13 +30,9 @@ object ZookeeperSchemaRegistry {
 
 class ZookeeperSchemaRegistry(zkRoot: String, zk: ZkClient) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(conf: ZkAvroConf) = this(conf.Root(), {
-    val zk = new ZkClient(conf.Connect(), conf.SessionTimeoutMs(), conf.ConnectTimeoutMs(), new ZkSerializer {
-      def serialize(o: Object): Array[Byte] = o.toString.getBytes
-
-      override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
-    })
-    val zkRoot = conf.Root()
+  def this(conf: ZkAvroConf) = this(conf.ZooKeeper.Root(), {
+    val zk = ZkClients.get(conf.ZooKeeper)
+    val zkRoot = conf.ZooKeeper.Root()
     if (!zk.exists(zkRoot)) zk.createPersistent(zkRoot)
     val zkSchemas = s"$zkRoot/schemas"
     if (!zk.exists(zkSchemas)) zk.createPersistent(zkSchemas)
@@ -52,7 +45,7 @@ class ZookeeperSchemaRegistry(zkRoot: String, zk: ZkClient) extends AvroSerde wi
     new ZkAvroConf().apply(config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path)))
   }
 
-  override def close(): Unit = zk.close()
+  override def close(): Unit = ZkClients.close(zk)
 
   /**
     * @param id

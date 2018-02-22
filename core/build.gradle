@@ -38,7 +38,6 @@ dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaHttpVersion
     compile group: 'com.typesafe.akka', name: 'akka-slf4j_' + baseScalaVersion, version: akkaVersion
-    compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
 
     testCompile group: 'com.typesafe.akka', name: 'akka-testkit_' + baseScalaVersion, version: akkaVersion
     testCompile project(':kafka:storage-kafka')
