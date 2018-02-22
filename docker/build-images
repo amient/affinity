@@ -1,0 +1,1 @@
+docker build -t  amient/affinity-ci docker/ci
