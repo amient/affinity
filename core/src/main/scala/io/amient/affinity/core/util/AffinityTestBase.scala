@@ -176,13 +176,13 @@ trait AffinityTestBase {
       assert(clusterReady.get)
     }
 
-    def uri(path: String) = Uri(s"http://127.0.0.1:$httpPort$path")
+    def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
 
-    def https_uri(path: String) = Uri(s"https://127.0.0.1:$httpPort$path")
+    def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
 
-    def wsuri(path: String) = new java.net.URI(s"ws://127.0.0.1:$httpPort$path")
+    def wsuri(path: String) = new java.net.URI(s"ws://localhost:$httpPort$path")
 
-    def wssuri(path: String) = new java.net.URI(s"wss://127.0.0.1:$httpPort$path")
+    def wssuri(path: String) = new java.net.URI(s"wss://localhost:$httpPort$path")
 
     def http(method: HttpMethod, uri: Uri): Future[HttpResponse] = {
       http(HttpRequest(method = method, uri = uri))
