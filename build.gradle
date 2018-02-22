@@ -21,7 +21,9 @@ ext {
 
 }
 
-task compile {}
+task compile {
+    //dummy task for different modules to attach to
+}
 
 task wrapper(type: Wrapper) {
     gradleVersion = '3.5'
