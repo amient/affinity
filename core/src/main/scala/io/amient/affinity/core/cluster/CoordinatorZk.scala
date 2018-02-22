@@ -40,7 +40,7 @@ object CoordinatorZk {
   }
 
   class CoordinatorZkConf extends CfgStruct[CoordinatorZkConf](classOf[CoorinatorConf]) {
-    val ZooKeeper = struct("zookeeper", new ZkConf, false)
+    val ZooKeeper = struct("zookeeper", new ZkConf)
     val ZkRoot = string("zookeeper.root", "/affinity")
   }
 }

@@ -30,7 +30,7 @@ object Gateway {
   class GatewayConf extends CfgStruct[GatewayConf] {
     val Class = cls("class", classOf[Gateway], false)
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
-    val Http = struct("http", new GatewayHttp.HttpConf, false)
+    val Http = struct("http", new GatewayHttp.HttpConf)
     val Streams = group("stream", classOf[InputStreamConf], false)
   }
 

@@ -45,7 +45,7 @@ object AvroSerde {
   }
 
   class AbsConf extends CfgStruct[AbsConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Avro = struct("affinity.avro", new AvroConf, false)
+    val Avro = struct("affinity.avro", new AvroConf)
   }
 
   object AvroConf extends AvroConf {

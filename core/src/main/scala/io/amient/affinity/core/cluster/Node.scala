@@ -44,7 +44,7 @@ object Node {
 
   class NodeConf extends CfgStruct[NodeConf] {
     val Containers: CfgGroup[CfgIntList] = group("container", classOf[CfgIntList], false)
-    val Gateway: GatewayConf = struct("gateway", new GatewayConf, false)
+    val Gateway: GatewayConf = struct("gateway", new GatewayConf)
     val StartupTimeoutMs: CfgInt = integer("startup.timeout.ms", Integer.MAX_VALUE)
     val ShutdownTimeoutMs: CfgInt = integer("shutdown.timeout.ms", 30000)
     val DataDir: CfgPath = filepath("data.dir", Paths.get("./.data")) //TODO #107 is this a reasonable default

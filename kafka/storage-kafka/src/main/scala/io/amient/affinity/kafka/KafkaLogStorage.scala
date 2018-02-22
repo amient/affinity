@@ -29,7 +29,7 @@ object KafkaStorage {
   }
 
   class KafkaStateConf extends CfgStruct[KafkaStateConf](classOf[StateConf]) {
-    val Storage = struct("storage", new KafkaStorageConf, true)
+    val Storage = struct("storage", new KafkaStorageConf)
   }
 
   object KafkaStorageConf extends KafkaStorageConf {
@@ -40,8 +40,8 @@ object KafkaStorage {
     val Topic = string("kafka.topic", true)
     val ReplicationFactor = integer("kafka.replication.factor", 1)
     val BootstrapServers = string("kafka.bootstrap.servers", true)
-    val Producer = struct("kafka.producer", new KafkaProducerConf, false)
-    val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false)
+    val Producer = struct("kafka.producer", new KafkaProducerConf)
+    val Consumer = struct("kafka.consumer", new KafkaConsumerConf)
   }
 
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)

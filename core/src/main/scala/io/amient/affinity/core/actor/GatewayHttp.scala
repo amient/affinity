@@ -61,8 +61,8 @@ object GatewayHttp {
     override def apply(config: Config) = new GatewayConf().apply(config)
   }
   class GatewayConf extends CfgStruct[GatewayConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Http = struct("affinity.node.gateway.http", new HttpConf, false)
-    val Tls = struct("affinity.node.gateway.tls", new TlsConf, false)
+    val Http = struct("affinity.node.gateway.http", new HttpConf)
+    val Tls = struct("affinity.node.gateway.tls", new TlsConf)
   }
 
   class HttpConf extends CfgStruct[HttpConf] {
@@ -70,7 +70,7 @@ object GatewayHttp {
     val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100)
     val Host = string("host", true)
     val Port = integer("port", true)
-    val Tls = struct("tls", new TlsConf, false)
+    val Tls = struct("tls", new TlsConf)
   }
 
   class TlsConf extends CfgStruct[TlsConf] {

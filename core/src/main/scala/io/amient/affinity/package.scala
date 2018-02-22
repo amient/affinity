@@ -15,8 +15,8 @@ package object affinity {
   }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Akka: AkkaConf = struct("akka", new AkkaConf, false)
-    val Affi: AffinityConf = struct("affinity", new AffinityConf, true)
+    val Akka: AkkaConf = struct("akka", new AkkaConf)
+    val Affi: AffinityConf = struct("affinity", new AffinityConf)
   }
 
   class AkkaConf extends CfgStruct[AkkaConf](Cfg.Options.IGNORE_UNKNOWN) {
@@ -25,11 +25,11 @@ package object affinity {
   }
 
   class AffinityConf extends CfgStruct[AffinityConf] {
-    val Avro: AvroConf = struct("avro", new AvroConf(), true)
-    val Coordinator: CoorinatorConf = struct("coordinator", new CoorinatorConf, true)
+    val Avro: AvroConf = struct("avro", new AvroConf())
+    val Coordinator: CoorinatorConf = struct("coordinator", new CoorinatorConf)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
     val Global: CfgGroup[StateConf] = group("global", classOf[StateConf], false)
-    val Node = struct("node", new NodeConf, true)
+    val Node = struct("node", new NodeConf)
   }
 
 }
