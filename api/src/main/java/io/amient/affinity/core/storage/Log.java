@@ -151,7 +151,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             public void close() throws IOException {
                 storage.cancel();
                 try {
-                    log.debug("cancelling storage and waiting for the logsync thread to complete..");
+                    log.debug("cancelling storage and waiting for the logsync thread to success..");
                     synchronized(this) {
                         join();
                     }

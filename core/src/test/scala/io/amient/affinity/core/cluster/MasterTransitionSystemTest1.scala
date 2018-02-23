@@ -141,7 +141,6 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
           val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
             case (status, list) => (status, list.length)
           }
-          statuses.foreach(println)
           errorCount.set(requests.size - statuses("200 OK"))
         } catch {
           case e: Throwable =>

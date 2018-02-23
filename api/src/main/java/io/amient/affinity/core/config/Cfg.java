@@ -20,7 +20,7 @@
 package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
-import io.amient.affinity.core.util.JOption;
+import io.amient.affinity.core.util.JavaOption;
 
 import java.io.Serializable;
 import java.util.NoSuchElementException;
@@ -35,8 +35,8 @@ abstract public class Cfg<T> implements Serializable {
 
     protected String relPath;
 
-    private JOption<T> value = JOption.empty();
-    private JOption<T> defaultValue = JOption.empty();
+    private JavaOption<T> value = JavaOption.empty();
+    private JavaOption<T> defaultValue = JavaOption.empty();
 
     protected boolean required = true;
     protected int listPos = -1;
@@ -45,7 +45,7 @@ abstract public class Cfg<T> implements Serializable {
 
     final public <C extends Cfg<T>> C setValue(T value) {
         //TODO using setValue should modify the underlying config object
-        this.value = JOption.of(value);
+        this.value = JavaOption.of(value);
         return (C) this;
     }
 
@@ -84,7 +84,7 @@ abstract public class Cfg<T> implements Serializable {
     }
 
     final void setDefaultValue(T value) {
-        defaultValue = JOption.of(value);
+        defaultValue = JavaOption.of(value);
     }
 
     @Override

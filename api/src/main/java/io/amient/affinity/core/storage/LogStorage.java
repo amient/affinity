@@ -157,8 +157,12 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
 
     /**
      * Commit all positions that were advanced by one of the iterators or the underlying fetch()
+     * The implementation may be be asynchronous if it can guarantee that the records which
+     * will have been consumed after this method was called and before the commit completed
+     * were not included in the commit
+     * @return Future with timestamp of the commit completion
      */
-    void commit();
+    Future<Long> commit();
 
     /**
      * Append a record to the end of the log

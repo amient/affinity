@@ -27,27 +27,27 @@ import java.util.Objects;
  * Java Optional is not serializable so using this
  * @param <T> option value type
  */
-public class JOption<T> implements Serializable {
-    private static final JOption<?> EMPTY = new JOption<>();
+public class JavaOption<T> implements Serializable {
+    private static final JavaOption<?> EMPTY = new JavaOption<>();
 
     private final T value;
 
-    public static<T> JOption<T> empty() {
+    public static<T> JavaOption<T> empty() {
         @SuppressWarnings("unchecked")
-        JOption<T> t = (JOption<T>) EMPTY;
+        JavaOption<T> t = (JavaOption<T>) EMPTY;
         return t;
     }
 
-    private JOption() {
+    private JavaOption() {
         this.value = null;
     }
 
-    private JOption(T value) {
+    private JavaOption(T value) {
         this.value = value;
     }
 
-    public static <T> JOption<T> of(T value) {
-        return new JOption<>(value);
+    public static <T> JavaOption<T> of(T value) {
+        return new JavaOption<>(value);
     }
 
     public boolean isPresent() {
@@ -72,11 +72,11 @@ public class JOption<T> implements Serializable {
             return true;
         }
 
-        if (!(obj instanceof JOption)) {
+        if (!(obj instanceof JavaOption)) {
             return false;
         }
 
-        JOption<?> other = (JOption<?>) obj;
+        JavaOption<?> other = (JavaOption<?>) obj;
         return Objects.equals(value, other.value);
     }
 }

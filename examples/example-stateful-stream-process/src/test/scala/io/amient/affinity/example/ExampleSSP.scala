@@ -31,14 +31,16 @@ class ExampleSSP extends GatewayStream {
 
   input[Null, String]("input-stream") {
     record =>
-      val ack: Future[Unit] = counter.updateAndGet(record.value, current => current match {
+      // any records written to out will be flushed automatically - gateway manages all declared outputs
+      // however to get end-to-end guarantee we need to return the ack from counter update
+      // as part of processing the record - it will be added to the pool of futures that need complete when commit occurs
+      counter.updateAndGet(record.value, current => current match {
         case None => Some(1)
         case Some(prev) => Some(prev + 1)
       }).collect {
         case Some(updatedCount) => out.write(Iterator.single((record.value, updatedCount)))
       }(scala.concurrent.ExecutionContext.Implicits.global)
 
-      //TODO #144 add guarantees - at the moment
   }
 
 }

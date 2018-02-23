@@ -26,10 +26,10 @@ import java.{lang, util}
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage._
-import io.amient.affinity.core.util.{EventTime, MappedJavaFuture, TimeRange}
+import io.amient.affinity.core.util.{EventTime, JavaPromise, MappedJavaFuture, TimeRange}
 import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
-import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsumer}
+import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsumer, OffsetAndMetadata, OffsetCommitCallback}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
@@ -189,9 +189,17 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
   }
 
-  def cancel() = kafkaConsumer.wakeup()
+  def cancel(): Unit = kafkaConsumer.wakeup()
 
-  def commit() = kafkaConsumer.commitAsync()
+  def commit(): JavaPromise[lang.Long] = {
+    val promise = new JavaPromise[java.lang.Long]
+    kafkaConsumer.commitAsync(new OffsetCommitCallback {
+      override def onComplete(offsets: util.Map[TopicPartition, OffsetAndMetadata], exception: Exception) = {
+        if (exception != null) promise.failure(exception) else promise.success(System.currentTimeMillis())
+      }
+    })
+    promise
+  }
 
   private var producerActive = false
 

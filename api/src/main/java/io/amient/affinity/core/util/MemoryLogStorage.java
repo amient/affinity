@@ -23,8 +23,6 @@ import io.amient.affinity.core.storage.LogEntry;
 import io.amient.affinity.core.storage.LogStorage;
 import io.amient.affinity.core.storage.LogStorageConf;
 import io.amient.affinity.core.storage.Record;
-import io.amient.affinity.core.util.EventTime;
-import io.amient.affinity.core.util.TimeRange;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -40,7 +38,7 @@ public class MemoryLogStorage implements LogStorage<Long> {
 
     private AtomicLong logEndOffset = new AtomicLong(-1L);
     private AtomicLong fetchStopOffset = new AtomicLong(Long.MAX_VALUE);
-    private ConcurrentLinkedQueue<WriteFuture> unflushedWrites = new ConcurrentLinkedQueue<>();
+    private ConcurrentLinkedQueue<WritePromise> unflushedWrites = new ConcurrentLinkedQueue<>();
     private ConcurrentHashMap<Long, LogEntry<Long>> internal = new ConcurrentHashMap<>();
     private Long position = 0L;
     private AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -115,13 +113,13 @@ public class MemoryLogStorage implements LogStorage<Long> {
     }
 
     @Override
-    public void commit() {
-        throw new RuntimeException("Not Implemented");
+    public Future<Long> commit() {
+        return new CompletedJavaFuture<>(() -> System.currentTimeMillis());
     }
 
     @Override
     public Future<Long> append(Record<byte[], byte[]> record) {
-        WriteFuture f = new WriteFuture(record);
+        WritePromise f = new WritePromise(record);
         unflushedWrites.add(f);
         return f;
     }
@@ -134,12 +132,12 @@ public class MemoryLogStorage implements LogStorage<Long> {
     @Override
     public void flush() {
         while (!unflushedWrites.isEmpty()) {
-            WriteFuture write = unflushedWrites.poll();
+            WritePromise write = unflushedWrites.poll();
             logEndOffset.updateAndGet((long pos) -> {
                 long newPos = pos + 1;
                 LogEntry entry = new LogEntry(newPos, write.record.key, write.record.value, write.record.timestamp);
                 internal.put(newPos, entry);
-                write.complete(newPos);
+                write.success(newPos);
                 return newPos;
             });
         }
@@ -162,52 +160,10 @@ public class MemoryLogStorage implements LogStorage<Long> {
     @Override
     public void ensureCorrectConfiguration(long ttlMs, int numPartitions, boolean readonly) { }
 
-
-    public final class WriteFuture implements Future<Long> {
-
+    public final class WritePromise extends JavaPromise<Long> {
         public Record<byte[], byte[]> record;
-
-        private final CountDownLatch latch = new CountDownLatch(1);
-        private Long value;
-
-        public WriteFuture(Record<byte[], byte[]> record) {
+        public WritePromise(Record<byte[], byte[]> record) {
             this.record = record;
         }
-
-        void complete(Long result) {
-            value = result;
-            latch.countDown();
-        }
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            return false;
-        }
-
-        @Override
-        public boolean isCancelled() {
-            return false;
-        }
-
-        @Override
-        public boolean isDone() {
-            return latch.getCount() == 0;
-        }
-
-        @Override
-        public Long get() throws InterruptedException {
-            latch.await();
-            return value;
-        }
-
-        @Override
-        public Long get(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException {
-            if (latch.await(timeout, unit)) {
-                return value;
-            } else {
-                throw new TimeoutException();
-            }
-        }
-
     }
 }
