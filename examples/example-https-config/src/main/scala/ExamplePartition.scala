@@ -17,14 +17,29 @@
  * limitations under the License.
  */
 
-
-package io.amient.affinity.example.minimal
-
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.{Partition, Routed}
 import io.amient.affinity.core.util.Reply
 
 case class GetValue(key: String) extends AvroRecord with Routed with Reply[Option[String]]
 
 case class PutValue(key: String, value: String) extends AvroRecord with Routed with Reply[Option[String]]
 
+class MySimplePartition extends Partition {
+
+  val cache = state[String, String]("cache")
+
+  import context.dispatcher
+
+  override def handle: Receive = {
+    case request @ GetValue(key: String) => sender.reply(request) {
+      cache(key)
+    }
+
+    case request @ PutValue(key: String, value: String) => sender.replyWith(request) {
+      cache.update(key, value)
+    }
+  }
+
+}

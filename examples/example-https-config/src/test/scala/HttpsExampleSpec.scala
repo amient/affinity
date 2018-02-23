@@ -17,13 +17,12 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.minimal
+package io.amient.affinity.example.https
 
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.AffinityTestBase
 import org.scalatest.{FlatSpec, Matchers}
 

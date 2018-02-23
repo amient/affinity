@@ -17,8 +17,6 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.minimal
-
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.cluster.Node
 

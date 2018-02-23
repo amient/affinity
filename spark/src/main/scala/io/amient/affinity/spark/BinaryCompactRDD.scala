@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Michal Harish, michal.harish@gmail.com
+ * Copyright 2016-2018 Michal Harish, michal.harish@gmail.com
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
