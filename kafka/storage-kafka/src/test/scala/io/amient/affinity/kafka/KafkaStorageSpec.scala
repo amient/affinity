@@ -85,12 +85,14 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
   private def createStateStoreForPartition(keyspace: String, partition: Int, store: String): State[Int, TestRecord] = {
     val conf = Conf(config)
     val stateConf = conf.Affi.Keyspace(keyspace).State(store)
-    State.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
+    val state = State.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
+    state.boot()
+    state
   }
 
   behavior of "KafkaStorage"
-  //FIXME #155
-  it should "survive failing writes" ignore {
+
+  it should "survive failing writes" in {
     config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     val stateStoreName = "failure-test"

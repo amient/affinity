@@ -67,12 +67,9 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
     //we don't need an arbitrary sleep to ensure the tailing state catches up with the writes above
     //before we fetch the latest news because the watermark is built into the request to make the test fast and deterministic
     val response = node.get_text(node.http_get(node.uri(s"/news/latest?w=${watermark.mkString(",")}")))
-    response should be(
-      "LATEST NEWS:\n" +
-        "10:30\tthe universe is expanding\n" +
-        "11:00\tthe universe is still expanding\n" +
-        "11:30\tthe universe briefly contracted but is expanding again")
-
+    response should include("10:30\tthe universe is expanding")
+    response should include("11:00\tthe universe is still expanding")
+    response should include("11:30\tthe universe briefly contracted but is expanding again")
 
   }
 
