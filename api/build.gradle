@@ -17,6 +17,7 @@ publishing {
 dependencies {
     compile group: 'com.typesafe', name: 'config', version: typesafeConfigVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
+    compile group: 'org.jooq', name: 'jool', version: '0.9.12'
 }
 
 

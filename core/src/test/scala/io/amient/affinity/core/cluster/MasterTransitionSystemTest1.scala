@@ -90,6 +90,8 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
     val stateConf = Conf(config).Affi.Keyspace("keyspace1").State("consistency-test")
     val p0 = State.create[String, String]("consistency-test", 0, stateConf, 2, system)
     val p1 = State.create[String, String]("consistency-test", 1, stateConf, 2, system)
+    p0.boot()
+    p1.boot()
     Await.result(Future.sequence(List(
       p0.replace("A", "initialValueA"),
       p0.replace("B", "initialValueB"),

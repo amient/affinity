@@ -24,6 +24,7 @@ import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.util.CompletedJavaFuture;
 import io.amient.affinity.core.util.EventTime;
 import io.amient.affinity.core.util.MappedJavaFuture;
+import org.jooq.lambda.Unchecked;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -233,7 +234,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      *
      * @param key to get value for
      * @return optional value or empty if no value is present
-     * @throws TimeoutException if the lock could not be acquired within lockTimeoutMs
+     * @throws TimeoutException     if the lock could not be acquired within lockTimeoutMs
      * @throws InterruptedException if waiting for the lock was interrupted
      */
     public Optional<V> get(K key) throws TimeoutException, InterruptedException {
@@ -249,9 +250,9 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * atomic get-and-update if the current and updated value are the same the no modifications are made to
      * the underlying stores and the returned future is completed immediately.
      *
-     * @param key   to updateImpl
-     * @param f function which given a current value returns an updated value or empty if the key is to be removed
-     *          as a result of the update
+     * @param key to updateImpl
+     * @param f   function which given a current value returns an updated value or empty if the key is to be removed
+     *            as a result of the update
      * @return Future Optional of the value previously held at the key position
      */
     public Future<Optional<V>> getAndUpdate(K key, Function<Optional<V>, Optional<V>> f) {
@@ -296,8 +297,8 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * the underlying stores and the returned future is completed immediately.
      *
      * @param key key which is going to be updated
-     * @param f function which given a current value returns an updated value or empty if the key is to be removed
-     *          as a result of the update
+     * @param f   function which given a current value returns an updated value or empty if the key is to be removed
+     *            as a result of the update
      * @return Future optional value which will be successful if the put operation succeeded and will hold the updated value
      */
     public Future<Optional<V>> updateAndGet(K key, Function<Optional<V>, Optional<V>> f) {
@@ -357,10 +358,12 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
             return delete(key);
         } else {
             byte[] valueBytes = valueSerde.toBytes(value);
-            return logOption.map((log) -> log.append(kvstore, key, valueBytes, recordTimestamp)).orElseGet(() -> {
-                kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp));
-                return new CompletedJavaFuture<>(null);
-            });
+            return logOption
+                    .map(Unchecked.function(log -> log.append(kvstore, key, valueBytes, recordTimestamp)))
+                    .orElseGet(() -> {
+                        kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp));
+                        return new CompletedJavaFuture<>(null);
+                    });
         }
     }
 
@@ -376,10 +379,12 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      */
     private Future<?> delete(byte[] key) {
         if (readonly) throw new IllegalStateException("delete() called on a read-only state");
-        return logOption.map((log) -> log.delete(kvstore, key)).orElseGet(() -> {
-            kvstore.remove(ByteBuffer.wrap(key));
-            return new CompletedJavaFuture<>(null);
-        });
+        return logOption
+                .map(Unchecked.function(log -> log.delete(kvstore, key)))
+                .orElseGet(() -> {
+                    kvstore.remove(ByteBuffer.wrap(key));
+                    return new CompletedJavaFuture<>(null);
+                });
     }
 
 

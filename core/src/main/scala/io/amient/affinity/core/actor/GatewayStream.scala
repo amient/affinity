@@ -133,6 +133,7 @@ trait GatewayStream extends Gateway {
             log.info(s"Resuming input stream processor: $identifier")
             processingPaused = false
           }
+          System.out.println("GATEWAY-INPUT-STREAM")
           for (record <- consumer.fetch(true)) {
             val key: K = keySerde.fromBytes(record.key)
             val value: V = valSerde.fromBytes(record.value)

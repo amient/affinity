@@ -11,11 +11,18 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class Log<POS extends Comparable<POS>> extends Thread implements Closeable {
 
+    private enum FSM {
+        INIT, BOOT, WRITE, TAIL
+    }
+
     private final static Logger log = LoggerFactory.getLogger(Log.class);
+
+    volatile private FSM fsm = FSM.INIT;
 
     final private AtomicReference<POS> checkpoint = new AtomicReference<>(null);
 
@@ -28,10 +35,9 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
 
     final private LogStorage<POS> storage;
 
-    private abstract class LogSync extends Thread implements Closeable {
-    }
+    private abstract class LogSync extends Thread implements Closeable { }
 
-    private AtomicReference<LogSync> synchronizer = new AtomicReference<>();
+    private AtomicReference<LogSync> logsync = new AtomicReference<>();
 
     public Log(LogStorage<POS> storage, Path checkpointFile) {
         this.storage = storage;
@@ -57,7 +63,17 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         return checkpoint.get();
     }
 
-    public Future<POS> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) {
+    private void fsmEnterWriteState() throws IOException {
+        switch(fsm) {
+            case INIT: throw new IllegalStateException("Bootstrap is required before writing");
+            case TAIL: stopLogSync(); break;
+            case BOOT: case WRITE: break;
+        }
+        this.fsm = FSM.WRITE;
+    }
+
+    public Future<POS> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) throws IOException {
+        fsmEnterWriteState();
         Record record = new Record(key, valueBytes, recordTimestamp);
         return new MappedJavaFuture<POS, POS>(storage.append(record)) {
             @Override
@@ -69,7 +85,8 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         };
     }
 
-    public Future<POS> delete(final MemStore kvstore, final byte[] key) {
+    public Future<POS> delete(final MemStore kvstore, final byte[] key) throws IOException {
+        fsmEnterWriteState();
         return new MappedJavaFuture<POS, POS>(storage.delete(key)) {
             @Override
             public POS map(POS position) {
@@ -81,10 +98,14 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     }
 
     public long bootstrap(final MemStore kvstore, int partition) {
-        stopSynchronizerIfRunning();
+        switch(fsm) {
+            case TAIL: stopLogSync(); break;
+            case WRITE: flushWrites(); break;
+            case INIT: case BOOT: break;
+        }
+        fsm = FSM.BOOT;
         POS checkpoint = getCheckpoint();
         storage.reset(partition, checkpoint);
-
         Iterator<LogEntry<POS>> i = storage.boundedIterator();
         long numRecordsProcessed = 0L;
         while (i.hasNext()) {
@@ -99,7 +120,13 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     }
 
     public <K> void tail(final MemStore kvstore, ObservableState<K> state) {
-        synchronizer.compareAndSet(null, new LogSync() {
+        switch(fsm) {
+            case INIT: throw new IllegalStateException("Cannot transition from init to tail - bootstrap is required first");
+            case WRITE: throw new IllegalStateException("Cannot transition from write mode directly from write to boot mode");
+            case BOOT: case TAIL: break;
+        }
+        fsm = FSM.TAIL;
+        logsync.compareAndSet(null, new LogSync() {
             @Override
             public void run() {
                 try {
@@ -127,9 +154,30 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             @Override
             public void close() throws IOException {
                 storage.cancel();
+                try {
+                    log.debug("cancelling storage and waiting for the logsync thread to complete..");
+                    synchronized(this) {
+                        join();
+                    }
+                } catch (InterruptedException e) {
+                    throw new IOException(e);
+                }
             }
         });
-        synchronizer.get().start();
+        logsync.get().start();
+    }
+
+    public void close() throws IOException {
+        try {
+            try {
+                if (fsm == FSM.TAIL) stopLogSync();
+            } finally {
+                fsm = FSM.INIT;
+                if (enabled) writeCheckpoint();
+            }
+        } finally {
+            stopped = true;
+        }
     }
 
     @Override
@@ -137,7 +185,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         try {
             stopped = false;
             while (!stopped) {
-                Thread.sleep(10000); //TODO make checkpoint interval configurable
+                TimeUnit.SECONDS.sleep(10); //TODO make checkpoint interval configurable
                 if (enabled && checkpointModified) {
                     writeCheckpoint();
                 }
@@ -148,19 +196,16 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         }
     }
 
-    public void close() throws IOException {
-        try {
-            stopSynchronizerIfRunning();
-            if (enabled) writeCheckpoint();
-        } finally {
-            stopped = true;
-        }
+    private void flushWrites() {
+        storage.flush();
     }
 
-    private void stopSynchronizerIfRunning() {
-        LogSync sync = synchronizer.get();
-        if (sync != null) {
-            synchronizer.compareAndSet(sync, null);
+    private void stopLogSync() {
+        LogSync sync = logsync.get();
+        if (sync == null) {
+            throw new IllegalStateException("Tail mode requires a running logsync thread");
+        } else {
+            logsync.compareAndSet(sync, null);
             try {
                 sync.close();
             } catch (IOException e) {

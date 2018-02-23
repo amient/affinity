@@ -78,7 +78,9 @@ class ExampleESPartition extends Partition {
   override def handle: Receive = {
     case request@GetLatest(watermark) => sender.reply(request) {
       while(marker.sum < watermark(partition)) {
-        synchronized(marker).wait(100)
+        marker.synchronized {
+          marker.wait(100)
+        }
       }
       latest.iterator.asScala.map(_.productIterator.mkString(("\t"))).toList
     }
