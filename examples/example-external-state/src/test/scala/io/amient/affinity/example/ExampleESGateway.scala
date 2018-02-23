@@ -43,7 +43,7 @@ class ExampleESGateway extends GatewayHttp {
   override def handle: Receive = {
 
     case HTTP(GET, PATH("news", "latest"), QUERY(("w", watermark)), response) =>
-      implicit val timeout = Timeout(3 second)
+      implicit val timeout = Timeout(5 seconds)
       val latestNews: Future[List[String]] = keyspace gather GetLatest(watermark.split(",").map(_.toLong))
       val responseText = latestNews.map(news=> "LATEST NEWS:\n" + news.mkString("\n"))
       handleAsText(response, responseText)
