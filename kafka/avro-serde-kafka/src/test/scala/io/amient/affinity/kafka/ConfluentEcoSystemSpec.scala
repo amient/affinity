@@ -92,6 +92,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
+    state.boot()
     state.numKeys should be(0)
     val updates = for (i <- (1 to numToWrite)) yield {
       state.replace(i, Test(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
