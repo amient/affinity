@@ -48,7 +48,7 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
 
   behavior of "External State"
 
-  val timeLimit = Span(15000, Millis) //it should be much faster but sometimes many tests are run at the same time
+  val timeLimit = Span(5000, Millis) //it should be much faster but sometimes many tests are run at the same time
 
   it should "start automatically tailing state partitions on startup even when master" in {
 

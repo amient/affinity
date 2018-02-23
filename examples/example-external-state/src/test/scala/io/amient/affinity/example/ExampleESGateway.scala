@@ -77,7 +77,7 @@ class ExampleESPartition extends Partition {
 
   override def handle: Receive = {
     case request@GetLatest(watermark) => sender.reply(request) {
-      while(marker.sum < watermark(partition)) {
+      while(marker.sum <= watermark(partition)) {
         marker.synchronized {
           marker.wait(100)
         }
