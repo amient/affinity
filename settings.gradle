@@ -12,6 +12,6 @@ include ':api',
         ':kafka:test-util-kafka',
 
         ':examples:example-distributed-graph',
-        ':examples:example-minimal-setup',
+        ':examples:example-https-config',
         ':examples:example-stateful-stream-process',
         ':examples:example-external-state'

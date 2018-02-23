@@ -26,7 +26,7 @@ case class GetValue(key: String) extends AvroRecord with Routed with Reply[Optio
 
 case class PutValue(key: String, value: String) extends AvroRecord with Routed with Reply[Option[String]]
 
-class MySimplePartition extends Partition {
+class ExamplePartition extends Partition {
 
   val cache = state[String, String]("cache")
 

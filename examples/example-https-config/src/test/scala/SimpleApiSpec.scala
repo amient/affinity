@@ -17,8 +17,6 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.https
-
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
@@ -29,18 +27,17 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-
 class SimpleApiSpec extends FlatSpec with AffinityTestBase with Matchers {
 
-  val config = ConfigFactory.load("minimal-example-test")
+  val config = ConfigFactory.load("https-example-test")
 
   behavior of "Simple Api Gateway"
 
   it should "work without the http layer" in {
 
-    new TestGatewayNode(configure(config, None, None).withoutPath(Conf.Affi.Node.Gateway.Http.path)) {
+    new TestGatewayNode(configure(config, None, None)) {
       awaitClusterReady {
-        startContainer("simple-keyspace", List(0, 1), new MySimplePartition())
+        startContainer("simple-keyspace", List(0, 1), new ExamplePartition())
       }
       implicit val context = system.dispatcher
       implicit val timeout = Timeout(3 seconds)

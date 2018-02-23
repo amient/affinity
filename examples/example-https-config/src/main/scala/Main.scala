@@ -26,7 +26,7 @@ object Main extends App {
 
   try {
 
-    new Node(ConfigFactory.load("minimal-example")).start()
+    new Node(ConfigFactory.load("https-example")).start()
 
   } catch {
     case NonFatal(e) =>

@@ -6,15 +6,16 @@ apply plugin: 'java'
 apply plugin: "com.github.johnrengelman.shadow"
 
 ext {
-    mainClass = "io.amient.affinity.example.minimal.Main"
-    mainScript = "example"
+    mainClass = "Main"
+    mainScript = "run-main"
 }
 
 dependencies {
     compile project(':core')
     compile project(':rocksdb')
     compile project(':kafka:storage-kafka')
-    compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.21'
+    compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
+    compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
 }
 

@@ -246,7 +246,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
       var exists: Option[Boolean] = None
       while (!exists.isDefined) {
-        if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.SECONDS).contains(topic)) {
+        if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.MILLISECONDS).contains(topic)) {
           exists = Some(true)
         } else {
           val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)

@@ -35,7 +35,7 @@ case class GetData(key: String) extends Reply[Option[String]]
 
 case class PutData(key: String, value: String) extends Reply[Option[String]]
 
-class MyApiGateway extends Gateway {
+class ExampleApiGateway extends Gateway {
 
   import context.dispatcher
 
@@ -56,7 +56,7 @@ class MyApiGateway extends Gateway {
 
 }
 
-class MyHttpGateway extends MyApiGateway with GatewayHttp {
+class ExampleHttpsGateway extends ExampleApiGateway with GatewayHttp {
 
   import context.dispatcher
 
