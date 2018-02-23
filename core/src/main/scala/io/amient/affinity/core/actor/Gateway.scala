@@ -113,7 +113,9 @@ trait Gateway extends ActorHandler with ActorState {
     super.preStart()
     activeState() // first bootstrap all global state stores
     passiveState() // any thereafter switch them to passive mode for the remainder of the runtime
-    //finally - set up a watch for each referenced keyspace coordinator
+    evaluateSuspensionStatus() //each gateway starts in a suspended mode so in case there are no keyspaces this will resume it
+
+    // finally - set up a watch for each referenced keyspace coordinator
     // coordinator will be sending 2 types of messages for each individual keyspace reference:
     // 1. MasterUpdates(..) sent whenever a master actor is added or removed to/from the routing tables
     // 1. KeyspaceStatus(..)
@@ -166,17 +168,23 @@ trait Gateway extends ActorHandler with ActorState {
       val (_, _, keyspaceCurrentlySuspended) = keyspaces(_keyspace)
       if (keyspaceCurrentlySuspended.get != suspended) {
         keyspaces(_keyspace)._3.set(suspended)
-        val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
-        if (gatewayShouldBeSuspended != handlingSuspended) {
-          handlingSuspended = gatewayShouldBeSuspended
-          onClusterStatus(gatewayShouldBeSuspended)
-          if (self.path.name == "gateway") {
-            context.system.eventStream.publish(msg) // this one is for IntegrationTestBase
-            context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
-          }
-        }
+        evaluateSuspensionStatus(Some(msg))
       }
+  }
 
+  private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {
+    val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
+    if (gatewayShouldBeSuspended != handlingSuspended) {
+      handlingSuspended = gatewayShouldBeSuspended
+      onClusterStatus(gatewayShouldBeSuspended)
+
+      //if this is an actual external gateway (as opposed to gateway trait mixec into say partition)
+      if (self.path.name == "gateway") {
+        //publish some messages for synchronizing test utitlities
+        msg.foreach(context.system.eventStream.publish) // this one is for IntegrationTestBase
+        context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
+      }
+    }
   }
 
 }

@@ -38,7 +38,7 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
 
   val gateway = new TestGatewayNode(config, new GatewayHttp {
     override def handle: Receive = {
-      case http@HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
+      case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
     }
   })
 
