@@ -37,7 +37,6 @@ import java.util.*;
 
 /**
  * The implementing class must provide a constructor that takes two arguments:
- * String identifier
  * StateConf conf
  */
 public abstract class MemStore implements Closeable {

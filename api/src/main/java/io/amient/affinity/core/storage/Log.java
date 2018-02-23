@@ -1,5 +1,6 @@
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.util.EventTime;
 import io.amient.affinity.core.util.MappedJavaFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +98,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         };
     }
 
-    public long bootstrap(final MemStore kvstore, int partition) {
+    public <K> long bootstrap(String identifier, final MemStore kvstore, int partition, Optional<ObservableState<K>> observableState) {
         switch(fsm) {
             case TAIL: stopLogSync(); break;
             case WRITE: flushWrites(); break;
@@ -105,21 +106,23 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         }
         fsm = FSM.BOOT;
         POS checkpoint = getCheckpoint();
+        log.debug("Bootstrap " + identifier + "/partition=" + partition + " from checkpoint " + checkpoint + ":end-offset");
+        long t = EventTime.unix();
         storage.reset(partition, checkpoint);
         Iterator<LogEntry<POS>> i = storage.boundedIterator();
         long numRecordsProcessed = 0L;
         while (i.hasNext()) {
             LogEntry<POS> entry = i.next();
             if (checkpoint == null || entry.position.compareTo(checkpoint) > 0) {
-                kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
-                updateCheckpoint(entry.position);
+                modifyState(kvstore, entry, observableState);
                 numRecordsProcessed += 1;
             }
         }
+        log.debug("Bootstrap - completed: " + identifier + "/partition=" + partition +", duration.ms = " + (EventTime.unix() - t));
         return numRecordsProcessed;
     }
 
-    public <K> void tail(final MemStore kvstore, ObservableState<K> state) {
+    public <K> void tail(final MemStore kvstore, Optional<ObservableState<K>> observableState) {
         switch(fsm) {
             case INIT: throw new IllegalStateException("Cannot transition from init to tail - bootstrap is required first");
             case WRITE: throw new IllegalStateException("Cannot transition from write mode directly from write to boot mode");
@@ -136,14 +139,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                             return;
                         } else while (entries.hasNext()) {
                             LogEntry<POS> entry = entries.next();
-                            if (storage.isTombstone(entry)) {
-                                kvstore.remove(ByteBuffer.wrap(entry.key));
-                                if (state != null) state.internalPush(entry.key, Optional.empty());
-                            } else {
-                                kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
-                                if (state != null) state.internalPush(entry.key, Optional.of(entry.value));
-                            }
-                            updateCheckpoint(entry.position);
+                            modifyState(kvstore, entry, observableState);
                         }
                     }
                 } catch (Throwable e) {
@@ -194,6 +190,17 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             log.error("Error in the manager thread", e);
             Thread.currentThread().getThreadGroup().interrupt();
         }
+    }
+
+    private <K> void modifyState(MemStore kvstore, LogEntry<POS> entry, Optional<ObservableState<K>> observableState) {
+        if (storage.isTombstone(entry)) {
+            kvstore.remove(ByteBuffer.wrap(entry.key));
+            observableState.ifPresent((state) -> state.internalPush(entry.key, Optional.empty()));
+        } else {
+            kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
+            observableState.ifPresent((state) -> state.internalPush(entry.key, Optional.of(entry.value)));
+        }
+        updateCheckpoint(entry.position);
     }
 
     private void flushWrites() {
