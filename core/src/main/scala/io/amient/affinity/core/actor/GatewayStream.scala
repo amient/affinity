@@ -70,6 +70,7 @@ trait GatewayStream extends Gateway {
   val inputStreamManager = new Thread {
     override def run(): Unit = {
       val inputStreamProcessors = declaredInputStreamProcessors.result()
+      if (inputStreamProcessors.isEmpty) return
       val inputStreamExecutor = Executors.newFixedThreadPool(inputStreamProcessors.size)
       try {
         inputStreamProcessors.foreach(inputStreamExecutor.submit)
