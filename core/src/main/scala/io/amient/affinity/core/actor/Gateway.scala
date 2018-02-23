@@ -86,7 +86,7 @@ trait Gateway extends ActorHandler with ActorState {
   abstract override def preStart(): Unit = {
     super.preStart()
     checkClusterStatus()
-    tailState() // any state store registered in the gateway layer is global, so all are tailing
+    passiveState() // any state store registered in the gateway layer is global, so all are tailing
     keyspaces.foreach {
       case (_, (coordinator, _, _)) => coordinator.watch(self, global = true)
     }

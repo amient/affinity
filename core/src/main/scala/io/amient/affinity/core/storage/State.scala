@@ -89,7 +89,7 @@ object State {
       }
       storage.open(checkpointFile)
     }
-    new State(kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, readonly = external)
+    new State(kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -111,7 +111,7 @@ class State[K, V](kvstore: MemStore,
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
                   val lockTimeoutMs: Int = 10000,
-                  val readonly: Boolean = false) extends ObservableState[K] with Closeable {
+                  val external: Boolean = false) extends ObservableState[K] with Closeable {
 
   self =>
 
@@ -365,7 +365,7 @@ class State[K, V](kvstore: MemStore,
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
   private def put(key: Array[Byte], value: V): Future[_] = {
-    if (readonly) throw new IllegalStateException("put() called on a read-only state")
+    if (external) throw new IllegalStateException("put() called on a read-only state")
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
       case e: EventTime => e.eventTimeUnix()
@@ -393,7 +393,7 @@ class State[K, V](kvstore: MemStore,
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
   private def delete(key: Array[Byte]): Future[_] = {
-    if (readonly) throw new IllegalStateException("delete() called on a read-only state")
+    if (external) throw new IllegalStateException("delete() called on a read-only state")
     logOption match {
       case None => Future.successful(kvstore.remove(ByteBuffer.wrap(key)))
       case Some(log) => log.delete(kvstore, key)

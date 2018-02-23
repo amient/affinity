@@ -65,7 +65,7 @@ trait Partition extends ActorHandler with ActorState {
     * may be resent as part of ack contract so this method must be idempotent.
     */
   protected def onBecomeMaster: Unit = {
-    bootState()
+    activeState()
     log.debug(s"Became master for partition $keyspace/$partition")
   }
 
@@ -75,7 +75,7 @@ trait Partition extends ActorHandler with ActorState {
     * The signalling message may be resent as part of ack contract so this method must be idempotent.
     */
   protected def onBecomeStandby: Unit = {
-    tailState()
+    passiveState()
     log.debug(s"Became standby for partition $keyspace/$partition")
   }
 
