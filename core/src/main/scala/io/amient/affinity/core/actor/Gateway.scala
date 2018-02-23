@@ -6,20 +6,18 @@ import akka.actor.{ActorRef, Props}
 import akka.event.Logging
 import akka.pattern.ask
 import akka.routing._
-import akka.serialization.SerializationExtension
 import akka.util.Timeout
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.actor.Keyspace.{CheckServiceAvailability, ServiceAvailability}
+import io.amient.affinity.core.actor.Keyspace.{CheckKeyspaceStatus, KeyspaceStatus}
 import io.amient.affinity.core.actor.Partition.{CreateKeyValueMediator, KeyValueMediatorCreated}
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
+import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
-import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.storage.State
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
@@ -54,16 +52,12 @@ trait Gateway extends ActorHandler with ActorState {
 
   def onClusterStatus(suspended: Boolean): Unit = ()
 
-  private val keyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
-  private val globals = mutable.Map[String, (State[_, _], AtomicBoolean)]()
-  private var handlingSuspended = true
-
   def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     globals.get(globalStateStore) match {
-      case Some((globalState, _)) => globalState.asInstanceOf[State[K, V]]
+      case Some(globalState) => globalState.asInstanceOf[State[K, V]]
       case None =>
         val bc = state[K, V](globalStateStore, conf.Global(globalStateStore))
-        globals += (globalStateStore -> (bc, new AtomicBoolean(true)))
+        globals += (globalStateStore -> bc)
         bc
     }
   }
@@ -83,55 +77,6 @@ trait Gateway extends ActorHandler with ActorState {
     }
   }
 
-  abstract override def preStart(): Unit = {
-    super.preStart()
-    checkClusterStatus()
-    passiveState() // any state store registered in the gateway layer is global, so all are tailing
-    keyspaces.foreach {
-      case (_, (coordinator, _, _)) => coordinator.watch(self, global = true)
-    }
-  }
-
-  abstract override def postStop(): Unit = {
-    try super.postStop() finally keyspaces.values.foreach {
-      case (coordinator, _, _) => try {
-        coordinator.unwatch(self)
-        coordinator.close()
-      } catch {
-        case NonFatal(e) => log.warning("Could not close one of the gateway coordinators", e);
-      }
-    }
-  }
-
-  abstract override def manage = super.manage orElse {
-
-    case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
-        context.parent ! Controller.GatewayCreated(-1)
-        if (conf.Node.Gateway.Http.isDefined) {
-          log.warning("affinity.gateway.http interface is configured but the node is trying " +
-            s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
-        }
-
-    case msg@MasterStatusUpdate(group, add, remove) => sender.reply(msg) {
-      val service: ActorRef = keyspaces(group)._2
-      remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))
-      add.foreach(ref => service ! AddRoutee(ActorRefRoutee(ref)))
-      service ! CheckServiceAvailability(group)
-    }
-
-    case msg@ServiceAvailability(group, suspended) =>
-      val (_, _, currentlySuspended) = keyspaces(group)
-      if (currentlySuspended.get != suspended) {
-        keyspaces(group)._3.set(suspended)
-        checkClusterStatus(Some(msg))
-      }
-
-    case request@GracefulShutdown() => sender.reply(request) {
-      context.stop(self)
-    }
-
-  }
-
   def connectKeyValueMediator(keyspace: ActorRef, stateStoreName: String, key: Any): Future[ActorRef] = {
     implicit val timeout = Timeout(1 second)
     keyspace ? CreateKeyValueMediator(stateStoreName, key) collect {
@@ -149,16 +94,89 @@ trait Gateway extends ActorHandler with ActorState {
     }
   }
 
+  /**
+    * internal map of all referenced keyspaces (keyspace: String -> (Coordinator, KeyspaceActorRef, SuspendedFlag)
+    */
+  private val keyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
 
-  private def checkClusterStatus(msg: Option[ServiceAvailability] = None): Unit = {
-    val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
-    if (gatewayShouldBeSuspended != handlingSuspended) {
-      handlingSuspended = gatewayShouldBeSuspended
-      onClusterStatus(gatewayShouldBeSuspended)
-      if (self.path.name == "gateway") {
-        msg.foreach(context.system.eventStream.publish(_)) // this one is for IntegrationTestBase
-        context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
+  /**
+    * internal lisf of all referenced global state stores
+    */
+  private val globals = mutable.Map[String, State[_, _]]()
+
+  /**
+    * internal gateway suspension flag is set to true whenever any of the keyspaces is suspended
+    */
+  private var handlingSuspended = true
+
+  abstract override def preStart(): Unit = {
+    super.preStart()
+    activeState() // first bootstrap all global state stores
+    passiveState() // any thereafter switch them to passive mode for the remainder of the runtime
+    //finally - set up a watch for each referenced keyspace coordinator
+    // coordinator will be sending 2 types of messages for each individual keyspace reference:
+    // 1. MasterUpdates(..) sent whenever a master actor is added or removed to/from the routing tables
+    // 1. KeyspaceStatus(..)
+    keyspaces.foreach {
+      case (_, (coordinator, _, _)) => coordinator.watch(self, clusterWide = true)
+    }
+  }
+
+  abstract override def postStop(): Unit = {
+    try super.postStop() finally {
+      globals.foreach {
+        case (identifier, state) => try {
+          state.close()
+        } catch {
+          case NonFatal(e) => log.error(e, s"Could not close cleanly global state: $identifier ")
+        }
+      }
+      keyspaces.values.foreach {
+        case (coordinator, _, _) => try {
+          coordinator.unwatch(self)
+          coordinator.close()
+        } catch {
+          case NonFatal(e) => log.warning("Could not close one of the gateway coordinators", e);
+        }
       }
     }
   }
+
+  abstract override def manage = super.manage orElse {
+
+    case request@GracefulShutdown() => sender.reply(request) {
+      context.stop(self)
+    }
+
+    case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
+      context.parent ! Controller.GatewayCreated(-1)
+      if (conf.Node.Gateway.Http.isDefined) {
+        log.warning("affinity.gateway.http interface is configured but the node is trying " +
+          s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
+      }
+
+    case msg@MasterUpdates(group, add, remove) => sender.reply(msg) {
+      val service: ActorRef = keyspaces(group)._2
+      remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))
+      add.foreach(ref => service ! AddRoutee(ActorRefRoutee(ref)))
+      service ! CheckKeyspaceStatus(group)
+    }
+
+    case msg@KeyspaceStatus(_keyspace, suspended) =>
+      val (_, _, keyspaceCurrentlySuspended) = keyspaces(_keyspace)
+      if (keyspaceCurrentlySuspended.get != suspended) {
+        keyspaces(_keyspace)._3.set(suspended)
+        val gatewayShouldBeSuspended = keyspaces.exists(_._2._3.get)
+        if (gatewayShouldBeSuspended != handlingSuspended) {
+          handlingSuspended = gatewayShouldBeSuspended
+          onClusterStatus(gatewayShouldBeSuspended)
+          if (self.path.name == "gateway") {
+            context.system.eventStream.publish(msg) // this one is for IntegrationTestBase
+            context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
+          }
+        }
+      }
+
+  }
+
 }

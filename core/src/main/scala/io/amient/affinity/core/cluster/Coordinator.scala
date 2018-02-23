@@ -51,10 +51,10 @@ object Coordinator {
     override protected def specializations(): util.Set[String] = Set("zookeeper", "embedded")
   }
 
-  final case class MasterStatusUpdate(group: String, add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
-    def localTo(actor: ActorRef): MasterStatusUpdate = {
-      MasterStatusUpdate(
-        group,
+  final case class MasterUpdates(_keyspace: String, add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
+    def localTo(actor: ActorRef): MasterUpdates = {
+      MasterUpdates(
+        _keyspace,
         add.filter(_.path.address == actor.path.address),
         remove.filter(_.path.address == actor.path.address)
       )
@@ -111,17 +111,17 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * watch changes in the coordinate group of routees in the whole cluster.
     *
     * @param watcher actor which will receive the messages
-    * @param global  if true, the watcher will be notified of master status changes in the entire cluster
-    *                if false, the watcher will be notified of master status changes local to that watcher
+    * @param clusterWide  if true, the watcher will be notified of master status changes in the entire cluster
+    *                     if false, the watcher will be notified of master status changes local to that watcher
     */
-  def watch(watcher: ActorRef, global: Boolean): Unit = {
+  def watch(watcher: ActorRef, clusterWide: Boolean): Unit = {
     synchronized {
-      watchers += watcher -> global
+      watchers += watcher -> clusterWide
 
-      val currentMasters = getCurrentMasters.filter(global || _.path.address.hasLocalScope)
-      val update = MasterStatusUpdate(group, currentMasters, Set())
+      val currentMasters = getCurrentMasters.filter(clusterWide || _.path.address.hasLocalScope)
+      val update = MasterUpdates(group, currentMasters, Set())
       implicit val timeout = Timeout(30 seconds)
-      watcher ack (if (global) update else update.localTo(watcher)) onFailure {
+      watcher ack (if (clusterWide) update else update.localTo(watcher)) onFailure {
         case e: Throwable => if (!closed.get) {
           logger.error(e, "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, terminating the system.")
           system.terminate()
@@ -178,7 +178,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         val add = currentMasters.filter(!prevMasters.contains(_))
         val remove = prevMasters.filter(!currentMasters.contains(_))
         if (!add.isEmpty || !remove.isEmpty) {
-          val update = MasterStatusUpdate(group, add, remove)
+          val update = MasterUpdates(group, add, remove)
           notifyWatchers(update)
         }
       }
@@ -193,7 +193,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   }
 
 
-  private def notifyWatchers(fullUpdate: MasterStatusUpdate) = {
+  private def notifyWatchers(fullUpdate: MasterUpdates) = {
     if (!closed.get) watchers.foreach { case (watcher, global) =>
       implicit val timeout = Timeout(30 seconds)
       try {

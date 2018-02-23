@@ -27,7 +27,7 @@ import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
-import io.amient.affinity.core.actor.Keyspace.ServiceAvailability
+import io.amient.affinity.core.actor.Keyspace.KeyspaceStatus
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.http.HttpExchange
@@ -53,14 +53,14 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
   private val servicesReady = scala.collection.mutable.Set[String]()
   system.eventStream.subscribe(system.actorOf(Props(new Actor {
     override def receive: Receive = {
-      case ServiceAvailability(g, false) => {
+      case KeyspaceStatus(g, false) => {
         servicesReady.synchronized {
           servicesReady.add(g)
           servicesReady.notify
         }
       }
     }
-  })), classOf[ServiceAvailability])
+  })), classOf[KeyspaceStatus])
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)

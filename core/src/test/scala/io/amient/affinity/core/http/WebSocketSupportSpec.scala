@@ -211,8 +211,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   }
 
   "Custom WebSocket channel" must {
-    //FIXME #153
-    "work" ignore {
+    "work" in {
       val wsqueue = new LinkedBlockingQueue[String]()
       val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-custom-socket"), new TextMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()

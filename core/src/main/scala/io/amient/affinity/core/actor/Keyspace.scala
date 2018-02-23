@@ -47,9 +47,9 @@ object Keyspace {
     val State = group("state", classOf[StateConf], false)
   }
 
-  final case class CheckServiceAvailability(group: String) extends Reply[ServiceAvailability]
+  final case class CheckKeyspaceStatus(_keyspace: String) extends Reply[KeyspaceStatus]
 
-  final case class ServiceAvailability(group: String, suspended: Boolean)
+  final case class KeyspaceStatus(_keyspace: String, suspended: Boolean)
 
 }
 
@@ -103,8 +103,8 @@ class Keyspace(config: Config) extends Actor {
         if (removed != routee) routes.put(partition, removed)
       }
 
-    case req@CheckServiceAvailability(group) => sender.reply(req) {
-      ServiceAvailability(group, suspended = (routes.size != numPartitions))
+    case req@CheckKeyspaceStatus(_keyspace) => sender.reply(req) {
+      KeyspaceStatus(_keyspace, suspended = (routes.size != numPartitions))
     }
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)

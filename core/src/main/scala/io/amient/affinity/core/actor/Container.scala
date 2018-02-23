@@ -28,7 +28,7 @@ import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.actor.Controller.{ContainerOnline, GracefulShutdown}
 import io.amient.affinity.core.actor.Partition.{BecomeMaster, BecomeStandby}
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
+import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -60,7 +60,7 @@ class Container(group: String) extends Actor {
     * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
     */
   private val coordinator = Coordinator.create(context.system, group)
-  coordinator.watch(self, global = false)
+  coordinator.watch(self, clusterWide = false)
 
   override def preStart(): Unit = {
     log.info(s"Starting container `$group` with ${context.children.size} partitions")
@@ -99,7 +99,7 @@ class Container(group: String) extends Actor {
       coordinator.unregister(partitions(ref))
       partitions -= ref
 
-    case request @ MasterStatusUpdate(_, add, remove) => sender.reply(request) {
+    case request @ MasterUpdates(_, add, remove) => sender.reply(request) {
       implicit val timeout = Timeout(startupTimeout)
       remove.toList.map(ref => ref ack BecomeStandby())
       add.toList.map(ref => ref ack BecomeMaster())

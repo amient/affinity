@@ -99,7 +99,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     }
 
     public <K> void tail(final MemStore kvstore, ObservableState<K> state) {
-        synchronizer.set(new LogSync() {
+        synchronizer.compareAndSet(null, new LogSync() {
             @Override
             public void run() {
                 try {

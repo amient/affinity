@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorSystem, Props}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
-import io.amient.affinity.core.cluster.Coordinator.MasterStatusUpdate
+import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -47,7 +47,7 @@ class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
       update1 synchronized {
         coordinator1.watch(system.actorOf(Props(new Actor {
           override def receive: Receive = {
-            case MasterStatusUpdate(g, add, del) => update1 synchronized update1.set(s"$g, ${add.size}, ${del.size}")
+            case MasterUpdates(g, add, del) => update1 synchronized update1.set(s"$g, ${add.size}, ${del.size}")
           }
         }), "subscriber1"), false)
       }
@@ -58,7 +58,7 @@ class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
       update2 synchronized {
         coordinator2.watch(system.actorOf(Props(new Actor {
           override def receive: Receive = {
-            case MasterStatusUpdate(g, add, del) => update2 synchronized update2.set(s"$g, ${add.size}, ${del.size}")
+            case MasterUpdates(g, add, del) => update2 synchronized update2.set(s"$g, ${add.size}, ${del.size}")
           }
         }), "subscriber2"), true)
         update2.wait(1000)

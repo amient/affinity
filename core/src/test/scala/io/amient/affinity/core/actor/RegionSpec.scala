@@ -43,7 +43,7 @@ class RegionSpec extends IntegrationTestBase with Matchers {
   })
 
   "A Region Actor" must {
-    "must keep Coordinator Updated during partition failure & restart scenario" ignore { //FIXME #91
+    "must keep Coordinator Updated during partition failure & restart scenario" in {
       val coordinator = new CoordinatorEmbedded(system, "region", null)
       try {
         val d = 1 second

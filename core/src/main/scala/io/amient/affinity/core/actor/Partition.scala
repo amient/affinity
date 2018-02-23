@@ -59,31 +59,27 @@ trait Partition extends ActorHandler with ActorState {
     */
   implicit val partition = self.path.name.toInt
 
-  /**
-    * onBecomeMaster is signalling that the partition should take over the responsibility
-    * of being the Master for the related physical partition. The signalling message
-    * may be resent as part of ack contract so this method must be idempotent.
-    */
-  protected def onBecomeMaster: Unit = {
-    activeState()
-    log.debug(s"Became master for partition $keyspace/$partition")
-  }
-
-  /**
-    * onBecomeStandby is signalling that the partition should become a passive standby
-    * and keep listening to the changes in the related physical partition.
-    * The signalling message may be resent as part of ack contract so this method must be idempotent.
-    */
-  protected def onBecomeStandby: Unit = {
-    passiveState()
-    log.debug(s"Became standby for partition $keyspace/$partition")
-  }
-
   override def preStart(): Unit = {
     log.debug(s"Starting keyspace: $keyspace, partition: $partition")
+    //active state will block until all state stores have caught-up
+    activeState()
+    //only after states have caught up we make the partition online and available to cooridnators
     context.parent ! PartitionOnline(self)
     super.preStart()
   }
+
+  /**
+    * onBecomeMaster will be fired when this Partition Actor has successfully become the Master for the
+    * underlying physical partition and after all state stores have been caught-up and are at this
+    * point consistent with the storage.
+    */
+  protected def onBecomeMaster: Unit = ()
+
+  /**
+    * onBecomeStandby will be fired when this Partition Actor became a standby for the underlying
+    * physical partition and after all state stores have been switched to the background passive mode.
+    */
+  protected def onBecomeStandby: Unit = ()
 
   override def postStop(): Unit = {
     try {
@@ -95,11 +91,15 @@ trait Partition extends ActorHandler with ActorState {
   abstract override def manage: Receive = super.manage orElse {
 
     case msg@BecomeMaster() =>
-      sender.reply(msg) {}
-      onBecomeMaster
+      sender.reply(msg) {} //acking the receipt of the instruction immediately
+      activeState() //then blocking the inbox until state stores have caught-up with storage
+      log.debug(s"Became master for partition $keyspace/$partition")
+      onBecomeMaster //then invoke custom handler
 
     case msg@BecomeStandby() =>
-      sender.reply(msg) {}
+      sender.reply(msg) {} //acking the receipt of the instruction immediately
+      passiveState()  //then switch state stores to passive mode, i.e. tailing the storage in the background
+      log.debug(s"Became standby for partition $keyspace/$partition")
       onBecomeStandby
 
     case CreateKeyValueMediator(stateStoreName: String, key: Any) => try {
