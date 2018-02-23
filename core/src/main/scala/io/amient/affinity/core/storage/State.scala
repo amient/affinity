@@ -60,13 +60,13 @@ object State {
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
     try {
-      create(partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
+      create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
     } catch {
       case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
   }
 
-  def create[K: ClassTag, V: ClassTag](partition: Int, stateConf: StateConf, numPartitions: Int, kvstore: MemStore, keySerde: AbstractSerde[K], valueSerde: AbstractSerde[V]): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, kvstore: MemStore, keySerde: AbstractSerde[K], valueSerde: AbstractSerde[V]): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
@@ -89,7 +89,7 @@ object State {
       }
       storage.open(checkpointFile)
     }
-    new State(kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    new State(identifier, kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -104,7 +104,8 @@ object State {
 }
 
 
-class State[K, V](kvstore: MemStore,
+class State[K, V](val identifier: String,
+                  kvstore: MemStore,
                   logOption: Option[Log[_]],
                   partition: Int,
                   keySerde: AbstractSerde[K],
@@ -117,6 +118,8 @@ class State[K, V](kvstore: MemStore,
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  def optional[T](opt: T): Optional[T] = if (opt != null) Optional.of(opt) else Optional.empty[T]
+
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
@@ -125,9 +128,11 @@ class State[K, V](kvstore: MemStore,
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
   }
 
-  private[affinity] def boot(): Unit = logOption.foreach(_.bootstrap(kvstore, partition))
+  private[affinity] def boot(): Unit = logOption.foreach(_
+    .bootstrap(identifier, kvstore, partition, optional[ObservableState[K]](if (external) this else null)))
 
-  private[affinity] def tail(): Unit = logOption.foreach(_.tail(kvstore, this))
+  private[affinity] def tail(): Unit = logOption.foreach(_
+    .tail(kvstore, optional[ObservableState[K]](this)))
 
   /**
     * @return a weak iterator that doesn't block read and write operations

@@ -142,7 +142,6 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
     // exclusive of the time range end
     val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
-    log.debug(s"Reset partition=${tp.partition()} limit $startOffset:$stopOffset")
     if (stopOffset >= startOffset) {
       partitionProgress.put(tp.partition, stopOffset)
     } else {

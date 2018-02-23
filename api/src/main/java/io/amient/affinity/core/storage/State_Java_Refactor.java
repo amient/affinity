@@ -39,6 +39,7 @@ import java.util.function.Function;
 
 public class State_Java_Refactor<K, V> extends ObservableState<K> implements Closeable {
 
+    private final String identifier;
     private final MemStore kvstore;
     private final Optional<Log<?>> logOption;
     private final int partition;
@@ -46,17 +47,19 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
     private final AbstractSerde<V> valueSerde;
     private final long ttlMs;
     private final int lockTimeoutMs;
-    private final boolean readonly;
+    private final boolean external;
 
-    public State_Java_Refactor(MemStore kvstore,
+    public State_Java_Refactor(String identifier,
+                               MemStore kvstore,
                                Optional<Log<?>> logOption,
                                int partition,
                                AbstractSerde<K> keySerde,
                                AbstractSerde<V> valueSerde,
                                long ttlMs, //-1
                                int lockTimeoutMs, //10000
-                               boolean readonly //false
+                               boolean external //false
     ) {
+        this.identifier = identifier;
         this.kvstore = kvstore;
         this.logOption = logOption;
         this.partition = partition;
@@ -64,16 +67,16 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         this.valueSerde = valueSerde;
         this.ttlMs = ttlMs;
         this.lockTimeoutMs = lockTimeoutMs;
-        this.readonly = readonly;
+        this.external = external;
 
     }
 
     void boot() {
-        logOption.ifPresent(log -> log.bootstrap(kvstore, partition));
+        logOption.ifPresent(log -> log.bootstrap(identifier, kvstore, partition, external ? Optional.of(this): Optional.empty()));
     }
 
     void tail() {
-        logOption.ifPresent(log -> log.tail(kvstore, this));
+        logOption.ifPresent(log -> log.tail(kvstore, Optional.of(this)));
     }
 
     public void close() throws IOException {
@@ -351,7 +354,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * @return future of the checkpoint that will represent the consistency information after the operation completes
      */
     private Future<?> put(byte[] key, V value) {
-        if (readonly) throw new IllegalStateException("put() called on a read-only state");
+        if (external) throw new IllegalStateException("put() called on a read-only state");
         long nowMs = System.currentTimeMillis();
         long recordTimestamp = (value instanceof EventTime) ? ((EventTime) value).eventTimeUnix() : nowMs;
         if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
@@ -378,7 +381,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * @return future of the checkpoint that will represent the consistency information after the operation completes
      */
     private Future<?> delete(byte[] key) {
-        if (readonly) throw new IllegalStateException("delete() called on a read-only state");
+        if (external) throw new IllegalStateException("delete() called on a read-only state");
         return logOption
                 .map(Unchecked.function(log -> log.delete(kvstore, key)))
                 .orElseGet(() -> {

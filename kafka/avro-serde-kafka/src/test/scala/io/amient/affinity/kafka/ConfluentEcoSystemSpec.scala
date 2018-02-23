@@ -157,7 +157,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
     val kvstore = new MemStoreSimpleMap(stateConf)
-    State.create(partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
+    State.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {
