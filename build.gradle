@@ -1,5 +1,5 @@
 group = 'io.amient.affinity'
-version = '0.5.4'
+version = '0.5.5-SNAPSHOT'
 
 ext {
     javaVersion = '1.8'
