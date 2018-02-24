@@ -26,12 +26,9 @@ class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: Abstract
 
   lazy val storage = LogStorage.newInstance(conf)
 
-  def write(data: Iterator[(K, V)]): Unit = {
-    val records = data.map {
-      case (k, v) if v.isInstanceOf[EventTime] => new Record(keySerde.toBytes(k), valSerde.toBytes(v), v.asInstanceOf[EventTime].eventTimeUnix)
-      case (k, v) => new Record(keySerde.toBytes(k), valSerde.toBytes(v), EventTime.unix)
-    }
-    records.foreach(storage.append)
+  def append(record: Record[K, V]): java.util.concurrent.Future[_ <: Comparable[_]] = {
+    val binaryRecord = new Record(keySerde.toBytes(record.key), valSerde.toBytes(record.value), record.timestamp)
+    storage.append(binaryRecord)
   }
 
   def flush() = storage.flush()

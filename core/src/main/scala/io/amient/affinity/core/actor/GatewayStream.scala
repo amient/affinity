@@ -46,7 +46,7 @@ trait GatewayStream extends Gateway {
 
   private val config = context.system.settings.config
 
-  type InputStreamProcessor[K, V] = Record[K, V] => Future[Any]
+  type InputStreamProcessor[K, V] = Record[K, V] => Future[AnyRef]
 
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
 
@@ -70,7 +70,7 @@ trait GatewayStream extends Gateway {
     * @tparam K
     * @tparam V
     */
-  def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: Record[K, V] => Future[Any]): Unit = {
+  def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: InputStreamProcessor[K, V]): Unit = {
     val streamConfig = LogStorage.StorageConf(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
@@ -129,7 +129,7 @@ trait GatewayStream extends Gateway {
     val minTimestamp = streamConfig.MinTimestamp()
     val consumer = LogStorage.newInstance(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
-    val work = new ListBuffer[Future[Any]]
+    val work = new ListBuffer[Future[AnyRef]]
     //FIXME hardcoded commit interval
     val commitInterval = 10 seconds
 
@@ -163,7 +163,7 @@ trait GatewayStream extends Gateway {
             //flush all outputs in parallel - these are all outputs declared in this gateway
             outpuStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
-            Await.result(Future.sequence(work.result), commitInterval)
+            Await.ready(Future.sequence(work.result), commitInterval)
             //make sure the previous commit has completed
             lastCommit.get(commitInterval.toMillis, TimeUnit.MILLISECONDS)
             //commit the records processed by this processor only since the last commit

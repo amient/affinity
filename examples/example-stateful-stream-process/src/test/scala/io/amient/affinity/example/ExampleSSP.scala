@@ -20,8 +20,7 @@
 package io.amient.affinity.example
 
 import io.amient.affinity.core.actor.GatewayStream
-
-import scala.concurrent.Future
+import io.amient.affinity.core.storage.Record
 
 class ExampleSSP extends GatewayStream {
 
@@ -38,7 +37,7 @@ class ExampleSSP extends GatewayStream {
         case None => Some(1)
         case Some(prev) => Some(prev + 1)
       }).collect {
-        case Some(updatedCount) => out.write(Iterator.single((record.value, updatedCount)))
+        case Some(updatedCount) => out.append(new Record(record.value, updatedCount, record.timestamp))
       }(scala.concurrent.ExecutionContext.Implicits.global)
 
   }

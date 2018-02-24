@@ -21,16 +21,15 @@ package io.amient.affinity.spark
 
 import java.time.{Duration, Instant}
 
-import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.storage.{LogStorage, LogStorageConf}
+import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
 import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
-import io.amient.affinity.kafka.{EmbeddedKafka, KafkaLogStorage, KafkaStorage}
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaLogStorage}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
@@ -90,17 +89,17 @@ class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with Befo
     val stream = new OutputDataStream[Int, CompactionTestEvent](
       AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap))
     try {
-      stream.write((0 to 99).iterator.map { i =>
-        (i, CompactionTestEvent(i, s"January($i)", JanuaryFirst2018.toEpochMilli + i * 1000))
-      })
+      (0 to 99).iterator.foreach { i =>
+        stream.append(new Record(i, CompactionTestEvent(i, s"January($i)", JanuaryFirst2018.toEpochMilli + i * 1000)))
+      }
 
-      stream.write((0 to 99).iterator.map { i =>
-        (i, CompactionTestEvent(i, s"February($i)", FebruaryFirst2018.toEpochMilli + i * 1000))
-      })
+      (0 to 99).iterator.map { i =>
+        stream.append(new Record(i, CompactionTestEvent(i, s"February($i)", FebruaryFirst2018.toEpochMilli + i * 1000)))
+      }
 
-      stream.write((0 to 99).iterator.map { i =>
-        (i, CompactionTestEvent(i, s"December($i)", DecemberFirst2017.toEpochMilli + i * 1000))
-      })
+      (0 to 99).iterator.map { i =>
+        stream.append(new Record(i, CompactionTestEvent(i, s"December($i)", DecemberFirst2017.toEpochMilli + i * 1000)))
+      }
 
     } finally {
       stream.close
@@ -110,7 +109,7 @@ class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with Befo
   "full reset RDD" should "return fully compacted stream" in {
     val rdd = avroCompactRdd[Int, CompactionTestEvent](getSerdeConf, getStorageConf(kafkaBootstrap))
     val result = rdd.collect.sortBy(_._1)
-    result.size should be (100)
+    result.size should be(100)
     result.forall(_._2.eventTimeUnix >= FebruaryFirst2018.toEpochMilli)
   }
 
@@ -118,7 +117,7 @@ class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with Befo
     val rdd = avroCompactRdd[Int, CompactionTestEvent](
       getSerdeConf, getStorageConf(kafkaBootstrap), TimeRange.prev(Duration.ofSeconds(50), Instant.from(Duration.ofSeconds(100).addTo(FebruaryFirst2018))))
     val result = rdd.collect.sortBy(_._1)
-    result.size should be (50)
+    result.size should be(50)
     result.forall(_._2.eventTimeUnix >= FebruaryFirst2018.toEpochMilli)
   }
 

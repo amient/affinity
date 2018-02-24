@@ -19,12 +19,18 @@
 
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.util.EventTime;
+
 import java.io.Serializable;
 
 public class Record<K, V> implements Serializable {
     public final K key;
     public final V value;
     public final long timestamp;
+
+    public Record(K key, V value) {
+        this (key, value, EventTime.unix());
+    }
 
     public Record(K key, V value, long timestamp) {
         this.key = key;

@@ -38,7 +38,7 @@ import io.amient.affinity.core.storage.State
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -57,7 +57,7 @@ object Gateway {
 
 }
 
-trait Gateway extends ActorHandler with ActorState {
+trait Gateway extends ActorHandler {
 
   private val log = Logging.getLogger(context.system, this)
 
@@ -67,22 +67,46 @@ trait Gateway extends ActorHandler with ActorState {
 
   private implicit val scheduler = context.system.scheduler
 
+  implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
+  implicit def untiToVoidFuture(f: Future[Unit]): Future[Void] = f.map(null)(ExecutionContext.Implicits.global)
+
   import context.dispatcher
+
+  private var started = false
+
+  /**
+    * internal map of all declared keyspaces (keyspace: String -> (Coordinator, KeyspaceActorRef, SuspendedFlag)
+    */
+  private val declaredKeyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
+  private lazy val keyspaces = declaredKeyspaces.toMap
+
+  /**
+    * internal lisf of all declared globals and their final version referenced global state stores
+    */
+  private val declaredGlobals = mutable.Map[String, State[_, _]]()
+  private lazy val globals = declaredGlobals.toMap
+
+  /**
+    * internal gateway suspension flag is set to true whenever any of the keyspaces is suspended
+    */
+  private var handlingSuspended = true
 
   def onClusterStatus(suspended: Boolean): Unit = ()
 
   def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
-    globals.get(globalStateStore) match {
+    if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
+    declaredGlobals.get(globalStateStore) match {
       case Some(globalState) => globalState.asInstanceOf[State[K, V]]
       case None =>
-        val bc = state[K, V](globalStateStore, conf.Global(globalStateStore))
-        globals += (globalStateStore -> bc)
+        val bc = State.create[K, V](globalStateStore, 0, conf.Global(globalStateStore), 1, context.system)
+        declaredGlobals += (globalStateStore -> bc)
         bc
     }
   }
 
   def keyspace(group: String): ActorRef = {
-    keyspaces.get(group) match {
+    if (started) throw new IllegalStateException("Cannot declare keyspace after the actor has started")
+    declaredKeyspaces.get(group) match {
       case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
@@ -91,7 +115,7 @@ trait Gateway extends ActorHandler with ActorState {
         val ks = context.actorOf(Props(new Keyspace(serviceConf.config())), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(ks)
-        keyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
+        declaredKeyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
         ks
     }
   }
@@ -104,42 +128,33 @@ trait Gateway extends ActorHandler with ActorState {
   }
 
   def describeKeyspaces: Map[String, Seq[String]] = {
+    if (!started) throw new IllegalStateException("Cannot get keyspace reference before the actor has started")
     val t = 60 seconds
     implicit val timeout = Timeout(t)
-    keyspaces.toMap.map {
+    keyspaces.map {
       case (group, (_, actorRef, _)) =>
         val x = Await.result(actorRef ? GetRoutees map (_.asInstanceOf[Routees]), t)
         (group, x.routees.map(_.toString))
     }
   }
 
-  /**
-    * internal map of all referenced keyspaces (keyspace: String -> (Coordinator, KeyspaceActorRef, SuspendedFlag)
-    */
-  private val keyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
-
-  /**
-    * internal lisf of all referenced global state stores
-    */
-  private val globals = mutable.Map[String, State[_, _]]()
-
-  /**
-    * internal gateway suspension flag is set to true whenever any of the keyspaces is suspended
-    */
-  private var handlingSuspended = true
-
   abstract override def preStart(): Unit = {
     super.preStart()
-    activeState() // first bootstrap all global state stores
-    passiveState() // any thereafter switch them to passive mode for the remainder of the runtime
+    started = true
+
+    // first bootstrap all global state stores
+    globals.values.foreach(_.boot)
+    // any thereafter switch them to passive mode for the remainder of the runtime
+    globals.values.foreach(_.tail)
+
     evaluateSuspensionStatus() //each gateway starts in a suspended mode so in case there are no keyspaces this will resume it
 
     // finally - set up a watch for each referenced keyspace coordinator
     // coordinator will be sending 2 types of messages for each individual keyspace reference:
     // 1. MasterUpdates(..) sent whenever a master actor is added or removed to/from the routing tables
     // 1. KeyspaceStatus(..)
-    keyspaces.foreach {
-      case (_, (coordinator, _, _)) => coordinator.watch(self, clusterWide = true)
+    keyspaces.values.foreach {
+      case (coordinator, _, _) => coordinator.watch(self, clusterWide = true)
     }
   }
 
@@ -152,12 +167,12 @@ trait Gateway extends ActorHandler with ActorState {
           case NonFatal(e) => log.error(e, s"Could not close cleanly global state: $identifier ")
         }
       }
-      keyspaces.values.foreach {
-        case (coordinator, _, _) => try {
+      keyspaces.foreach {
+        case (identifier, (coordinator, _, _)) => try {
           coordinator.unwatch(self)
           coordinator.close()
         } catch {
-          case NonFatal(e) => log.warning("Could not close one of the gateway coordinators", e);
+          case NonFatal(e) => log.warning(s"Could not close coordinators for keyspace: $identifier", e);
         }
       }
     }

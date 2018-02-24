@@ -106,7 +106,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         }
         fsm = FSM.BOOT;
         POS checkpoint = getCheckpoint();
-        log.debug("Bootstrap " + identifier + "/partition=" + partition + " from checkpoint " + checkpoint + ":end-offset");
+        log.debug("Bootstrap " + identifier + " from checkpoint " + checkpoint + ":end-offset");
         long t = EventTime.unix();
         storage.reset(partition, checkpoint);
         Iterator<LogEntry<POS>> i = storage.boundedIterator();
@@ -118,7 +118,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 numRecordsProcessed += 1;
             }
         }
-        log.debug("Bootstrap - completed: " + identifier + "/partition=" + partition +", duration.ms = " + (EventTime.unix() - t));
+        log.debug("Bootstrap - completed: " + identifier + ", duration.ms = " + (EventTime.unix() - t));
         return numRecordsProcessed;
     }
 
@@ -151,7 +151,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             public void close() throws IOException {
                 storage.cancel();
                 try {
-                    log.debug("cancelling storage and waiting for the logsync thread to success..");
+                    log.trace("cancelling storage fetch operation and waiting for the logsync thread to complete..");
                     synchronized(this) {
                         join();
                     }
