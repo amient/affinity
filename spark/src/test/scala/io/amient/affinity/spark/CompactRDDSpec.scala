@@ -89,15 +89,15 @@ class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with Befo
     val stream = new OutputDataStream[Int, CompactionTestEvent](
       AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap))
     try {
-      (0 to 99).iterator.foreach { i =>
+      (0 to 99).foreach { i =>
         stream.append(new Record(i, CompactionTestEvent(i, s"January($i)", JanuaryFirst2018.toEpochMilli + i * 1000)))
       }
 
-      (0 to 99).iterator.map { i =>
+      (0 to 99).foreach { i =>
         stream.append(new Record(i, CompactionTestEvent(i, s"February($i)", FebruaryFirst2018.toEpochMilli + i * 1000)))
       }
 
-      (0 to 99).iterator.map { i =>
+      (0 to 99).foreach { i =>
         stream.append(new Record(i, CompactionTestEvent(i, s"December($i)", DecemberFirst2017.toEpochMilli + i * 1000)))
       }
 

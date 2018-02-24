@@ -29,7 +29,7 @@ public class Record<K, V> implements Serializable {
     public final long timestamp;
 
     public Record(K key, V value) {
-        this (key, value, EventTime.unix());
+        this (key, value, value instanceof EventTime ? ((EventTime)value).eventTimeUnix() : EventTime.unix());
     }
 
     public Record(K key, V value, long timestamp) {
