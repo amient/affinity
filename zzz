@@ -80,6 +80,17 @@ variant() {
 
 }
 
+publish() {
+    BRANCH=$1
+    COMMAND=$2
+    git checkout $BRANCH
+    continue $? "$BRANCH/checkout"
+    git pull
+    continue $? "$BRANCH/pull"
+    ./gradlew $COMMAND
+    continue $? "$BRANCH/publish"
+}
+
 Usage() {
     echo ""
     echo "This script will run the given gradle commands over the whole cross-compiled space of this project."
@@ -100,8 +111,7 @@ Usage() {
     echo "      test-all            - run all tests on root and all variants"
     echo "      merge               - only merge root into all variants"
     echo "      install             - install selected modules sets from all branches into local maven"
-    echo "      publish-master      - publish selected modules sets to maven-central - only for master root"
-    echo "      publish-branches    - publish selected modules sets maven-central - only for master root"
+    echo "      publish             - publish all master and variant modules to sonatype central repo"
     echo ""
     echo ""
 }
@@ -139,24 +149,19 @@ case "$2" in
         RUN_ON_ROOT="true"
         RUN_ON_VARIANTS="true"
         ;;
-    publish-master)
-        if [ "$ROOT" != "master" ]; then
-            Usage
-            fail "publish tasks can be performed only when ROOT=master"
-        fi
-        C="uploadArchives -Pmaven-central --quiet"
-        RUN_ON_ROOT="true"
-        RUN_ON_VARIANTS="false"
-        ;;
-    publish-branches)
-        if [ "$ROOT" != "master" ]; then
-            Usage
-            fail "publish tasks can be performed only when ROOT=master"
-        fi
-        C="uploadArchives -Pmaven-central --quiet"
-        ALL="false"
-        RUN_ON_ROOT="false"
-        RUN_ON_VARIANTS="true"
+    publish)
+        publish "$ROOT" "uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-spark_2.0"  ":spark:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.11" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.11" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.11" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.11" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.10" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.10" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.10" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_0.10" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
+        git checkout "$ROOT"
+        exit 0;
         ;;
     *)
         Usage
