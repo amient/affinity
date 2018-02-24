@@ -56,7 +56,7 @@ variant() {
         elif [ $SETS == "spark" ]; then
             MESSAGE="$BRANCH/:spark:$C"
             echo $MESSAGE
-            ./gradlew :kafka:avro-formatter-kafka:$C
+            ./gradlew :spark:$C
             continue $? $MESSAGE
         elif [ $SETS == "kafka" ]; then
             MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
