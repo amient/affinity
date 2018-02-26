@@ -21,7 +21,7 @@ package io.amient.affinity.avro
 
 import java.util.UUID
 
-import io.amient.affinity.avro.record.{Alias, AvroRecord}
+import io.amient.affinity.avro.record.{Alias, AvroRecord, Fixed}
 import io.amient.affinity.core.util.ByteUtils
 
 case class AliasedAvro(@Alias("old_name1", "old_name2") name: String) extends AvroRecord
@@ -34,6 +34,9 @@ object SimpleEnum extends Enumeration {
 case class SimpleKey(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
+
+case class CompoundKey(@Fixed(2) country: String, @Fixed(10) city: String, id2: Int) extends AvroRecord
+
 
 case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()

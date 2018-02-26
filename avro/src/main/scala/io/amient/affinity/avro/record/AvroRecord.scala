@@ -41,7 +41,21 @@ import scala.reflect.runtime.{universe, _}
 
 final class Alias(aliases: String*) extends StaticAnnotation
 
+final class Fixed(len: Int) extends StaticAnnotation
+
 object AvroRecord extends AvroExtractors {
+
+  def stringToFixed(value: String, getFixedSize: Int): Array[Byte] = {
+    val bytes = value.getBytes()
+    val result: Array[Byte] = Array.fill[Byte](getFixedSize)(0)
+    val transfer = math.min(bytes.length, result.length)
+    ByteUtils.copy(bytes, 0, result, result.length - transfer, transfer)
+    result
+  }
+
+  def fixedToString(fixed: Array[Byte]): String = {
+    new String(fixed).trim()
+  }
 
   val INT_SCHEMA = Schema.create(Schema.Type.INT)
   val BOOLEAN_SCHEMA = Schema.create(Schema.Type.BOOLEAN)
@@ -102,6 +116,9 @@ object AvroRecord extends AvroExtractors {
         case None => null
         case Some(x) => deriveValue(schemaField.getTypes.get(1), x)
       }
+      case FIXED =>
+        val result: Array[Byte] = AvroRecord.stringToFixed(value.toString, schemaField.getFixedSize)
+        new GenericData.Fixed(schemaField, result)
       case otherAvroType => value match {
         case ref: AnyRef => ref
         case any => throw new NotImplementedError(s"Unsupported type conversion from scala $any to avro $otherAvroType")
@@ -279,7 +296,8 @@ object AvroRecord extends AvroExtractors {
           datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
             item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
         }
-      case FIXED => throw new NotImplementedError("Avro Fixed are not supported")
+      case FIXED =>
+        AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
     }
   }
 
@@ -367,9 +385,13 @@ object AvroRecord extends AvroExtractors {
           val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
           val params = constructor.asMethod.paramLists(0)
           val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
-            case (assembler, (symbol, i)) =>
-              val fieldSchema = inferSchema(symbol.typeSignature)
-              val builder = assembler.name(symbol.name.toString)
+            case (assembler, (symbol: Symbol, i)) =>
+              val fieldSchemaType = symbol.name.toString
+              val fieldSchema = symbol.annotations.find(_.tree.tpe =:= typeOf[Fixed]).map { a =>
+                val size = a.tree.children.tail.map(_.productElement(0)).head.asInstanceOf[Constant].value.asInstanceOf[Int]
+                SchemaBuilder.builder().fixed(fieldSchemaType).size(size)
+              }.getOrElse(inferSchema(symbol.typeSignature))
+              val builder = assembler.name(fieldSchemaType)
               symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
                 a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
               }
