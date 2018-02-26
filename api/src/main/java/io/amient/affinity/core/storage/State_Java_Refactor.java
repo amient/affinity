@@ -99,7 +99,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      */
     public CloseableIterator<Record<K, V>> iterator() {
         return new CloseableIterator<Record<K, V>>() {
-            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> underlying = kvstore.iterator();
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> underlying = kvstore.iterator(null);
             private Record<K, V> current = null;
 
             public boolean hasNext() {

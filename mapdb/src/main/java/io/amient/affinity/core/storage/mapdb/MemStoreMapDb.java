@@ -108,7 +108,7 @@ public class MemStoreMapDb extends MemStore {
     }
 
     @Override
-    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
+    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer prefix) {
         return CloseableIterator.apply(internal.entrySet().stream().map(entry ->
                 (Map.Entry<ByteBuffer, ByteBuffer>)
                         new AbstractMap.SimpleEntry<>(

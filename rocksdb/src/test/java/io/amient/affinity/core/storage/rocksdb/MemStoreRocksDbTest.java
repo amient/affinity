@@ -59,7 +59,7 @@ public class MemStoreRocksDbTest {
             assertTrue(!instance.apply(key2).isPresent());
             instance.put(key1, ByteBuffer.wrap("value1000".getBytes()));
             instance.put(key2, ByteBuffer.wrap("value2000".getBytes()));
-            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator(null);
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertFalse(it.hasNext());
@@ -69,6 +69,35 @@ public class MemStoreRocksDbTest {
         } finally {
             instance.close();
         }
+    }
+
+    @Test
+    public void shouldAllowPrefixSeek() throws IOException {
+        String tmp = folder.newFolder().toString();
+
+        StateConf template = new StateConf();
+        Config config = ConfigFactory.empty()
+                //.withValue(new MemStoreRocksDb.MemStoreRocksDbConf().apply(template.MemStore).PrefixSize.path(), ConfigValueFactory.fromAnyRef(3))
+                .withValue(template.MemStore.DataDir.path(), ConfigValueFactory.fromAnyRef(tmp))
+                .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreRocksDb.class.getName()));
+
+        MemStore instance = new MemStoreRocksDb(new StateConf().apply(config));
+        try {
+            instance.put(ByteBuffer.wrap("key1-A".getBytes()), ByteBuffer.wrap("value1A".getBytes()));
+            instance.put(ByteBuffer.wrap("key1-B".getBytes()), ByteBuffer.wrap("value1B".getBytes()));
+            instance.put(ByteBuffer.wrap("key1-C".getBytes()), ByteBuffer.wrap("value1C".getBytes()));
+            instance.put(ByteBuffer.wrap("key2-A".getBytes()), ByteBuffer.wrap("value2A".getBytes()));
+            instance.put(ByteBuffer.wrap("key3-A".getBytes()), ByteBuffer.wrap("value3A".getBytes()));
+            instance.put(ByteBuffer.wrap("key3-B".getBytes()), ByteBuffer.wrap("value3B".getBytes()));
+
+            Map<ByteBuffer, ByteBuffer> it = instance.applyPrefix(ByteBuffer.wrap("key1".getBytes()));
+            assert(it.size() == 3);
+            Map<ByteBuffer, ByteBuffer> it2 = instance.applyPrefix(ByteBuffer.wrap("key3".getBytes()));
+            assert(it2.size() == 2);
+        } finally {
+            instance.close();
+        }
+
     }
 
 }

@@ -138,7 +138,7 @@ class State[K, V](val identifier: String,
     * @return a weak iterator that doesn't block read and write operations
     */
   def iterator: CloseableIterator[Record[K, V]] = new CloseableIterator[Record[K, V]] {
-    val underlying = kvstore.iterator
+    val underlying = kvstore.iterator(null)
     val mapped = underlying.flatMap { entry =>
       val key = keySerde.fromBytes(entry.getKey.array())
       option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {

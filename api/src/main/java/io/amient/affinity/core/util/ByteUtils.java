@@ -440,6 +440,23 @@ public class ByteUtils {
     }
 
     /**
+     * Check if one byte array range is contained in another
+     * @param cArray the content array which is searched through
+     * @param vArray the value array that is searched for
+     * @return true if the cArray starts with the vArray
+     */
+    final public static boolean startsWith(byte[] cArray, byte[] vArray) {
+        if (cArray.length < vArray.length) return false;
+        int cLimit = vArray.length - 1;
+        for (int c = 0; c <= cLimit; c++) {
+            if (vArray[c] != cArray[c]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * CRC32 checksum of a byte array range
      * @param array input array to perform the checksum over
      * @param offset start position
