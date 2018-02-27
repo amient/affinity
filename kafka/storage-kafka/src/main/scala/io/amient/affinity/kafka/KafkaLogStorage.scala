@@ -135,7 +135,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     onPartitionsAssigned(List(tp))
   }
 
-  override def reset(partition: Int, startPosition: java.lang.Long): Unit = {
+  override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
     val tp = new TopicPartition(topic, partition)
     val startOffset: Long = if (startPosition == null) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
     kafkaConsumer.seek(tp, startOffset)
@@ -147,6 +147,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     } else {
       partitionProgress.remove(tp.partition)
     }
+    stopOffset
   }
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
@@ -167,7 +168,9 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def fetch(unbounded: Boolean): util.Iterator[LogEntry[java.lang.Long]] = {
 
-    if (!unbounded && partitionProgress.isEmpty) return null
+    if (!unbounded && partitionProgress.isEmpty) {
+      return null
+    }
 
     val kafkaRecords = try {
       kafkaConsumer.poll(6000)
@@ -181,8 +184,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       } else if (!partitionProgress.contains(record.partition)) {
         false
       } else {
-        if (record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
-        record.timestamp >= range.start && record.timestamp <= range.end
+        if (record.offset >= partitionProgress(record.partition)) {
+          partitionProgress.remove(record.partition)
+        }
+        val valid = record.timestamp >= range.start && record.timestamp <= range.end
+        valid
       }
     }.map {
       case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)

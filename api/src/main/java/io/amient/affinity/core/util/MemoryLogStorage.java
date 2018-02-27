@@ -78,9 +78,11 @@ public class MemoryLogStorage implements LogStorage<Long> {
     }
 
     @Override
-    public void reset(int partition, Long startPosition) {
+    public Long reset(int partition, Long startPosition) {
         position = startPosition == null ? 0 : startPosition;
-        fetchStopOffset.set(logEndOffset.get());
+        long stopOffset = logEndOffset.get();
+        fetchStopOffset.set(stopOffset);
+        return stopOffset;
     }
 
     @Override

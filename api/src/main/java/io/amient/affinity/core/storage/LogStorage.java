@@ -102,8 +102,9 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      *
      * @param partition partition number [0 - (numPartitions-1)]
      * @param startPosition position to seek or null if resetting to the beginning of the log
+     * @return the latest position available in the underlying stream
      */
-    void reset(int partition, POS startPosition);
+    POS reset(int partition, POS startPosition);
 
     /**
      * get key subject for the schema registry
