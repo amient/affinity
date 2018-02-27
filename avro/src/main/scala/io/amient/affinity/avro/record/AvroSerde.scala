@@ -70,6 +70,15 @@ object AvroSerde {
       case _: NoSuchMethodException => registryClass.newInstance()
     }
   }
+
+  def prefixLength(recordClass: Class[_ <: AvroRecord]): Int = {
+    val schema = AvroRecord.inferSchema(recordClass)
+    val fixedLen = schema.getFields.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
+    require(fixedLen > 0, recordClass.getName + " doesn't have any leading fixed fields")
+    5 + fixedLen
+  }
+
+
 }
 
 trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
@@ -166,5 +175,24 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     AvroRecord.read(record, readerSchema)
   }
 
+  /**
+    *
+    * @param recordClass
+    * @param keys
+    * @return
+    */
+  def prefix(recordClass: Class[_ <: AvroRecord], keys: String*): Array[Byte] = {
+    val output = new ByteArrayOutputStream()
+    val schema = AvroRecord.inferSchema(recordClass)
+    val schemaId: Int = register(recordClass)
+    output.write(0) //magic byte
+    ByteUtils.writeIntValue(schemaId, output) //schema id
+    //all used prefix keys
+    keys.zip(schema.getFields.take(keys.length).map(_.schema.getFixedSize)).foreach {
+      case (value: String, fixedLen: Int) =>
+        output.write(AvroRecord.stringToFixed(value, fixedLen))
+    }
+    output.toByteArray
+  }
 
 }

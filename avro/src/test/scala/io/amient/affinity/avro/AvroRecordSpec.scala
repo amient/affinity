@@ -19,7 +19,7 @@
 
 package io.amient.affinity.avro
 
-import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
@@ -176,6 +176,25 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     }
     println(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
 
+  }
+
+  "Compound Key Prefix" should "have the same binary prefix as SimpleKey" in {
+    def f(city: String, num: Int): CompoundKey = {
+      val ck = new CompoundKey("UK", city, num)
+      val bytes = newSerde.toBytes(ck)
+      val ck_ = newSerde.fromBytes(bytes)
+      ck_ should be (ck)
+      ck
+    }
+    val keys = List(f("C001", 0), f("C001", 1), f("C002", 2), f("C002", 3), f("C002", 4))
+    val bytes = keys.map(newSerde.toBytes)
+    AvroSerde.prefixLength(classOf[CompoundKey]) should be(17)
+    val c001 = newSerde.prefix(classOf[CompoundKey], "UK", "C001")
+    bytes.filter(key => key.startsWith(c001)).size should be (2)
+    val uk = newSerde.prefix(classOf[CompoundKey], "UK")
+    bytes.filter(key => key.startsWith(uk)).size should be (5)
+    val c003 = newSerde.prefix(classOf[CompoundKey], "UK", "C003")
+    bytes.filter(key => key.startsWith(c003)).size should be (0)
   }
 
 }

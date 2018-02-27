@@ -46,7 +46,7 @@ Below is the table of all supported types, all which support default values.
     Long                    long
     Float                   float
     Double                  double
-    String                  string
+    String                  string or fixed     @Fixed(len) alias can be used on a string field 
     Array[Byte]             bytes               
     Map[String, T]          map(T)              Maps have to have String keys
     Iterable[T]             array(T)            List[T], Seq[T], Set[T], etc.
