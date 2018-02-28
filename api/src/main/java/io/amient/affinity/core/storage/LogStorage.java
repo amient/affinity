@@ -102,7 +102,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      *
      * @param partition partition number [0 - (numPartitions-1)]
      * @param startPosition position to seek or null if resetting to the beginning of the log
-     * @return the latest position available in the underlying stream
+     * @return the latest position available in the underlying stream or null if nothing is available
      */
     POS reset(int partition, POS startPosition);
 

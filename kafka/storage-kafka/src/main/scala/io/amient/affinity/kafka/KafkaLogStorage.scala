@@ -138,16 +138,20 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
     val tp = new TopicPartition(topic, partition)
     val startOffset: Long = if (startPosition == null) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
-    if (startOffset >= 0) kafkaConsumer.seek(tp, startOffset) else kafkaConsumer.seekToBeginning(List(tp))
-    val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
-    // exclusive of the time range end
-    val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
-    if (stopOffset >= startOffset) {
-      partitionProgress.put(tp.partition, stopOffset)
+    if (startOffset < 0) {
+      return null
     } else {
-      partitionProgress.remove(tp.partition)
+      kafkaConsumer.seek(tp, startOffset)
+      val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
+      // exclusive of the time range end
+      val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
+      if (stopOffset >= startOffset) {
+        partitionProgress.put(tp.partition, stopOffset)
+      } else {
+        partitionProgress.remove(tp.partition)
+      }
+      stopOffset
     }
-    stopOffset
   }
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
