@@ -135,17 +135,22 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     onPartitionsAssigned(List(tp))
   }
 
-  override def reset(partition: Int, startPosition: java.lang.Long): Unit = {
+  override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
     val tp = new TopicPartition(topic, partition)
     val startOffset: Long = if (startPosition == null) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
-    kafkaConsumer.seek(tp, startOffset)
-    val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
-    // exclusive of the time range end
-    val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
-    if (stopOffset >= startOffset) {
-      partitionProgress.put(tp.partition, stopOffset)
+    if (startOffset < 0) {
+      return null
     } else {
-      partitionProgress.remove(tp.partition)
+      kafkaConsumer.seek(tp, startOffset)
+      val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
+      // exclusive of the time range end
+      val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
+      if (stopOffset >= startOffset) {
+        partitionProgress.put(tp.partition, stopOffset)
+      } else {
+        partitionProgress.remove(tp.partition)
+      }
+      stopOffset
     }
   }
 
@@ -167,10 +172,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def fetch(unbounded: Boolean): util.Iterator[LogEntry[java.lang.Long]] = {
 
-    if (!unbounded && partitionProgress.isEmpty) return null
+    if (!unbounded && partitionProgress.isEmpty) {
+      return null
+    }
 
     val kafkaRecords = try {
-      kafkaConsumer.poll(6000)
+      kafkaConsumer.poll(500)
     } catch {
       case _: WakeupException => return null
     }
@@ -181,8 +188,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       } else if (!partitionProgress.contains(record.partition)) {
         false
       } else {
-        if (record.offset >= partitionProgress(record.partition)) partitionProgress.remove(record.partition)
-        record.timestamp >= range.start && record.timestamp <= range.end
+        if (record.offset >= partitionProgress(record.partition)) {
+          partitionProgress.remove(record.partition)
+        }
+        val valid = record.timestamp >= range.start && record.timestamp <= range.end
+        valid
       }
     }.map {
       case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)
@@ -194,7 +204,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   def commit(): JavaPromise[lang.Long] = {
     val promise = new JavaPromise[java.lang.Long]
     kafkaConsumer.commitAsync(new OffsetCommitCallback {
-      override def onComplete(offsets: util.Map[TopicPartition, OffsetAndMetadata], exception: Exception) = {
+      def onComplete(offsets: util.Map[TopicPartition, OffsetAndMetadata], exception: Exception) = {
         if (exception != null) promise.failure(exception) else promise.success(System.currentTimeMillis())
       }
     })

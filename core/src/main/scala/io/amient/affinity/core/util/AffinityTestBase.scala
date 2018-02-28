@@ -23,11 +23,10 @@ import java.io.File
 import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
 import java.util.UUID
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPInputStream
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
 
-import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpEncodings
 import akka.http.scaladsl.{ConnectionContext, Http}
@@ -37,13 +36,11 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
-import io.amient.affinity.avro.ZookeeperSchemaRegistry
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Gateway.GatewayClusterStatus
 import io.amient.affinity.core.actor.{Gateway, Partition, Routed}
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
-import io.amient.affinity.core.cluster.{CoordinatorZk, Node}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import org.apache.avro.util.ByteBufferInputStream
 import org.codehaus.jackson.JsonNode
@@ -158,24 +155,6 @@ trait AffinityTestBase {
       val context = SSLContext.getInstance("TLS")
       context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
       ConnectionContext.https(context)
-    }
-
-    def awaitClusterReady(): Unit = awaitClusterReady {
-      startContainers()
-    }
-
-    def awaitClusterReady(startUpSequence: => Unit): Unit = {
-      val clusterReady = new AtomicBoolean(false)
-      system.eventStream.subscribe(system.actorOf(Props(new Actor {
-        override def receive: Receive = {
-          case GatewayClusterStatus(false) =>
-            clusterReady.set(true)
-            clusterReady.synchronized(clusterReady.notify)
-        }
-      })), classOf[GatewayClusterStatus])
-      startUpSequence
-      clusterReady.synchronized(clusterReady.wait(15000))
-      assert(clusterReady.get)
     }
 
     def uri(path: String) = Uri(s"http://localhost:$httpPort$path")

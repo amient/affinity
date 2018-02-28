@@ -21,15 +21,16 @@ package io.amient.affinity.core.cluster
 
 
 import java.nio.file.Paths
+import java.util.concurrent.{CountDownLatch, TimeUnit}
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
-import io.amient.affinity.core.actor.Gateway.GatewayConf
+import io.amient.affinity.core.actor.Gateway.{GatewayClusterStatus, GatewayConf}
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 
@@ -68,11 +69,27 @@ class Node(config: Config) {
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
+  val clusterReady = new CountDownLatch(1)
+  system.eventStream.subscribe(system.actorOf(Props(new Actor {
+    override def receive: Receive = {
+      case GatewayClusterStatus(false) => clusterReady.countDown()
+    }
+  })), classOf[GatewayClusterStatus])
+
   sys.addShutdownHook {
     if (!terminated.isCompleted) {
       log.info("process killed - attempting graceful shutdown")
       shutdown()
     }
+  }
+
+  def awaitClusterReady(): Unit = awaitClusterReady {
+    startContainers()
+  }
+
+  def awaitClusterReady(startUpSequence: => Unit): Unit = {
+    startUpSequence
+    clusterReady.await(15, TimeUnit.SECONDS)
   }
 
   final def shutdown(): Unit = {
@@ -96,7 +113,7 @@ class Node(config: Config) {
     }
   }
 
-  def startContainers() = {
+  def startContainers() = if (conf.Affi.Node.Containers.isDefined) {
     Future.sequence(conf.Affi.Node.Containers().map {
       case (group: String, value: CfgIntList) =>
         val partitions = value().map(_.toInt).toList

@@ -108,17 +108,20 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         POS checkpoint = getCheckpoint();
         log.debug("Bootstrap " + identifier + " from checkpoint " + checkpoint + ":end-offset");
         long t = EventTime.unix();
-        storage.reset(partition, checkpoint);
-        Iterator<LogEntry<POS>> i = storage.boundedIterator();
+        POS endOffsest = storage.reset(partition, checkpoint);
         long numRecordsProcessed = 0L;
-        while (i.hasNext()) {
-            LogEntry<POS> entry = i.next();
-            if (checkpoint == null || entry.position.compareTo(checkpoint) > 0) {
-                modifyState(kvstore, entry, observableState);
-                numRecordsProcessed += 1;
+        if (endOffsest != null) {
+            Iterator<LogEntry<POS>> i = storage.boundedIterator();
+            while (i.hasNext()) {
+                LogEntry<POS> entry = i.next();
+                if (checkpoint == null || entry.position.compareTo(checkpoint) > 0) {
+                    modifyState(kvstore, entry, observableState);
+                    numRecordsProcessed += 1;
+                }
             }
+            updateCheckpoint(endOffsest);
         }
-        log.debug("Bootstrap - completed: " + identifier + ", duration.ms = " + (EventTime.unix() - t));
+        log.debug("Bootstrap - completed: " + identifier + ", new checkpoint= " + getCheckpoint() +  ", duration.ms = " + (EventTime.unix() - t));
         return numRecordsProcessed;
     }
 

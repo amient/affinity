@@ -68,6 +68,7 @@ trait Gateway extends ActorHandler {
   private implicit val scheduler = context.system.scheduler
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
+
   implicit def untiToVoidFuture(f: Future[Unit]): Future[Void] = f.map(null)(ExecutionContext.Implicits.global)
 
   import context.dispatcher
@@ -158,29 +159,29 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  abstract override def postStop(): Unit = {
-    try super.postStop() finally {
-      globals.foreach {
-        case (identifier, state) => try {
-          state.close()
-        } catch {
-          case NonFatal(e) => log.error(e, s"Could not close cleanly global state: $identifier ")
-        }
-      }
-      keyspaces.foreach {
-        case (identifier, (coordinator, _, _)) => try {
-          coordinator.unwatch(self)
-          coordinator.close()
-        } catch {
-          case NonFatal(e) => log.warning(s"Could not close coordinators for keyspace: $identifier", e);
-        }
+  def shutdown(): Unit = {
+    globals.foreach {
+      case (identifier, state) => try {
+        state.close()
+      } catch {
+        case NonFatal(e) => log.error(e, s"Could not close cleanly global state: $identifier ")
       }
     }
+    keyspaces.foreach {
+      case (identifier, (coordinator, _, _)) => try {
+        coordinator.unwatch(self)
+        coordinator.close()
+      } catch {
+        case NonFatal(e) => log.warning(s"Could not close coordinators for keyspace: $identifier", e);
+      }
+    }
+    log.info("Gateway shutdown completed")
   }
 
   abstract override def manage = super.manage orElse {
 
     case request@GracefulShutdown() => sender.reply(request) {
+      shutdown()
       context.stop(self)
     }
 

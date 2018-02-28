@@ -102,8 +102,9 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      *
      * @param partition partition number [0 - (numPartitions-1)]
      * @param startPosition position to seek or null if resetting to the beginning of the log
+     * @return the latest position available in the underlying stream or null if nothing is available
      */
-    void reset(int partition, POS startPosition);
+    POS reset(int partition, POS startPosition);
 
     /**
      * get key subject for the schema registry
@@ -159,7 +160,12 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      * Commit all positions that were advanced by one of the iterators or the underlying fetch()
      * The implementation may be be asynchronous if it can guarantee that the records which
      * will have been consumed after this method was called and before the commit completed
-     * were not included in the commit
+     * were not included in the commit.
+     *
+     * The implementation must ensure that the order of commit is preserved, i.e. a successful
+     * completion of the future returned by the last call to commit means all previous commits
+     * also succeeded.
+     *
      * @return Future with timestamp of the commit completion
      */
     Future<Long> commit();

@@ -343,8 +343,6 @@ When doing a lot of work on the javascript watchify can be used
 ## Logging
 
 Affinity uses SLF4j and it also redirects all Akka logging to SLF4J.
-It doesn't provide any binding for compile configuration, that is left to applications - in one of the examples,
-logback is used, in another log4j.
-
-For all testing slf4j-log4j (Java Logging) binding is used by default.
+It doesn't provide any binding for compile configuration, that is left to applications.
+In all examples and for all tests, logback binding is used.
 

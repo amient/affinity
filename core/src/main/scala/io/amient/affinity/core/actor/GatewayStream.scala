@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.actor
 
+import java.io.Closeable
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
@@ -30,16 +31,15 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.parallel.immutable.ParSeq
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
-import scala.util.control.NonFatal
-import scala.concurrent.duration._
 
 trait GatewayStream extends Gateway {
 
   @volatile private var closed = false
   @volatile private var clusterSuspended = true
-  @volatile private var processingPaused = true
+
   private val lock = new Object
 
   private val log = Logging.getLogger(context.system, this)
@@ -65,8 +65,9 @@ trait GatewayStream extends Gateway {
 
   /**
     * Create an input stream handler which will be managed by the gateway by giving it a processor function
+    *
     * @param streamIdentifier id of the stream configuration object
-    * @param processor a function that takes (Record[K,V]) and returns Boolean signal that informs the committer
+    * @param processor        a function that takes (Record[K,V]) and returns Boolean signal that informs the committer
     * @tparam K
     * @tparam V
     */
@@ -85,12 +86,10 @@ trait GatewayStream extends Gateway {
       try {
         inputStreamProcessors.foreach(inputStreamExecutor.submit)
         while (!closed) {
-          inputStreamProcessors.foreach { p =>
-            p.synchronized(p.notify())
-          }
           lock.synchronized(lock.wait(1000))
         }
         inputStreamExecutor.shutdown()
+        inputStreamProcessors.foreach(_.close)
         inputStreamExecutor.awaitTermination(10, TimeUnit.SECONDS) //TODO use shutdown timeout
       } finally {
         inputStreamExecutor.shutdownNow()
@@ -98,25 +97,32 @@ trait GatewayStream extends Gateway {
     }
   }
 
-  override def preStart(): Unit = {
+  abstract override def preStart(): Unit = {
     inputStreamManager.start()
     super.preStart()
   }
 
-  override def postStop(): Unit = {
-    closed = true
+  abstract override def shutdown(): Unit = {
     try {
-      lock.synchronized(lock.notify())
+      lock.synchronized {
+        closed = true
+        lock.notifyAll()
+      }
+      inputStreamManager.synchronized {
+        inputStreamManager.join()
+      }
     } finally {
-      super.postStop()
+      super.shutdown()
     }
   }
 
-  override def onClusterStatus(suspended: Boolean) = synchronized {
+  abstract override def onClusterStatus(suspended: Boolean) = synchronized {
     if (clusterSuspended != suspended) {
-      this.clusterSuspended = suspended
+      lock.synchronized {
+        this.clusterSuspended = suspended
+        lock.notifyAll()
+      }
       super.onClusterStatus(suspended)
-      lock.synchronized(lock.notify())
     }
   }
 
@@ -124,66 +130,72 @@ trait GatewayStream extends Gateway {
                                   keySerde: AbstractSerde[K],
                                   valSerde: AbstractSerde[V],
                                   streamConfig: LogStorageConf,
-                                  processor: InputStreamProcessor[K, V]) extends Runnable {
+                                  processor: InputStreamProcessor[K, V]) extends Runnable with Closeable {
 
     val minTimestamp = streamConfig.MinTimestamp()
     val consumer = LogStorage.newInstance(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
     val work = new ListBuffer[Future[AnyRef]]
-    //FIXME hardcoded commit interval
+    //TODO make hardcoded commit interval configurable
     val commitInterval = 10 seconds
+
+    override def close(): Unit = consumer.cancel()
 
     override def run(): Unit = {
       implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
+      var lastCommit: java.util.concurrent.Future[java.lang.Long] = new CompletedJavaFuture(0L)
+
       try {
         consumer.reset(TimeRange.since(minTimestamp))
         log.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommitTimestamp = System.currentTimeMillis()
-        var lastCommit: java.util.concurrent.Future[java.lang.Long] = new CompletedJavaFuture(0L)
-        while (!closed) {
-          //processingPaused is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
+        var finalized = false
+        while ((!closed && !finalized) || !lastCommit.isDone) {
+          //clusterSuspended is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
           //should be suspended anyway and hang so no need to do it for every record
-          if (processingPaused) {
+          if (clusterSuspended) {
             log.info(s"Pausing input stream processor: $identifier")
-            synchronized(wait())
+            lock.synchronized(lock.wait())
+            if (closed) return
             log.info(s"Resuming input stream processor: $identifier")
-            processingPaused = false
           }
-          for (record <- consumer.fetch(true)) {
+          val records = consumer.fetch(true)
+          if (records != null) for (record <- records) {
             val key: K = keySerde.fromBytes(record.key)
             val value: V = valSerde.fromBytes(record.value)
             val unitOfWork = processor(new Record(key, value, record.timestamp))
             if (!unitOfWork.isCompleted) work += unitOfWork
           }
-          /*  At-least-once guaratnee processing input messages
+          /*  At-least-once guarantee processing input messages
            *  Every <commitInterval> all outputs and work is flushed and then consumer is commited()
            */
           val now = System.currentTimeMillis()
-          if (now - lastCommitTimestamp > commitInterval.toMillis) {
+          if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval.toMillis) {
             //flush all outputs in parallel - these are all outputs declared in this gateway
             outpuStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
             Await.ready(Future.sequence(work.result), commitInterval)
-            //make sure the previous commit has completed
-            lastCommit.get(commitInterval.toMillis, TimeUnit.MILLISECONDS)
             //commit the records processed by this processor only since the last commit
             lastCommit = consumer.commit() //trigger new commit
             //clear the work accumulator for the next commit
             work.clear
             lastCommitTimestamp = now
+            if (closed) finalized = true
           }
-
         }
+
       } catch {
-        case NonFatal(e) => log.error(e, s"Input stream processor: $identifier")
         case _: InterruptedException =>
+        case e: Throwable => log.error(e, s"Input stream processor: $identifier")
       } finally {
+        log.info(s"Finished input stream processor: $identifier (closed = $closed)")
         consumer.close()
         keySerde.close()
         valSerde.close()
-        log.info(s"Finished input stream processor: $identifier (closed = $closed)")
       }
     }
+
+
   }
 
 

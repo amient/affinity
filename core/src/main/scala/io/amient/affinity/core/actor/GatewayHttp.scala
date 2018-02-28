@@ -142,10 +142,10 @@ trait GatewayHttp extends Gateway {
     }
   }
 
-  abstract override def postStop: Unit = {
-    super.postStop()
-    log.info("Gateway stopping")
+  abstract override def shutdown(): Unit = {
     httpInterface.close()
+    log.info("Http Interface closed")
+    super.shutdown()
   }
 
   abstract override def manage: Receive = super.manage orElse {
