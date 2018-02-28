@@ -7,9 +7,8 @@ apply plugin: 'scala'
 dependencies {
     compile project(':core')
     compile project(':kafka:storage-kafka')
-    compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
-    compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    testCompile group: 'com.typesafe.akka', name: 'akka-slf4j_' + baseScalaVersion, version: akkaVersion
     testCompile project(':kafka:test-util-kafka')
 }
 
