@@ -30,6 +30,9 @@ final public class CompletedJavaFuture<T> implements Future<T> {
 
     private final Supplier<T> resultSupplier;
 
+    public CompletedJavaFuture() {
+        this.resultSupplier = () -> null;
+    }
     public CompletedJavaFuture(T result) {
         this.resultSupplier = () -> result;
     }
