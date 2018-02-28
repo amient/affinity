@@ -22,24 +22,31 @@ package io.amient.affinity.example
 import io.amient.affinity.core.actor.GatewayStream
 import io.amient.affinity.core.storage.Record
 
-class ExampleSSP extends GatewayStream {
+import scala.concurrent.Future
+
+class ExampleWordCount extends GatewayStream {
 
   val out = output[String, Long]("output-stream")
 
   val counter = global[String, Long]("state-counter")
 
-  input[Null, String]("input-stream") {
+  //raw input stream: keys are null, and values are plain string bytes
+  input[Array[Byte], Array[Byte]]("input-stream") {
     record =>
+      val words = new String(record.value).split("\\s").toList
       // any records written to out will be flushed automatically - gateway manages all declared outputs
-      // however to get end-to-end guarantee we need to return the ack from counter update
+      // however to get end-to-end guarantee we need to return the ack from counter updates
+      // which is here summarized as Future.sequence of all individual word count updates
       // as part of processing the record - it will be added to the pool of futures that need complete when commit occurs
-      counter.updateAndGet(record.value, current => current match {
-        case None => Some(1)
-        case Some(prev) => Some(prev + 1)
-      }).collect {
-        case Some(updatedCount) => out.append(new Record(record.value, updatedCount, record.timestamp))
-      }(scala.concurrent.ExecutionContext.Implicits.global)
-
+      implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
+      Future.sequence(words.map { word =>
+        counter.updateAndGet(word, current => current match {
+          case None => Some(1)
+          case Some(prev) => Some(prev + 1)
+        }).collect {
+          case Some(updatedCount) => out.append(new Record(word, updatedCount, record.timestamp))
+        }
+      })
   }
 
 }

@@ -177,7 +177,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
 
     val kafkaRecords = try {
-      kafkaConsumer.poll(6000)
+      kafkaConsumer.poll(500)
     } catch {
       case _: WakeupException => return null
     }
@@ -204,7 +204,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   def commit(): JavaPromise[lang.Long] = {
     val promise = new JavaPromise[java.lang.Long]
     kafkaConsumer.commitAsync(new OffsetCommitCallback {
-      override def onComplete(offsets: util.Map[TopicPartition, OffsetAndMetadata], exception: Exception) = {
+      def onComplete(offsets: util.Map[TopicPartition, OffsetAndMetadata], exception: Exception) = {
         if (exception != null) promise.failure(exception) else promise.success(System.currentTimeMillis())
       }
     })
