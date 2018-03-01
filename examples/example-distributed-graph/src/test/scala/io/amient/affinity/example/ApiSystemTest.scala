@@ -19,12 +19,10 @@
 
 package io.amient.affinity.example
 
-import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.http.javadsl.model.headers._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.Uri
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
@@ -57,67 +55,60 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
 
   val nodeConfig = configure(config, Some(zkConnect), Some(kafkaBootstrap))
-  val dataNode = new Node(nodeConfig)
-  val gatewayNode = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)), new ExampleGatewayRoot
-    with Ping
-    with Admin
-    with PublicApi
-    with Graph) {
-    awaitClusterReady {
-      dataNode.startContainer("graph", List(0, 1))
-    }
+  val node2 = new Node(nodeConfig)
+  val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+
+  override def beforeAll(): Unit = {
+    node1.startGateway(new ExampleGatewayRoot with Ping with Admin with PublicApi with Graph)
+    node2.startContainer("graph", List(0, 1))
+    node1.awaitClusterReady
   }
-
-
-  import gatewayNode._
-
   override def afterAll(): Unit = {
     try {
-      dataNode.shutdown()
-      gatewayNode.shutdown()
+      node2.shutdown()
+      node1.shutdown()
     } finally {
       super.afterAll()
     }
   }
 
   "ExampleApp Gateway" should "be able to play ping pong" in {
-    http_get(uri("/ping")).entity should be(jsonStringEntity("pong"))
+    node1.http_get("/ping").entity should be(jsonStringEntity("pong"))
   }
 
   "Admin requests" should "be authenticated with Basic Auth" in {
-    val response1 = http_get(uri("/settings"))
+    val response1 = node1.http_get("/settings")
     response1.status should be(Unauthorized)
     val authHeader = response1.header[WWWAuthenticate].get
     val challenge = authHeader.getChallenges.iterator().next
     challenge.realm() should be("Create admin password")
     challenge.scheme() should be("BASIC")
-    http_get(uri("/settings"), List(Authorization.basic("admin", "1234"))).status should be(OK)
-    http_get(uri("/settings"), List(Authorization.basic("admin", "wrong-password"))).status should be(Unauthorized)
+    node1.http_get("/settings", List(Authorization.basic("admin", "1234"))).status should be(OK)
+    node1.http_get("/settings", List(Authorization.basic("admin", "wrong-password"))).status should be(Unauthorized)
   }
 
   "Public API requests" should "be allowed only with valid salted and time-based signature" in {
     val publicKey = "pkey1"
-    val createApiKey = http_post(uri(s"/settings/add?key=$publicKey"), Array(), List(Authorization.basic("admin", "1234")))
+    val createApiKey = node1.http_post(s"/settings/add?key=$publicKey", Array(), List(Authorization.basic("admin", "1234")))
     createApiKey.status should be(OK)
-    implicit val materializer = ActorMaterializer.create(gatewayNode.system)
-    val salt = get_json(createApiKey).getTextValue
+    implicit val materializer = ActorMaterializer.create(node1.system)
+    val salt = node1.get_json(createApiKey).getTextValue
     val crypto = new TimeCryptoProofSHA256(salt)
 
-    val requestUrl = uri("/profile/mypii")
+    val requestPath = "/profile/mypii"
     //unsigned request should be rejected
-    val response1 = http_get(requestUrl)
+    val response1 = node1.http_get(requestPath)
     response1.status should be(Unauthorized)
 
     //signed request should have a valid response
-    val requestSignature = crypto.sign(requestUrl.path.toString)
-    val glue = if (requestUrl.rawQueryString.isDefined) "&" else "?"
-    val signedRequestUrl = Uri(requestUrl + glue + "signature=" + publicKey + ":" + requestSignature)
-    val response2 = http_get(signedRequestUrl)
+    val requestSignature = crypto.sign(requestPath)
+    val signedRequestUrl = requestPath + "?signature=" + publicKey + ":" + requestSignature
+    val response2 = node1.http_get(signedRequestUrl)
     response2.status should be(OK)
 
     //the response should also be signed by the server and the response signature must be valid
     val json2 = Await.result(response2.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
-    val jsonNode = mapper.readValue(json2, classOf[JsonNode])
+    val jsonNode = node1.mapper.readValue(json2, classOf[JsonNode])
     jsonNode.get("pii").getTextValue should be("mypii")
     val responseSignature = jsonNode.get("signature").getTextValue
     crypto.verify(responseSignature, requestSignature + "!")
@@ -126,40 +117,40 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   "Graph API" should "should maintain connected components when adding and removing edges" in {
     //(1~>2), (3~>4) ==> component1(1,2), component3(3,4)
-    http_get(uri("/vertex/1")).status should be(NotFound)
-    http_get(uri("/vertex/2")).status should be(NotFound)
-    http_post(uri("/connect/1/2")).status should be(SeeOther)
-    http_post(uri("/connect/3/4")).status should be(SeeOther)
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/2"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/3"))).get("data").get("component").getIntValue should be(3)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(3)
-    get_json(http_get(uri("/component/1"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2)) should be(Set())
-    http_get(uri("/component/2")).status should be(NotFound)
-    get_json(http_get(uri("/component/3"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(3, 4)) should be(Set())
-    http_get(uri("/component/4")).status should be(NotFound)
+    node1.http_get("/vertex/1").status should be(NotFound)
+    node1.http_get("/vertex/2").status should be(NotFound)
+    node1.http_post("/connect/1/2").status should be(SeeOther)
+    node1.http_post("/connect/3/4").status should be(SeeOther)
+    node1.get_json(node1.http_get("/vertex/1")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/2")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/3")).get("data").get("component").getIntValue should be(3)
+    node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").getIntValue should be(3)
+    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2)) should be(Set())
+    node1.http_get("/component/2").status should be(NotFound)
+    node1.get_json(node1.http_get("/component/3")).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(3, 4)) should be(Set())
+    node1.http_get("/component/4").status should be(NotFound)
 
     //(3~>1)         ==> component1(1,2,3,4)
-    http_post(uri("/connect/3/1")).status should be(SeeOther)
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/2"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/3"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/component/1"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
-    http_get(uri("/component/2")).status should be(NotFound)
-    http_get(uri("/component/3")).status should be(NotFound)
-    http_get(uri("/component/4")).status should be(NotFound)
+    node1.http_post("/connect/3/1").status should be(SeeOther)
+    node1.get_json(node1.http_get("/vertex/1")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/2")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/3")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
+    node1.http_get("/component/2").status should be(NotFound)
+    node1.http_get("/component/3").status should be(NotFound)
+    node1.http_get("/component/4").status should be(NotFound)
 
     //(4!>3)         ==> component1(1,2,3), component4(4)
-    http_post(uri("/disconnect/4/3")).status should be(SeeOther)
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/2"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/3"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(4)
-    get_json(http_get(uri("/component/1"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2, 3)) should be(Set())
-    http_get(uri("/component/2")).status should be(NotFound)
-    http_get(uri("/component/3")).status should be(NotFound)
-    get_json(http_get(uri("/component/4"))).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(4)) should be(Set())
+    node1.http_post("/disconnect/4/3").status should be(SeeOther)
+    node1.get_json(node1.http_get("/vertex/1")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/2")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/3")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").getIntValue should be(4)
+    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(1, 2, 3)) should be(Set())
+    node1.http_get("/component/2").status should be(NotFound)
+    node1.http_get("/component/3").status should be(NotFound)
+    node1.get_json(node1.http_get("/component/4")).get("data").get("connected").getElements().asScala.map(_.getIntValue).toSet.diff(Set(4)) should be(Set())
 
   }
 
@@ -167,7 +158,7 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   "Graph API" should "stream changes to vertex websocket subscribers" in {
     val lastMessage = new AtomicReference[GenericRecord](null)
     lastMessage.synchronized {
-      val ws = new WebSocketClient(URI.create(s"ws://localhost:$httpPort/vertex?id=1000"), new AvroMessageHandler() {
+      val ws = new WebSocketClient(node1.wsuri("/vertex?id=1000"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
         override def onMessage(message: scala.Any): Unit = {
           lastMessage.synchronized {
@@ -178,7 +169,7 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
       })
       lastMessage.wait(1000)
       (lastMessage.get == null) should be(true)
-      http_post(uri("/connect/1000/2000")).status should be(SeeOther)
+      node1.http_post("/connect/1000/2000").status should be(SeeOther)
       lastMessage.wait(1000)
       val msg = lastMessage.get
       (msg != null) should be(true)

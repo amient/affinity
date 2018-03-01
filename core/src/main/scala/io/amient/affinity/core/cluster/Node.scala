@@ -39,7 +39,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
-import scala.util.Success
 import scala.util.control.NonFatal
 
 object Node {

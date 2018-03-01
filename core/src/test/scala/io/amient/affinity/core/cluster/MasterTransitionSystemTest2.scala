@@ -52,8 +52,8 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
-  val gateway = new Node(config)
-  gateway.startGateway(new GatewayHttp {
+  val node1 = new Node(config)
+  node1.startGateway(new GatewayHttp {
 
     import context.dispatcher
 
@@ -76,20 +76,20 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
     }
   })
 
-  val region1 = new Node(config)
-  val region2 = new Node(config)
+  val node2 = new Node(config)
+  val node3 = new Node(config)
 
   override def beforeAll(): Unit = {
-    region1.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
-    region2.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
-    gateway.awaitClusterReady
+    node2.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
+    node3.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
+    node1.awaitClusterReady
   }
 
   override def afterAll(): Unit = {
     try {
-      gateway.shutdown()
-      region1.shutdown()
-      region2.shutdown()
+      node1.shutdown()
+      node2.shutdown()
+      node3.shutdown()
     } finally {
       super.afterAll()
     }
@@ -114,7 +114,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
           if (isInterrupted) throw new InterruptedException
           val key = random.nextInt.toString
           val value = random.nextInt.toString
-          requests += gateway.http(POST, s"/$key/$value") map {
+          requests += node1.http(POST, s"/$key/$value") map {
             case response =>
               expected += key -> value
               response.status.value
@@ -139,13 +139,13 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
     client.start
     try {
       Thread.sleep(100)
-      region1.shutdown()
+      node2.shutdown()
       stopSignal.set(true)
       client.join()
       Thread.sleep(100)
       errorCount.get should be(0L)
       val x = Await.result(Future.sequence(expected.map { case (key, value) =>
-        gateway.http(GET, s"/$key").map {
+        node1.http(GET, s"/$key").map {
           response => (response.entity, jsonStringEntity(value))
         }
       }), specTimeout)

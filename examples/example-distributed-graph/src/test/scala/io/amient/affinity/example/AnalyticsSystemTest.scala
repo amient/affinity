@@ -47,36 +47,31 @@ class AnalyticsSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKa
     .withValue(Conf.Affi.Node.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
     .withValue(Conf.Affi.Node.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
 
-  val dataNode = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
-  val gatewayNode = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)), new ExampleGatewayRoot
-    with Ping
-    with Admin
-    with PublicApi
-    with Graph) {
-    awaitClusterReady {
-      dataNode.startContainer("graph", List(0, 1, 2, 3))
-    }
+  val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+
+  override def beforeAll(): Unit = {
+    node1.startGateway(new ExampleGatewayRoot with Ping with Admin with PublicApi with Graph)
+    node2.startContainer("graph", List(0, 1, 2, 3))
+    node1.awaitClusterReady
+    node1.http_post("/connect/1/2").status should be(SeeOther)
+    node1.http_post("/connect/3/4").status should be(SeeOther)
+    node1.http_post("/connect/2/3").status should be(SeeOther)
+
   }
-
-  import gatewayNode._
-
-  http_post(uri("/connect/1/2")).status should be(SeeOther)
-  http_post(uri("/connect/3/4")).status should be(SeeOther)
-  http_post(uri("/connect/2/3")).status should be(SeeOther)
-
   override def afterAll(): Unit = {
     try {
-      dataNode.shutdown()
-      gatewayNode.shutdown()
+      node2.shutdown()
+      node1.shutdown()
     } finally {
       super.afterAll()
     }
   }
-  
+
   "Spark Module" should "be able to see avro-serialised state in kafka" in {
 
-    get_json(http_get(uri("/vertex/1"))).get("data").get("component").getIntValue should be(1)
-    get_json(http_get(uri("/vertex/4"))).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/1")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").getIntValue should be(1)
 
     implicit val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")

@@ -37,10 +37,10 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
 
   val system = ActorSystem.create("TlsGatewayTest", config)
 
-  val gateway = new Node(config)
+  val node = new Node(config)
 
   override def beforeAll: Unit = {
-    gateway.startGateway(new GatewayHttp {
+    node.startGateway(new GatewayHttp {
       override def handle: Receive = {
         case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
       }
@@ -49,14 +49,14 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
 
   override def afterAll(): Unit = {
     try {
-      gateway.shutdown()
+      node.shutdown()
     } finally {
       super.afterAll()
     }
   }
 
   "HTTPS Requests" should "be handled correctly as TLS" in {
-    gateway.https_get("/tls-hello").entity should equal(HttpEntity("Hello World"))
+    node.https_get("/tls-hello").entity should equal(HttpEntity("Hello World"))
   }
 
 }

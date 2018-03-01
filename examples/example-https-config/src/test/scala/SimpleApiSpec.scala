@@ -19,7 +19,7 @@
 
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.Conf
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.util.AffinityTestBase
 import org.scalatest.{FlatSpec, Matchers}
@@ -35,19 +35,22 @@ class SimpleApiSpec extends FlatSpec with AffinityTestBase with Matchers {
 
   it should "work without the http layer" in {
 
-    new TestGatewayNode(configure(config, None, None)) {
-      awaitClusterReady {
-        startContainer("simple-keyspace", List(0, 1), new ExamplePartition())
-      }
-      implicit val context = system.dispatcher
+    val node = new Node(config)
+    node.start()
+    try {
+      node.awaitClusterReady
+      implicit val scheduler = node.system.scheduler
+      implicit val context = node.system.dispatcher
       implicit val timeout = Timeout(3 seconds)
-      Await.result(gateway ack GetData("key1"), 3 seconds) should be (None)
-      Await.result(gateway ack PutData("key1", "value1"), 3 seconds) should be(None)
-      Await.result(gateway ack GetData("key1"), 3 seconds) should be(Some("value1"))
-      Await.result(gateway ack PutData("key1", "value2"), 3 seconds) should be(Some("value1"))
-      Await.result(gateway ack GetData("key1"), 3 seconds) should be(Some("value2"))
-      shutdown()
+      Await.result(node.gateway ack GetData("key1"), 3 seconds) should be(None)
+      Await.result(node.gateway ack PutData("key1", "value1"), 3 seconds) should be(None)
+      Await.result(node.gateway ack GetData("key1"), 3 seconds) should be(Some("value1"))
+      Await.result(node.gateway ack PutData("key1", "value2"), 3 seconds) should be(Some("value1"))
+      Await.result(node.gateway ack GetData("key1"), 3 seconds) should be(Some("value2"))
+    } finally {
+      node.shutdown()
     }
+
   }
 
 }

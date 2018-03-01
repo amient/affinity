@@ -23,6 +23,7 @@ import java.io.File
 import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPInputStream
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
@@ -126,6 +127,8 @@ class NodeWithTestMethods(underlying: Node) {
   private implicit val materializer = ActorMaterializer.create(system)
 
   import system.dispatcher
+
+  lazy val gateway = Await.result(system.actorSelection("/user/controller/gateway").resolveOne(FiniteDuration.apply(1, TimeUnit.SECONDS)), 1 second)
 
   val testSSLContext = {
     val certStore = KeyStore.getInstance(KeyStore.getDefaultType)

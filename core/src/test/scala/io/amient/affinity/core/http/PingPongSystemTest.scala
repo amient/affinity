@@ -43,8 +43,8 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
 
   def config = configure("pingpong")
 
-  val gateway = new Node(config)
-  gateway.startGateway(new GatewayHttp {
+  val node1 = new Node(config)
+  node1.startGateway(new GatewayHttp {
 
     import context.dispatcher
 
@@ -67,34 +67,34 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     }
   })
 
-  val region = new Node(config)
+  val node2 = new Node(config)
 
   override protected def beforeAll(): Unit = {
-    region.startContainer("region", List(0, 1), new Partition {
+    node2.startContainer("region", List(0, 1), new Partition {
       override def handle: Receive = {
         case req@ClustrPing() => sender.reply(req)("pong")
       }
     })
-    gateway.awaitClusterReady()
+    node1.awaitClusterReady()
   }
 
   override def afterAll(): Unit = {
-    gateway.shutdown()
-    region.shutdown()
+    node1.shutdown()
+    node2.shutdown()
   }
 
 
   "A Simple Gateway" should "play ping pong well" in {
-    gateway.http_get("/ping").entity should be(jsonStringEntity("pong"))
+    node1.http_get("/ping").entity should be(jsonStringEntity("pong"))
   }
 
   "A Simple Cluster" should "play ping pong too" in {
-    gateway.http_get("/clusterping").entity should be(jsonStringEntity("pong"))
+    node1.http_get("/clusterping").entity should be(jsonStringEntity("pong"))
   }
 
   "A Simple Handler" should "be able to change http timeout dynamically" in {
     val t = System.currentTimeMillis()
-    val response = gateway.http_get("/timeout")
+    val response = node1.http_get("/timeout")
     response.status should be(ServiceUnavailable)
     response.entity.toString.contains("The server was not able to produce a timely response") should be(true)
     (System.currentTimeMillis() - t) should be < 1000L
@@ -104,6 +104,6 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     val json = new ObjectMapper().createObjectNode()
     json.put("hello", "hello")
     Encoder.json(json) should be("{\"hello\":\"hello\"}")
-    gateway.get_json(gateway.http_post_json("/ping", json)) should be(json)
+    node1.get_json(node1.http_post_json("/ping", json)) should be(json)
   }
 }
