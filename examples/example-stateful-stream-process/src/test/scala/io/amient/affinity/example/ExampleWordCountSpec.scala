@@ -101,8 +101,7 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
       producer.send(new ProducerRecord(inputTopic, null, "World".getBytes)).get()
       poll() should be (("World", 1))
       producer.send(new ProducerRecord(inputTopic, null, "Hello World".getBytes)).get()
-      poll() should be (("Hello", 4))
-      poll() should be (("World", 2))
+      Set(poll(), poll()) should be(Set(("Hello", 4), ("World", 2)))
     } finally {
       consumer.close()
     }

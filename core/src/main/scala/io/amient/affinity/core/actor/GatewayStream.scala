@@ -46,7 +46,7 @@ trait GatewayStream extends Gateway {
 
   private val config = context.system.settings.config
 
-  type InputStreamProcessor[K, V] = Record[K, V] => Future[AnyRef]
+  type InputStreamProcessor[K, V] = Record[K, V] => Future[Any]
 
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
 
@@ -135,7 +135,7 @@ trait GatewayStream extends Gateway {
     val minTimestamp = streamConfig.MinTimestamp()
     val consumer = LogStorage.newInstance(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
-    val work = new ListBuffer[Future[AnyRef]]
+    val work = new ListBuffer[Future[Any]]
     //TODO make hardcoded commit interval configurable
     val commitInterval = 10 seconds
 

@@ -69,7 +69,7 @@ trait Gateway extends ActorHandler {
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
 
-  implicit def untiToVoidFuture(f: Future[Unit]): Future[Void] = f.map(null)(ExecutionContext.Implicits.global)
+  implicit def unitToVoidFuture(f: Future[Unit]): Future[Void] = f.map(null)(ExecutionContext.Implicits.global)
 
   import context.dispatcher
 
