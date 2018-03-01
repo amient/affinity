@@ -30,7 +30,6 @@ import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.util.Reply
-import org.scalatest.Matchers
 
 import scala.collection.immutable.Seq
 
@@ -41,7 +40,7 @@ case class TestValue(items: List[Int]) extends AvroRecord {
   def withRemovedItem(item: Int) = TestValue(items.filter(_ != item))
 }
 
-class AkkaSerializationSpec extends IntegrationTestBase with Matchers {
+class AkkaSerializationSpec extends IntegrationTestBase {
 
   val registry = new MemorySchemaRegistry()
 

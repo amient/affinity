@@ -22,6 +22,7 @@ package io.amient.affinity.example
 import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
@@ -40,11 +41,16 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
 
   val topic = config.getString("affinity.keyspace.external.state.news.storage.kafka.topic")
 
-  val node = new TestGatewayNode(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val node = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-  override def beforeAll: Unit = node.awaitClusterReady()
+  override def beforeAll: Unit = {
+    node.start()
+    node.awaitClusterReady()
+  }
 
-  override def afterAll: Unit = node.shutdown()
+  override def afterAll: Unit = {
+    node.shutdown()
+  }
 
   behavior of "External State"
 
@@ -66,7 +72,7 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
     val watermark = (0 to numPartitions).map(p => highestOffsets.get(p).getOrElse(-1))
     //we don't need an arbitrary sleep to ensure the tailing state catches up with the writes above
     //before we fetch the latest news because the watermark is built into the request to make the test fast and deterministic
-    val response = node.get_text(node.http_get(node.uri(s"/news/latest?w=${watermark.mkString(",")}")))
+    val response = node.get_text(node.http_get(s"/news/latest?w=${watermark.mkString(",")}"))
     response should include("10:30\tthe universe is expanding")
     response should include("11:00\tthe universe is still expanding")
     response should include("11:30\tthe universe briefly contracted but is expanding again")

@@ -23,6 +23,7 @@ import java.io.File
 import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPInputStream
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
@@ -37,8 +38,6 @@ import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.{Gateway, Partition, Routed}
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
@@ -56,6 +55,8 @@ object AffinityTestBase {
 }
 
 trait AffinityTestBase {
+
+  implicit def nodeToNodeWithTestMethods(node: Node): NodeWithTestMethods = new NodeWithTestMethods(node)
 
   final def configure(): Config = configure(ConfigFactory.defaultReference)
 
@@ -114,118 +115,103 @@ trait AffinityTestBase {
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))
 
-  class MyTestPartition(store: String) extends Partition {
-
-    import MyTestPartition._
-    import context.dispatcher
-
-    val data = state[String, String](store)
-
-    override def handle: Receive = {
-      case request@GetValue(key) => sender.reply(request) {
-        data(key)
-      }
-
-      case request@PutValue(key, value) => sender.replyWith(request) {
-        data.replace(key, value)
-      }
-    }
-  }
-
-  class TestGatewayNode(config: Config, gatewayCreator: => Gateway)
-    extends Node(config.withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(0))) {
-
-    def this(config: Config) = this(config, Conf(config).Affi.Node.Gateway.Class().newInstance())
-
-    import system.dispatcher
-
-    implicit val materializer = ActorMaterializer.create(system)
-
-    lazy val gateway = Await.result(system.actorSelection("/user/controller/gateway").resolveOne(10 seconds), 10 seconds)
-
-    val httpPort: Int = Await.result(startGateway(gatewayCreator), startupTimeout)
-
-    val testSSLContext = {
-      val certStore = KeyStore.getInstance(KeyStore.getDefaultType)
-      certStore.load(null, null)
-      certStore.setCertificateEntry("ca", CertificateFactory.getInstance("X.509")
-        .generateCertificate(getClass.getClassLoader.getResourceAsStream("keys/localhost.cer")))
-      val certManagerFactory = TrustManagerFactory.getInstance("SunX509")
-      certManagerFactory.init(certStore)
-      val context = SSLContext.getInstance("TLS")
-      context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
-      ConnectionContext.https(context)
-    }
-
-    def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
-
-    def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
-
-    def wsuri(path: String) = new java.net.URI(s"ws://localhost:$httpPort$path")
-
-    def wssuri(path: String) = new java.net.URI(s"wss://localhost:$httpPort$path")
-
-    def http(method: HttpMethod, uri: Uri): Future[HttpResponse] = {
-      http(HttpRequest(method = method, uri = uri))
-    }
-
-    def http_get(uri: Uri, headers: List[HttpHeader] = List()): HttpResponse = {
-      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri, headers = headers)), 30 seconds)
-    }
-
-    def http_get(uri: Uri): HttpResponse = {
-      Await.result(http(HttpRequest(method = HttpMethods.GET, uri = uri)), 30 seconds)
-    }
-
-    val mapper = new ObjectMapper()
-
-    def get_json(response: HttpResponse): JsonNode = {
-      val json = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
-      mapper.readValue(json, classOf[JsonNode])
-    }
-
-    def get_text(response: HttpResponse): String = {
-      Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
-    }
-
-    def http_post(uri: Uri, entity: Array[Byte] = Array(), headers: List[HttpHeader] = List()): HttpResponse = {
-      Await.result(http(HttpRequest(entity = HttpEntity(entity), method = HttpMethods.POST, uri = uri, headers = headers)), 30 seconds)
-    }
-
-    def http_post_json(uri: Uri, json: JsonNode, headers: List[HttpHeader] = List()): HttpResponse = {
-      Await.result(http(HttpRequest(entity = HttpEntity(ContentTypes.`application/json`, Encoder.json(json)), method = HttpMethods.POST, uri = uri, headers = headers)), 30 seconds)
-    }
-
-    def http(req: HttpRequest) = {
-      val decodedResponse: Future[HttpResponse] = Http().singleRequest(req, testSSLContext) flatMap {
-        response =>
-          response.header[headers.`Content-Encoding`] match {
-            case Some(c) if (c.encodings.contains(HttpEncodings.gzip)) =>
-              response.entity.dataBytes.map(_.asByteBuffer).runWith(Sink.seq).map {
-                byteBufferSequence =>
-                  val unzipped = fromInputStream(() => new GZIPInputStream(new ByteBufferInputStream(byteBufferSequence.asJava)))
-                  val unzippedEntity = HttpEntity(response.entity.contentType, unzipped)
-                  response.copy(entity = unzippedEntity)
-              }
-            case _ => Future.successful(response)
-          }
-      }
-      decodedResponse.flatMap(_.toStrict(2 seconds))
-    }
-
-  }
-
 }
 
 
-object MyTestPartition {
+class NodeWithTestMethods(underlying: Node) {
 
-  case class GetValue(key: String) extends Routed with Reply[Option[String]] {
-    override def hashCode(): Int = key.hashCode
+  val httpPort = underlying.getHttpPort()
+
+  private implicit val system = underlying.system
+
+  private implicit val materializer = ActorMaterializer.create(system)
+
+  import system.dispatcher
+
+  lazy val gateway = Await.result(system.actorSelection("/user/controller/gateway").resolveOne(FiniteDuration.apply(1, TimeUnit.SECONDS)), 1 second)
+
+  val testSSLContext = {
+    val certStore = KeyStore.getInstance(KeyStore.getDefaultType)
+    certStore.load(null, null)
+    certStore.setCertificateEntry("ca", CertificateFactory.getInstance("X.509")
+      .generateCertificate(getClass.getClassLoader.getResourceAsStream("keys/localhost.cer")))
+    val certManagerFactory = TrustManagerFactory.getInstance("SunX509")
+    certManagerFactory.init(certStore)
+    val context = SSLContext.getInstance("TLS")
+    context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
+    ConnectionContext.https(context)
   }
 
-  case class PutValue(key: String, value: String) extends Routed with Reply[Unit] {
-    override def hashCode(): Int = key.hashCode
+  def wsuri(path: String) = new java.net.URI(s"ws://localhost:$httpPort$path")
+
+  def wssuri(path: String) = new java.net.URI(s"wss://localhost:$httpPort$path")
+
+  def http(method: HttpMethod, path: String): Future[HttpResponse] = {
+    http(HttpRequest(method = method, uri(path)))
+  }
+
+  def http_get(path: String, headers: List[HttpHeader] = List()): HttpResponse = {
+    Await.result(http(HttpRequest(method = HttpMethods.GET, uri(path), headers = headers)), 30 seconds)
+  }
+
+  def http_get(path: String): HttpResponse = {
+    Await.result(http(HttpRequest(method = HttpMethods.GET, uri(path))), 30 seconds)
+  }
+
+  def https_get(path: String, headers: List[HttpHeader] = List()): HttpResponse = {
+    Await.result(http(HttpRequest(method = HttpMethods.GET, https_uri(path), headers = headers)), 30 seconds)
+  }
+
+  def https_get(path: String): HttpResponse = {
+    Await.result(http(HttpRequest(method = HttpMethods.GET, https_uri(path))), 30 seconds)
+  }
+
+  val mapper = new ObjectMapper()
+
+  def get_json(response: HttpResponse): JsonNode = {
+    val json = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
+    mapper.readValue(json, classOf[JsonNode])
+  }
+
+  def get_text(response: HttpResponse): String = {
+    Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
+  }
+
+  def http_post(path: String, entity: Array[Byte] = Array(), headers: List[HttpHeader] = List()): HttpResponse = {
+    Await.result(http(HttpRequest(entity = HttpEntity(entity), method = HttpMethods.POST, uri = uri(path), headers = headers)), 30 seconds)
+  }
+
+  def http_post_json(path: String, json: JsonNode, headers: List[HttpHeader] = List()): HttpResponse = {
+    Await.result(http(HttpRequest(entity = HttpEntity(ContentTypes.`application/json`, Encoder.json(json)), method = HttpMethods.POST, uri = uri(path), headers = headers)), 30 seconds)
+  }
+
+  def https_post(path: String, entity: Array[Byte] = Array(), headers: List[HttpHeader] = List()): HttpResponse = {
+    Await.result(http(HttpRequest(entity = HttpEntity(entity), method = HttpMethods.POST, uri = https_uri(path), headers = headers)), 30 seconds)
+  }
+
+  def https_post_json(path: String, json: JsonNode, headers: List[HttpHeader] = List()): HttpResponse = {
+    Await.result(http(HttpRequest(entity = HttpEntity(ContentTypes.`application/json`, Encoder.json(json)), method = HttpMethods.POST, uri = https_uri(path), headers = headers)), 30 seconds)
+  }
+
+  private def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
+
+  private def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
+
+  private def http(req: HttpRequest) = {
+    val decodedResponse: Future[HttpResponse] = Http().singleRequest(req, testSSLContext) flatMap {
+      response =>
+        response.header[headers.`Content-Encoding`] match {
+          case Some(c) if (c.encodings.contains(HttpEncodings.gzip)) =>
+            response.entity.dataBytes.map(_.asByteBuffer).runWith(Sink.seq).map {
+              byteBufferSequence =>
+                val unzipped = fromInputStream(() => new GZIPInputStream(new ByteBufferInputStream(byteBufferSequence.asJava)))
+                val unzippedEntity = HttpEntity(response.entity.contentType, unzipped)
+                response.copy(entity = unzippedEntity)
+            }
+          case _ => Future.successful(response)
+        }
+    }
+    decodedResponse.flatMap(_.toStrict(2 seconds))
   }
 
 }

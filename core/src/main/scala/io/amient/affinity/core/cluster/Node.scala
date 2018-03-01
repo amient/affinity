@@ -36,7 +36,7 @@ import io.amient.affinity.core.config._
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
@@ -69,7 +69,9 @@ class Node(config: Config) {
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
-  val clusterReady = new CountDownLatch(1)
+  private val httpGatewayPort = Promise[Int]()
+
+  private val clusterReady = new CountDownLatch(1)
   system.eventStream.subscribe(system.actorOf(Props(new Actor {
     override def receive: Receive = {
       case GatewayClusterStatus(false) => clusterReady.countDown()
@@ -83,13 +85,16 @@ class Node(config: Config) {
     }
   }
 
-  def awaitClusterReady(): Unit = awaitClusterReady {
-    startContainers()
+  /**
+    * Await all partitions in all keyspaces to have masters
+    * @return httpPort or -1 if gateway doesn't have http interface attached
+    */
+  def awaitClusterReady() {
+    clusterReady.await(15, TimeUnit.SECONDS)
   }
 
-  def awaitClusterReady(startUpSequence: => Unit): Unit = {
-    startUpSequence
-    clusterReady.await(15, TimeUnit.SECONDS)
+  def getHttpPort(): Int = {
+    Await.result(httpGatewayPort.future, 15 seconds)
   }
 
   final def shutdown(): Unit = {
@@ -105,20 +110,27 @@ class Node(config: Config) {
     Props(creator)
   }
 
-  def start(): Unit = {
+  def start() {
     startContainers()
+    startGateway()
+  }
+
+  def startGateway() {
     if (conf.Affi.Node.Gateway.Class.isDefined) {
-      //the gateway could be started programatically but in this case it is by config
       startGateway(conf.Affi.Node.Gateway.Class().newInstance())
+    } else {
+      httpGatewayPort.success(-1)
     }
   }
 
-  def startContainers() = if (conf.Affi.Node.Containers.isDefined) {
-    Future.sequence(conf.Affi.Node.Containers().map {
-      case (group: String, value: CfgIntList) =>
-        val partitions = value().map(_.toInt).toList
-        startContainer(group, partitions)
-    })
+  def startContainers() {
+    if (conf.Affi.Node.Containers.isDefined) {
+      Future.sequence(conf.Affi.Node.Containers().map {
+        case (group: String, value: CfgIntList) =>
+          val partitions = value().map(_.toInt).toList
+          startContainer(group, partitions)
+      })
+    }
   }
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
@@ -142,13 +154,12 @@ class Node(config: Config) {
     * @param creator
     * @param tag
     * @tparam T
-    * @return the httpPort on which the gateway is listening
     */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T])  {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse {
+    httpGatewayPort.completeWith(startupFutureWithShutdownFuse {
       controller ack CreateGateway(Props(creator))
-    }
+    })
   }
 
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {

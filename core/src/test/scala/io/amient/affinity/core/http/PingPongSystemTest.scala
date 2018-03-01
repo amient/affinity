@@ -41,9 +41,10 @@ case class ClustrPing() extends Scatter[String] {
 
 class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAfterAll with Matchers {
 
-  val config = configure("pingpong")
+  def config = configure("pingpong")
 
-  val gateway = new TestGatewayNode(config, new GatewayHttp {
+  val node1 = new Node(config)
+  node1.startGateway(new GatewayHttp {
 
     import context.dispatcher
 
@@ -58,7 +59,7 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
-        delegateAndHandleErrors(response, ks gather ClustrPing() ) {
+        delegateAndHandleErrors(response, ks gather ClustrPing()) {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
       case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
@@ -66,39 +67,36 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     }
   })
 
-  val region = new Node(config)
+  val node2 = new Node(config)
 
-  gateway.awaitClusterReady {
-    region.startContainer("region", List(0,1), new Partition {
+  override protected def beforeAll(): Unit = {
+    node2.startContainer("region", List(0, 1), new Partition {
       override def handle: Receive = {
         case req@ClustrPing() => sender.reply(req)("pong")
       }
     })
+    node1.awaitClusterReady()
   }
 
   override def afterAll(): Unit = {
-    try {
-      gateway.shutdown()
-      region.shutdown()
-    } finally {
-      super.afterAll()
-    }
+    node1.shutdown()
+    node2.shutdown()
   }
 
 
   "A Simple Gateway" should "play ping pong well" in {
-    gateway.http_get(gateway.uri("/ping")).entity should be(jsonStringEntity("pong"))
+    node1.http_get("/ping").entity should be(jsonStringEntity("pong"))
   }
 
   "A Simple Cluster" should "play ping pong too" in {
-    gateway.http_get(gateway.uri("/clusterping")).entity should be(jsonStringEntity("pong"))
+    node1.http_get("/clusterping").entity should be(jsonStringEntity("pong"))
   }
 
   "A Simple Handler" should "be able to change http timeout dynamically" in {
     val t = System.currentTimeMillis()
-    val response = gateway.http_get(gateway.uri("/timeout"))
+    val response = node1.http_get("/timeout")
     response.status should be(ServiceUnavailable)
-    response.entity.toString.contains("The server was not able to produce a timely response") should be (true)
+    response.entity.toString.contains("The server was not able to produce a timely response") should be(true)
     (System.currentTimeMillis() - t) should be < 1000L
   }
 
@@ -106,6 +104,6 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     val json = new ObjectMapper().createObjectNode()
     json.put("hello", "hello")
     Encoder.json(json) should be("{\"hello\":\"hello\"}")
-    gateway.get_json(gateway.http_post_json(gateway.uri("/ping"), json)) should be(json)
+    node1.get_json(node1.http_post_json("/ping", json)) should be(json)
   }
 }

@@ -50,11 +50,7 @@ class HttpInterface(val httpHost: String, httpPort: Int, ssl: Option[SSLContext]
 
   @volatile private var binding: ServerBinding = null
 
-  private val listenAddress = new AtomicReference[InetSocketAddress](null)
-
-  def getListenPort: Int = listenAddress.get.getPort
-
-  def bind(gateway: ActorRef): Unit = {
+  def bind(gateway: ActorRef): InetSocketAddress = {
     close()
     log.debug(s"binding http interface with $httpHost:$httpPort")
     val bindingFuture: Future[Http.ServerBinding] =
@@ -69,14 +65,13 @@ class HttpInterface(val httpHost: String, httpPort: Int, ssl: Option[SSLContext]
       }).run()
 
     binding = Await.result(bindingFuture, 10 seconds)
-    listenAddress.set(binding.localAddress)
-    log.info(s"http interface listening on ${listenAddress.get}")
+    log.info(s"http interface listening on ${binding.localAddress}")
+    binding.localAddress
   }
 
   def close(): Unit = {
     if (binding != null) {
       log.debug("unbinding http interface")
-      listenAddress.set(null)
       Await.result(binding.unbind(), 15 seconds)
     }
   }

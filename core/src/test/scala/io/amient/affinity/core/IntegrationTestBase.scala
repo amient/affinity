@@ -24,27 +24,27 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
-import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Keyspace.KeyspaceStatus
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.http.HttpExchange
-import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, Matchers, Suite, WordSpecLike}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
 import scala.language.postfixOps
 
-class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with BeforeAndAfterAll {
+trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Matchers {
 
-  def this() = this(ActorSystem.create("IntegrationTestSystem",
+  self: Suite =>
+
+  val system: ActorSystem = ActorSystem.create("IntegrationTestSystem",
     ConfigFactory.load("integrationtests").withValue(
-      EmbedConf(Conf.Affi.Coordinator).ID.path,
-      ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet()))
-  ))
+      EmbedConf(Conf.Affi.Coordinator).ID.path, ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet()))
+  )
 
   implicit val materializer = ActorMaterializer.create(system)
 
@@ -63,7 +63,7 @@ class IntegrationTestBase(system: ActorSystem) extends TestKit(system) with Impl
   })), classOf[KeyspaceStatus])
 
   override def afterAll {
-    TestKit.shutdownActorSystem(system)
+    Await.ready(system.terminate(), 15 seconds)
   }
 
   def awaitServiceReady(group: String) {

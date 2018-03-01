@@ -24,6 +24,7 @@ import akka.http.scaladsl.model.HttpMethods.GET
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers.HTTP
 import io.amient.affinity.core.util.AffinityTestBase
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -32,26 +33,30 @@ import scala.language.postfixOps
 
 class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAndAfterAll with Matchers {
 
-  val config = configure("tlstests")
+  def config = configure("tlstests")
 
   val system = ActorSystem.create("TlsGatewayTest", config)
 
-  val gateway = new TestGatewayNode(config, new GatewayHttp {
-    override def handle: Receive = {
-      case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
-    }
-  })
+  val node = new Node(config)
+
+  override def beforeAll: Unit = {
+    node.startGateway(new GatewayHttp {
+      override def handle: Receive = {
+        case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
+      }
+    })
+  }
 
   override def afterAll(): Unit = {
     try {
-      gateway.shutdown()
+      node.shutdown()
     } finally {
       super.afterAll()
     }
   }
 
   "HTTPS Requests" should "be handled correctly as TLS" in {
-    gateway.http_get(gateway.https_uri("/tls-hello")).entity should equal(HttpEntity("Hello World"))
+    node.https_get("/tls-hello").entity should equal(HttpEntity("Hello World"))
   }
 
 }
