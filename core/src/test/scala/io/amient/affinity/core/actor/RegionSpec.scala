@@ -23,13 +23,13 @@ import akka.actor.{ActorPath, PoisonPill, Props}
 import akka.util.Timeout
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
-import org.scalatest.Matchers
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 
-class RegionSpec extends IntegrationTestBase with Matchers {
+class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPatience {
 
   val testPartition = Props(new Partition {
     override def preStart(): Unit = {
@@ -55,23 +55,26 @@ class RegionSpec extends IntegrationTestBase with Matchers {
             context.actorOf(testPartition, name = partition.toString)
           }
         }), name = "region")
-        awaitCond(coordinator.services.size == 4, 10 seconds)
+        eventually { coordinator.services.size should be(4) }
 
         //first stop Partition explicitly - it shouldn't be restarted
         import system.dispatcher
+        println(coordinator.services)
         system.actorSelection(ActorPath.fromString(coordinator.services.head._1)).resolveOne() onSuccess {
           case actorRef => system.stop(actorRef)
         }
-        awaitCond(coordinator.services.size == 3, 10 seconds)
+        eventually { coordinator.services.size should be(3) }
 
         //now simulate error in one of the partitions
         val partitionToFail = coordinator.services.head._1
         system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne() onSuccess {
           case actorRef => actorRef ! new IllegalStateException("Exception expected by the Test")
         }
-        awaitCond(coordinator.services.size == 2 && !coordinator.services.contains(partitionToFail), 6 seconds)
+        eventually  { coordinator.services.size should be(2) }
+        eventually  { coordinator.services should not contain(partitionToFail) }
+
         // it had a failure, it should be restarted
-        awaitCond(coordinator.services.size == 3, 10 seconds)
+        eventually { coordinator.services.size should be(3) }
         region ! PoisonPill
 
       } finally {

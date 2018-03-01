@@ -30,9 +30,9 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.cluster.MasterTransitionPartition.{GetValue, PutValue}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
@@ -52,7 +52,8 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
-  val gateway = new TestGatewayNode(config, new GatewayHttp {
+  val gateway = new Node(config)
+  gateway.startGateway(new GatewayHttp {
 
     import context.dispatcher
 
@@ -77,9 +78,11 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
 
   val region1 = new Node(config)
   val region2 = new Node(config)
-  gateway.awaitClusterReady {
-    region1.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
-    region2.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
+
+  override def beforeAll(): Unit = {
+    region1.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
+    region2.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
+    gateway.awaitClusterReady
   }
 
   override def afterAll(): Unit = {
@@ -111,7 +114,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
           if (isInterrupted) throw new InterruptedException
           val key = random.nextInt.toString
           val value = random.nextInt.toString
-          requests += gateway.http(POST, gateway.uri(s"/$key/$value")) map {
+          requests += gateway.http(POST, s"/$key/$value") map {
             case response =>
               expected += key -> value
               response.status.value
@@ -142,7 +145,7 @@ class MasterTransitionSystemTest2 extends FlatSpec with AffinityTestBase with Em
       Thread.sleep(100)
       errorCount.get should be(0L)
       val x = Await.result(Future.sequence(expected.map { case (key, value) =>
-        gateway.http(GET, gateway.uri(s"/$key")).map {
+        gateway.http(GET, s"/$key").map {
           response => (response.entity, jsonStringEntity(value))
         }
       }), specTimeout)

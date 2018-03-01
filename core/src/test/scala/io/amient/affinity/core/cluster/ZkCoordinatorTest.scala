@@ -40,7 +40,8 @@ class ZkCoordinatorTest extends FlatSpec with AffinityTestBase with EmbeddedZooK
   def config = configure("distributedit", zkConnect = Some(zkConnect))
 
   val system = ActorSystem.create("test", config)
-  val gatewayNode = new TestGatewayNode(config, new GatewayHttp {
+  val gateway = new Node(config)
+  gateway.startGateway(new GatewayHttp {
 
     val regionService = keyspace("region")
 
@@ -68,20 +69,18 @@ class ZkCoordinatorTest extends FlatSpec with AffinityTestBase with EmbeddedZooK
 //  val region2 = new Node(config.withValue("affinity.node.container.region",
 //    ConfigValueFactory.fromIterable(List(1,3,5,7))))
 
-  gatewayNode.awaitClusterReady {
+
+  override protected def beforeAll(): Unit = {
     regionNode1.start()
-//    region2.start()
+    //    region2.start()
+    gateway.awaitClusterReady()
+
   }
 
-
   override def afterAll(): Unit = {
-    try {
-      gatewayNode.shutdown()
+    gateway.shutdown()
 //      region2.shutdown()
-      regionNode1.shutdown()
-    } finally {
-      super.afterAll()
-    }
+    regionNode1.shutdown()
   }
 
   //  try {

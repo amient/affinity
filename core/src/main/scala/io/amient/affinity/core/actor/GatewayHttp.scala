@@ -28,6 +28,7 @@ import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import akka.event.Logging
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
@@ -124,11 +125,12 @@ trait GatewayHttp extends Gateway {
   private val httpInterface: HttpInterface = new HttpInterface(
     conf.Node.Gateway.Http.Host(), conf.Node.Gateway.Http.Port(), sslContext)
 
+  lazy private val listener = httpInterface.bind(self)
+
   abstract override def preStart(): Unit = {
     super.preStart()
     log.info("Gateway starting")
-    httpInterface.bind(self)
-    context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
+    context.parent ! Controller.GatewayCreated(listener.getPort)
   }
 
   override def onClusterStatus(suspended: Boolean): Unit = if (isSuspended != suspended) {
@@ -145,11 +147,12 @@ trait GatewayHttp extends Gateway {
   abstract override def shutdown(): Unit = {
     httpInterface.close()
     log.info("Http Interface closed")
+    Http().shutdownAllConnectionPools()
     super.shutdown()
   }
 
   abstract override def manage: Receive = super.manage orElse {
-    case msg@CreateGateway => context.parent ! Controller.GatewayCreated(httpInterface.getListenPort)
+    case msg@CreateGateway => context.parent ! Controller.GatewayCreated(listener.getPort)
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)

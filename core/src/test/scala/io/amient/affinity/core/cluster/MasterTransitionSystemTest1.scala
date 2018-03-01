@@ -30,15 +30,14 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.cluster.MasterTransitionPartition.{GetValue, PutValue}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.storage.{LogStorage, State}
-import io.amient.affinity.core.util.MyTestPartition.{GetValue, PutValue}
+import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.immutable.ListMap
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -48,18 +47,20 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
 
   override def numPartitions = 2
 
-  import scala.concurrent.ExecutionContext.Implicits.global
-
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
-  val gateway = new TestGatewayNode(config, new GatewayHttp {
+  val node1 = new Node(config)
+  val node2 = new Node(config)
+  val node3 = new Node(config)
 
-    import context.dispatcher
+  node1.startGateway(new GatewayHttp {
 
     implicit val scheduler = context.system.scheduler
 
     val keyspace1 = keyspace("keyspace1")
+
+    import context.dispatcher
 
     override def handle: Receive = {
       case HTTP(GET, PATH("status"), _, response) =>
@@ -82,14 +83,12 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
     }
   })
 
-  import gateway._
+  import scala.concurrent.ExecutionContext.Implicits.global
 
-  val region1 = new Node(config)
-  val region2 = new Node(config)
-  gateway.awaitClusterReady {
+  override def beforeAll(): Unit = try {
     val stateConf = Conf(config).Affi.Keyspace("keyspace1").State("consistency-test")
-    val p0 = State.create[String, String]("consistency-test", 0, stateConf, 2, system)
-    val p1 = State.create[String, String]("consistency-test", 1, stateConf, 2, system)
+    val p0 = State.create[String, String]("consistency-test", 0, stateConf, 2, node1.system)
+    val p1 = State.create[String, String]("consistency-test", 1, stateConf, 2, node1.system)
     p0.boot()
     p1.boot()
     Await.result(Future.sequence(List(
@@ -98,26 +97,28 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
       p1.replace("A", "initialValueA"),
       p1.replace("B", "initialValueB"))), 1 second)
 
-    region1.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
-    region2.startContainer("keyspace1", List(0, 1), new MyTestPartition("consistency-test"))
+    node2.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
+    node3.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
+
+    node1.awaitClusterReady
+
+
+  } finally {
+    super.beforeAll()
   }
 
   override def afterAll(): Unit = {
-    try {
-      gateway.shutdown()
-      region2.shutdown()
-      region1.shutdown()
-    } finally {
-      super.afterAll()
-    }
+    node1.shutdown()
+    node2.shutdown()
+    node3.shutdown()
   }
 
   "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
 
-    http_get(uri("/A")).entity should be(jsonStringEntity("initialValueA"))
-    http_get(uri("/B")).entity should be(jsonStringEntity("initialValueB"))
-    http_post(uri("/A/updatedValueA")).status.intValue should be(303)
-    http_get(uri("/A")).entity should be(jsonStringEntity("updatedValueA"))
+    node1.http_get("/A").entity should be(jsonStringEntity("initialValueA"))
+    node1.http_get("/B").entity should be(jsonStringEntity("initialValueB"))
+    node1.http_post("/A/updatedValueA").status.intValue should be(303)
+    node1.http_get("/A").entity should be(jsonStringEntity("updatedValueA"))
 
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
@@ -130,8 +131,8 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
         while (!stopSignal.get) {
           Thread.sleep(1)
           if (isInterrupted) throw new InterruptedException
-          val uri = gateway.uri(if (random.nextBoolean()) "/A" else "/B")
-          requests += http(GET, uri) map {
+          val path = if (random.nextBoolean()) "/A" else "/B"
+          requests += node1.http(GET, path) map {
             case response => response.status.value
           } recover {
             case e: Throwable => e.getMessage
@@ -152,7 +153,7 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
     }
     client.start
     Thread.sleep(100)
-    region1.shutdown()
+    node2.shutdown()
     stopSignal.set(true)
     client.join()
     errorCount.get should be(0L)
