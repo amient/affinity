@@ -22,18 +22,21 @@ package io.amient.affinity.core.util
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 
+import scala.concurrent.{ExecutionContext, Future}
+
 class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
 
   lazy val storage = LogStorage.newInstance(conf)
 
-  def append(record: Record[K, V]): java.util.concurrent.Future[_ <: Comparable[_]] = {
+  def append(record: Record[K, V]): Future[_ <: Comparable[_]] = {
     val binaryRecord = new Record(keySerde.toBytes(record.key), valSerde.toBytes(record.value), record.timestamp)
-    storage.append(binaryRecord)
+    val jf = storage.append(binaryRecord)
+    Future(jf.get)(ExecutionContext.Implicits.global)
   }
 
-  def flush() = storage.flush()
+  def flush(): Unit = storage.flush()
 
-  def close() = {
+  def close(): Unit = {
     try flush() finally try storage.close() finally {
       keySerde.close()
       valSerde.close()

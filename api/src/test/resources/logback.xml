@@ -16,8 +16,8 @@
     <logger name="org.I0Itec.zkclient" level="ERROR" />
     <logger name="kafka" level="ERROR" />
     <logger name="org.apache.kafka" level="ERROR" />
-    <logger name="org.apache.zookeeper" level="ERROR"/>
-    <logger name="zookeeper.server" level="ERROR"/>
+    <logger name="zookeeper.server" level="OFF"/>
+    <logger name="org.apache.zookeeper" level="OFF"/>
 
 
 </configuration>
