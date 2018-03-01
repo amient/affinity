@@ -64,7 +64,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         return checkpoint.get();
     }
 
-    private void fsmEnterWriteState() throws IOException {
+    private void fsmEnterWriteState() {
         switch(fsm) {
             case INIT: throw new IllegalStateException("Bootstrap is required before writing");
             case TAIL: stopLogSync(); break;
@@ -73,7 +73,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         this.fsm = FSM.WRITE;
     }
 
-    public Future<POS> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) throws IOException {
+    public Future<POS> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) {
         fsmEnterWriteState();
         Record record = new Record(key, valueBytes, recordTimestamp);
         return new MappedJavaFuture<POS, POS>(storage.append(record)) {
@@ -86,7 +86,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         };
     }
 
-    public Future<POS> delete(final MemStore kvstore, final byte[] key) throws IOException {
+    public Future<POS> delete(final MemStore kvstore, final byte[] key) {
         fsmEnterWriteState();
         return new MappedJavaFuture<POS, POS>(storage.delete(key)) {
             @Override

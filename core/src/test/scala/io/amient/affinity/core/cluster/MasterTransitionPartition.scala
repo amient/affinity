@@ -29,7 +29,7 @@ object MasterTransitionPartition {
     override def hashCode(): Int = key.hashCode
   }
 
-  case class PutValue(key: String, value: String) extends Routed with Reply[Unit] {
+  case class PutValue(key: String, value: String) extends Routed with Reply[Option[String]] {
     override def hashCode(): Int = key.hashCode
   }
 
