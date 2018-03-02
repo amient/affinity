@@ -63,10 +63,12 @@ class GraphPartition extends Partition {
     }
 
     case command@UpdateVertexComponent(vid, cid) => sender.replyWith(command) {
-      graph.transform(vid) {
+      graph.getAndUpdate(vid, {
         case None => throw new NoSuchElementException
-        case Some(props) if (props.component == cid) => (None, Some(props), cid)
-        case Some(props) => (Some(command), Some(props.withComponent(cid)), props.component)
+        case Some(props: VertexProps) if (props.component == cid) => Some(props)
+        case Some(props: VertexProps) => Some(props.withComponent(cid))
+      }) map {
+        _.get.component
       }
     }
 
@@ -77,15 +79,11 @@ class GraphPartition extends Partition {
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
     case command@ModifyGraph(vertex, edge, GOP.ADD) => sender.replyWith(command) {
-      graph.transform(vertex) {
-        case Some(existing) if (existing.edges.exists(_.target == edge.target)) =>
-          (None, Some(existing), existing)
-        case None =>
-          val inserted = VertexProps(System.currentTimeMillis, vertex, Set(edge))
-          (Some(inserted), Some(inserted), inserted)
-        case Some(existing) => val updated = existing.withEdges(existing.edges + edge)
-          (Some(command), Some(updated), updated)
-      }
+      graph.updateAndGet(vertex, {
+        case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Some(existing)
+        case None => Some(VertexProps(System.currentTimeMillis, vertex, Set(edge)))
+        case Some(existing) => Some(existing.withEdges(existing.edges + edge))
+      }) map (_.get)
     }
 
 
@@ -93,17 +91,14 @@ class GraphPartition extends Partition {
       * Remove an edge from the graph vertex.
       * This is a non-recursive operation, local to the
       * data shard owned by this partition.
-      * Responds Status.Failure if the operation fails, true if the data was modified, false otherwise
+      * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
     case command@ModifyGraph(vertex, edge, GOP.REMOVE) => sender.replyWith(command) {
-      graph.transform(vertex) {
+      graph.updateAndGet(vertex ,{
         case None => throw new NoSuchElementException
-        case Some(existing) if !existing.edges.exists(_.target == edge.target) =>
-          throw new IllegalArgumentException("not connected")
-        case Some(existing) =>
-          val updated = existing.withEdges(existing.edges.filter(_.target != edge.target))
-          (Some(command), Some(updated), updated)
-      }
+        case Some(existing) if !existing.edges.exists(_.target == edge.target) => throw new IllegalArgumentException("not connected")
+        case Some(existing) => Some(existing.withEdges(existing.edges.filter(_.target != edge.target)))
+      }) map (_.get)
     }
   }
 }
