@@ -167,10 +167,10 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
           }
         }
       })
-      lastMessage.wait(1000)
+      lastMessage.wait(5000)
       (lastMessage.get == null) should be(true)
       node1.http_post("/connect/1000/2000").status should be(SeeOther)
-      lastMessage.wait(1000)
+      lastMessage.wait(5000)
       val msg = lastMessage.get
       (msg != null) should be(true)
       msg.getSchema.getName should be("VertexProps")
