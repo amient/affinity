@@ -480,7 +480,7 @@ trait WebSocketSupport extends GatewayHttp {
         } catch {
           case NonFatal(e) =>
             var logged = false
-            val errorHandler = receiveHandleError(upstream) orElse {
+            val errorHandler: PartialFunction[Throwable, Unit] = receiveHandleError(upstream) orElse {
               case RequestException(status: StatusCode) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.defaultMessage)
               case e: ExecutionException => receiveHandleError(upstream)(e.getCause)
               case e: NoSuchElementException => upstream ! Map("type" -> "error", "code" -> 404, "message" -> e.getMessage())
