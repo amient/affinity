@@ -334,6 +334,7 @@ class State[K, V](val identifier: String,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
+  @deprecated
   def transform[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       val k = keySerde.toBytes(key)
