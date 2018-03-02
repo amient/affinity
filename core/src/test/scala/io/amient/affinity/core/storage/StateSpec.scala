@@ -31,7 +31,7 @@ import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-case class ExampleCompoundKey(@Fixed(1) key:String, subkey: Int)
+case class ExampleCompoundKey(@Fixed(1) key:String, subkey: Int) extends AvroRecord
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
@@ -108,7 +108,14 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
     )))
-    val state = State.create[ExampleCompoundKey, ExpirableValue]("prefix-key-store", 0, stateConf, 1, system)
+    val state = State.create[ExampleCompoundKey, String]("prefix-key-store", 0, stateConf, 1, system)
+    state.insert(new ExampleCompoundKey("key1", 1), "value11")
+    state.insert(new ExampleCompoundKey("key1", 2), "value12")
+    state.insert(new ExampleCompoundKey("key1", 3), "value13")
+    state.insert(new ExampleCompoundKey("key2", 1), "value21")
+    state.insert(new ExampleCompoundKey("key2", 2), "value22")
+    state.insert(new ExampleCompoundKey("key3", 1), "value31")
+    //TODO #160 add state.getRange("key1")
   }
 
 

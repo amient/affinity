@@ -50,12 +50,9 @@ object State {
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
-    val keyPrefixLength = if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
-      AvroSerde.prefixLength(keyClass.asSubclass(classOf[AvroRecord]))
-    } else {
-      0
+    if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
+      stateConf.MemStore.KeyPrefixSize.setValue(AvroSerde.prefixLength(keyClass.asSubclass(classOf[AvroRecord])))
     }
-    println(s"Compound Key Prefix Length: $keyPrefixLength")
     val kvstoreClass = stateConf.MemStore.Class()
     val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])
     if (!stateConf.MemStore.DataDir.isDefined) {

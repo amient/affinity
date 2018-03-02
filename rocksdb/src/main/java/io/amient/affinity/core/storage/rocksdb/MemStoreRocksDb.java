@@ -19,8 +19,6 @@
 
 package io.amient.affinity.core.storage.rocksdb;
 
-import io.amient.affinity.core.config.CfgBool;
-import io.amient.affinity.core.config.CfgInt;
 import io.amient.affinity.core.config.CfgStruct;
 import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
@@ -46,8 +44,6 @@ public class MemStoreRocksDb extends MemStore {
             super(MemStoreConf.class);
         }
         //TODO on 64-bit systems memory mapped files can be enabled
-        public CfgInt PrefixSize = integer("rocksdb.prefix.size", false);
-
     }
 
     private static Map<Path, Long> refs = new HashMap<>();
@@ -98,8 +94,8 @@ public class MemStoreRocksDb extends MemStore {
         Files.createDirectories(pathToData);
         MemStoreRocksDbConf rocksDbConf = new MemStoreRocksDbConf().apply(conf.MemStore);
         Options rocksOptions = new Options().setCreateIfMissing(true);
-        if (rocksDbConf.PrefixSize.isDefined()) {
-            rocksOptions.useCappedPrefixExtractor(rocksDbConf.PrefixSize.apply());
+        if (conf.MemStore.KeyPrefixSize.isDefined()) {
+            rocksOptions.useCappedPrefixExtractor(conf.MemStore.KeyPrefixSize.apply());
         }
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
     }
