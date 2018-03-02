@@ -440,7 +440,7 @@ public class ByteUtils {
     }
 
     /**
-     * Check if one byte array range is contained in another
+     * Check if one byte array range starts with another
      * @param cArray the content array which is searched through
      * @param vArray the value array that is searched for
      * @return true if the cArray starts with the vArray
@@ -450,6 +450,23 @@ public class ByteUtils {
         int cLimit = vArray.length - 1;
         for (int c = 0; c <= cLimit; c++) {
             if (vArray[c] != cArray[c]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Check if one byte buffer starts with another
+     * @param cBuf the content buffer which is searched through
+     * @param vBuf the value buffer that is searched for
+     * @return true if the cBuf starts with the vBug
+     */
+    final public static boolean startsWith(ByteBuffer cBuf, ByteBuffer vBuf) {
+        if (cBuf.limit() < vBuf.limit()) return false;
+        int cLimit = vBuf.limit() - 1;
+        for (int c = 0; c <= cLimit; c++) {
+            if (vBuf.get(vBuf.position()+c) != cBuf.get(cBuf.position()+c)) {
                 return false;
             }
         }

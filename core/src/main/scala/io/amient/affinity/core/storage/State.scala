@@ -28,6 +28,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
@@ -48,6 +49,13 @@ object State {
   def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
+    val keyClass = implicitly[ClassTag[K]].runtimeClass
+    val keyPrefixLength = if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
+      AvroSerde.prefixLength(keyClass.asSubclass(classOf[AvroRecord]))
+    } else {
+      0
+    }
+    println(s"Compound Key Prefix Length: $keyPrefixLength")
     val kvstoreClass = stateConf.MemStore.Class()
     val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])
     if (!stateConf.MemStore.DataDir.isDefined) {
@@ -334,7 +342,7 @@ class State[K, V](val identifier: String,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
-  @deprecated
+  @deprecated("Use get,getAndUpdate or updateAndGet", "2 March 2018")
   def transform[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       val k = keySerde.toBytes(key)

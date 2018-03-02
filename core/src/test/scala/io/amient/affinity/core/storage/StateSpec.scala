@@ -23,13 +23,15 @@ import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
-import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.util.EventTime
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+
+case class ExampleCompoundKey(@Fixed(1) key:String, subkey: Int)
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
@@ -100,6 +102,13 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
     state(3L) should be(Some(ExpirableValue("three", nowMs)))
     state.iterator.size should be(2L)
     state.numKeys should be(2L)
+  }
+
+  it should "manage 1-N mappings when compound key prefix is used" in {
+    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
+      State.StateConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
+    )))
+    val state = State.create[ExampleCompoundKey, ExpirableValue]("prefix-key-store", 0, stateConf, 1, system)
   }
 
 

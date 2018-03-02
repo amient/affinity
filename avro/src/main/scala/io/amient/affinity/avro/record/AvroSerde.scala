@@ -71,6 +71,13 @@ object AvroSerde {
     }
   }
 
+  /**
+    * Calculate a total length of serialized binary prefix of an avro record
+    * by adding up the fixed avro serde header and the sequence of initial
+    * fixed fields.
+    * @param recordClass
+    * @return maximum number of bytes in the binary prefix
+    */
   def prefixLength(recordClass: Class[_ <: AvroRecord]): Int = {
     val schema = AvroRecord.inferSchema(recordClass)
     val fixedLen = schema.getFields.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
@@ -176,19 +183,21 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
   }
 
   /**
+    * Generate a binary prefix by projecting the sequence key parts onto the
+    * fixed fields of the given avro class's schema using avro binary encoding
     *
-    * @param recordClass
-    * @param keys
-    * @return
+    * @param recordClass class whose avro schema will be used
+    * @param keyParts values for the initial sequence of fixed fields as defined by the schema
+    * @return bytes of the binary prefix including the avro serde 5-byte header
     */
-  def prefix(recordClass: Class[_ <: AvroRecord], keys: String*): Array[Byte] = {
+  def prefix(recordClass: Class[_ <: AvroRecord], keyParts: String*): Array[Byte] = {
     val output = new ByteArrayOutputStream()
     val schema = AvroRecord.inferSchema(recordClass)
     val schemaId: Int = register(recordClass)
     output.write(0) //magic byte
     ByteUtils.writeIntValue(schemaId, output) //schema id
     //all used prefix keys
-    keys.zip(schema.getFields.take(keys.length).map(_.schema.getFixedSize)).foreach {
+    keyParts.zip(schema.getFields.take(keyParts.length).map(_.schema.getFixedSize)).foreach {
       case (value: String, fixedLen: Int) =>
         output.write(AvroRecord.stringToFixed(value, fixedLen))
     }

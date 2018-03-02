@@ -21,7 +21,10 @@ package io.amient.affinity.core.util;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 
 public interface CloseableIterator<T> extends Iterator<T>, Closeable {
 
@@ -51,5 +54,9 @@ public interface CloseableIterator<T> extends Iterator<T>, Closeable {
                 return underlying.next();
             }
         };
+    }
+
+    static CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> empty() {
+        return apply(Collections.emptyIterator());
     }
 }

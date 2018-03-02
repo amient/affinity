@@ -45,7 +45,7 @@ public class MemStoreRocksDb extends MemStore {
         public MemStoreRocksDbConf() {
             super(MemStoreConf.class);
         }
-        //on 64-bit systems memory mapped files can be enabled
+        //TODO on 64-bit systems memory mapped files can be enabled
         public CfgInt PrefixSize = integer("rocksdb.prefix.size", false);
 
     }

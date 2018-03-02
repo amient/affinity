@@ -77,7 +77,7 @@ public class MemStoreRocksDbTest {
 
         StateConf template = new StateConf();
         Config config = ConfigFactory.empty()
-                //.withValue(new MemStoreRocksDb.MemStoreRocksDbConf().apply(template.MemStore).PrefixSize.path(), ConfigValueFactory.fromAnyRef(3))
+                .withValue(new MemStoreRocksDb.MemStoreRocksDbConf().apply(template.MemStore).PrefixSize.path(), ConfigValueFactory.fromAnyRef(3))
                 .withValue(template.MemStore.DataDir.path(), ConfigValueFactory.fromAnyRef(tmp))
                 .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreRocksDb.class.getName()));
 
