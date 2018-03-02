@@ -61,6 +61,7 @@ object GatewayHttp {
   object GatewayConf extends GatewayConf {
     override def apply(config: Config) = new GatewayConf().apply(config)
   }
+
   class GatewayConf extends CfgStruct[GatewayConf](Cfg.Options.IGNORE_UNKNOWN) {
     val Http = struct("affinity.node.gateway.http", new HttpConf)
     val Tls = struct("affinity.node.gateway.tls", new TlsConf)
@@ -232,21 +233,24 @@ trait GatewayHttp extends Gateway {
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 
   def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
+    case e@RequestException(status) => errorResponse(e, status, headers)
     case e: ExecutionException => handleException(e.getCause)
-    case e: NoSuchElementException => errorResponse(e, NotFound, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: IllegalArgumentException => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: AssertionError => errorResponse(e, BadRequest, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: IllegalStateException => errorResponse(e, Conflict, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: NoSuchElementException => errorResponse(e, NotFound, headers)
+    case e: IllegalArgumentException => errorResponse(e, BadRequest, headers)
+    case e: IllegalStateException => errorResponse(e, Conflict, headers)
     case e: IllegalAccessException => errorResponse(e, Forbidden)
     case e: SecurityException => errorResponse(e, Unauthorized)
-    case e: NotImplementedError => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
-    case e: UnsupportedOperationException => errorResponse(e, NotImplemented, if (e.getMessage == null) "" else e.getMessage, headers)
+    case e: NotImplementedError => errorResponse(e, NotImplemented, headers)
+    case e: UnsupportedOperationException => errorResponse(e, NotImplemented, headers)
     case NonFatal(e) => errorResponse(e, InternalServerError, headers = headers)
   }
 
-  private def errorResponse(e: Throwable, status: StatusCode, message: String = "", headers: List[HttpHeader] = List()): HttpResponse = {
+  private def errorResponse(e: Throwable, status: StatusCode, headers: List[HttpHeader] = List()): HttpResponse = {
     log.error(e, s"${status} - default http error handler")
-    HttpResponse(status, entity = if (e.getMessage == null) "" else e.getMessage, headers = headers)
+    status.defaultMessage() match {
+      case null => HttpResponse(status, headers = headers)
+      case message => HttpResponse(status, entity = message, headers = headers)
+    }
   }
 
 }
@@ -292,8 +296,9 @@ trait WebSocketSupport extends GatewayHttp {
     * |                 +------+     TEXT     |ACTOR     +---------------+
     * |                                       +----------+   JSON
     * +
-    * @param exchange   web socket echange as captured in the http interface
-    * @param mediator   key-value mediator create using connectKeyValueMediator()
+    *
+    * @param exchange web socket echange as captured in the http interface
+    * @param mediator key-value mediator create using connectKeyValueMediator()
     */
   def jsonWebSocket(exchange: WebSocketExchange, mediator: ActorRef) {
     customWebSocket(exchange, new DownstreamActor {
@@ -346,8 +351,8 @@ trait WebSocketSupport extends GatewayHttp {
     * upstream ByteString will be sent as raw binary message to the client (used internally for schema request)
     * upstream any other type handling is not defined and will throw scala.MatchError
     *
-    * @param exchange   web socket echange as captured in the http interface
-    * @param mediator   key-value mediator create using connectKeyValueMediator()
+    * @param exchange web socket echange as captured in the http interface
+    * @param mediator key-value mediator create using connectKeyValueMediator()
     */
   def avroWebSocket(exchange: WebSocketExchange, mediator: ActorRef): Unit = {
     customWebSocket(exchange, new DownstreamActor {
@@ -453,6 +458,8 @@ trait WebSocketSupport extends GatewayHttp {
 
     def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit]
 
+    def receiveHandleError(upstream: ActorRef): PartialFunction[Throwable, Unit] = PartialFunction.empty
+
     override def postStop(): Unit = {
       log.debug("WebSocket Downstream Actor Closing")
       if (upstream != null) {
@@ -471,7 +478,24 @@ trait WebSocketSupport extends GatewayHttp {
         try {
           receiveMessage(upstream)(msg)
         } catch {
-          case e: Throwable => log.error(e, "websocket downstream message could not be handled")
+          case NonFatal(e) =>
+            var logged = false
+            val errorHandler = receiveHandleError(upstream) orElse {
+              case RequestException(status: StatusCode) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.defaultMessage)
+              case e: ExecutionException => receiveHandleError(upstream)(e.getCause)
+              case e: NoSuchElementException => upstream ! Map("type" -> "error", "code" -> 404, "message" -> e.getMessage())
+              case e: IllegalArgumentException => upstream ! Map("type" -> "error", "code" -> 400, "message" -> e.getMessage())
+              case e: IllegalStateException => upstream ! Map("type" -> "error", "code" -> 409, "message" -> e.getMessage())
+              case _: IllegalAccessException => upstream ! Map("type" -> "error", "code" -> 403, "message" -> "Forbidden")
+              case _: SecurityException => upstream ! Map("type" -> "error", "code" -> 401, "message" -> "Unauthorized")
+              case _: NotImplementedError | _: UnsupportedOperationException => upstream ! Map("type" -> "error", "code" -> 501, "message" -> "Not Implemented")
+              case NonFatal(e) =>
+                logged = true
+                log.error(e, "Json WebSocket receive handler failure")
+                upstream ! Map("type" -> "error", "code" -> 500, "message" -> "Something went wrong with the server")
+            }
+            errorHandler(e)
+            if (!logged) log.warning(e.getMessage)
         }
     }
 

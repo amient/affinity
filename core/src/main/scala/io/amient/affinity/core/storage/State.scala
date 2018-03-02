@@ -181,17 +181,22 @@ class State[K, V](val identifier: String,
     *
     * @param key   to update
     * @param value new value to be associated with the key
-    * @return Unit Future which may be failed if the operation didn't succeed
+    * @return Future which if successful holds either:
+    *         Success(Some(value)) if the write was persisted
+    *         Success(None) if the write was persisted but the operation resulted in the value was expired immediately
+    *         Failure(ex) if the operation failed due to exception
     */
-  def replace(key: K, value: V): Future[Unit] = put(keySerde.toBytes(key), value).map(_ => push(key, value))
+  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => { push(key, w); w })
 
   /**
     * delete the given key
     *
     * @param key to delete
-    * @return Unit Future which may be failed if the operation didn't succeed
+    * @return Future which may be either:
+    *         Success(None) if the key was deleted
+    *         Failure(ex) if the operation failed due to exception
     */
-  def delete(key: K): Future[Unit] = delete(keySerde.toBytes(key)).map(_ => push(key, null))
+  def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => { push(key, w); w })
 
   /**
     * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
@@ -369,7 +374,7 @@ class State[K, V](val identifier: String,
     * @param value new value for the key
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def put(key: Array[Byte], value: V): Future[_] = {
+  private def put(key: Array[Byte], value: V): Future[Option[V]] = {
     if (external) throw new IllegalStateException("put() called on a read-only state")
     val nowMs = System.currentTimeMillis()
     val recordTimestamp = value match {
@@ -381,8 +386,11 @@ class State[K, V](val identifier: String,
     } else {
       val valueBytes = valueSerde.toBytes(value)
       logOption match {
-        case None => Future.successful(kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp)))
-        case Some(log) => log.append(kvstore, key, valueBytes, recordTimestamp)
+        case None =>
+          kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
+          Future.successful(Some(value))
+        case Some(log) =>
+          log.append(kvstore, key, valueBytes, recordTimestamp) map (_ => Some(value))
       }
     }
   }
@@ -397,11 +405,14 @@ class State[K, V](val identifier: String,
     * @param key serialized key to delete
     * @return future of the checkpoint that will represent the consistency information after the operation completes
     */
-  private def delete(key: Array[Byte]): Future[_] = {
+  private def delete(key: Array[Byte]): Future[Option[V]] = {
     if (external) throw new IllegalStateException("delete() called on a read-only state")
     logOption match {
-      case None => Future.successful(kvstore.remove(ByteBuffer.wrap(key)))
-      case Some(log) => log.delete(kvstore, key)
+      case None =>
+        kvstore.remove(ByteBuffer.wrap(key))
+        Future.successful(None)
+      case Some(log) =>
+        log.delete(kvstore, key) map (_ => None)
     }
   }
 

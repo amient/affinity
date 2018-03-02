@@ -24,7 +24,6 @@ import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.util.CompletedJavaFuture;
 import io.amient.affinity.core.util.EventTime;
 import io.amient.affinity.core.util.MappedJavaFuture;
-import org.jooq.lambda.Unchecked;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -135,9 +134,10 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * Retrieve a value from the store asynchronously
      *
      * @param key to retrieve value of
-     * @return Future.Success(Some(V)) if the key exists and the value could be retrieved and deserialized
-     * Future.Success(None) if the key doesn't exist
-     * Future.Failed(Throwable) if a non-fatal exception occurs
+     * @return Future which if successful holds either:
+     *         Success(Some(value)) if the write was persisted
+     *         Success(None) if the write was persisted but the operation resulted in the value was expired immediately
+     *         Failure(ex) if the operation failed due to exception
      */
     Optional<V> apply(K key) {
         return apply(ByteBuffer.wrap(keySerde.toBytes(key)));
@@ -157,12 +157,12 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * @param value new value to be associated with the key
      * @return Unit Future which may be failed if the operation didn't succeed
      */
-    public Future<Void> replace(K key, V value) {
-        return new MappedJavaFuture(put(keySerde.toBytes(key), value)) {
+    public Future<Optional<V>> replace(K key, V value) {
+        return new MappedJavaFuture<Optional<V>, Optional<V>>(put(keySerde.toBytes(key), value)) {
             @Override
-            public Void map(Object result) {
+            public Optional<V> map(Optional<V> result) {
                 push(key, value);
-                return null;
+                return result;
             }
         };
     }
@@ -171,14 +171,16 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * delete the given key
      *
      * @param key to delete
-     * @return Unit Future which may be failed if the operation didn't succeed
+     * @return Future which may be either:
+     *         Success(None) if the key was deleted
+     *         Failure(ex) if the operation failed due to exception
      */
-    public Future<Void> delete(K key) {
-        return new MappedJavaFuture(delete(keySerde.toBytes(key))) {
+    public Future<Optional<V>> delete(K key) {
+        return new MappedJavaFuture<Optional<V>, Optional<V>>(delete(keySerde.toBytes(key))) {
             @Override
-            public Void map(Object result) {
+            public Optional<V> map(Optional<V> result) {
                 push(key, null);
-                return null;
+                return result;
             }
         };
     }
@@ -353,7 +355,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * @param value new value for the key
      * @return future of the checkpoint that will represent the consistency information after the operation completes
      */
-    private Future<?> put(byte[] key, V value) {
+    private Future<Optional<V>> put(byte[] key, V value) {
         if (external) throw new IllegalStateException("put() called on a read-only state");
         long nowMs = System.currentTimeMillis();
         long recordTimestamp = (value instanceof EventTime) ? ((EventTime) value).eventTimeUnix() : nowMs;
@@ -361,12 +363,17 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
             return delete(key);
         } else {
             byte[] valueBytes = valueSerde.toBytes(value);
-            return logOption
-                    .map(Unchecked.function(log -> log.append(kvstore, key, valueBytes, recordTimestamp)))
-                    .orElseGet(() -> {
-                        kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp));
-                        return new CompletedJavaFuture<>(null);
-                    });
+            if (logOption.isPresent()) {
+                return new MappedJavaFuture(logOption.get().append(kvstore, key, valueBytes, recordTimestamp)) {
+                    @Override
+                    public Optional<V> map(Object result) {
+                        return Optional.of(value);
+                    }
+                };
+            } else {
+                kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp));
+                return new CompletedJavaFuture<>(Optional.of(value));
+            }
         }
     }
 
@@ -380,14 +387,19 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * @param key serialized key to delete
      * @return future of the checkpoint that will represent the consistency information after the operation completes
      */
-    private Future<?> delete(byte[] key) {
+    private Future<Optional<V>> delete(byte[] key) {
         if (external) throw new IllegalStateException("delete() called on a read-only state");
-        return logOption
-                .map(Unchecked.function(log -> log.delete(kvstore, key)))
-                .orElseGet(() -> {
-                    kvstore.remove(ByteBuffer.wrap(key));
-                    return new CompletedJavaFuture<>(null);
-                });
+        if (logOption.isPresent()) {
+            return new MappedJavaFuture(logOption.get().delete(kvstore, key)) {
+                @Override
+                public Optional<V> map(Object result) {
+                    return Optional.empty();
+                }
+            };
+        } else {
+            kvstore.remove(ByteBuffer.wrap(key));
+            return new CompletedJavaFuture<>(Optional.empty());
+        }
     }
 
 
