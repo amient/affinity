@@ -141,6 +141,10 @@ object AvroJsonConverter {
           }
           builder.result.asJava
         case Schema.Type.ENUM if data.isTextual => new EnumSymbol(schema, data.getTextValue)
+        //TODO Schema.Type.BYTES => Array[Byte] =>
+        //TODO Schema.Type.FIXED if runtime == "int" => ByteUtils..
+        //TODO Schema.Type.FIXED if runtime == "long" => ByteUtils..
+        //TODO Schema.Type.FIXED => AvroRecord.fixedToString(...)
         case Schema.Type.RECORD if data.isObject =>
           val builder = new GenericRecordBuilder(schema)
           schema.getFields foreach { field =>

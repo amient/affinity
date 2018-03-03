@@ -37,6 +37,8 @@ case class SimpleKey(val id: Int) extends AvroRecord {
 
 case class CompoundKey(@Fixed(2) country: String, @Fixed(10) city: String, id2: Int) extends AvroRecord
 
+case class LongCompoundKey(@Fixed version: Long, @Fixed(2) country: String, @Fixed(10) city: String, value: Double) extends AvroRecord
+
 
 case class SimpleRecord(val id: SimpleKey = SimpleKey(0), val side: SimpleEnum.Value = SimpleEnum.A, val seq: Seq[SimpleKey] = Seq()) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()

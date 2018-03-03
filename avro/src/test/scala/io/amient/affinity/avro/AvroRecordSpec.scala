@@ -178,7 +178,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   }
 
-  "Compound Key Prefix" should "have the same binary prefix as SimpleKey" in {
+  "Compound Key" should "have the same binary prefix as the whole key" in {
     def f(city: String, num: Int): CompoundKey = {
       val ck = new CompoundKey("UK", city, num)
       val bytes = newSerde.toBytes(ck)
@@ -195,6 +195,16 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     bytes.filter(key => ByteUtils.startsWith(key, uk)).size should be (5)
     val c003 = newSerde.prefix(classOf[CompoundKey], "UK", "C003")
     bytes.filter(key => ByteUtils.startsWith(key, c003)).size should be (0)
+  }
+
+  "Long Compound Key " should "have the same binary prefix as Simple Key" in {
+    AvroRecord.inferSchema[LongCompoundKey].toString should be ("{\"type\":\"record\",\"name\":\"LongCompoundKey\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"version\",\"type\":{\"type\":\"fixed\",\"name\":\"version\",\"namespace\":\"\",\"size\":8,\"runtime\":\"long\"}},{\"name\":\"country\",\"type\":{\"type\":\"fixed\",\"name\":\"country\",\"namespace\":\"\",\"size\":2}},{\"name\":\"city\",\"type\":{\"type\":\"fixed\",\"name\":\"city\",\"namespace\":\"\",\"size\":10}},{\"name\":\"value\",\"type\":\"double\"}]}")
+    val key = LongCompoundKey(100L, "UK", "C001", 99.9)
+    val bytes = newSerde.toBytes(key)
+    val prefix = newSerde.prefix(classOf[LongCompoundKey], new java.lang.Long(100L), "UK", "C001")
+    assert(ByteUtils.startsWith(bytes , prefix))
+    newSerde.fromBytes(bytes) should be(key)
+
   }
 
 }

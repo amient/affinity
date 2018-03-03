@@ -41,4 +41,11 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
 
   }
 
+  it should "serailize fixed field variants" ignore {
+    val msg = LongCompoundKey(100L, "UK", "C001", 9.9)
+    val avroJson = AvroJsonConverter.toJson(msg)
+    println(avroJson)
+    AvroJsonConverter.toAvro(avroJson, msg.getSchema()) should be (msg)
+  }
+
 }

@@ -177,9 +177,10 @@ class State[K, V](val identifier: String,
     ) yield valueSerde.fromBytes(byteRecord.value)
   }
 
-  def range(prefix: String*): Map[K, V] = {
+  def range(prefix: Any*): Map[K, V] = {
     val builder = Map.newBuilder[K, V]
-    val bytePrefix: Array[Byte] = keySerde.prefix(keyClass, prefix: _*)
+    val javaPrefix = prefix.map(_.asInstanceOf[AnyRef])
+    val bytePrefix: Array[Byte] = keySerde.prefix(keyClass, javaPrefix: _*)
     kvstore.iterator(ByteBuffer.wrap(bytePrefix)).foreach { entry =>
       option(kvstore.unwrap(entry.getKey, entry.getValue, ttlMs)).foreach { record =>
         builder += keySerde.fromBytes(record.key) -> valueSerde.fromBytes(record.value)
