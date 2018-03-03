@@ -76,13 +76,12 @@ object AvroSerde {
     * by adding up the fixed avro serde header and the sequence of initial
     * fixed fields.
     * @param recordClass
-    * @return maximum number of bytes in the binary prefix
+    * @return Some(maximum number of bytes in the binary prefix) or None if the schema has no leading fixed fields
     */
-  def prefixLength(recordClass: Class[_ <: AvroRecord]): Int = {
+  def binaryPrefixLength(recordClass: Class[_ <: AvroRecord]): Option[Int] = {
     val schema = AvroRecord.inferSchema(recordClass)
     val fixedLen = schema.getFields.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
-    require(fixedLen > 0, recordClass.getName + " doesn't have any leading fixed fields")
-    5 + fixedLen
+    if(fixedLen > 0) Some(5 + fixedLen) else None
   }
 
 

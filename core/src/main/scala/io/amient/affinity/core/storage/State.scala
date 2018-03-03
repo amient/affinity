@@ -51,7 +51,9 @@ object State {
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
     if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
-      stateConf.MemStore.KeyPrefixSize.setValue(AvroSerde.prefixLength(keyClass.asSubclass(classOf[AvroRecord])))
+      AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord])) foreach {
+        prefixLength => stateConf.MemStore.KeyPrefixSize.setValue(prefixLength)
+      }
     }
     val kvstoreClass = stateConf.MemStore.Class()
     val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])

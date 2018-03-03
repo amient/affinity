@@ -188,7 +188,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     }
     val keys = List(f("C001", 0), f("C001", 1), f("C002", 2), f("C002", 3), f("C002", 4))
     val bytes = keys.map(newSerde.toBytes)
-    AvroSerde.prefixLength(classOf[CompoundKey]) should be(17)
+    AvroSerde.binaryPrefixLength(classOf[CompoundKey]) should be(Some(17))
     val c001 = newSerde.prefix(classOf[CompoundKey], "UK", "C001")
     bytes.filter(key => ByteUtils.startsWith(key, c001)).size should be (2)
     val uk = newSerde.prefix(classOf[CompoundKey], "UK")
