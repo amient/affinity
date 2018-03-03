@@ -233,7 +233,7 @@ trait GatewayHttp extends Gateway {
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 
   def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
-    case e@RequestException(status) => errorResponse(e, status, headers)
+    case e@RequestException(status) => errorResponse(e, StatusCodes.custom(status.intValue().toString.take(3).toInt, status.reason, status.defaultMessage), headers)
     case e: ExecutionException => handleException(e.getCause)
     case e: NoSuchElementException => errorResponse(e, NotFound, headers)
     case e: IllegalArgumentException => errorResponse(e, BadRequest, headers)
