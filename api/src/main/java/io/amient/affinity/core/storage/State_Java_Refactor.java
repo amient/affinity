@@ -169,7 +169,8 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
      * @param range  time range to filter the records by
      * @param prefix1 mandatory root prefix
      * @param prefixN optional secondary prefix sequence
-     * @return Map<K,V> of all records matching the prefix
+     * @return Map of all records matching the prefix
+     * @throws IOException if the i/o fails
      */
     public Map<K,V> range(TimeRange range, Object prefix1, Object... prefixN) throws IOException {
         LinkedHashMap<K, V> result = new LinkedHashMap<>();
