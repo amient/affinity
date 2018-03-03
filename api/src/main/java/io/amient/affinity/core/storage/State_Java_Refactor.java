@@ -28,6 +28,7 @@ import io.amient.affinity.core.util.MappedJavaFuture;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -42,6 +43,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
     private final MemStore kvstore;
     private final Optional<Log<?>> logOption;
     private final int partition;
+    private final Class<K> keyClass;
     private final AbstractSerde<K> keySerde;
     private final AbstractSerde<V> valueSerde;
     private final long ttlMs;
@@ -52,6 +54,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
                                MemStore kvstore,
                                Optional<Log<?>> logOption,
                                int partition,
+                               Class<K> keyClass,
                                AbstractSerde<K> keySerde,
                                AbstractSerde<V> valueSerde,
                                long ttlMs, //-1
@@ -62,6 +65,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         this.kvstore = kvstore;
         this.logOption = logOption;
         this.partition = partition;
+        this.keyClass = keyClass;
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
         this.ttlMs = ttlMs;
@@ -147,6 +151,18 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         return kvstore.apply(key).flatMap((cell) ->
                 kvstore.unwrap(key, cell, ttlMs).map((byteRecord) -> valueSerde.fromBytes(byteRecord.value))
         );
+    }
+
+    Map<K,V> range(String... prefix) {
+        LinkedHashMap<K, V> result = new LinkedHashMap<>();
+        byte[] bytePrefix = keySerde.prefix(keyClass, prefix);
+//        try(CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = iterator(keyPrefix)) {
+//            while(it.hasNext()) {
+//                Map.Entry<ByteBuffer, ByteBuffer> entry = it.next();
+//                result.put(entry.getKey(), entry.getValue());
+//            }
+//        }
+        return result;
     }
 
     /**

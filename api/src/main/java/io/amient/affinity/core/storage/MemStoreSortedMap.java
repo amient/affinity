@@ -51,7 +51,7 @@ public class MemStoreSortedMap extends MemStore {
             } else {
                 Iterator<Map.Entry<ByteBuffer, ByteBuffer>> tailEntries = internal2.tailMap(startKey).entrySet().iterator();
                 return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
-                    Map.Entry<ByteBuffer, ByteBuffer> head = tailEntries.next();
+                    Map.Entry<ByteBuffer, ByteBuffer> head = null;
                     @Override
                     public void close() throws IOException { }
 

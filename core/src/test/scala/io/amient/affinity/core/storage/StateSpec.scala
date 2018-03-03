@@ -31,7 +31,7 @@ import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-case class ExampleCompoundKey(@Fixed(1) key:String, subkey: Int) extends AvroRecord
+case class ExampleCompoundKey(@Fixed(4) key1:String, @Fixed(1) key2: String, subkey: Int) extends AvroRecord
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
@@ -109,13 +109,36 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
     )))
     val state = State.create[ExampleCompoundKey, String]("prefix-key-store", 0, stateConf, 1, system)
-    state.insert(new ExampleCompoundKey("key1", 1), "value11")
-    state.insert(new ExampleCompoundKey("key1", 2), "value12")
-    state.insert(new ExampleCompoundKey("key1", 3), "value13")
-    state.insert(new ExampleCompoundKey("key2", 1), "value21")
-    state.insert(new ExampleCompoundKey("key2", 2), "value22")
-    state.insert(new ExampleCompoundKey("key3", 1), "value31")
-    //TODO #160 add state.getRange("key1")
+    state.insert(ExampleCompoundKey("key1", "x", 1), "value11")
+    state.insert(ExampleCompoundKey("key1", "y", 2), "value12")
+    state.insert(ExampleCompoundKey("key1", "x", 3), "value13")
+    state.insert(ExampleCompoundKey("key2", "x", 1), "value21")
+    state.insert(ExampleCompoundKey("key2", "y", 2), "value22")
+    state.insert(ExampleCompoundKey("key3", "z", 1), "value31")
+
+    state.range("key1") should be(Map(
+      ExampleCompoundKey("key1", "x", 1) -> "value11",
+      ExampleCompoundKey("key1", "y", 2) -> "value12",
+      ExampleCompoundKey("key1", "x", 3) -> "value13"
+    ))
+
+    state.range("key2") should be(Map(
+      ExampleCompoundKey("key2", "x", 1) -> "value21",
+      ExampleCompoundKey("key2", "y", 2) -> "value22"
+    ))
+
+    state.range("key3") should be(Map(
+      ExampleCompoundKey("key3", "z", 1) -> "value31"
+    ))
+
+    state.range("key1", "x") should be(Map(
+      ExampleCompoundKey("key1", "x", 1) -> "value11",
+      ExampleCompoundKey("key1", "x", 3) -> "value13"
+    ))
+
+    state.range("key4") should be(Map.empty)
+
+    state.range("key")
   }
 
 

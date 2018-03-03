@@ -72,7 +72,7 @@ public class MemStoreRocksDbTest {
     }
 
     @Test
-    public void shouldAllowPrefixSeek() throws IOException {
+    public void shouldSupportPrefixIterator() throws IOException {
         String tmp = folder.newFolder().toString();
 
         StateConf template = new StateConf();
@@ -90,10 +90,16 @@ public class MemStoreRocksDbTest {
             instance.put(ByteBuffer.wrap("key3-A".getBytes()), ByteBuffer.wrap("value3A".getBytes()));
             instance.put(ByteBuffer.wrap("key3-B".getBytes()), ByteBuffer.wrap("value3B".getBytes()));
 
-            Map<ByteBuffer, ByteBuffer> it = instance.applyPrefix(ByteBuffer.wrap("key1".getBytes()));
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator(ByteBuffer.wrap("key1".getBytes()));
             assert(it.size() == 3);
-            Map<ByteBuffer, ByteBuffer> it2 = instance.applyPrefix(ByteBuffer.wrap("key3".getBytes()));
+            it.close();
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it2 = instance.iterator(ByteBuffer.wrap("key3".getBytes()));
             assert(it2.size() == 2);
+            it2.close();
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it3 = instance.iterator(ByteBuffer.wrap("key".getBytes()));
+            assert(it3.size() == 6);
+            it3.close();
+
         } finally {
             instance.close();
         }

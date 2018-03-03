@@ -94,7 +94,8 @@ object State {
       }
       storage.open(checkpointFile)
     }
-    new State(identifier, kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    val keyClass: Class[K] = implicitly[ClassTag[K]].runtimeClass.asInstanceOf[Class[K]]
+    new State(identifier, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -113,6 +114,7 @@ class State[K, V](val identifier: String,
                   kvstore: MemStore,
                   logOption: Option[Log[_]],
                   partition: Int,
+                  keyClass: Class[K],
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
@@ -175,6 +177,19 @@ class State[K, V](val identifier: String,
     ) yield valueSerde.fromBytes(byteRecord.value)
   }
 
+  def range(prefix: String*): Map[K, V] = {
+    val builder = Map.newBuilder[K, V]
+    val bytePrefix: Array[Byte] = keySerde.prefix(keyClass, prefix: _*)
+    kvstore.iterator(ByteBuffer.wrap(bytePrefix)).foreach { entry =>
+      val recordOpt = kvstore.unwrap(entry.getKey, entry.getValue, ttlMs)
+      if (recordOpt.isPresent) {
+        val record = recordOpt.get()
+        builder += keySerde.fromBytes(record.key) -> valueSerde.fromBytes(record.value)
+      }
+    }
+    builder.result()
+  }
+
   /**
     * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
@@ -191,7 +206,9 @@ class State[K, V](val identifier: String,
     *         Success(None) if the write was persisted but the operation resulted in the value was expired immediately
     *         Failure(ex) if the operation failed due to exception
     */
-  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => { push(key, w); w })
+  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => {
+    push(key, w); w
+  })
 
   /**
     * delete the given key
@@ -201,7 +218,9 @@ class State[K, V](val identifier: String,
     *         Success(None) if the key was deleted
     *         Failure(ex) if the operation failed due to exception
     */
-  def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => { push(key, w); w })
+  def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => {
+    push(key, w); w
+  })
 
   /**
     * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
@@ -217,7 +236,7 @@ class State[K, V](val identifier: String,
     * it is different from delete in that it returns the removed value
     * which is more costly.
     *
-    * @param key     to remove
+    * @param key   to remove
     * @param event is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */

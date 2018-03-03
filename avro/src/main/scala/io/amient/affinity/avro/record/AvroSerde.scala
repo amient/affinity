@@ -186,18 +186,18 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     * Generate a binary prefix by projecting the sequence key parts onto the
     * fixed fields of the given avro class's schema using avro binary encoding
     *
-    * @param recordClass class whose avro schema will be used
-    * @param keyParts values for the initial sequence of fixed fields as defined by the schema
+    * @param cls class whose avro schema will be used
+    * @param prefix values for the initial sequence of fixed fields as defined by the schema
     * @return bytes of the binary prefix including the avro serde 5-byte header
     */
-  def prefix(recordClass: Class[_ <: AvroRecord], keyParts: String*): Array[Byte] = {
+  override def prefix(cls: Class[_ <: Any], prefix: String*): Array[Byte] = {
     val output = new ByteArrayOutputStream()
-    val schema = AvroRecord.inferSchema(recordClass)
-    val schemaId: Int = register(recordClass)
+    val schema = AvroRecord.inferSchema(cls)
+    val schemaId: Int = register(cls)
     output.write(0) //magic byte
     ByteUtils.writeIntValue(schemaId, output) //schema id
     //all used prefix keys
-    keyParts.zip(schema.getFields.take(keyParts.length).map(_.schema.getFixedSize)).foreach {
+    prefix.zip(schema.getFields.take(prefix.length).map(_.schema.getFixedSize)).foreach {
       case (value: String, fixedLen: Int) =>
         output.write(AvroRecord.stringToFixed(value, fixedLen))
     }

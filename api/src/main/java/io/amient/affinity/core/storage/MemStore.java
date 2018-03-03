@@ -72,17 +72,6 @@ public abstract class MemStore implements Closeable {
 
     protected abstract boolean isPersistent();
 
-    public LinkedHashMap<ByteBuffer, ByteBuffer> applyPrefix(ByteBuffer keyPrefix) throws IOException {
-        LinkedHashMap<ByteBuffer, ByteBuffer>  result = new LinkedHashMap<>();
-        try(CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = iterator(keyPrefix)) {
-            while(it.hasNext()) {
-                Map.Entry<ByteBuffer, ByteBuffer> entry = it.next();
-                result.put(entry.getKey(), entry.getValue());
-            }
-        }
-        return result;
-    }
-
     public abstract CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer keyPrefix);
 
     /**

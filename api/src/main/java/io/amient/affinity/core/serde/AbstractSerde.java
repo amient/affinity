@@ -27,4 +27,8 @@ public interface AbstractSerde<T> extends Closeable {
 
     byte[] toBytes(T obj);
 
+    default byte[] prefix(Class<? extends T> cls, String... prefix) {
+        throw new UnsupportedOperationException();
+    }
+
 }
