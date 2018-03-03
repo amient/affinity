@@ -24,7 +24,7 @@ import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
-import io.amient.affinity.core.util.EventTime
+import io.amient.affinity.core.util.{EventTime, TimeRange}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
@@ -117,31 +117,31 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
     state.insert(ExampleCompoundKey(2000L, "y", 2), "value22")
     state.insert(ExampleCompoundKey(3000L, "z", 1), "value31")
 
-    state.range(1000L) should be(Map(
+    state.range(TimeRange.UNBOUNDED, 1000L) should be(Map(
       ExampleCompoundKey(1000L, "x", 1) -> "value11",
       ExampleCompoundKey(1000L, "y", 2) -> "value12",
       ExampleCompoundKey(1000L, "x", 3) -> "value13"
     ))
 
-    state.range(1000L, "x") should be(Map(
+    state.range(TimeRange.UNBOUNDED, 1000L, "x") should be(Map(
       ExampleCompoundKey(1000L, "x", 1) -> "value11",
       ExampleCompoundKey(1000L, "x", 3) -> "value13"
     ))
 
-    state.range(2000L) should be(Map(
+    state.range(TimeRange.UNBOUNDED, 2000L) should be(Map(
       ExampleCompoundKey(2000L, "x", 1) -> "value21",
       ExampleCompoundKey(2000L, "y", 2) -> "value22"
     ))
 
-    state.range(3000L) should be(Map(
+    state.range(TimeRange.UNBOUNDED, 3000L) should be(Map(
       ExampleCompoundKey(3000L, "z", 1) -> "value31"
     ))
 
-    state.range(3000L, "!") should be(Map())
+    state.range(TimeRange.UNBOUNDED, 3000L, "!") should be(Map())
 
-    state.range(4000L) should be(Map.empty)
+    state.range(TimeRange.UNBOUNDED, 4000L) should be(Map.empty)
 
-    state.range(0L) should be (Map.empty)
+    state.range(TimeRange.UNBOUNDED, 0L) should be (Map.empty)
   }
 
 

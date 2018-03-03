@@ -68,6 +68,10 @@ public class TimeRange implements Serializable {
         return EventTime.local(end);
     }
 
+    public boolean contains(long unixtimestamp) { return unixtimestamp >= start && unixtimestamp < end; }
+
+    public boolean contains(OffsetDateTime datetime) { return contains(datetime.toInstant().toEpochMilli()); }
+
     public static TimeRange since(OffsetDateTime datetime) {
         return since(datetime.toInstant().toEpochMilli());
     }

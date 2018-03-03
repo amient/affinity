@@ -141,16 +141,33 @@ class State[K, V](val identifier: String,
   private[affinity] def tail(): Unit = logOption.foreach(_
     .tail(kvstore, optional[ObservableState[K]](this)))
 
+
   /**
+    * get an iterator for all records that are strictly not expired
     * @return a weak iterator that doesn't block read and write operations
     */
-  def iterator: CloseableIterator[Record[K, V]] = new CloseableIterator[Record[K, V]] {
-    val underlying = kvstore.iterator(null)
+  def iterator:  CloseableIterator[Record[K, V]] = iterator(TimeRange.UNBOUNDED)
+
+  /**
+    * get iterator for all records that are within a given time range and an optional prefix sequence
+    * @param range  time range to filter the records by
+    * @param prefix vararg sequence for the compound key to match; can be empty
+    * @return a weak iterator that doesn't block read and write operations
+    */
+  def iterator(range: TimeRange, prefix: Any*): CloseableIterator[Record[K, V]] = new CloseableIterator[Record[K, V]] {
+    val javaPrefix = prefix.map(_.asInstanceOf[AnyRef])
+    val bytePrefix: ByteBuffer = if (javaPrefix.isEmpty) null else {
+      ByteBuffer.wrap(keySerde.prefix(keyClass, javaPrefix: _*))
+    }
+    val underlying = kvstore.iterator(bytePrefix)
     val mapped = underlying.flatMap { entry =>
-      val key = keySerde.fromBytes(entry.getKey.array())
-      option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
-        byteRecord => new Record(key, valueSerde.fromBytes(byteRecord.value), byteRecord.timestamp)
-      }
+      option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs))
+        .filter(byteRecord => range.contains(byteRecord.timestamp))
+        .map { byteRecord =>
+          val key = keySerde.fromBytes(byteRecord.key)
+          val value = valueSerde.fromBytes(byteRecord.value)
+          new Record(key, value, byteRecord.timestamp)
+        }
     }
 
     override def next(): Record[K, V] = mapped.next()
@@ -177,16 +194,22 @@ class State[K, V](val identifier: String,
     ) yield valueSerde.fromBytes(byteRecord.value)
   }
 
-  def range(prefix: Any*): Map[K, V] = {
+  /**
+    * Get all records that match the given time range and optional prefix sequence
+    * @param range  time range to filter the records by
+    * @param prefix1 mandatory root prefix
+    * @param prefixN optional secondary prefix sequence
+    * @return Map[K,V] as a transformation of Record.key -> Record.value
+    */
+  def range(range: TimeRange, prefix1: Any, prefixN: Any*): Map[K, V] = {
     val builder = Map.newBuilder[K, V]
-    val javaPrefix = prefix.map(_.asInstanceOf[AnyRef])
-    val bytePrefix: Array[Byte] = keySerde.prefix(keyClass, javaPrefix: _*)
-    kvstore.iterator(ByteBuffer.wrap(bytePrefix)).foreach { entry =>
-      option(kvstore.unwrap(entry.getKey, entry.getValue, ttlMs)).foreach { record =>
-        builder += keySerde.fromBytes(record.key) -> valueSerde.fromBytes(record.value)
-      }
+    val it = iterator(range, (prefix1 +: prefixN): _*)
+    try {
+      it.foreach(record => builder += record.key -> record.value)
+      builder.result()
+    } finally {
+      it.close()
     }
-    builder.result()
   }
 
   /**
@@ -206,7 +229,8 @@ class State[K, V](val identifier: String,
     *         Failure(ex) if the operation failed due to exception
     */
   def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => {
-    push(key, w); w
+    push(key, w);
+    w
   })
 
   /**
@@ -218,7 +242,8 @@ class State[K, V](val identifier: String,
     *         Failure(ex) if the operation failed due to exception
     */
   def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => {
-    push(key, w); w
+    push(key, w);
+    w
   })
 
   /**

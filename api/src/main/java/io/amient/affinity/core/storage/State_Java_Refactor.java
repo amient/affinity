@@ -20,10 +20,7 @@
 package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.serde.AbstractSerde;
-import io.amient.affinity.core.util.CloseableIterator;
-import io.amient.affinity.core.util.CompletedJavaFuture;
-import io.amient.affinity.core.util.EventTime;
-import io.amient.affinity.core.util.MappedJavaFuture;
+import io.amient.affinity.core.util.*;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -98,11 +95,23 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
     }
 
     /**
+     * get an iterator for all records that are strictly not expired
      * @return a weak iterator that doesn't block read and write operations
      */
     public CloseableIterator<Record<K, V>> iterator() {
+        return iterator(TimeRange.UNBOUNDED);
+    }
+
+    /**
+     * get iterator for all records that are within a given time range and an optional prefix sequence
+     * @param range  time range to filter the records by
+     * @param prefix vararg sequence for the compound key to match; can be empty
+     * @return a weak iterator that doesn't block read and write operations
+     */
+    public CloseableIterator<Record<K, V>> iterator(TimeRange range, Object... prefix) {
+        ByteBuffer bytePrefix = prefix.length == 0 ? null : ByteBuffer.wrap(keySerde.prefix(keyClass, prefix));
         return new CloseableIterator<Record<K, V>>() {
-            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> underlying = kvstore.iterator(null);
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> underlying = kvstore.iterator(bytePrefix);
             private Record<K, V> current = null;
 
             public boolean hasNext() {
@@ -112,9 +121,11 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
                     Optional<Record<byte[], byte[]>> value = kvstore.unwrap(entry.getKey(), entry.getValue(), ttlMs);
                     if (value.isPresent()) {
                         Record<byte[], byte[]> record = value.get();
-                        K key = keySerde.fromBytes(record.key);
-                        current = new Record<>(key, valueSerde.fromBytes(record.value), record.timestamp);
-                        return true;
+                        if (range.contains(record.timestamp)) {
+                            K key = keySerde.fromBytes(record.key);
+                            current = new Record<>(key, valueSerde.fromBytes(record.value), record.timestamp);
+                            return true;
+                        }
                     }
                 }
                 return false;
@@ -153,18 +164,19 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         );
     }
 
-    public Map<K,V> range(Object... prefix) throws IOException {
+    /**
+     * Get all records that match prefix as Map
+     * @param range  time range to filter the records by
+     * @param prefix1 mandatory root prefix
+     * @param prefixN optional secondary prefix sequence
+     * @return Map<K,V> of all records matching the prefix
+     */
+    public Map<K,V> range(TimeRange range, Object prefix1, Object... prefixN) throws IOException {
         LinkedHashMap<K, V> result = new LinkedHashMap<>();
-        byte[] bytePrefix = keySerde.prefix(keyClass, prefix);
-        try(CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = kvstore.iterator(ByteBuffer.wrap(bytePrefix))) {
+        try(CloseableIterator<Record<K,V>> it = iterator(range,  prefix1, prefixN)) {
             while(it.hasNext()) {
-                Map.Entry<ByteBuffer, ByteBuffer> entry = it.next();
-                Optional<Record<byte[], byte[]>> recordOpt = kvstore.unwrap(entry.getKey(), entry.getValue(), ttlMs);
-                if (recordOpt.isPresent()) {
-                    Record<byte[], byte[]> record = recordOpt.get();
-                    result.put(keySerde.fromBytes(record.key), valueSerde.fromBytes(record.value));
-                }
-
+                Record<K, V> record = it.next();
+                result.put(record.key, record.value);
             }
         }
         return result;
