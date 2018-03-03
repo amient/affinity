@@ -181,9 +181,7 @@ class State[K, V](val identifier: String,
     val builder = Map.newBuilder[K, V]
     val bytePrefix: Array[Byte] = keySerde.prefix(keyClass, prefix: _*)
     kvstore.iterator(ByteBuffer.wrap(bytePrefix)).foreach { entry =>
-      val recordOpt = kvstore.unwrap(entry.getKey, entry.getValue, ttlMs)
-      if (recordOpt.isPresent) {
-        val record = recordOpt.get()
+      option(kvstore.unwrap(entry.getKey, entry.getValue, ttlMs)).foreach { record =>
         builder += keySerde.fromBytes(record.key) -> valueSerde.fromBytes(record.value)
       }
     }

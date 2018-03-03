@@ -153,15 +153,20 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         );
     }
 
-    Map<K,V> range(String... prefix) {
+    public Map<K,V> range(String... prefix) throws IOException {
         LinkedHashMap<K, V> result = new LinkedHashMap<>();
         byte[] bytePrefix = keySerde.prefix(keyClass, prefix);
-//        try(CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = iterator(keyPrefix)) {
-//            while(it.hasNext()) {
-//                Map.Entry<ByteBuffer, ByteBuffer> entry = it.next();
-//                result.put(entry.getKey(), entry.getValue());
-//            }
-//        }
+        try(CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = kvstore.iterator(ByteBuffer.wrap(bytePrefix))) {
+            while(it.hasNext()) {
+                Map.Entry<ByteBuffer, ByteBuffer> entry = it.next();
+                Optional<Record<byte[], byte[]>> recordOpt = kvstore.unwrap(entry.getKey(), entry.getValue(), ttlMs);
+                if (recordOpt.isPresent()) {
+                    Record<byte[], byte[]> record = recordOpt.get();
+                    result.put(keySerde.fromBytes(record.key), valueSerde.fromBytes(record.value));
+                }
+
+            }
+        }
         return result;
     }
 
