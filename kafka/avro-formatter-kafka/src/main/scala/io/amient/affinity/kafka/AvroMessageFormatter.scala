@@ -35,30 +35,27 @@ import org.codehaus.jackson.map.ObjectMapper
 
 
 /**
-  * Usage in kafka console consumer utility:
+  * See README of this module for Usage in kafka console consumer utility:
   *
-  * kafka-console-consumer.sh \
-  *   --formatter io.amient.affinity.kafka.AvroMessageFormatter \
-  *  [--property schema.registry.zookeeper.connect=localhost:2181 \]
-  *  [--property schema.registry.url=http://localhost:8081 \]
-  *  [--property pretty \]
-  *  [--property print.key \]
-  *  [--property print.timestamp \]
-  *   --zookeeper ...\
-  *   --topic ... \
   */
 class AvroMessageFormatter extends MessageFormatter {
 
   private var serde: AvroSerde = null
 
   private var pretty = false
-  private var printKeys = false
+  private var printKey = false
+  private var printValue = true
+  private var printOffset = false
+  private var printPartition = false
   private var printTimestamps = false
 
   override def init(props: Properties): Unit = {
     if (props.containsKey("pretty")) pretty = true
-    if (props.containsKey("print.key")) printKeys = true
+    if (props.containsKey("print.key")) printKey = true
+    if (props.containsKey("print.offset")) printOffset = true
     if (props.containsKey("print.timestamp")) printTimestamps = true
+    if (props.containsKey("print.partition")) printPartition = true
+    if (props.containsKey("no.value")) printValue = false
     if (props.containsKey("schema.registry.url")) {
       serde = new ConfluentSchemaRegistry(ConfigFactory.empty
         .withValue(CfAvroConf.ConfluentSchemaRegistryUrl.path,
@@ -89,24 +86,36 @@ class AvroMessageFormatter extends MessageFormatter {
 
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
 
+    if (printPartition) {
+      output.print(consumerRecord.partition())
+      output.print(": ")
+    }
+    if (printOffset) {
+      output.print(consumerRecord.offset())
+      output.print("\t")
+    }
     if (printTimestamps) {
       output.print(EventTime.local(consumerRecord.timestamp()).toString)
       output.print("\t")
     }
-    if (printKeys) {
+    if (printKey) {
       val key: Any = serde.fromBytes(consumerRecord.key)
       val simpleJson: String = AvroJsonConverter.toJson(key)
       output.print(simpleJson)
       output.print("\t")
     }
 
-    val value: Any = serde.fromBytes(consumerRecord.value)
-    val simpleJson: String = AvroJsonConverter.toJson(value)
-    if (pretty) {
-      val json: JsonNode = mapper.readTree(simpleJson)
-      output.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json))
-    } else {
-      output.println(simpleJson)
+    if (printValue) {
+      val value: Any = serde.fromBytes(consumerRecord.value)
+      val simpleJson: String = AvroJsonConverter.toJson(value)
+      if (pretty) {
+        val json: JsonNode = mapper.readTree(simpleJson)
+        output.print(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json))
+      } else {
+        output.print(simpleJson)
+      }
     }
+
+    output.println()
   }
 }
