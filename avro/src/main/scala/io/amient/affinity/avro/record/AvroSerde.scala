@@ -75,13 +75,14 @@ object AvroSerde {
     * Calculate a total length of serialized binary prefix of an avro record
     * by adding up the fixed avro serde header and the sequence of initial
     * fixed fields.
+    *
     * @param recordClass
     * @return Some(maximum number of bytes in the binary prefix) or None if the schema has no leading fixed fields
     */
   def binaryPrefixLength(recordClass: Class[_ <: AvroRecord]): Option[Int] = {
     val schema = AvroRecord.inferSchema(recordClass)
     val fixedLen = schema.getFields.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
-    if(fixedLen > 0) Some(5 + fixedLen) else None
+    if (fixedLen > 0) Some(5 + fixedLen) else None
   }
 
 
@@ -185,7 +186,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     * Generate a binary prefix by projecting the sequence key parts onto the
     * fixed fields of the given avro class's schema using avro binary encoding
     *
-    * @param cls class whose avro schema will be used
+    * @param cls    class whose avro schema will be used
     * @param prefix values for the initial sequence of fixed fields as defined by the schema
     * @return bytes of the binary prefix including the avro serde 5-byte header
     */

@@ -50,11 +50,6 @@ object State {
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
-    if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
-      AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord])) foreach {
-        prefixLength => stateConf.MemStore.KeyPrefixSize.setValue(prefixLength)
-      }
-    }
     val kvstoreClass = stateConf.MemStore.Class()
     val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])
     if (!stateConf.MemStore.DataDir.isDefined) {
@@ -63,6 +58,11 @@ object State {
         stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
       } else {
         throw new IllegalArgumentException(stateConf.MemStore.DataDir.path + " could not be derived for state: " + identifier)
+      }
+    }
+    if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
+      AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord])).foreach {
+        prefixLen: Int => stateConf.MemStore.KeyPrefixSize.setValue(prefixLen); ()
       }
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
