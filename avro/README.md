@@ -38,21 +38,24 @@ be moved in future to a separate module avro-zookeeper-registry.
 
 Below is the table of all supported types, all which support default values.
 
-    Scala Type              Avro Type            Note
-    ----------------------------------------------------------------------------------------
-    Null                    null
-    Boolean                 boolean
-    Int                     int
-    Long                    long
-    Float                   float
-    Double                  double
-    String                  string or fixed     @Fixed(len) alias can be used on a string field 
-    Array[Byte]             bytes               
-    Map[String, T]          map(T)              Maps have to have String keys
-    Iterable[T]             array(T)            List[T], Seq[T], Set[T], etc.
-    Enumeration             enum                only scala enums are suppored
-    Option[T]               union(null,T)
-    case class              indexed-record      nested schemas are allowed
+    Scala Type                      Avro Type            Note
+    ----------------------------------------------------------------------------------------------------
+    Null                            null
+    Boolean                         boolean
+    Int                             int
+    @Fixed Int                      fixed(4)
+    Long                            long
+    @Fixed Long                     fixed(8)
+    Float                           float
+    Double                          double
+    String                          string 
+    @Fixed(size) String             fixed(size) 
+    Array[Byte]                     bytes               
+    Map[String, T]                  map(T)              Maps have to have String keys
+    Iterable[T]                     array(T)            List[T], Seq[T], Set[T], etc.
+    Enumeration                     enum                only scala enums are suppored
+    Option[T]                       union(null,T)
+    case class                      record              nested schemas are allowed
 
 ### Note on Top-level primitive types
 
@@ -193,8 +196,11 @@ ship with confluent schema registry - the wire format is the same, except with a
 you can work with type-safe case classes instead of generic avro records.**
 
 
+## AvroJsonConverter
 
-
+    AvroJsonConverter.toJson(avro: Any): String
+    AvroJsonConverter.toJson(writer: Writer, avro: Any): Unit
+    AvroJsonConverter.toAvro(json: String, schema: Schema): Any
 
 ## Best Practices
 
