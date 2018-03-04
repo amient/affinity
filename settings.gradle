@@ -14,4 +14,5 @@ include ':api',
         ':examples:example-distributed-graph',
         ':examples:example-https-config',
         ':examples:example-stateful-stream-process',
-        ':examples:example-external-state'
+        ':examples:example-external-state',
+        ':examples:example-range-lookups'

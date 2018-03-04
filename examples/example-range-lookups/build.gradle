@@ -1,0 +1,18 @@
+group = rootProject.group
+version = rootProject.version
+
+apply plugin: 'java'
+apply plugin: 'scala'
+
+dependencies {
+    compile project(':core')
+    compile project(':spark')
+    compile project(':rocksdb')
+    compile project(':kafka:storage-kafka')
+    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+    testCompile group: 'com.typesafe.akka', name: 'akka-slf4j_' + baseScalaVersion, version: akkaVersion
+    testCompile project(':kafka:test-util-kafka')
+}
+
+
+
