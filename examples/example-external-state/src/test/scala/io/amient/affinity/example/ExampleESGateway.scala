@@ -42,9 +42,9 @@ class ExampleESGateway extends GatewayHttp {
   implicit val scheduler = context.system.scheduler
   override def handle: Receive = {
 
-    case HTTP(GET, PATH("news", "latest"), QUERY(("w", watermark)), response) =>
+    case HTTP(GET, PATH("news", "latest"), _, response) =>
       implicit val timeout = Timeout(5 seconds)
-      val latestNews: Future[List[String]] = keyspace gather GetLatest(watermark.split(",").map(_.toLong))
+      val latestNews: Future[List[String]] = keyspace gather GetLatest()
       val responseText = latestNews.map(news=> "LATEST NEWS:\n" + news.mkString("\n"))
       handleAsText(response, responseText)
   }
@@ -52,7 +52,7 @@ class ExampleESGateway extends GatewayHttp {
 }
 
 
-case class GetLatest(watermark: Array[Long]) extends Scatter[List[String]] {
+case class GetLatest() extends Scatter[List[String]] {
   override def gather(r1: List[String], r2: List[String]) = r1 ++ r2
 }
 
@@ -60,28 +60,16 @@ case class GetLatest(watermark: Array[Long]) extends Scatter[List[String]] {
 class ExampleESPartition extends Partition {
 
 
-  val marker = new LongAdder()
   val latest = new ConcurrentLinkedQueue[(String, String)]()
 
   state[String, String]("news").listen {
     case (k: String, Some(v: String)) =>
       latest.add((k, v))
       while (latest.size() > 3) latest.poll()
-      //not a usual situation - actor logic synchronized over 2 threads
-      // - but it's only so that the test is deterministic
-      marker.synchronized {
-        marker.increment
-        marker.notify
-      }
   }
 
   override def handle: Receive = {
-    case request@GetLatest(watermark) => sender.reply(request) {
-      while(marker.sum <= watermark(partition)) {
-        marker.synchronized {
-          marker.wait(100)
-        }
-      }
+    case request@GetLatest() => sender.reply(request) {
       latest.iterator.asScala.map(_.productIterator.mkString(("\t"))).toList
     }
   }

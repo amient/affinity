@@ -44,8 +44,19 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
   val node = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
   override def beforeAll: Unit = {
+    val externalProducer = createKafkaAvroProducer[String, String]()
+    try {
+      externalProducer.send(new ProducerRecord(topic, "10:30", "the universe is expanding"))
+      externalProducer.send(new ProducerRecord(topic, "11:00", "the universe is still expanding"))
+      externalProducer.send(new ProducerRecord(topic, "11:30", "the universe briefly contracted but is expanding again"))
+      externalProducer.flush()
+    } finally {
+      externalProducer.close()
+    }
+    //the external fixture is produced and the externalProducer is flushed() before the node is started
     node.start()
     node.awaitClusterReady()
+    //at this point all stores have loaded everything available in the external topic so the test will be deterministic
   }
 
   override def afterAll: Unit = {
@@ -57,22 +68,9 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
   val timeLimit = Span(5000, Millis) //it should be much faster but sometimes many tests are run at the same time
 
   it should "start automatically tailing state partitions on startup even when master" in {
-
-    val externalProducer = createKafkaAvroProducer[String, String]()
-    val highestOffsets = try {
-      val produced = List(
-        externalProducer.send(new ProducerRecord(topic, "10:30", "the universe is expanding")),
-        externalProducer.send(new ProducerRecord(topic, "11:00", "the universe is still expanding")),
-        externalProducer.send(new ProducerRecord(topic, "11:30", "the universe briefly contracted but is expanding again")))
-      externalProducer.flush()
-      produced.map(_.get).map(m => (m.partition, m.offset)).groupBy(_._1).mapValues(_.map(_._2).max)
-    } finally {
-      externalProducer.close()
-    }
-    val watermark = (0 to numPartitions).map(p => highestOffsets.get(p).getOrElse(-1))
     //we don't need an arbitrary sleep to ensure the tailing state catches up with the writes above
     //before we fetch the latest news because the watermark is built into the request to make the test fast and deterministic
-    val response = node.get_text(node.http_get(s"/news/latest?w=${watermark.mkString(",")}"))
+    val response = node.get_text(node.http_get(s"/news/latest"))
     response should include("10:30\tthe universe is expanding")
     response should include("11:00\tthe universe is still expanding")
     response should include("11:30\tthe universe briefly contracted but is expanding again")
