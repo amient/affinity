@@ -441,7 +441,9 @@ class State[K, V](val identifier: String,
           kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
           Future.successful(Some(value))
         case Some(log) =>
-          log.append(kvstore, key, valueBytes, recordTimestamp) map (_ => Some(value))
+          log.append(kvstore, key, valueBytes, recordTimestamp) map {
+            pos =>Some(value)
+          }
       }
     }
   }

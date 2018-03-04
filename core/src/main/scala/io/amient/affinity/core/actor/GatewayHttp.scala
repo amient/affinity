@@ -228,8 +228,8 @@ trait GatewayHttp extends Gateway {
     promise.completeWith(f recover handleException)
   }
 
-  def delegateAndHandleErrors(promise: Promise[HttpResponse], delegate: Future[Any])
-                             (f: Any => HttpResponse)(implicit ctx: ExecutionContext) {
+  def delegateAndHandleErrors[T](promise: Promise[HttpResponse], delegate: Future[T])
+                             (f: T => HttpResponse)(implicit ctx: ExecutionContext) {
     promise.completeWith(delegate map f recover handleException)
   }
 
