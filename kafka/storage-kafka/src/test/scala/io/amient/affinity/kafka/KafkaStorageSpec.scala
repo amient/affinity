@@ -138,15 +138,12 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
       state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
-        (s) => s, (e: Throwable) => {
-        numWrites.decrementAndGet()
-        e
-      })
+        (s) => s, (e: Throwable) => { numWrites.decrementAndGet(); e })
     })
     Await.ready(updates, specTimeout)
     numWrites.get should be >= 0
     log.info(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
-    state.numKeys should equal(numWrites.get)
+    synchronized(state).iterator.size() should equal(numWrites.get)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
