@@ -47,8 +47,6 @@ class MasterTransitionSpec2 extends FlatSpec with AffinityTestBase with Embedded
 
   val specTimeout = 15 seconds
 
-  implicit val timeout = Timeout(specTimeout)
-
   override def numPartitions = 2
 
   def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
@@ -65,11 +63,13 @@ class MasterTransitionSpec2 extends FlatSpec with AffinityTestBase with Embedded
 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) =>
+        implicit val timeout = Timeout(specTimeout / 5)
         delegateAndHandleErrors(response, keyspace1 ack GetValue(key)) {
           case value => Encoder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
+        implicit val timeout = Timeout(specTimeout / 5)
         delegateAndHandleErrors(response, keyspace1 ack PutValue(key, value)) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
