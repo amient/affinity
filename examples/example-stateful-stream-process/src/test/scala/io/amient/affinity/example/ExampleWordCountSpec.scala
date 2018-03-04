@@ -91,8 +91,8 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
     consumer.subscribe(List(outputTopic).asJava)
     val outputQueue = new LinkedBlockingQueue[ConsumerRecord[String, Long]]()
     def poll(): (String, Long) = {
-      if (outputQueue.isEmpty) outputQueue.addAll(consumer.poll(5000).records(outputTopic).asScala.toList.asJava)
-      val record = outputQueue.poll(5000, TimeUnit.MILLISECONDS)
+      if (outputQueue.isEmpty) outputQueue.addAll(consumer.poll(10000).records(outputTopic).asScala.toList.asJava)
+      val record = outputQueue.poll(10000, TimeUnit.MILLISECONDS)
       (record.key, record.value)
     }
     try {

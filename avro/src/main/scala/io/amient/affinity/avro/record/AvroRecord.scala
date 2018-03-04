@@ -41,7 +41,7 @@ import scala.reflect.runtime.{universe, _}
 
 final class Alias(aliases: String*) extends StaticAnnotation
 
-final class Fixed(len: Int) extends StaticAnnotation
+final class Fixed(len: Int = -1) extends StaticAnnotation
 
 object AvroRecord extends AvroExtractors {
 
@@ -116,6 +116,11 @@ object AvroRecord extends AvroExtractors {
         case None => null
         case Some(x) => deriveValue(schemaField.getTypes.get(1), x)
       }
+      //TODO case FIXED if schemaField.getProp("runtime") == "uuid" =>
+      case FIXED if schemaField.getProp("runtime") == "int" || value.isInstanceOf[Int] =>
+        new GenericData.Fixed(schemaField, ByteUtils.intValue(value.asInstanceOf[Int]))
+      case FIXED if schemaField.getProp("runtime") == "long" || value.isInstanceOf[Long] =>
+        new GenericData.Fixed(schemaField, ByteUtils.longValue(value.asInstanceOf[Long]))
       case FIXED =>
         val result: Array[Byte] = AvroRecord.stringToFixed(value.toString, schemaField.getFixedSize)
         new GenericData.Fixed(schemaField, result)
@@ -296,8 +301,14 @@ object AvroRecord extends AvroExtractors {
           datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
             item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
         }
-      case FIXED =>
-        AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
+      //TODO case FIXED if schema.getProp("runtime") == "uuid"
+      case FIXED if schema.getProp("runtime") == "int" || tpe =:= typeOf[Int] =>
+        ByteUtils.asIntValue(datum.asInstanceOf[GenericFixed].bytes())
+
+      case FIXED if schema.getProp("runtime") == "long" || tpe =:= typeOf[Long] =>
+        ByteUtils.asLongValue(datum.asInstanceOf[GenericFixed].bytes())
+
+      case FIXED => AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
     }
   }
 
@@ -386,12 +397,20 @@ object AvroRecord extends AvroExtractors {
           val params = constructor.asMethod.paramLists(0)
           val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
             case (assembler, (symbol: Symbol, i)) =>
-              val fieldSchemaType = symbol.name.toString
+              val fieldName = symbol.name.toString
               val fieldSchema = symbol.annotations.find(_.tree.tpe =:= typeOf[Fixed]).map { a =>
-                val size = a.tree.children.tail.map(_.productElement(0)).head.asInstanceOf[Constant].value.asInstanceOf[Int]
-                SchemaBuilder.builder().fixed(fieldSchemaType).size(size)
+                val fixedSize = a.tree.children.tail.collect { case Literal(Constant(size: Int)) => size }.headOption
+                val fieldType = symbol.typeSignature
+                fixedSize match {
+                  case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
+                  case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
+                  case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).size(size)
+                  case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameter for @Fixed(<int>) $fieldName: $fieldType)")
+                  case Some(size) => throw new IllegalArgumentException(s"Only fixed string fields can have custom fixed size: @Fixed $fieldName: $fieldType")
+                  case None => throw new IllegalArgumentException(s"Only int, long and string can be used as fixed fields")
+                }
               }.getOrElse(inferSchema(symbol.typeSignature))
-              val builder = assembler.name(fieldSchemaType)
+              val builder = assembler.name(fieldName)
               symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
                 a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
               }

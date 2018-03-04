@@ -42,5 +42,7 @@ final class AvroSerdeProxy(tools: Serdes) extends Serde[Any] {
 
   override def identifier: Int = 200
 
+  override def prefix(cls: Class[_ <: Any], prefix: AnyRef*): Array[Byte] = internal.prefix(cls, prefix:_*)
+
 }
 

@@ -41,7 +41,8 @@ public class MemStoreSimpleMap extends MemStore {
     }
 
     @Override
-    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
+    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer prefix) {
+        if (prefix != null) throw new UnsupportedOperationException("MemStoreSimpleMap doesn't support prefixes, use MemStoreSortedMap instead");
         return CloseableIterator.apply(internal.entrySet().iterator());
     }
 

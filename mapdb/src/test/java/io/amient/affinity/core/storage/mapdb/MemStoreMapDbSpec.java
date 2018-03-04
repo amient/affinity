@@ -59,7 +59,7 @@ public class MemStoreMapDbSpec {
             assertTrue(!instance.apply(key2).isPresent());
             instance.put(key1, ByteBuffer.wrap("value1000".getBytes()));
             instance.put(key2, ByteBuffer.wrap("value2000".getBytes()));
-            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator();
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> it = instance.iterator(null);
             assertEquals("value1000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertEquals("value2000", new String(ByteUtils.bufToArray(it.next().getValue())));
             assertFalse(it.hasNext());

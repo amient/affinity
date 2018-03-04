@@ -275,6 +275,16 @@ public class ByteUtils {
     }
 
     /**
+     * Generate 32-bit BIG ENDIAN number into a byte array
+     * @param value int number to convert
+     * @return a new 4-byte array with encoded integer
+     */
+    public static byte[] intValue(int value) {
+        byte[] result = new byte[4];
+        return putIntValue(value, result, 0);
+    }
+
+    /**
      * Write 32-bit BIG ENDIAN number into a byte array
      * @param value int number to convert
      * @param result destination array where to write the big endian
@@ -303,13 +313,40 @@ public class ByteUtils {
     }
 
     /**
+     * Write 64-bit BIG ENDIAN number into an output stream
+     * @param value long number to write
+     * @param out destination output stream where to write the big endian
+     * @throws IOException if the output stream cannot be written to
+     */
+    public static void writeLongValue(long value, OutputStream out) throws IOException {
+        out.write((byte)((value >>> 56) & 0xFF));
+        out.write((byte)((value >>> 48) & 0xFF));
+        out.write((byte)((value >>> 40) & 0xFF));
+        out.write((byte)((value >>> 32) & 0xFF));
+        out.write((byte)((value >>> 24) & 0xFF));
+        out.write((byte)((value >>> 16) & 0xFF));
+        out.write((byte)((value >>> 8) & 0xFF));
+        out.write((byte)((value >>> 0) & 0xFF));
+    }
+
+    /**
+     * Generate 64-bit BIG ENDIAN number into a byte array
+     * @param value long number to convert
+     * @return a new 8-byte array with encoded integer
+     */
+    public static byte[] longValue(long value) {
+        byte[] result = new byte[8];
+        return putLongValue(value, result, 0);
+    }
+
+
+    /**
      * Write 64-bit BIG ENDIAN number into a byte array
      * @param value long number to convert
      * @param result destination array where to write the big endian
      * @param offset position in the destination array to start from
      * @return the modified array passed in the result parameter
      */
-
     public static byte[] putLongValue(long value, byte[] result, int offset) {
         result[offset + 0] = (byte) ((value >>> 56) & 0xFF);
         result[offset + 1] = (byte) ((value >>> 48) & 0xFF);
@@ -437,6 +474,40 @@ public class ByteUtils {
             }
         }
         return false;
+    }
+
+    /**
+     * Check if one byte array range starts with another
+     * @param cArray the content array which is searched through
+     * @param vArray the value array that is searched for
+     * @return true if the cArray starts with the vArray
+     */
+    final public static boolean startsWith(byte[] cArray, byte[] vArray) {
+        if (cArray.length < vArray.length) return false;
+        int cLimit = vArray.length - 1;
+        for (int c = 0; c <= cLimit; c++) {
+            if (vArray[c] != cArray[c]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Check if one byte buffer starts with another
+     * @param cBuf the content buffer which is searched through
+     * @param vBuf the value buffer that is searched for
+     * @return true if the cBuf starts with the vBug
+     */
+    final public static boolean startsWith(ByteBuffer cBuf, ByteBuffer vBuf) {
+        if (cBuf.limit() < vBuf.limit()) return false;
+        int cLimit = vBuf.limit() - 1;
+        for (int c = 0; c <= cLimit; c++) {
+            if (vBuf.get(vBuf.position()+c) != cBuf.get(cBuf.position()+c)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

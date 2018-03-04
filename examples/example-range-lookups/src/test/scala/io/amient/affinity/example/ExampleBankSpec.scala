@@ -1,0 +1,128 @@
+/*
+ * Copyright 2016-2018 Michal Harish, michal.harish@gmail.com
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.amient.affinity.example
+
+import java.util.concurrent.TimeUnit
+import java.util.{Properties, UUID}
+
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.avro.MemorySchemaRegistry
+import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.util.AffinityTestBase
+import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroSerializer}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+
+import scala.collection.JavaConverters._
+import scala.util.Random
+
+class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with BeforeAndAfterAll with Matchers {
+  override def numPartitions = 3
+
+  val MemorySchemaRegistryId = "3453466"
+
+  val testNodeDataDir = createTempDirectory
+  val config = ConfigFactory.parseMap(Map(
+    "kafka.bootstrap.servers" -> kafkaBootstrap,
+    "affinity.node.data.dir" -> testNodeDataDir.toString,
+    "affinity.avro.schema.registry.class" -> classOf[MemorySchemaRegistry].getName,
+    "affinity.avro.schema.registry.id" -> MemorySchemaRegistryId
+  ).asJava).withFallback(ConfigFactory.parseResources("example-bank.conf")).resolve()
+
+  val node = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+
+  val inputTopic = config.getString("affinity.node.gateway.stream.input-stream.kafka.topic")
+
+  val producerProps = new Properties() {
+    import ProducerConfig._
+    put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap)
+    put(ACKS_CONFIG, "1")
+    put(KEY_SERIALIZER_CLASS_CONFIG, classOf[KafkaAvroSerializer].getName)
+    put(VALUE_SERIALIZER_CLASS_CONFIG, classOf[KafkaAvroSerializer].getName)
+    put(CLIENT_ID_CONFIG, UUID.randomUUID.toString)
+    put("schema.registry.class", classOf[MemorySchemaRegistry].getName)
+    put("schema.registry.id", MemorySchemaRegistryId)
+  }
+
+  override def beforeAll(): Unit = {
+    //produce test data for all tests
+    val producer = new KafkaProducer[Account, Transaction](producerProps)
+    try {
+      val randomPartition = new Random()
+
+      def produceTestTransaction(account: Account, t: Transaction): Long = {
+        producer.send(new ProducerRecord(inputTopic, randomPartition.nextInt(numPartitions), t.timestamp, account, t)).get.offset
+      }
+      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1001, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
+      produceTestTransaction(Account("33-55-10", 49772300), Transaction(1002, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
+      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1003, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
+      produceTestTransaction(Account("11-10-30", 88885454), Transaction(1004, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
+      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1005, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
+      produceTestTransaction(Account("11-10-30", 88885454), Transaction(1006, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
+      producer.flush()
+    } finally {
+      producer.close()
+    }
+    //then start node so that the
+    node.start()
+    node.awaitClusterReady()
+    //TODO expose something in the AffinityTestBase to have precise blocking point that the input data was processed
+    //e.g. awaitInputProcessed("input-stream", watermark) where watermark is the set of highest partition-offsets of produced in the fixture
+    Thread.sleep(5000)
+  }
+
+  override def afterAll(): Unit = {
+    try {
+      node.shutdown()
+    } finally {
+      deleteDirectory(testNodeDataDir)
+    }
+  }
+
+
+  "ExampleWallet" should "should able to retrieve all transactions for the first account" in {
+    node.get_json(node.http_get("/transactions/11-10-30/10233321")).getElements.asScala.size should be(3)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the second account" in {
+    node.get_json(node.http_get("/transactions/11-10-30/88885454")).getElements.asScala.size should be(2)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the thrid account" in {
+    node.get_json(node.http_get("/transactions/33-55-10/49772300")).getElements.asScala.size should be(1)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the first branch" in {
+    node.get_json(node.http_get("/transactions/11-10-30")).getElements.asScala.size should be(5)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the second branch" in {
+    node.get_json(node.http_get("/transactions/33-55-10")).getElements.asScala.size should be (1)
+  }
+
+  "ExampleWallet" should "should respond with empty transaction list for unknown branch" in {
+    node.get_json(node.http_get("/transactions/xx-xx-xx")).getElements.asScala shouldBe empty
+  }
+
+  //TODO api timerange tests
+
+  //TODO analytical timerage tests
+
+}

@@ -23,13 +23,15 @@ import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
-import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.util.EventTime
+import io.amient.affinity.avro.record.{AvroRecord, Fixed}
+import io.amient.affinity.core.util.{EventTime, TimeRange}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+
+case class ExampleCompoundKey(@Fixed key1:Long, @Fixed(1) key2: String, subkey: Int) extends AvroRecord
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
@@ -100,6 +102,46 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
     state(3L) should be(Some(ExpirableValue("three", nowMs)))
     state.iterator.size should be(2L)
     state.numKeys should be(2L)
+  }
+
+  it should "manage 1-N mappings when compound key prefix is used" in {
+    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
+      State.StateConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
+    )))
+    val state = State.create[ExampleCompoundKey, String]("prefix-key-store", 0, stateConf, 1, system)
+
+    state.insert(ExampleCompoundKey(1000L, "x", 1), "value11")
+    state.insert(ExampleCompoundKey(1000L, "y", 2), "value12")
+    state.insert(ExampleCompoundKey(1000L, "x", 3), "value13")
+    state.insert(ExampleCompoundKey(2000L, "x", 1), "value21")
+    state.insert(ExampleCompoundKey(2000L, "y", 2), "value22")
+    state.insert(ExampleCompoundKey(3000L, "z", 1), "value31")
+
+    state.range(TimeRange.UNBOUNDED, 1000L) should be(Map(
+      ExampleCompoundKey(1000L, "x", 1) -> "value11",
+      ExampleCompoundKey(1000L, "y", 2) -> "value12",
+      ExampleCompoundKey(1000L, "x", 3) -> "value13"
+    ))
+
+    state.range(TimeRange.UNBOUNDED, 1000L, "x") should be(Map(
+      ExampleCompoundKey(1000L, "x", 1) -> "value11",
+      ExampleCompoundKey(1000L, "x", 3) -> "value13"
+    ))
+
+    state.range(TimeRange.UNBOUNDED, 2000L) should be(Map(
+      ExampleCompoundKey(2000L, "x", 1) -> "value21",
+      ExampleCompoundKey(2000L, "y", 2) -> "value22"
+    ))
+
+    state.range(TimeRange.UNBOUNDED, 3000L) should be(Map(
+      ExampleCompoundKey(3000L, "z", 1) -> "value31"
+    ))
+
+    state.range(TimeRange.UNBOUNDED, 3000L, "!") should be(Map())
+
+    state.range(TimeRange.UNBOUNDED, 4000L) should be(Map.empty)
+
+    state.range(TimeRange.UNBOUNDED, 0L) should be (Map.empty)
   }
 
 

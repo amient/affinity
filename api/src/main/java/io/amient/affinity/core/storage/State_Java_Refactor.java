@@ -20,14 +20,12 @@
 package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.serde.AbstractSerde;
-import io.amient.affinity.core.util.CloseableIterator;
-import io.amient.affinity.core.util.CompletedJavaFuture;
-import io.amient.affinity.core.util.EventTime;
-import io.amient.affinity.core.util.MappedJavaFuture;
+import io.amient.affinity.core.util.*;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -42,6 +40,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
     private final MemStore kvstore;
     private final Optional<Log<?>> logOption;
     private final int partition;
+    private final Class<K> keyClass;
     private final AbstractSerde<K> keySerde;
     private final AbstractSerde<V> valueSerde;
     private final long ttlMs;
@@ -52,6 +51,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
                                MemStore kvstore,
                                Optional<Log<?>> logOption,
                                int partition,
+                               Class<K> keyClass,
                                AbstractSerde<K> keySerde,
                                AbstractSerde<V> valueSerde,
                                long ttlMs, //-1
@@ -62,6 +62,7 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         this.kvstore = kvstore;
         this.logOption = logOption;
         this.partition = partition;
+        this.keyClass = keyClass;
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
         this.ttlMs = ttlMs;
@@ -94,11 +95,23 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
     }
 
     /**
+     * get an iterator for all records that are strictly not expired
      * @return a weak iterator that doesn't block read and write operations
      */
     public CloseableIterator<Record<K, V>> iterator() {
+        return iterator(TimeRange.UNBOUNDED);
+    }
+
+    /**
+     * get iterator for all records that are within a given time range and an optional prefix sequence
+     * @param range  time range to filter the records by
+     * @param prefix vararg sequence for the compound key to match; can be empty
+     * @return a weak iterator that doesn't block read and write operations
+     */
+    public CloseableIterator<Record<K, V>> iterator(TimeRange range, Object... prefix) {
+        ByteBuffer bytePrefix = prefix.length == 0 ? null : ByteBuffer.wrap(keySerde.prefix(keyClass, prefix));
         return new CloseableIterator<Record<K, V>>() {
-            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> underlying = kvstore.iterator();
+            CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> underlying = kvstore.iterator(bytePrefix);
             private Record<K, V> current = null;
 
             public boolean hasNext() {
@@ -108,9 +121,11 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
                     Optional<Record<byte[], byte[]>> value = kvstore.unwrap(entry.getKey(), entry.getValue(), ttlMs);
                     if (value.isPresent()) {
                         Record<byte[], byte[]> record = value.get();
-                        K key = keySerde.fromBytes(record.key);
-                        current = new Record<>(key, valueSerde.fromBytes(record.value), record.timestamp);
-                        return true;
+                        if (range.contains(record.timestamp)) {
+                            K key = keySerde.fromBytes(record.key);
+                            current = new Record<>(key, valueSerde.fromBytes(record.value), record.timestamp);
+                            return true;
+                        }
                     }
                 }
                 return false;
@@ -147,6 +162,25 @@ public class State_Java_Refactor<K, V> extends ObservableState<K> implements Clo
         return kvstore.apply(key).flatMap((cell) ->
                 kvstore.unwrap(key, cell, ttlMs).map((byteRecord) -> valueSerde.fromBytes(byteRecord.value))
         );
+    }
+
+    /**
+     * Get all records that match prefix as Map
+     * @param range  time range to filter the records by
+     * @param prefix1 mandatory root prefix
+     * @param prefixN optional secondary prefix sequence
+     * @return Map of all records matching the prefix
+     * @throws IOException if the i/o fails
+     */
+    public Map<K,V> range(TimeRange range, Object prefix1, Object... prefixN) throws IOException {
+        LinkedHashMap<K, V> result = new LinkedHashMap<>();
+        try(CloseableIterator<Record<K,V>> it = iterator(range,  prefix1, prefixN)) {
+            while(it.hasNext()) {
+                Record<K, V> record = it.next();
+                result.put(record.key, record.value);
+            }
+        }
+        return result;
     }
 
     /**

@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage.rocksdb;
 
+import io.amient.affinity.core.config.CfgStruct;
 import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.storage.StateConf;
@@ -36,6 +37,15 @@ import java.util.*;
 public class MemStoreRocksDb extends MemStore {
 
     private final static org.slf4j.Logger log = LoggerFactory.getLogger(MemStoreRocksDb.class);
+
+    public static class MemStoreRocksDbConf extends CfgStruct<MemStoreRocksDbConf> {
+
+        public MemStoreRocksDbConf() {
+            super(MemStoreConf.class);
+        }
+        //TODO on 64-bit systems memory mapped files can be enabled
+    }
+
     private static Map<Path, Long> refs = new HashMap<>();
     private static Map<Path, RocksDB> instances = new HashMap<>();
 
@@ -82,12 +92,17 @@ public class MemStoreRocksDb extends MemStore {
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
         log.info("Opening RocksDb MemStore: " + pathToData);
         Files.createDirectories(pathToData);
+        MemStoreRocksDbConf rocksDbConf = new MemStoreRocksDbConf().apply(conf.MemStore);
         Options rocksOptions = new Options().setCreateIfMissing(true);
+        if (conf.MemStore.KeyPrefixSize.isDefined()) {
+            rocksOptions.useCappedPrefixExtractor(conf.MemStore.KeyPrefixSize.apply());
+        }
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
     }
 
     @Override
-    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator() {
+    public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer prefix) {
+        byte[] prefixBytes = prefix == null ? null : ByteUtils.bufToArray(prefix);
         return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
             private RocksIterator rocksIterator = null;
             private boolean checked = false;
@@ -97,11 +112,20 @@ public class MemStoreRocksDb extends MemStore {
                 checked = true;
                 if (rocksIterator == null) {
                     rocksIterator = internal.newIterator();
-                    rocksIterator.seekToFirst();
+                    if (prefixBytes == null) {
+                        rocksIterator.seekToFirst();
+                    } else {
+                        rocksIterator.seek(prefixBytes);
+                    }
+
                 } else {
                     rocksIterator.next();
                 }
-                return rocksIterator.isValid();
+                if (prefixBytes == null) {
+                    return rocksIterator.isValid();
+                } else {
+                    return rocksIterator.isValid() && ByteUtils.startsWith(rocksIterator.key(), prefixBytes);
+                }
             }
 
             @Override

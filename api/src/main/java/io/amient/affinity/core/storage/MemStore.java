@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.config.CfgCls;
+import io.amient.affinity.core.config.CfgInt;
 import io.amient.affinity.core.config.CfgPath;
 import io.amient.affinity.core.config.CfgStruct;
 import io.amient.affinity.core.util.ByteUtils;
@@ -44,7 +45,7 @@ public abstract class MemStore implements Closeable {
     public static class MemStoreConf extends CfgStruct<MemStoreConf> {
         public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
         public CfgPath DataDir = filepath("data.dir", false);
-
+        public CfgInt KeyPrefixSize = integer("key.prefix.size", false);
         //TODO public CfgInt MemReadTimeoutMs = integer("memstore.read.timeout.ms", 1000);
         @Override
         protected Set<String> specializations() {
@@ -71,7 +72,7 @@ public abstract class MemStore implements Closeable {
 
     protected abstract boolean isPersistent();
 
-    public abstract CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator();
+    public abstract CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer keyPrefix);
 
     /**
      * @param key ByteBuffer representation of the key

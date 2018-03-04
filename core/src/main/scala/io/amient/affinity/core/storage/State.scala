@@ -28,6 +28,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
+import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
@@ -48,6 +49,7 @@ object State {
   def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
+    val keyClass = implicitly[ClassTag[K]].runtimeClass
     val kvstoreClass = stateConf.MemStore.Class()
     val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])
     if (!stateConf.MemStore.DataDir.isDefined) {
@@ -56,6 +58,11 @@ object State {
         stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
       } else {
         throw new IllegalArgumentException(stateConf.MemStore.DataDir.path + " could not be derived for state: " + identifier)
+      }
+    }
+    if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
+      AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord])).foreach {
+        prefixLen: Int => stateConf.MemStore.KeyPrefixSize.setValue(prefixLen); ()
       }
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
@@ -89,7 +96,8 @@ object State {
       }
       storage.open(checkpointFile)
     }
-    new State(identifier, kvstore, logOption, partition, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    val keyClass: Class[K] = implicitly[ClassTag[K]].runtimeClass.asInstanceOf[Class[K]]
+    new State(identifier, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -108,6 +116,7 @@ class State[K, V](val identifier: String,
                   kvstore: MemStore,
                   logOption: Option[Log[_]],
                   partition: Int,
+                  keyClass: Class[K],
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
@@ -134,16 +143,33 @@ class State[K, V](val identifier: String,
   private[affinity] def tail(): Unit = logOption.foreach(_
     .tail(kvstore, optional[ObservableState[K]](this)))
 
+
   /**
+    * get an iterator for all records that are strictly not expired
     * @return a weak iterator that doesn't block read and write operations
     */
-  def iterator: CloseableIterator[Record[K, V]] = new CloseableIterator[Record[K, V]] {
-    val underlying = kvstore.iterator
+  def iterator:  CloseableIterator[Record[K, V]] = iterator(TimeRange.UNBOUNDED)
+
+  /**
+    * get iterator for all records that are within a given time range and an optional prefix sequence
+    * @param range  time range to filter the records by
+    * @param prefix vararg sequence for the compound key to match; can be empty
+    * @return a weak iterator that doesn't block read and write operations
+    */
+  def iterator(range: TimeRange, prefix: Any*): CloseableIterator[Record[K, V]] = new CloseableIterator[Record[K, V]] {
+    val javaPrefix = prefix.map(_.asInstanceOf[AnyRef])
+    val bytePrefix: ByteBuffer = if (javaPrefix.isEmpty) null else {
+      ByteBuffer.wrap(keySerde.prefix(keyClass, javaPrefix: _*))
+    }
+    val underlying = kvstore.iterator(bytePrefix)
     val mapped = underlying.flatMap { entry =>
-      val key = keySerde.fromBytes(entry.getKey.array())
-      option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs)).map {
-        byteRecord => new Record(key, valueSerde.fromBytes(byteRecord.value), byteRecord.timestamp)
-      }
+      option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs))
+        .filter(byteRecord => range.contains(byteRecord.timestamp))
+        .map { byteRecord =>
+          val key = keySerde.fromBytes(byteRecord.key)
+          val value = valueSerde.fromBytes(byteRecord.value)
+          new Record(key, value, byteRecord.timestamp)
+        }
     }
 
     override def next(): Record[K, V] = mapped.next()
@@ -171,6 +197,24 @@ class State[K, V](val identifier: String,
   }
 
   /**
+    * Get all records that match the given time range and optional prefix sequence
+    * @param range  time range to filter the records by
+    * @param prefix1 mandatory root prefix
+    * @param prefixN optional secondary prefix sequence
+    * @return Map[K,V] as a transformation of Record.key -> Record.value
+    */
+  def range(range: TimeRange, prefix1: Any, prefixN: Any*): Map[K, V] = {
+    val builder = Map.newBuilder[K, V]
+    val it = iterator(range, (prefix1 +: prefixN): _*)
+    try {
+      it.foreach(record => builder += record.key -> record.value)
+      builder.result()
+    } finally {
+      it.close()
+    }
+  }
+
+  /**
     * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
   def numKeys: Long = kvstore.numKeys()
@@ -186,7 +230,10 @@ class State[K, V](val identifier: String,
     *         Success(None) if the write was persisted but the operation resulted in the value was expired immediately
     *         Failure(ex) if the operation failed due to exception
     */
-  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => { push(key, w); w } )
+  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => {
+    push(key, w);
+    w
+  })
 
   /**
     * delete the given key
@@ -196,7 +243,10 @@ class State[K, V](val identifier: String,
     *         Success(None) if the key was deleted
     *         Failure(ex) if the operation failed due to exception
     */
-  def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => { push(key, w); w })
+  def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => {
+    push(key, w);
+    w
+  })
 
   /**
     * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
@@ -212,7 +262,7 @@ class State[K, V](val identifier: String,
     * it is different from delete in that it returns the removed value
     * which is more costly.
     *
-    * @param key     to remove
+    * @param key   to remove
     * @param event is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */
@@ -334,7 +384,7 @@ class State[K, V](val identifier: String,
     *             3. R which is the result value expected by the caller
     * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
     */
-  @deprecated
+  @deprecated("Use get,getAndUpdate or updateAndGet", "2 March 2018")
   def transform[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
     try {
       val k = keySerde.toBytes(key)

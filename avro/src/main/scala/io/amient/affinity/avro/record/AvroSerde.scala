@@ -24,8 +24,8 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.typesafe.config.Config
-import io.amient.affinity.avro.{AvroSchemaRegistry, MemorySchemaRegistry}
 import io.amient.affinity.avro.record.AvroSerde.MAGIC
+import io.amient.affinity.avro.{AvroSchemaRegistry, MemorySchemaRegistry}
 import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.ByteUtils
@@ -71,11 +71,18 @@ object AvroSerde {
     }
   }
 
-  def prefixLength(recordClass: Class[_ <: AvroRecord]): Int = {
+  /**
+    * Calculate a total length of serialized binary prefix of an avro record
+    * by adding up the fixed avro serde header and the sequence of initial
+    * fixed fields.
+    *
+    * @param recordClass
+    * @return Some(maximum number of bytes in the binary prefix) or None if the schema has no leading fixed fields
+    */
+  def binaryPrefixLength(recordClass: Class[_ <: AvroRecord]): Option[Int] = {
     val schema = AvroRecord.inferSchema(recordClass)
     val fixedLen = schema.getFields.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
-    require(fixedLen > 0, recordClass.getName + " doesn't have any leading fixed fields")
-    5 + fixedLen
+    if (fixedLen > 0) Some(5 + fixedLen) else None
   }
 
 
@@ -176,21 +183,24 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
   }
 
   /**
+    * Generate a binary prefix by projecting the sequence key parts onto the
+    * fixed fields of the given avro class's schema using avro binary encoding
     *
-    * @param recordClass
-    * @param keys
-    * @return
+    * @param cls    class whose avro schema will be used
+    * @param prefix values for the initial sequence of fixed fields as defined by the schema
+    * @return bytes of the binary prefix including the avro serde 5-byte header
     */
-  def prefix(recordClass: Class[_ <: AvroRecord], keys: String*): Array[Byte] = {
+  override def prefix(cls: Class[_ <: Any], prefix: AnyRef*): Array[Byte] = {
     val output = new ByteArrayOutputStream()
-    val schema = AvroRecord.inferSchema(recordClass)
-    val schemaId: Int = register(recordClass)
+    val schema = AvroRecord.inferSchema(cls)
+    val schemaId: Int = register(cls)
     output.write(0) //magic byte
     ByteUtils.writeIntValue(schemaId, output) //schema id
     //all used prefix keys
-    keys.zip(schema.getFields.take(keys.length).map(_.schema.getFixedSize)).foreach {
-      case (value: String, fixedLen: Int) =>
-        output.write(AvroRecord.stringToFixed(value, fixedLen))
+    prefix.zip(schema.getFields.take(prefix.length).map(_.schema.getFixedSize)).foreach {
+      case (value: String, fixedLen: Int) => output.write(AvroRecord.stringToFixed(value, fixedLen))
+      case (value: Integer, 4) => ByteUtils.writeIntValue(value, output)
+      case (value: java.lang.Long, 8) => ByteUtils.writeLongValue(value, output)
     }
     output.toByteArray
   }

@@ -111,6 +111,15 @@ trait AvroExtractors {
       }
     }
 
+    object AvroFixed extends AvroExtractors {
+      def unapply(s: Any): Option[ByteBuffer] = {
+        typeIsAllowed(Schema.Type.FIXED) map { _ =>
+          throw new UnsupportedOperationException
+          //TODO ByteBuffer.wrap(...)
+        }
+      }
+    }
+
 
     require(schemas.size > 0, s"No schemas provided for datum: ${datum.getClass}")
     datum match {
@@ -128,6 +137,7 @@ trait AvroExtractors {
       case AvroBytes(b) => b
       case AvroArray(i) => i
       case AvroUnion(u) => u
+      case AvroFixed(b) => b
       //          case w: java.util.AbstractCollection[_] if schemas.exists(_.getType == Schema.Type.ARRAY) =>
       //            gen.writeStartArray()
       //            w.toSeq.foreach(generate(_, schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)))
