@@ -72,11 +72,8 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   abstract override def afterAll(): Unit = {
     try {
       kafka.shutdown()
-    } catch {
-      case e: IllegalStateException => //
     } finally {
       def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
-
       if (testDir.exists()) getRecursively(testDir).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
     }
     super.afterAll()

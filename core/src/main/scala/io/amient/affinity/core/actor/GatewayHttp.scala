@@ -134,14 +134,17 @@ trait GatewayHttp extends Gateway {
     context.parent ! Controller.GatewayCreated(listener.getPort)
   }
 
-  override def onClusterStatus(suspended: Boolean): Unit = if (isSuspended != suspended) {
-    isSuspended = suspended
-    log.info("Handling " + (if (suspended) "Suspended" else "Resumed"))
-    if (!isSuspended) {
-      val reprocess = suspendedHttpRequestQueue.toList
-      suspendedHttpRequestQueue.clear
-      if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
-      reprocess.foreach(handle(_))
+  abstract override def onClusterStatus(suspended: Boolean): Unit = {
+    super.onClusterStatus(suspended)
+    if (isSuspended != suspended) {
+      isSuspended = suspended
+      log.info("Handling " + (if (suspended) "Suspended" else "Resumed"))
+      if (!isSuspended) {
+        val reprocess = suspendedHttpRequestQueue.toList
+        suspendedHttpRequestQueue.clear
+        if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
+        reprocess.foreach(handle(_))
+      }
     }
   }
 

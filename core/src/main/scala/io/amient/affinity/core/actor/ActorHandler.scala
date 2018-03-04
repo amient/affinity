@@ -31,4 +31,8 @@ trait ActorHandler extends Actor {
 
   def unhandled: Receive = PartialFunction.empty
 
+  def onClusterStatus(suspended: Boolean) = ()
+
+  def shutdown() = ()
+
 }
