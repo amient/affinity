@@ -173,12 +173,12 @@ horizontally by the means of partitioning - read-replicas would break the possib
  
 ### Failover
 
-When a partition master is taken down any or fails, one of the standby replicas is selected 
-as a new master. There is a gap between master failing and the standby replica takes over which
- should be only a few milliseconds but may be a few seconds as well. This means all the actor 
- references in the routing table of Keyspace actors will change but some of the messages to 
- the original actors may already be in flight and will thus fail / timeout.Depending on type of 
- delivery pattern used, the behaviour will be as follows:
+When a partition master is taken down or fails, one of the standby replicas is selected 
+as a new master. There is a gap between the master failing and the standby replica taking over which
+ should be very short if the standby was up to date but may be a few seconds in any case. 
+ This means all the actor references in the routing tables of Keyspace actors will change 
+ but some of the messages to the original actors may already be in flight and will thus 
+ not be delivered. Depending on type of messaging pattern used, the behaviour will be as follows:
 
     keyspace ! message
     
@@ -190,15 +190,16 @@ will not know about the loss.
     keyspace ? message 
     
 The above is an ask pattern. If the message is routed to the failed master before the standby
-replica takes over the delivery will wail and the sender will get a timeout after 1 second but
-redelivery will not be attempted.
+replica takes over, the delivery will fail and the sender will get a timeout after 1 second.
+Redelivery will not be attempted.
 
     implicit val timeout = Timeout(1 second)
     keyspace ack message
     
 The above is an ack pattern which also entails retries in case of timeout. 2 retries are attempted
- by default. With this pattern a the failover will be completely transparent if the standby replica
- takes over within 3 attempts, i.e. 3 seconds, otherwise the sender will get a timeout on the future. 
+ by default. With this pattern the fail-over will be completely transparent if the standby replica
+ takes over within 3 attempts, i.e. 3 seconds, otherwise the sender will get a timeout on the future
+ as in the case of ask pattern.
 
 
 
