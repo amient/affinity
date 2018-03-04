@@ -20,6 +20,7 @@
 package io.amient.affinity.core.util
 
 import java.io.File
+import java.nio.file.Files
 import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
 import java.util.UUID
@@ -106,6 +107,8 @@ trait AffinityTestBase {
         }
     }
   }
+
+  def createTempDirectory: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
 
   def deleteDirectory(path: File) = if (path.exists()) {
     def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles

@@ -92,9 +92,7 @@ trait Gateway extends ActorHandler {
     */
   private var handlingSuspended = true
 
-  def onClusterStatus(suspended: Boolean): Unit = ()
-
-  def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
+  final def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     declaredGlobals.get(globalStateStore) match {
       case Some(globalState) => globalState.asInstanceOf[State[K, V]]
@@ -105,7 +103,7 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  def keyspace(group: String): ActorRef = {
+  final def keyspace(group: String): ActorRef = {
     if (started) throw new IllegalStateException("Cannot declare keyspace after the actor has started")
     declaredKeyspaces.get(group) match {
       case Some((_, keyspaceActor, _)) => keyspaceActor
@@ -121,14 +119,14 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  def connectKeyValueMediator(keyspace: ActorRef, stateStoreName: String, key: Any): Future[ActorRef] = {
+  final def connectKeyValueMediator(keyspace: ActorRef, stateStoreName: String, key: Any): Future[ActorRef] = {
     implicit val timeout = Timeout(1 second)
     keyspace ? CreateKeyValueMediator(stateStoreName, key) collect {
       case KeyValueMediatorCreated(keyValueMediator) => keyValueMediator
     }
   }
 
-  def describeKeyspaces: Map[String, Seq[String]] = {
+  final def describeKeyspaces: Map[String, Seq[String]] = {
     if (!started) throw new IllegalStateException("Cannot get keyspace reference before the actor has started")
     val t = 60 seconds
     implicit val timeout = Timeout(t)
@@ -159,7 +157,7 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  def shutdown(): Unit = {
+  abstract override def shutdown(): Unit = {
     globals.foreach {
       case (identifier, state) => try {
         state.close()

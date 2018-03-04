@@ -38,4 +38,9 @@ public class Record<K, V> implements Serializable {
         this.timestamp = timestamp;
     }
 
+    @Override
+    public String toString() {
+        return key.toString() + " " + value.toString() + " @ " + EventTime.local(timestamp);
+    }
+
 }
