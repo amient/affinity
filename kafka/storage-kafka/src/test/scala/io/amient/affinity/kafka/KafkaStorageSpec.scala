@@ -73,12 +73,15 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
 
   import system.dispatcher
 
-  override def beforeAll: Unit = {
+  override def beforeAll: Unit = try {
     SerializationExtension(system)
+  } finally {
+    super.beforeAll()
   }
 
-  override def afterAll(): Unit = {
+  override def afterAll(): Unit = try {
     system.terminate()
+  } finally {
     super.afterAll()
   }
 

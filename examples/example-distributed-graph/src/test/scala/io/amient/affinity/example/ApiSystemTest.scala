@@ -58,18 +58,19 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   val node2 = new Node(nodeConfig)
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit = try {
     node1.startGateway(new ExampleGatewayRoot with Ping with Admin with PublicApi with Graph)
     node2.startContainer("graph", List(0, 1))
     node1.awaitClusterReady
+  } finally {
+    super.beforeAll()
   }
-  override def afterAll(): Unit = {
-    try {
-      node2.shutdown()
-      node1.shutdown()
-    } finally {
-      super.afterAll()
-    }
+
+  override def afterAll(): Unit = try {
+    node2.shutdown()
+    node1.shutdown()
+  } finally {
+    super.afterAll()
   }
 
   "ExampleApp Gateway" should "be able to play ping pong" in {
@@ -160,6 +161,7 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     lastMessage.synchronized {
       val ws = new WebSocketClient(node1.wsuri("/vertex?id=1000"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
+
         override def onMessage(message: scala.Any): Unit = {
           lastMessage.synchronized {
             lastMessage.set(message.asInstanceOf[GenericRecord])

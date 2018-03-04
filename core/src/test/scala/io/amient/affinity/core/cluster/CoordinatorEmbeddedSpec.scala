@@ -28,7 +28,7 @@ import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import org.scalatest.{FlatSpec, Matchers}
 
-class CoordinatorEmbeddedTest extends FlatSpec with Matchers {
+class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
 
   "CoordinatorEmbedded instances" should "share the underlying space for the same id and group" in {
     val config = ConfigFactory.empty()

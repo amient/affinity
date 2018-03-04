@@ -33,7 +33,6 @@ import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.MasterTransitionPartition.{GetValue, PutValue}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
@@ -43,7 +42,12 @@ import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.Random
 
-class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
+
+class MasterTransitionSpec2 extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
+
+  val specTimeout = 15 seconds
+
+  implicit val timeout = Timeout(specTimeout)
 
   override def numPartitions = 2
 
@@ -51,77 +55,54 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
   val node1 = new Node(config)
-  val node2 = new Node(config)
-  val node3 = new Node(config)
-
   node1.startGateway(new GatewayHttp {
+
+    import context.dispatcher
 
     implicit val scheduler = context.system.scheduler
 
     val keyspace1 = keyspace("keyspace1")
 
-    import context.dispatcher
-
     override def handle: Receive = {
-      case HTTP(GET, PATH("status"), _, response) =>
-        handleAsJson(response, describeKeyspaces)
-
       case HTTP(GET, PATH(key), _, response) =>
-        implicit val timeout = Timeout(500 milliseconds)
         delegateAndHandleErrors(response, keyspace1 ack GetValue(key)) {
-          _ match {
-            case None => HttpResponse(NotFound)
-            case Some(value) => Encoder.json(OK, value, gzip = false)
-          }
+          case value => Encoder.json(OK, value, gzip = false)
         }
 
       case HTTP(POST, PATH(key, value), _, response) =>
-        implicit val timeout = Timeout(1500 milliseconds)
         delegateAndHandleErrors(response, keyspace1 ack PutValue(key, value)) {
           case result => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
     }
   })
 
-  import scala.concurrent.ExecutionContext.Implicits.global
+  val node2 = new Node(config)
+  val node3 = new Node(config)
 
   override def beforeAll(): Unit = try {
-    val stateConf = Conf(config).Affi.Keyspace("keyspace1").State("consistency-test")
-    val p0 = State.create[String, String]("consistency-test", 0, stateConf, 2, node1.system)
-    val p1 = State.create[String, String]("consistency-test", 1, stateConf, 2, node1.system)
-    p0.boot()
-    p1.boot()
-    Await.result(Future.sequence(List(
-      p0.replace("A", "initialValueA"),
-      p0.replace("B", "initialValueB"),
-      p1.replace("A", "initialValueA"),
-      p1.replace("B", "initialValueB"))), 1 second)
-
     node2.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
     node3.startContainer("keyspace1", List(0, 1), new MasterTransitionPartition("consistency-test"))
-
     node1.awaitClusterReady
-
-
   } finally {
     super.beforeAll()
   }
 
-  override def afterAll(): Unit = {
+  override def afterAll(): Unit = try {
     node1.shutdown()
     node2.shutdown()
     node3.shutdown()
+  } finally {
+    super.afterAll()
   }
 
-  "Master Transition" should "not cause requests being dropped when ack(cluster, _) is used" in {
-
-    node1.http_get("/A").entity should be(jsonStringEntity("initialValueA"))
-    node1.http_get("/B").entity should be(jsonStringEntity("initialValueB"))
-    node1.http_post("/A/updatedValueA").status.intValue should be(303)
-    node1.http_get("/A").entity should be(jsonStringEntity("updatedValueA"))
-
+  "Master Transition" should "not lead to inconsistent state" in {
+    val requestCount = new AtomicLong(0L)
     val errorCount = new AtomicLong(0L)
     val stopSignal = new AtomicBoolean(false)
+    val expected = scala.collection.mutable.Map[String, String]()
+
+
+    import scala.concurrent.ExecutionContext.Implicits.global
 
     val client = new Thread {
 
@@ -129,20 +110,25 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
         val random = new Random()
         val requests = scala.collection.mutable.ListBuffer[Future[String]]()
         while (!stopSignal.get) {
-          Thread.sleep(1)
+          Thread.sleep(2)
           if (isInterrupted) throw new InterruptedException
-          val path = if (random.nextBoolean()) "/A" else "/B"
-          requests += node1.http(GET, path) map {
-            case response => response.status.value
+          val key = random.nextInt.toString
+          val value = random.nextInt.toString
+          requests += node1.http(POST, s"/$key/$value") map {
+            case response =>
+              expected += key -> value
+              response.status.value
           } recover {
             case e: Throwable => e.getMessage
           }
         }
+        requestCount.set(requests.size)
         try {
-          val statuses = Await.result(Future.sequence(requests), 5 seconds).groupBy(x => x).map {
+          val statuses = Await.result(Future.sequence(requests), specTimeout).groupBy(x => x).map {
             case (status, list) => (status, list.length)
           }
-          errorCount.set(requests.size - statuses("200 OK"))
+          statuses.foreach(println)
+          errorCount.set(requestCount.get - statuses("303 See Other"))
         } catch {
           case e: Throwable =>
             e.printStackTrace()
@@ -152,12 +138,23 @@ class MasterTransitionSystemTest1 extends FlatSpec with AffinityTestBase with Em
       }
     }
     client.start
-    Thread.sleep(100)
-    node2.shutdown()
-    stopSignal.set(true)
-    client.join()
-    errorCount.get should be(0L)
-  }
+    try {
+      Thread.sleep(100)
+      node2.shutdown()
+      stopSignal.set(true)
+      client.join()
+      Thread.sleep(100)
+      errorCount.get should be(0L)
+      val x = Await.result(Future.sequence(expected.map { case (key, value) =>
+        node1.http(GET, s"/$key").map {
+          response => (response.entity, jsonStringEntity(value))
+        }
+      }), specTimeout)
+      x.count { case (entity, expected) => entity != expected } should be(0)
+    } finally {
+      client.interrupt()
+    }
 
+  }
 
 }

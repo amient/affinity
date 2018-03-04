@@ -48,8 +48,9 @@ trait EmbeddedConfluentRegistry extends EmbeddedKafka with BeforeAndAfterAll {
   log.info("Confluent schema registry listening at: " + registryUrl)
   val registryClient = new CachedSchemaRegistryClient(registryUrl, 20)
 
-  abstract override def afterAll() {
+  abstract override def afterAll() = try {
     registry.stop()
+  } finally {
     super.afterAll()
   }
 

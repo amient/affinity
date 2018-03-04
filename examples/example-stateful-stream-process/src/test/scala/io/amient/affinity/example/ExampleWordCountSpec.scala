@@ -72,14 +72,18 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
   }
 
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit = try {
     node.start()
     node.awaitClusterReady()
+  } finally {
+    super.beforeAll()
   }
 
-  override def afterAll(): Unit = {
+  override def afterAll(): Unit = try {
     node.shutdown()
     producer.close()
+  } finally {
+    super.afterAll()
   }
 
   "ExampleSSP" should "work" in {

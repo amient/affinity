@@ -50,22 +50,22 @@ class AnalyticsSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKa
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit = try {
     node1.startGateway(new ExampleGatewayRoot with Ping with Admin with PublicApi with Graph)
     node2.startContainer("graph", List(0, 1, 2, 3))
     node1.awaitClusterReady
     node1.http_post("/connect/1/2").status should be(SeeOther)
     node1.http_post("/connect/3/4").status should be(SeeOther)
     node1.http_post("/connect/2/3").status should be(SeeOther)
-
+  } finally {
+    super.beforeAll()
   }
-  override def afterAll(): Unit = {
-    try {
-      node2.shutdown()
-      node1.shutdown()
-    } finally {
-      super.afterAll()
-    }
+
+  override def afterAll(): Unit = try {
+    node2.shutdown()
+    node1.shutdown()
+  } finally {
+    super.afterAll()
   }
 
   "Spark Module" should "be able to see avro-serialised state in kafka" in {
