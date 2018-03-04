@@ -65,7 +65,7 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) => {
-        implicit val timeout = Timeout(1 second)
+        implicit val timeout = Timeout(specTimeout / 5)
         delegateAndHandleErrors(response, keyspace1 ack GetValue(key)) {
           case valueOption => Encoder.json(OK, valueOption, gzip = false)
         }
@@ -84,7 +84,6 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   override def beforeAll(): Unit = try {
     node2.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
-    TimeUnit.MILLISECONDS.sleep(500)
     node3.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
   } finally {
     super.beforeAll()
