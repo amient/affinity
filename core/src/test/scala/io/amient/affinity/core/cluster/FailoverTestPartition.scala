@@ -4,9 +4,9 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{Partition, Routed}
 import io.amient.affinity.core.util.Reply
 
-class MasterTransitionPartition(store: String) extends Partition {
+class FailoverTestPartition(store: String) extends Partition {
 
-  import MasterTransitionPartition._
+  import FailoverTestPartition._
   import context.dispatcher
 
   val data = state[String, String](store)
@@ -23,7 +23,7 @@ class MasterTransitionPartition(store: String) extends Partition {
 }
 
 
-object MasterTransitionPartition {
+object FailoverTestPartition {
 
   case class GetValue(key: String) extends Routed with Reply[Option[String]] {
     override def hashCode(): Int = key.hashCode

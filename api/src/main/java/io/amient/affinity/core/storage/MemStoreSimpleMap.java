@@ -56,7 +56,7 @@ public class MemStoreSimpleMap extends MemStore {
     }
 
     @Override
-    public void put(ByteBuffer key, ByteBuffer value) {
+    public void put(ByteBuffer key, ByteBuffer value)  {
         internal.put(key, value);
     }
 

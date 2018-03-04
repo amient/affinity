@@ -186,7 +186,7 @@ class State[K, V](val identifier: String,
     *         Success(None) if the write was persisted but the operation resulted in the value was expired immediately
     *         Failure(ex) if the operation failed due to exception
     */
-  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => { push(key, w); w })
+  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => { push(key, w); w } )
 
   /**
     * delete the given key
@@ -391,7 +391,9 @@ class State[K, V](val identifier: String,
           kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
           Future.successful(Some(value))
         case Some(log) =>
-          log.append(kvstore, key, valueBytes, recordTimestamp) map (_ => Some(value))
+          log.append(kvstore, key, valueBytes, recordTimestamp) map {
+            pos =>Some(value)
+          }
       }
     }
   }
