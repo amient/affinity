@@ -50,7 +50,7 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
 
   val inputTopic = config.getString("affinity.node.gateway.stream.input-stream.kafka.topic")
 
-  val producer = new KafkaProducer[Account, Transaction](new Properties() {
+  val producerProps = new Properties() {
     import ProducerConfig._
     put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap)
     put(ACKS_CONFIG, "1")
@@ -59,33 +59,70 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     put(CLIENT_ID_CONFIG, UUID.randomUUID.toString)
     put("schema.registry.class", classOf[MemorySchemaRegistry].getName)
     put("schema.registry.id", MemorySchemaRegistryId)
-  })
+  }
 
   override def beforeAll(): Unit = {
     //produce test data for all tests
-    val randomPartition = new Random()
-    def produceTestTransaction(account: Account, t: Transaction): Long = {
-      producer.send(new ProducerRecord(inputTopic, randomPartition.nextInt(numPartitions), t.timestamp, account, t)).get.offset
+    val producer = new KafkaProducer[Account, Transaction](producerProps)
+    try {
+      val randomPartition = new Random()
+
+      def produceTestTransaction(account: Account, t: Transaction): Long = {
+        producer.send(new ProducerRecord(inputTopic, randomPartition.nextInt(numPartitions), t.timestamp, account, t)).get.offset
+      }
+      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1001, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
+      produceTestTransaction(Account("33-55-10", 49772300), Transaction(1002, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
+      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1003, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
+      produceTestTransaction(Account("11-10-30", 88885454), Transaction(1004, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
+      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1005, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
+      produceTestTransaction(Account("11-10-30", 88885454), Transaction(1006, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
+      producer.flush()
+    } finally {
+      producer.close()
     }
-    produceTestTransaction(Account("111030", 10233321), Transaction(1001, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
-    produceTestTransaction(Account("111030", 10233321), Transaction(1001, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
-    produceTestTransaction(Account("111030", 10233321), Transaction(1001, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
+    //then start node so that the
     node.start()
     node.awaitClusterReady()
-    //TODO wait for all the last offset to be loaded (expose affinity test base function to do this and refactor the external state example as well
+    //TODO expose something in the AffinityTestBase to have precise blocking point that the input data was processed
+    //e.g. awaitInputProcessed("input-stream", watermark) where watermark is the set of highest partition-offsets of produced in the fixture
+    Thread.sleep(5000)
   }
 
   override def afterAll(): Unit = {
     try {
       node.shutdown()
-      producer.close()
     } finally {
       deleteDirectory(testNodeDataDir)
     }
   }
 
 
-  "ExampleWallet" should "store and index transactions by account prefix" in {
-    //TODO make a http request to GetAccountTransactions for Account("111030", 10233321)
+  "ExampleWallet" should "should able to retrieve all transactions for the first account" in {
+    node.get_json(node.http_get("/transactions/11-10-30/10233321")).getElements.asScala.size should be(3)
   }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the second account" in {
+    node.get_json(node.http_get("/transactions/11-10-30/88885454")).getElements.asScala.size should be(2)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the thrid account" in {
+    node.get_json(node.http_get("/transactions/33-55-10/49772300")).getElements.asScala.size should be(1)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the first branch" in {
+    node.get_json(node.http_get("/transactions/11-10-30")).getElements.asScala.size should be(5)
+  }
+
+  "ExampleWallet" should "should able to retrieve all transactions for the second branch" in {
+    node.get_json(node.http_get("/transactions/33-55-10")).getElements.asScala.size should be (1)
+  }
+
+  "ExampleWallet" should "should respond with empty transaction list for unknown branch" in {
+    node.get_json(node.http_get("/transactions/xx-xx-xx")).getElements.asScala shouldBe empty
+  }
+
+  //TODO api timerange tests
+
+  //TODO analytical timerage tests
+
 }
