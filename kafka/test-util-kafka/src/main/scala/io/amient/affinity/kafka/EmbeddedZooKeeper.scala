@@ -27,14 +27,11 @@ import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.slf4j.LoggerFactory
 
-trait EmbeddedZooKeeper extends BeforeAndAfterAll {
+trait EmbeddedZooKeeper extends EmbeddedService {
 
   self: Suite =>
 
   private val log = LoggerFactory.getLogger(classOf[EmbeddedZooKeeper])
-
-  private val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
-  testDir.mkdirs()
 
   private val embeddedZkPath = new File(testDir, "local-zookeeper")
   // smaller testDir footprint, default zookeeper file blocks are 65535Kb
@@ -46,13 +43,10 @@ trait EmbeddedZooKeeper extends BeforeAndAfterAll {
   log.info(s"Embedded ZooKeeper $zkConnect, data directory: $testDir")
   zkFactory.startup(zookeeper)
 
-  abstract override def afterAll(): Unit = {
-    try {
-      zkFactory.shutdown()
-    } finally {
-      def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
-      if (testDir.exists()) getRecursively(testDir).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
-    }
+  abstract override def afterAll(): Unit = try {
+    zkFactory.shutdown()
+  } finally {
     super.afterAll()
   }
+
 }

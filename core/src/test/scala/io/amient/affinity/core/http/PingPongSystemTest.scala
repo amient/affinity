@@ -35,7 +35,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import scala.concurrent.duration._
 import scala.language.{existentials, implicitConversions, postfixOps}
 
-case class ClustrPing() extends Scatter[String] {
+case class ClusterPing() extends Scatter[String] {
   override def gather(r1: String, r2: String) = r2
 }
 
@@ -59,7 +59,7 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) =>
         implicit val timeout = Timeout(1 second)
-        delegateAndHandleErrors(response, ks gather ClustrPing()) {
+        delegateAndHandleErrors(response, ks gather ClusterPing()) {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
       case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
@@ -69,18 +69,22 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
 
   val node2 = new Node(config)
 
-  override protected def beforeAll(): Unit = {
+  override protected def beforeAll(): Unit = try {
     node2.startContainer("region", List(0, 1), new Partition {
       override def handle: Receive = {
-        case req@ClustrPing() => sender.reply(req)("pong")
+        case req@ClusterPing() => sender.reply(req)("pong")
       }
     })
     node1.awaitClusterReady()
+  } finally {
+    super.beforeAll()
   }
 
-  override def afterAll(): Unit = {
+  override def afterAll(): Unit = try {
     node1.shutdown()
     node2.shutdown()
+  } finally {
+    super.afterAll()
   }
 
 

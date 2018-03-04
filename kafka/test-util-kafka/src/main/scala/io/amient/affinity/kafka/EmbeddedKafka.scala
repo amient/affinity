@@ -40,9 +40,6 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 
   def numPartitions: Int
 
-  private val testDir: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
-  testDir.mkdirs()
-
   private val embeddedKafkaPath = new File(testDir, "local-kafka-logs")
   private val kafkaConfig = new KafkaConfig(new Properties {
     put("broker.id", "1")
@@ -69,14 +66,11 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
   tmpZkClient.close
   log.info(s"Embedded Kafka $kafkaBootstrap, data dir: $testDir")
 
-  abstract override def afterAll(): Unit = {
-    try {
-      kafka.shutdown()
-    } finally {
-      def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
-      if (testDir.exists()) getRecursively(testDir).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
-    }
+  abstract override def afterAll(): Unit = try {
+    kafka.shutdown()
+  } finally {
     super.afterAll()
   }
+
 
 }

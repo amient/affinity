@@ -43,7 +43,7 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
 
   val node = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
-  override def beforeAll: Unit = {
+  override def beforeAll: Unit = try {
     val externalProducer = createKafkaAvroProducer[String, String]()
     try {
       externalProducer.send(new ProducerRecord(topic, "10:30", "the universe is expanding"))
@@ -57,10 +57,14 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
     node.start()
     node.awaitClusterReady()
     //at this point all stores have loaded everything available in the external topic so the test will be deterministic
+  } finally {
+    super.beforeAll()
   }
 
-  override def afterAll: Unit = {
+  override def afterAll: Unit = try {
     node.shutdown()
+  } finally {
+    super.afterAll()
   }
 
   behavior of "External State"

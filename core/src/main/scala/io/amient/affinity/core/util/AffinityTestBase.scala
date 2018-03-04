@@ -110,10 +110,9 @@ trait AffinityTestBase {
 
   def createTempDirectory: File = Files.createTempDirectory(this.getClass.getSimpleName).toFile
 
-  def deleteDirectory(path: File) = if (path.exists()) {
-    def getRecursively(f: File): Seq[File] = f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles
-
-    getRecursively(path).foreach(f => if (!f.delete()) throw new RuntimeException("Failed to delete " + f.getAbsolutePath))
+  def deleteDirectory(f: File): Unit = if (f.exists) {
+    if (f.isDirectory) f.listFiles.foreach(deleteDirectory)
+    if (!f.delete) throw new RuntimeException(s"Failed to delete ${f.getAbsolutePath}")
   }
 
   def jsonStringEntity(s: String) = HttpEntity.Strict(ContentTypes.`application/json`, ByteString("\"" + s + "\""))

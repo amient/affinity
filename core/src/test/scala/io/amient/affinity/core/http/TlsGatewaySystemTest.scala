@@ -39,20 +39,20 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
 
   val node = new Node(config)
 
-  override def beforeAll: Unit = {
+  override def beforeAll: Unit = try {
     node.startGateway(new GatewayHttp {
       override def handle: Receive = {
         case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
       }
     })
+  } finally {
+    super.beforeAll()
   }
 
-  override def afterAll(): Unit = {
-    try {
-      node.shutdown()
-    } finally {
-      super.afterAll()
-    }
+  override def afterAll(): Unit = try {
+    node.shutdown()
+  } finally {
+    super.afterAll()
   }
 
   "HTTPS Requests" should "be handled correctly as TLS" in {
