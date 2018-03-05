@@ -23,7 +23,10 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
     this(sc, storageBinder, TimeRange.UNBOUNDED)
   }
 
-  def compact = if (compacted) this else new LogRDD(sc, storageBinder, range, true)
+  /**
+    * @return compacted LogRDD version of this LogRDD
+    */
+  def compact = if (compacted) this else new LogRDD[POS](sc, storageBinder, range, true)
 
   protected def getPartitions: Array[Partition] = {
     val stream = storageBinder
@@ -66,14 +69,20 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
     }
   }
 
+  /**
+    * transform the bianry LogRDD into RDD[(K,V)] using the give serdes
+    * @param serdeBinder serde used for both keys and values
+    * @tparam K Key type
+    * @tparam V Value type
+    */
   def present[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any]): RDD[(K, V)] = {
     present[K, V](serdeBinder, serdeBinder)
   }
 
   /**
-    * present the bianry LogRDD as RDD[(K,V)] using the give serdes
+    * transform the bianry LogRDD into RDD[(K,V)] using the give serdes
     *
-    * @param keySerdeBinder   serde for Key types
+    * @param keySerdeBinder serde for Key types
     * @param valueSerdeBinder serde for this LogRDD value type
     * @tparam K Key type of both rdds
     * @tparam V Value type of this rdd
@@ -135,37 +144,28 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
 
 object LogRDD {
 
-  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS])(implicit sc: SparkContext): LogRDD[POS] = {
-    apply(storageBinder, TimeRange.UNBOUNDED)
-  }
-
-  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS], range: TimeRange)(implicit sc: SparkContext): LogRDD[POS] = {
-    apply(storageBinder, range, compacted = true)
-  }
-
-
   /**
-    * Map underlying binary stream to typed RDD, either fully or from the given time range
+    * Map an RDD to the underlying binary log stream
     *
-    * @param storageBinder
-    * @param range
-    * @param compacted
-    * @param sc
+    * @param storageBinder binding for the log storage
+    * @param sc spark context
+    * @tparam POS type of the log position
     * @return LogRDD
     */
-  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS], range: TimeRange, compacted: Boolean)(implicit sc: SparkContext): LogRDD[POS] = {
-    new LogRDD(sc, storageBinder, range, compacted)
+  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS], range: TimeRange = TimeRange.UNBOUNDED)
+                                   (implicit sc: SparkContext): LogRDD[POS] = {
+    new LogRDD[POS](sc, storageBinder, range, compacted = false)
   }
 
   /**
-    * append data into binary stream
+    * append a set key-value pairs to the log storage
     *
-    * @param serdeBinder
-    * @param storageBinder
-    * @param data
-    * @param sc
-    * @tparam K
-    * @tparam V
+    * @param serdeBinder serde used for both keys and values
+    * @param storageBinder binding for the log storage
+    * @param data rdd containing the key-value pairs to be appended
+    * @param sc spark context
+    * @tparam K key type
+    * @tparam V value type
     */
   def append[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
                                        storageBinder: => LogStorage[_],
@@ -174,15 +174,15 @@ object LogRDD {
   }
 
   /**
-    * append data into binary stream
+    * append a set key-value pairs to the log storage
     *
-    * @param keySerdeBinder
-    * @param valueSerdeBinder
-    * @param storageBinder
-    * @param data
-    * @param sc
-    * @tparam K
-    * @tparam V
+    * @param keySerdeBinder serde used for keys
+    * @param valueSerdeBinder serde used for values
+    * @param storageBinder binding for the log storage
+    * @param data rdd containing the key-value pairs to be appended
+    * @param sc spark context
+    * @tparam K key type
+    * @tparam V value type
     */
   def append[K: ClassTag, V: ClassTag](keySerdeBinder: => AbstractSerde[_ >: K],
                                        valueSerdeBinder: => AbstractSerde[_ >: V],

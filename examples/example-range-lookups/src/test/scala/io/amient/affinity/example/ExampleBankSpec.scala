@@ -150,15 +150,15 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace("default").State("transactions").Storage
 
-    new LogRDD(sc, LogStorage.newInstance(storageConf), new TimeRange(txn4.timestamp, txn6.timestamp))
+    LogRDD(LogStorage.newInstance(storageConf), new TimeRange(txn4.timestamp, txn6.timestamp))
       .present[StorageKey, Transaction](AvroSerde.create(avroConf))
       .values.collect.sortBy(_.id) should be (Array(txn4, txn5, txn6))
 
-    new LogRDD(sc, LogStorage.newInstance(storageConf), new TimeRange(txn3.timestamp, txn4.timestamp))
+    LogRDD(LogStorage.newInstance(storageConf), new TimeRange(txn3.timestamp, txn4.timestamp))
       .present[StorageKey, Transaction](AvroSerde.create(avroConf))
       .values.collect.sortBy(_.id) should be (Array(txn3, txn4))
 
-    new LogRDD(sc, LogStorage.newInstance(storageConf), new TimeRange(txn1.timestamp, txn4.timestamp))
+    LogRDD(LogStorage.newInstance(storageConf), new TimeRange(txn1.timestamp, txn4.timestamp))
       .present[StorageKey, Transaction](AvroSerde.create(avroConf))
       .values.collect.sortBy(_.id) should be (Array(txn1, txn2, txn3, txn4))
 

@@ -25,7 +25,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.LogStorage
-import io.amient.affinity.core.util.AffinityTestBase
+import io.amient.affinity.core.util.{AffinityTestBase, TimeRange}
 import io.amient.affinity.example.graph.message.{Component, VertexProps}
 import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
@@ -116,10 +116,10 @@ object SparkDriver {
 
   def componentRdd(implicit conf: Conf, sc: SparkContext) = avroRdd[Int, Component]("graph", "components")
 
-  def avroRdd[K: ClassTag, V: ClassTag](ks: String, store: String)(implicit conf: Conf, sc: SparkContext) = {
+  def avroRdd[K: ClassTag, V: ClassTag](ks: String, store: String)(implicit conf: Conf, sc: SparkContext): RDD[(K,V)] = {
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
-    new LogRDD(sc, LogStorage.newInstance(storageConf)).compact.present[K, V](AvroSerde.create(avroConf))
+    LogRDD(LogStorage.newInstance(storageConf)).compact.present[K, V](AvroSerde.create(avroConf))
   }
 
   def avroUpdate[K: ClassTag, V: ClassTag](ks: String, store: String, data: RDD[(K, V)])(implicit conf: Conf, sc: SparkContext): Unit = {
