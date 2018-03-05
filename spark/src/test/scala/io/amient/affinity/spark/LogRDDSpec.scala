@@ -42,7 +42,7 @@ case class CompactionTestEvent(key: Int, data: String, ts: Long) extends AvroRec
   override def eventTimeUnix() = ts
 }
 
-object CompactRDDSpecUniverse {
+object LogRDDSpecUniverse {
 
   val topic = "test-topic"
   val DecemberFirst2017 = Instant.ofEpochMilli(1512086401000L)
@@ -63,17 +63,17 @@ object CompactRDDSpecUniverse {
 
   def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.UNBOUNDED)
                                               (implicit sc: SparkContext): RDD[(K, V)] = {
-    CompactRDD(AvroSerde.create(avroConf), LogStorage.newInstance(storageConf), range)
+    LogRDD(LogStorage.newInstance(storageConf), range).compact.present[K,V](AvroSerde.create(avroConf))
   }
 
 }
 
 
-class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
+class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAndAfterAll {
 
   override def numPartitions = 10
 
-  import CompactRDDSpecUniverse._
+  import LogRDDSpecUniverse._
 
   implicit val sc = new SparkContext(new SparkConf()
     .setMaster("local[10]")
@@ -119,6 +119,17 @@ class CompactRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with Befo
     val result = rdd.collect.sortBy(_._1)
     result.size should be(50)
     result.forall(_._2.eventTimeUnix >= FebruaryFirst2018.toEpochMilli)
+  }
+
+  "join on LogRDD" should "only serialize keys on the right rdd in the first stage" in {
+    val avroConf = getSerdeConf
+    val storageConf = getStorageConf(kafkaBootstrap)
+    val compactLogRdd: LogRDD = new LogRDD(sc, LogStorage.newInstance(storageConf)).compact
+    val right: RDD[(Int, String)] = sc.parallelize(List(49 -> "Fourty Nine",50 -> "Fifity"))
+    val optimiziedJoin = compactLogRdd.join(AvroSerde.create(avroConf), right)
+    optimiziedJoin.count should be(2)
+    val normalJoin = compactLogRdd.present[Int, CompactionTestEvent](AvroSerde.create(avroConf)).join(right)
+    optimiziedJoin.values.collect should be (normalJoin.values.collect)
   }
 
 }

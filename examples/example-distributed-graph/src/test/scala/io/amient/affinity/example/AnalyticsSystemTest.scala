@@ -31,7 +31,7 @@ import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
 import io.amient.affinity.example.rest.ExampleGatewayRoot
 import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.EmbeddedKafka
-import io.amient.affinity.spark.CompactRDD
+import io.amient.affinity.spark.LogRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
@@ -119,12 +119,12 @@ object SparkDriver {
   def avroRdd[K: ClassTag, V: ClassTag](ks: String, store: String)(implicit conf: Conf, sc: SparkContext) = {
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
-    CompactRDD[K, V](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf))
+    new LogRDD(sc, LogStorage.newInstance(storageConf)).compact.present[K, V](AvroSerde.create(avroConf))
   }
 
   def avroUpdate[K: ClassTag, V: ClassTag](ks: String, store: String, data: RDD[(K, V)])(implicit conf: Conf, sc: SparkContext): Unit = {
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace(ks).State(store).Storage
-    CompactRDD(AvroSerde.create(avroConf), LogStorage.newInstance(storageConf), data)
+    LogRDD.append(AvroSerde.create(avroConf), LogStorage.newInstance(storageConf), data)
   }
 }

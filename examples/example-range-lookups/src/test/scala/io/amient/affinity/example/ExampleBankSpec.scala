@@ -19,7 +19,6 @@
 
 package io.amient.affinity.example
 
-import java.util.concurrent.TimeUnit
 import java.util.{Properties, UUID}
 
 import com.typesafe.config.ConfigFactory
@@ -30,10 +29,10 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.LogStorage
 import io.amient.affinity.core.util.{AffinityTestBase, TimeRange}
 import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroSerializer}
-import io.amient.affinity.spark.CompactRDD
+import io.amient.affinity.spark.LogRDD
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.serializer.KryoSerializer
+import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -151,14 +150,17 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     val avroConf = conf.Affi.Avro
     val storageConf = conf.Affi.Keyspace("default").State("transactions").Storage
 
-    CompactRDD[StorageKey, Transaction](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf),
-      new TimeRange(txn4.timestamp, txn6.timestamp)).values.collect.sortBy(_.id) should be (Array(txn4, txn5, txn6))
+    new LogRDD(sc, LogStorage.newInstance(storageConf), new TimeRange(txn4.timestamp, txn6.timestamp))
+      .present[StorageKey, Transaction](AvroSerde.create(avroConf))
+      .values.collect.sortBy(_.id) should be (Array(txn4, txn5, txn6))
 
-    CompactRDD[StorageKey, Transaction](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf),
-      new TimeRange(txn3.timestamp, txn4.timestamp)).values.collect.sortBy(_.id) should be (Array(txn3, txn4))
+    new LogRDD(sc, LogStorage.newInstance(storageConf), new TimeRange(txn3.timestamp, txn4.timestamp))
+      .present[StorageKey, Transaction](AvroSerde.create(avroConf))
+      .values.collect.sortBy(_.id) should be (Array(txn3, txn4))
 
-    CompactRDD[StorageKey, Transaction](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf),
-      new TimeRange(txn1.timestamp, txn4.timestamp)).values.collect.sortBy(_.id) should be (Array(txn1, txn2, txn3, txn4))
+    new LogRDD(sc, LogStorage.newInstance(storageConf), new TimeRange(txn1.timestamp, txn4.timestamp))
+      .present[StorageKey, Transaction](AvroSerde.create(avroConf))
+      .values.collect.sortBy(_.id) should be (Array(txn1, txn2, txn3, txn4))
 
   }
 
