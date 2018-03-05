@@ -124,7 +124,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
   "join on LogRDD" should "only serialize keys on the right rdd in the first stage" in {
     val avroConf = getSerdeConf
     val storageConf = getStorageConf(kafkaBootstrap)
-    val compactLogRdd: LogRDD = new LogRDD(sc, LogStorage.newInstance(storageConf)).compact
+    val compactLogRdd = new LogRDD(sc, LogStorage.newInstance(storageConf)).compact
     val right: RDD[(Int, String)] = sc.parallelize(List(49 -> "Fourty Nine",50 -> "Fifity"))
     val optimiziedJoin = compactLogRdd.join(AvroSerde.create(avroConf), right)
     optimiziedJoin.count should be(2)
