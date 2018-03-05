@@ -23,11 +23,17 @@ import java.util.concurrent.TimeUnit
 import java.util.{Properties, UUID}
 
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
+import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.util.AffinityTestBase
+import io.amient.affinity.core.storage.LogStorage
+import io.amient.affinity.core.util.{AffinityTestBase, TimeRange}
 import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroSerializer}
+import io.amient.affinity.spark.CompactRDD
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.serializer.KryoSerializer
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -61,6 +67,15 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     put("schema.registry.id", MemorySchemaRegistryId)
   }
 
+  val txn1 = Transaction(1001, 99.9, timestamp = 1530000000000L) //08am 26 June 2018
+  val txn2 = Transaction(1002, 99.9, timestamp = 1530000000000L) //08am 26 June 2018
+  val txn3 = Transaction(1003, 99.9, timestamp = 1530086400000L) //08am 27 June 2018
+  val txn4 = Transaction(1004, 99.9, timestamp = 1530090000000L) //09am 27 June 2018
+  val txn5 = Transaction(1005, 99.9, timestamp = 1530172800000L) //08am 28 June 2018
+  val txn6 = Transaction(1006, 99.9, timestamp = 1530172800000L) //08am 28 June 2018
+
+
+
   override def beforeAll(): Unit = {
     //produce test data for all tests
     val producer = new KafkaProducer[Account, Transaction](producerProps)
@@ -70,21 +85,20 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
       def produceTestTransaction(account: Account, t: Transaction): Long = {
         producer.send(new ProducerRecord(inputTopic, randomPartition.nextInt(numPartitions), t.timestamp, account, t)).get.offset
       }
-      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1001, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
-      produceTestTransaction(Account("33-55-10", 49772300), Transaction(1002, 99.9, timestamp = 1530000000000L)) //08am 26 June 2018
-      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1003, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
-      produceTestTransaction(Account("11-10-30", 88885454), Transaction(1004, 99.9, timestamp = 1530086400000L)) //08am 27 June 2018
-      produceTestTransaction(Account("11-10-30", 10233321), Transaction(1005, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
-      produceTestTransaction(Account("11-10-30", 88885454), Transaction(1006, 99.9, timestamp = 1530172800000L)) //08am 28 June 2018
+      produceTestTransaction(Account("11-10-30", 10233321), txn1)
+      produceTestTransaction(Account("33-55-10", 49772300), txn2)
+      produceTestTransaction(Account("11-10-30", 10233321), txn3)
+      produceTestTransaction(Account("11-10-30", 88885454), txn4)
+      produceTestTransaction(Account("11-10-30", 10233321), txn5)
+      produceTestTransaction(Account("11-10-30", 88885454), txn6)
       producer.flush()
     } finally {
       producer.close()
     }
-    //then start node so that the
     node.start()
     node.awaitClusterReady()
     //TODO expose something in the AffinityTestBase to have precise blocking point that the input data was processed
-    //e.g. awaitInputProcessed("input-stream", watermark) where watermark is the set of highest partition-offsets of produced in the fixture
+    //e.g. awaitInputProcessed("input-stream") where watermark is the set of highest partition-offsets
     Thread.sleep(5000)
   }
 
@@ -121,8 +135,31 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     node.get_json(node.http_get("/transactions/xx-xx-xx")).getElements.asScala shouldBe empty
   }
 
-  //TODO api timerange tests
+  "ExampleWallet" should "should able to retrieve all transactions before a given date for the first branch" in {
+    node.get_json(node.http_get("/transactions/11-10-30?before=2018-06-28")).getElements.asScala.size should be(3)
+  }
 
-  //TODO analytical timerage tests
+  "ExampleWallet" should "be stored in kafka with event-time index" in {
+    implicit val sc = new SparkContext(new SparkConf()
+      .setMaster("local[1]")
+      .set("spark.driver.host", "localhost")
+      .setAppName("Example_Bank_Analytics")
+      .set("spark.serializer", classOf[KryoSerializer].getName))
+
+    implicit val conf = Conf(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+
+    val avroConf = conf.Affi.Avro
+    val storageConf = conf.Affi.Keyspace("default").State("transactions").Storage
+
+    CompactRDD[StorageKey, Transaction](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf),
+      new TimeRange(txn4.timestamp, txn6.timestamp)).values.collect.sortBy(_.id) should be (Array(txn4, txn5, txn6))
+
+    CompactRDD[StorageKey, Transaction](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf),
+      new TimeRange(txn3.timestamp, txn4.timestamp)).values.collect.sortBy(_.id) should be (Array(txn3, txn4))
+
+    CompactRDD[StorageKey, Transaction](AvroSerde.create(avroConf), LogStorage.newInstance(storageConf),
+      new TimeRange(txn1.timestamp, txn4.timestamp)).values.collect.sortBy(_.id) should be (Array(txn1, txn2, txn3, txn4))
+
+  }
 
 }

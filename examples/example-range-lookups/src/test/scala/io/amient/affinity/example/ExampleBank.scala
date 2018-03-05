@@ -24,7 +24,7 @@ import akka.util.Timeout
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Routed}
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH}
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util.{EventTime, Reply, Scatter, TimeRange}
 
@@ -52,6 +52,9 @@ class ExampleBank extends GatewayStream with GatewayHttp {
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode, INT(number)), _, response) =>
       defaultKeyspace ack GetAccountTransactions(Account(sortcode, number)) map (handleAsJson(response, _))
 
+    case HTTP(HttpMethods.GET, PATH("transactions", sortcode), QUERY(("before", before)), response) =>
+      defaultKeyspace gather GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
+
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), _, response) =>
       defaultKeyspace gather GetBranchTransactions(sortcode) map (handleAsJson(response, _))
   }
@@ -62,7 +65,7 @@ class ExampleBank extends GatewayStream with GatewayHttp {
 case class StoreTransaction(key: Account, t: Transaction) extends AvroRecord with Routed with Reply[Unit]
 case class StorageKey(@Fixed(8) sortcode: String, @Fixed account: Int, txn: Long) extends AvroRecord
 case class GetAccountTransactions(key: Account) extends AvroRecord with Routed with Reply[Seq[Transaction]]
-case class GetBranchTransactions(sortcode: String) extends AvroRecord with Scatter[Seq[Transaction]] {
+case class GetBranchTransactions(sortcode: String, beforeUnixTs: Long = Long.MaxValue) extends AvroRecord with Scatter[Seq[Transaction]] {
   override def gather(r1: Seq[Transaction], r2: Seq[Transaction]) = r1 ++ r2
 }
 
@@ -73,12 +76,11 @@ class DefaultPartition extends Partition {
   override def handle: Receive = {
 
     case request@StoreTransaction(account@Account(sortcode, number), transaction) => sender.reply(request) {
-      println(s"Storing transaction in partition: $partition, account: $account, txn: ${transaction.id}")
       transactions.replace(StorageKey(sortcode, number, transaction.id), transaction)
     }
 
-    case request@GetBranchTransactions(sortcode) => sender.reply(request) {
-      transactions.range(TimeRange.UNBOUNDED, sortcode).values.toList
+    case request@GetBranchTransactions(sortcode, before) => sender.reply(request) {
+      transactions.range(TimeRange.until(before), sortcode).values.toList
     }
 
     case request@GetAccountTransactions(account) => sender.reply(request) {

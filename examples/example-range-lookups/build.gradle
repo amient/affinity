@@ -6,12 +6,15 @@ apply plugin: 'scala'
 
 dependencies {
     compile project(':core')
-    compile project(':spark')
     compile project(':rocksdb')
     compile project(':kafka:storage-kafka')
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile group: 'com.typesafe.akka', name: 'akka-slf4j_' + baseScalaVersion, version: akkaVersion
     testCompile project(':kafka:test-util-kafka')
+    testCompile project(':spark')
+    testCompile group: 'org.apache.spark', name: 'spark-core_' + rootProject.baseScalaVersion, version: project(':spark').sparkVersion
+    testCompile group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2'
+
 }
 
 

@@ -115,7 +115,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   }
 
   private val kafkaConsumer = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
-  private val partitionProgress = new mutable.HashMap[Int, java.lang.Long]()
+  private val stopOffsets = new mutable.HashMap[Int, java.lang.Long]()
   private var closed = false
   private var range: TimeRange = TimeRange.UNBOUNDED
 
@@ -137,25 +137,27 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
     val tp = new TopicPartition(topic, partition)
-    val startOffset = if (startPosition == null || startPosition <0) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
+    val startOffset = if (startPosition == null || startPosition < 0) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
     if (startOffset < 0) {
       return null
     } else {
       kafkaConsumer.seek(tp, startOffset)
-      val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp)
-      // exclusive of the time range end
-      val stopOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset) - 1
+      val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp) - 1
+      val stopOffset = maxOffset
+      /* kafka at the moment supports only offsets-after(t), so if one day there is offsets-before(t) we can optimize more:
+      val stopOffset: Long = Option(kafkaConsumer.offsetsBefore(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset)
+      */
       if (stopOffset >= startOffset) {
-        partitionProgress.put(tp.partition, stopOffset)
+        stopOffsets.put(tp.partition, stopOffset)
       } else {
-        partitionProgress.remove(tp.partition)
+        stopOffsets.remove(tp.partition)
       }
       stopOffset
     }
   }
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
-    partitions.foreach(tp => partitionProgress.remove(tp.partition))
+    partitions.foreach(tp => stopOffsets.remove(tp.partition))
   }
 
   override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]) = {
@@ -172,7 +174,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def fetch(unbounded: Boolean): util.Iterator[LogEntry[java.lang.Long]] = {
 
-    if (!unbounded && partitionProgress.isEmpty) {
+    if (!unbounded && stopOffsets.isEmpty) {
       return null
     }
 
@@ -185,14 +187,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     kafkaRecords.iterator.filter { record =>
       if (unbounded) {
         record.timestamp >= range.start && record.timestamp <= range.end
-      } else if (!partitionProgress.contains(record.partition)) {
+      } else if (!stopOffsets.contains(record.partition)) {
         false
       } else {
-        if (record.offset >= partitionProgress(record.partition)) {
-          partitionProgress.remove(record.partition)
-        }
-        val valid = record.timestamp >= range.start && record.timestamp <= range.end
-        valid
+        if (record.offset >= stopOffsets(record.partition)) stopOffsets.remove(record.partition)
+        record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {
       case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)

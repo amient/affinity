@@ -20,10 +20,11 @@
 package io.amient.affinity.spark
 
 import io.amient.affinity.core.serde.AbstractSerde
-import io.amient.affinity.core.storage.{LogStorage, Record}
+import io.amient.affinity.core.storage.{ByteKey, LogStorage, Record}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
+import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{SparkContext, TaskContext}
 
 import scala.reflect.ClassTag
@@ -71,13 +72,35 @@ object CompactRDD {
                                       storageBinder: => LogStorage[_],
                                       range: TimeRange,
                                       compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
-    new BinaryCompactRDD(sc, storageBinder, range, compacted).mapPartitions { partition =>
+//    new BinaryCompactRDD(sc, storageBinder, range, compacted).mapPartitions { partition =>
+//      val keySerde = keySerdeBinder
+//      val valueSerde = valueSerdeBinder
+//      TaskContext.get.addTaskCompletionListener { _ =>
+//        try keySerde.close finally valueSerde.close
+//      }
+//      partition.flatMap { case (key, record) =>
+//        (keySerde.fromBytes(key.bytes), valueSerde.fromBytes(record.value)) match {
+//          case (k: K, v: V) => Some((k, v))
+//          case _ => None
+//        }
+//      }
+//    }
+
+    new LogRDD(sc, storageBinder, range).mapPartitions { partition =>
+      type R = Record[Array[Byte], Array[Byte]]
       val keySerde = keySerdeBinder
       val valueSerde = valueSerdeBinder
       TaskContext.get.addTaskCompletionListener { _ =>
         try keySerde.close finally valueSerde.close
       }
-      partition.flatMap { case (key, record) =>
+      val compactor = (r1: R, r2: R) => if (r1.timestamp > r2.timestamp) r1 else r2
+      val logRecords = partition.map(record => (new ByteKey(record.key), record))
+      val compactedRecords: Iterator[(ByteKey, R)] = if (!compacted) logRecords else {
+        val spillMap = new ExternalAppendOnlyMap[ByteKey, R, R]((v) => v, compactor, compactor)
+        spillMap.insertAll(logRecords)
+        spillMap.iterator
+      }
+      compactedRecords.flatMap { case (key, record) =>
         (keySerde.fromBytes(key.bytes), valueSerde.fromBytes(record.value)) match {
           case (k: K, v: V) => Some((k, v))
           case _ => None
