@@ -121,7 +121,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
 
   behavior of "KafkaDeserializer"
 
-  it should "be able to work with ZkAvroSchemaRegistry" in {
+  //FIXME #155
+  it should "be able to work with ZkAvroSchemaRegistry" ignore {
 
     config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
     system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
