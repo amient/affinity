@@ -11,14 +11,15 @@ import org.apache.spark.{Partition, SparkContext, TaskContext}
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
-class LogRDD private(@transient private val sc: SparkContext, storageBinder: => LogStorage[_], range: TimeRange, compacted: Boolean)
+class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkContext,
+                                             storageBinder: => LogStorage[POS], range: TimeRange, compacted: Boolean)
   extends RDD[(ByteKey, LogEntry[_])](sc, Nil) {
 
-  def this(sc: SparkContext, storageBinder: => LogStorage[_], range: TimeRange) {
+  def this(sc: SparkContext, storageBinder: => LogStorage[POS], range: TimeRange) {
     this(sc, storageBinder, range, false)
   }
 
-  def this(sc: SparkContext, storageBinder: => LogStorage[_]) {
+  def this(sc: SparkContext, storageBinder: => LogStorage[POS]) {
     this(sc, storageBinder, TimeRange.UNBOUNDED)
   }
 
@@ -38,15 +39,15 @@ class LogRDD private(@transient private val sc: SparkContext, storageBinder: => 
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(ByteKey, LogEntry[_])] = {
-    val storage = storageBinder
+    val storage: LogStorage[POS] = storageBinder
     storage.reset(split.index, range)
     context.addTaskCompletionListener(_ => storage.close)
-    val compactor = (r1: LogEntry[_], r2: LogEntry[_]) => if (r1.timestamp > r2.timestamp) r1 else r2
+    val compactor = (r1: LogEntry[POS], r2: LogEntry[POS]) => if (r1.timestamp > r2.timestamp) r1 else r2
     val logRecords = storage.boundedIterator().asScala.map(record => (new ByteKey(record.key), record))
     if (!compacted) logRecords else {
-      val spillMap = new ExternalAppendOnlyMap[ByteKey, LogEntry[_], LogEntry[_]]((v) => v, compactor, compactor)
+      val spillMap = new ExternalAppendOnlyMap[ByteKey, LogEntry[POS], LogEntry[POS]]((v) => v, compactor, compactor)
       spillMap.insertAll(logRecords)
-      spillMap.iterator
+      spillMap.iterator.filter { case (_, entry) => !storage.isTombstone(entry) }
     }
   }
 
@@ -71,7 +72,8 @@ class LogRDD private(@transient private val sc: SparkContext, storageBinder: => 
 
   /**
     * present the bianry LogRDD as RDD[(K,V)] using the give serdes
-    * @param keySerdeBinder serde for Key types
+    *
+    * @param keySerdeBinder   serde for Key types
     * @param valueSerdeBinder serde for this LogRDD value type
     * @tparam K Key type of both rdds
     * @tparam V Value type of this rdd
@@ -100,9 +102,9 @@ class LogRDD private(@transient private val sc: SparkContext, storageBinder: => 
     *   2. join on ByteKey before deserializing value
     *   3. deserialize value on the reusult subset only
     *
-    * @param keySerdeBinder serde for Key types
+    * @param keySerdeBinder   serde for Key types
     * @param valueSerdeBinder serde for this LogRDD value type
-    * @param other RDD to join on the right side
+    * @param other            RDD to join on the right side
     * @tparam K Key type of both rdds
     * @tparam V Value type of this rdd
     * @tparam W Value type of the other rdd
@@ -133,11 +135,11 @@ class LogRDD private(@transient private val sc: SparkContext, storageBinder: => 
 
 object LogRDD {
 
-  def apply(storageBinder: => LogStorage[_])(implicit sc: SparkContext): LogRDD = {
+  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS])(implicit sc: SparkContext): LogRDD[POS] = {
     apply(storageBinder, TimeRange.UNBOUNDED)
   }
 
-  def apply(storageBinder: => LogStorage[_], range: TimeRange)(implicit sc: SparkContext): LogRDD = {
+  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS], range: TimeRange)(implicit sc: SparkContext): LogRDD[POS] = {
     apply(storageBinder, range, compacted = true)
   }
 
@@ -151,8 +153,7 @@ object LogRDD {
     * @param sc
     * @return LogRDD
     */
-  def apply(storageBinder: => LogStorage[_], range: TimeRange, compacted: Boolean)(implicit sc: SparkContext): LogRDD = {
-
+  def apply[POS <: Comparable[POS]](storageBinder: => LogStorage[POS], range: TimeRange, compacted: Boolean)(implicit sc: SparkContext): LogRDD[POS] = {
     new LogRDD(sc, storageBinder, range, compacted)
   }
 
