@@ -22,15 +22,20 @@ package io.amient.affinity.kafka
 import java.io.File
 import java.nio.file.Files
 import java.util.Properties
+import java.util.concurrent.TimeUnit
 
 import kafka.cluster.Broker
 import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.serialize.ZkSerializer
+import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.slf4j.LoggerFactory
+import scala.collection.JavaConverters._
+
+import scala.collection.mutable
 
 trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 
@@ -54,6 +59,16 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 
   private val kafka = new KafkaServerStartable(kafkaConfig)
   kafka.startup()
+
+  lazy val admin = AdminClient.create(Map[String, AnyRef]("bootstrap.servers" -> kafkaBootstrap).asJava)
+
+  def createTopic(name: String): Unit = {
+    admin.createTopics(List(new NewTopic(name, numPartitions, 1)) asJava).all().get(30, TimeUnit.SECONDS)
+  }
+
+  def listTopics: mutable.Set[String] = {
+    admin.listTopics().names().get(1, TimeUnit.SECONDS).asScala
+  }
 
   val tmpZkClient = new ZkClient(zkConnect, 5000, 6000, new ZkSerializer {
     def serialize(o: Object): Array[Byte] = o.toString.getBytes
