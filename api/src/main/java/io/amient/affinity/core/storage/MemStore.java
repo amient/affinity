@@ -134,7 +134,7 @@ public abstract class MemStore implements Closeable {
         if (ttlMs > 0 && valueAndMetadata.getLong(0) + ttlMs < System.currentTimeMillis()) {
             //this is the magic that expires key-value pairs based on their create timestamp
             //State.iterator also invokes unwrap for each entry therefore simply iterating cleans up expired entries
-            remove(key);
+            remove(key); //TODO as part of #148 (using compaction filters on rocksdb) this remove could be dropped
             return Optional.empty();
         } else {
             int len = valueAndMetadata.limit();
