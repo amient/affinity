@@ -82,7 +82,7 @@ object Encoder {
             jsonWriteRec(k)
             out.write(":".getBytes)
             out.flush()
-            jsonWriteRec(v)
+            jsonWrite(v, out)
           }
           out.write("}".getBytes)
           out.flush()
@@ -96,7 +96,7 @@ object Encoder {
               out.write(",".getBytes)
               out.flush()
             }
-            jsonWriteRec(el)
+            jsonWrite(el, out)
           }
           out.write("]".getBytes)
           out.flush()
