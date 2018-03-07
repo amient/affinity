@@ -54,40 +54,41 @@ object AvroJsonConverter {
 
   private val mapper = new ObjectMapper()
 
-  def toAvro(data: String, schema: Schema): Any = {
+  def toAvro(json: String, schema: Schema): Any = {
 
-    def to(data: JsonNode, schema: Schema): Any = {
+    def to(json: JsonNode, schema: Schema): Any = {
       schema.getType match {
-        case Schema.Type.NULL if data.isNull => null
-        case Schema.Type.BOOLEAN if data.isBoolean => data.getBooleanValue
-        case Schema.Type.INT if data.isNumber => data.getIntValue
-        case Schema.Type.LONG if data.isNumber => data.getLongValue
-        case Schema.Type.FLOAT if data.isNumber => data.getDoubleValue.toFloat
-        case Schema.Type.DOUBLE if data.isNumber => data.getDoubleValue
-        case Schema.Type.STRING if data.isTextual => new Utf8(data.getTextValue)
+        case Schema.Type.NULL if json.isNull => null
+        case Schema.Type.BOOLEAN if json.isBoolean => json.getBooleanValue
+        case Schema.Type.INT if json.isNumber => json.getIntValue
+        case Schema.Type.LONG if json.isNumber => json.getLongValue
+        case Schema.Type.FLOAT if json.isNumber => json.getDoubleValue.toFloat
+        case Schema.Type.DOUBLE if json.isNumber => json.getDoubleValue
+        case Schema.Type.STRING if json == null => new Utf8()
+        case Schema.Type.STRING if json.isTextual => new Utf8(json.getTextValue)
         case Schema.Type.UNION if schema.getTypes.size == 2 && schema.getTypes.get(0).getType == Schema.Type.NULL =>
-          schema.getTypes.map(s => Try(to(data, s))).find(_.isSuccess).map(_.get).get
-        case Schema.Type.ARRAY if data.isArray => data.getElements.map(x => to(x, schema.getElementType)).toList.asJava
-        case Schema.Type.MAP if data.isObject =>
+          schema.getTypes.map(s => Try(to(json, s))).find(_.isSuccess).map(_.get).get
+        case Schema.Type.ARRAY if json.isArray => json.getElements.map(x => to(x, schema.getElementType)).toList.asJava
+        case Schema.Type.MAP if json.isObject =>
           val builder = Map.newBuilder[String, Any]
           schema.getFields foreach { field =>
-            builder += field.name -> to(data.get(field.name), field.schema)
+            builder += field.name -> to(json.get(field.name), field.schema)
           }
           builder.result.asJava
-        case Schema.Type.ENUM if data.isTextual => new EnumSymbol(schema, data.getTextValue)
-        case Schema.Type.BYTES => ByteBuffer.wrap(data.getTextValue.getBytes(StandardCharsets.UTF_8))
-        case Schema.Type.FIXED => new GenericData.Fixed(schema, data.getTextValue.getBytes(StandardCharsets.UTF_8))
-        case Schema.Type.RECORD if data.isObject =>
+        case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.getTextValue)
+        case Schema.Type.BYTES => ByteBuffer.wrap(json.getTextValue.getBytes(StandardCharsets.UTF_8))
+        case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getTextValue.getBytes(StandardCharsets.UTF_8))
+        case Schema.Type.RECORD if json.isObject =>
           val builder = new GenericRecordBuilder(schema)
           schema.getFields foreach { field =>
-            val d = data.get(field.name)
+            val d = json.get(field.name)
             builder.set(field, to(d, field.schema()))
           }
           builder.build()
-        case _ => throw new IllegalArgumentException(s"Can't convert ${data} using schema: $schema")
+        case _ => throw new IllegalArgumentException(s"Can't convert ${json} using schema: $schema")
       }
     }
 
-    AvroRecord.read(to(mapper.readTree(data), schema), schema)
+    AvroRecord.read(to(mapper.readTree(json), schema), schema)
   }
 }
