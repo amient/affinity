@@ -19,30 +19,26 @@
 
 package io.amient.affinity.avro.record
 
-import java.io.{ByteArrayOutputStream, OutputStream, StringWriter, Writer}
+import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import io.amient.affinity.avro.record.AvroRecord.extract
-import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData.EnumSymbol
-import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecordBuilder, IndexedRecord}
+import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
+import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
-import org.codehaus.jackson.{JsonFactory, JsonGenerator, JsonNode}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
-import scala.collection.immutable.Seq
 import scala.util.Try
 
 object AvroJsonConverter {
 
-  private val jfactory = new JsonFactory()
-
   def toJson(data: Any, pretty: Boolean = false): String = {
-    val out = new ByteArrayOutputStream()//new StringWriter()
+    val out = new ByteArrayOutputStream()
     toJson(out, data, pretty)
     out.toString()
   }

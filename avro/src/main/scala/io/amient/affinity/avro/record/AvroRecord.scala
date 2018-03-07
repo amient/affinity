@@ -257,7 +257,7 @@ object AvroRecord extends AvroExtractors {
         val arguments = record.getSchema.getFields.asScala.map { field =>
           readDatum(record.get(field.pos), params(field.pos), field.schema)
         }
-        constructorMirror(arguments: _*)
+        constructorMirror(arguments: _*).asInstanceOf[AvroRecord]
       case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
         .map { case (k, v) => (
           k.toString,
@@ -408,12 +408,14 @@ abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
   override def getSchema: Schema = schema
 
-// TODO there is a way to optimize the get(i) method a) by caching the result b) when reading fields from generic, initialize the cache right away
-//  private val get_ : Map[Int, AnyRef] = fields.map {
-//    case (i, field) => i -> AvroRecord.extract(field.get(this), List(schema.getFields.get(i).schema))
-//  }
-  final override def get(i: Int): AnyRef = //get_(i)
+  // TODO there is a way to optimize writes by the get(i) method a) by caching the result b) when reading fields from generic, initialize the cache right away
+//  private[record] val generic = mutable.Map[Int, AnyRef]()
+//  final override def get(i: Int): AnyRef = generic.getOrElseUpdate(i, {
+//    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
+//  })
+  final override def get(i: Int): AnyRef = {
     AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
+  }
 
   final override def put(i: Int, v: scala.Any): Unit = {
     throw new AvroRuntimeException("Scala AvroRecord is immutable")
