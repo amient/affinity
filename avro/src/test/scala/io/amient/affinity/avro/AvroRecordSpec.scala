@@ -198,7 +198,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
   "Long Compound Key " should "have the same binary prefix as Simple Key" in {
-    AvroRecord.inferSchema[LongCompoundKey].toString should be ("{\"type\":\"record\",\"name\":\"LongCompoundKey\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"version\",\"type\":{\"type\":\"fixed\",\"name\":\"version\",\"namespace\":\"\",\"size\":8,\"runtime\":\"long\"}},{\"name\":\"country\",\"type\":{\"type\":\"fixed\",\"name\":\"country\",\"namespace\":\"\",\"size\":2}},{\"name\":\"city\",\"type\":{\"type\":\"fixed\",\"name\":\"city\",\"namespace\":\"\",\"size\":10}},{\"name\":\"value\",\"type\":\"double\"}]}")
+    AvroRecord.inferSchema[LongCompoundKey].toString should be ("{\"type\":\"record\",\"name\":\"LongCompoundKey\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"version\",\"type\":{\"type\":\"fixed\",\"name\":\"version\",\"namespace\":\"\",\"size\":8,\"runtime\":\"long\"}},{\"name\":\"country\",\"type\":{\"type\":\"fixed\",\"name\":\"country\",\"namespace\":\"\",\"size\":2}},{\"name\":\"city\",\"type\":{\"type\":\"fixed\",\"name\":\"city\",\"namespace\":\"\",\"size\":4}},{\"name\":\"value\",\"type\":\"double\"}]}")
     val key = LongCompoundKey(100L, "UK", "C001", 99.9)
     val bytes = newSerde.toBytes(key)
     val prefix = newSerde.prefix(classOf[LongCompoundKey], new java.lang.Long(100L), "UK", "C001")

@@ -99,38 +99,6 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-  /**
-    * deriveValue is used in reflection to get defaults for constructor arguments
-    *
-    * @param schemaField
-    * @param value
-    * @return
-    */
-  private def deriveValue(schemaField: Schema, value: Any): AnyRef = {
-    schemaField.getType match {
-      case BYTES => java.nio.ByteBuffer.wrap(value.asInstanceOf[Array[Byte]])
-      case ARRAY => value.asInstanceOf[Iterable[Any]].map(deriveValue(schemaField.getElementType, _)).asJava
-      case ENUM => new EnumSymbol(schemaField, value)
-      case MAP => value.asInstanceOf[Map[String, _]].mapValues(deriveValue(schemaField.getValueType, _)).asJava
-      case UNION => value match {
-        case None => null
-        case Some(x) => deriveValue(schemaField.getTypes.get(1), x)
-      }
-      //TODO case FIXED if schemaField.getProp("runtime") == "uuid" =>
-      case FIXED if schemaField.getProp("runtime") == "int" || value.isInstanceOf[Int] =>
-        new GenericData.Fixed(schemaField, ByteUtils.intValue(value.asInstanceOf[Int]))
-      case FIXED if schemaField.getProp("runtime") == "long" || value.isInstanceOf[Long] =>
-        new GenericData.Fixed(schemaField, ByteUtils.longValue(value.asInstanceOf[Long]))
-      case FIXED =>
-        val result: Array[Byte] = AvroRecord.stringToFixed(value.toString, schemaField.getFixedSize)
-        new GenericData.Fixed(schemaField, result)
-      case otherAvroType => value match {
-        case ref: AnyRef => ref
-        case any => throw new NotImplementedError(s"Unsupported type conversion from scala $any to avro $otherAvroType")
-      }
-    }
-  }
-
   private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
     def getOrInitialize(fqn: String): universe.Mirror = {
       getOrInitialize(fqn, new Supplier[Mirror] {
@@ -269,15 +237,14 @@ object AvroRecord extends AvroExtractors {
     readDatum(record, tpe, schema)
   }
 
-  //TODO instead Any, this method should be readDatum[T: TypeTag](...):T because there are some unchecked .asInstanceOf[T]
-  def readDatum[T: TypeTag](datum: Any, tpe: Type, schema: Schema): Any = {
+  def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
     schema.getType match {
-      case BOOLEAN => new java.lang.Boolean(datum.asInstanceOf[Boolean])
-      case INT => new java.lang.Integer(datum.asInstanceOf[Int])
+      case BOOLEAN => datum.asInstanceOf[Boolean]
+      case INT => datum.asInstanceOf[Int]
       case NULL => null
-      case FLOAT => new java.lang.Float(datum.asInstanceOf[Float])
-      case DOUBLE => new java.lang.Double(datum.asInstanceOf[Double])
-      case LONG => new java.lang.Long(datum.asInstanceOf[Long])
+      case FLOAT => datum.asInstanceOf[Float]
+      case DOUBLE => datum.asInstanceOf[Double]
+      case LONG => datum.asInstanceOf[Long]
       case BYTES => ByteUtils.bufToArray(datum.asInstanceOf[java.nio.ByteBuffer])
       case STRING if datum == null => null
       case STRING => String.valueOf(datum.asInstanceOf[Utf8])
@@ -290,7 +257,7 @@ object AvroRecord extends AvroExtractors {
         val arguments = record.getSchema.getFields.asScala.map { field =>
           readDatum(record.get(field.pos), params(field.pos), field.schema)
         }
-        constructorMirror(arguments: _*)
+        constructorMirror(arguments: _*).asInstanceOf[AvroRecord]
       case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
         .map { case (k, v) => (
           k.toString,
@@ -330,7 +297,6 @@ object AvroRecord extends AvroExtractors {
   }
 
   def inferSchema(obj: Any): Schema = {
-    //TODO use extractors here because the list is incomplete
     obj match {
       case container: GenericContainer => container.getSchema
       case null => AvroRecord.NULL_SCHEMA
@@ -419,13 +385,13 @@ object AvroRecord extends AvroExtractors {
               if (defaultDef == NoSymbol) {
                 field.noDefault()
               } else {
-                val defaultGetter = companionMirror.reflectMethod(defaultDef.asMethod)
-                field.withDefault(deriveValue(fieldSchema, defaultGetter()))
+                val fieldDefaultValue = companionMirror.reflectMethod(defaultDef.asMethod)()
+                field.withDefault(extract(fieldDefaultValue, List(fieldSchema)))
               }
           }
           assembler.endRecord()
         } else {
-          throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
+          throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
         }
       }
     })
@@ -442,11 +408,17 @@ abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
   override def getSchema: Schema = schema
 
+  // TODO there is a way to optimize writes by the get(i) method a) by caching the result b) when reading fields from generic, initialize the cache right away
+//  private[record] val generic = mutable.Map[Int, AnyRef]()
+//  final override def get(i: Int): AnyRef = generic.getOrElseUpdate(i, {
+//    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
+//  })
   final override def get(i: Int): AnyRef = {
-    AvroRecord.deriveValue(schema.getFields.get(i).schema(), fields(i).get(this))
+    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
   }
 
   final override def put(i: Int, v: scala.Any): Unit = {
     throw new AvroRuntimeException("Scala AvroRecord is immutable")
   }
+
 }

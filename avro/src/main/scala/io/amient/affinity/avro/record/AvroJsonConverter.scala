@@ -19,143 +19,76 @@
 
 package io.amient.affinity.avro.record
 
-import java.io.{StringWriter, Writer}
+import java.io.{ByteArrayOutputStream, OutputStream}
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
+import io.amient.affinity.avro.record.AvroRecord.extract
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData.EnumSymbol
-import org.apache.avro.generic.{GenericRecordBuilder, IndexedRecord}
+import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
+import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
-import org.codehaus.jackson.{JsonFactory, JsonGenerator, JsonNode}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
-import scala.collection.immutable.Seq
 import scala.util.Try
 
 object AvroJsonConverter {
 
-  private val jfactory = new JsonFactory()
-
-  def toJson(data: Any): String = {
-    val out = new StringWriter()
-    toJson(out, data)
+  def toJson(data: Any, pretty: Boolean = false): String = {
+    val out = new ByteArrayOutputStream()
+    toJson(out, data, pretty)
     out.toString()
   }
 
-  def toJson(writer: Writer, data: Any): Unit = toJson(writer, AvroRecord.inferSchema(data), data)
+  def toJson(out: OutputStream, data: Any, pretty: Boolean): Unit = toJson(out, AvroRecord.inferSchema(data), data, pretty)
 
-  def toJson(out: Writer, schema: Schema, data: Any): Unit = {
-    val gen: JsonGenerator = jfactory.createJsonGenerator(out)
-
-    //TODO use AvroExtractors with encoder instead of repeating the extraction logic
-    def generate(datum: Any, schemas: List[Schema]): Unit = {
-      require(schemas.size > 0, s"No schemas provided for datum: ${datum.getClass}")
-
-      def typeIsAllowed(t: Schema.Type) = schemas.exists(_.getType == t)
-
-      schemas.map(_.getType) match {
-        case Schema.Type.UNION :: Nil => generate(datum, schemas(0).getTypes.toList)
-        case _ => datum match {
-          case null if typeIsAllowed(Schema.Type.NULL) => gen.writeNull()
-          case null => throw new IllegalArgumentException("Illegal null value for schemas: " + schemas.map(_.getType).mkString(","))
-          case _ if typeIsAllowed(Schema.Type.ENUM) => gen.writeString(datum.toString)
-          case b: Boolean if typeIsAllowed(Schema.Type.BOOLEAN) => gen.writeBoolean(b)
-          case b: Byte if typeIsAllowed(Schema.Type.INT) => gen.writeNumber(b)
-          case i: Int if typeIsAllowed(Schema.Type.INT) => gen.writeNumber(i)
-          case l: Long if typeIsAllowed(Schema.Type.LONG) => gen.writeNumber(l)
-          case f: Float if typeIsAllowed(Schema.Type.FLOAT) => gen.writeNumber(f)
-          case d: Double if typeIsAllowed(Schema.Type.DOUBLE) => gen.writeNumber(d)
-          case s: String if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s)
-          case s: Utf8 if typeIsAllowed(Schema.Type.STRING) => gen.writeString(s.toString)
-          case b: java.nio.ByteBuffer if typeIsAllowed(Schema.Type.BYTES) => gen.writeBinary(b.array()) //FIXME #123
-          case b: Array[Byte] if typeIsAllowed(Schema.Type.FIXED) => gen.writeBinary(b)
-          case r: IndexedRecord if typeIsAllowed(Schema.Type.RECORD) =>
-            gen.writeStartObject()
-            val s = schemas.find(_.getType == Schema.Type.RECORD).get
-            s.getFields.zipWithIndex.foreach { case (f, i) =>
-              gen.writeFieldName(f.name())
-              generate(r.get(i), List(f.schema()))
-            }
-            gen.writeEndObject()
-          case i: Seq[_] if typeIsAllowed(Schema.Type.ARRAY) =>
-            val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)
-            gen.writeStartArray()
-            i.foreach(generate(_, s))
-            gen.writeEndArray()
-          case i: Iterable[_] if typeIsAllowed(Schema.Type.ARRAY) =>
-            val s = schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)
-            gen.writeStartArray()
-            i.toSeq.foreach(generate(_, s))
-            gen.writeEndArray()
-          case w: java.util.AbstractCollection[_] if schemas.exists(_.getType == Schema.Type.ARRAY) =>
-            gen.writeStartArray()
-            w.toSeq.foreach(generate(_, schemas.filter(_.getType == Schema.Type.ARRAY).map(_.getElementType)))
-            gen.writeEndArray()
-          case i: Map[_, _] if typeIsAllowed(Schema.Type.MAP) =>
-            gen.writeStartObject()
-            val s = schemas.filter(_.getType == Schema.Type.MAP).map(_.getValueType)
-            i.toSeq.foreach { case (k, v) =>
-              gen.writeFieldName(k.toString)
-              generate(v, s)
-            }
-            gen.writeEndObject()
-          case i: java.util.Map[_, _] if typeIsAllowed(Schema.Type.MAP) =>
-            gen.writeStartObject()
-            val s = schemas.filter(_.getType == Schema.Type.MAP).map(_.getValueType)
-            i.toSeq.foreach { case (k, v) =>
-              gen.writeFieldName(k.toString)
-              generate(v, s)
-            }
-            gen.writeEndObject()
-          case x => throw new IllegalArgumentException(s"Unsupported avro-json conversion for ${x.getClass} and the following schemas: { ${schemas.mkString(",")} }")
-        }
-      }
-    }
-
-    generate(data, List(schema))
-    gen.flush()
+  def toJson(out: OutputStream, schema: Schema, data: Any, pretty: Boolean): Unit = {
+    val encoder: JsonEncoder = new JsonEncoder(schema, out, pretty)
+    val writer = new GenericDatumWriter[Any](schema)
+    writer.write(extract(data, List(schema)), encoder)
+    encoder.flush()
   }
 
   private val mapper = new ObjectMapper()
 
-  def toAvro(data: String, schema: Schema): Any = {
+  def toAvro(json: String, schema: Schema): Any = {
 
-    //TODO    val parser = jfactory.createJsonParser(data)
-
-    def to(data: JsonNode, schema: Schema): Any = {
+    def to(json: JsonNode, schema: Schema): Any = {
       schema.getType match {
-        case Schema.Type.NULL if data.isNull => null
-        case Schema.Type.INT if data.isNumber => data.getIntValue
-        case Schema.Type.LONG if data.isNumber => data.getLongValue
-        case Schema.Type.FLOAT if data.isNumber => data.getDoubleValue.toFloat
-        case Schema.Type.DOUBLE if data.isNumber => data.getDoubleValue
-        case Schema.Type.STRING if data.isTextual => new Utf8(data.getTextValue)
+        case Schema.Type.NULL if json.isNull => null
+        case Schema.Type.BOOLEAN if json.isBoolean => json.getBooleanValue
+        case Schema.Type.INT if json.isNumber => json.getIntValue
+        case Schema.Type.LONG if json.isNumber => json.getLongValue
+        case Schema.Type.FLOAT if json.isNumber => json.getDoubleValue.toFloat
+        case Schema.Type.DOUBLE if json.isNumber => json.getDoubleValue
+        case Schema.Type.STRING if json == null => new Utf8()
+        case Schema.Type.STRING if json.isTextual => new Utf8(json.getTextValue)
         case Schema.Type.UNION if schema.getTypes.size == 2 && schema.getTypes.get(0).getType == Schema.Type.NULL =>
-          schema.getTypes.toIterator.map(s => Try(to(data, s))).find(_.isSuccess).map(_.get).get
-        case Schema.Type.ARRAY if data.isArray => data.getElements.map(x => to(x, schema.getElementType)).toList.asJava
-        case Schema.Type.MAP if data.isObject =>
+          schema.getTypes.map(s => Try(to(json, s))).find(_.isSuccess).map(_.get).get
+        case Schema.Type.ARRAY if json.isArray => json.getElements.map(x => to(x, schema.getElementType)).toList.asJava
+        case Schema.Type.MAP if json.isObject =>
           val builder = Map.newBuilder[String, Any]
           schema.getFields foreach { field =>
-            builder += field.name -> to(data.get(field.name), field.schema)
+            builder += field.name -> to(json.get(field.name), field.schema)
           }
           builder.result.asJava
-        case Schema.Type.ENUM if data.isTextual => new EnumSymbol(schema, data.getTextValue)
-        //TODO Schema.Type.BYTES => Array[Byte] =>
-        //TODO Schema.Type.FIXED if runtime == "int" => ByteUtils..
-        //TODO Schema.Type.FIXED if runtime == "long" => ByteUtils..
-        //TODO Schema.Type.FIXED => AvroRecord.fixedToString(...)
-        case Schema.Type.RECORD if data.isObject =>
+        case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.getTextValue)
+        case Schema.Type.BYTES => ByteBuffer.wrap(json.getTextValue.getBytes(StandardCharsets.UTF_8))
+        case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getTextValue.getBytes(StandardCharsets.UTF_8))
+        case Schema.Type.RECORD if json.isObject =>
           val builder = new GenericRecordBuilder(schema)
           schema.getFields foreach { field =>
-            val d = data.get(field.name)
+            val d = json.get(field.name)
             builder.set(field, to(d, field.schema()))
           }
           builder.build()
-        case _ => throw new IllegalArgumentException(s"Can't convert ${data} using schema: $schema")
+        case _ => throw new IllegalArgumentException(s"Can't convert ${json} using schema: $schema")
       }
     }
 
-    AvroRecord.read(to(mapper.readTree(data), schema), schema)
+    AvroRecord.read(to(mapper.readTree(json), schema), schema)
   }
 }

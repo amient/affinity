@@ -60,9 +60,9 @@ class ExampleGatewayRoot extends GatewayHttp {
   val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   override def handleException(headers: List[HttpHeader] = List()): PartialFunction[Throwable, HttpResponse] = {
-    case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized" -> e.getMessage)
-    case e: NoSuchElementException => Encoder.json(NotFound, "Haven't got that" -> e.getMessage)
-    case e: IllegalArgumentException => Encoder.json(BadRequest, "BadRequest" -> e.getMessage)
+    case e: IllegalAccessException => Encoder.json(NotFound, "Unauthorized")
+    case e: NoSuchElementException => Encoder.json(NotFound, "Haven't got that")
+    case e: IllegalArgumentException => Encoder.json(BadRequest, "BadRequest")
     case e: UnsupportedOperationException => Encoder.json(NotImplemented, "Probably maintenance- Please try again..")
     case NonFatal(e) =>
       e.printStackTrace()

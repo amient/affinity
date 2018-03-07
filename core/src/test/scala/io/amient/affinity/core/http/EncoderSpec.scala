@@ -34,8 +34,13 @@ class EncoderSpec extends FlatSpec with Matchers {
     Encoder.json(Map("a" -> "hello", "b" -> 123)) should be ("{\"a\":\"hello\",\"b\":123}")
   }
 
-  "Encoder" should "automatically format Products" in {
-    Encoder.json(("hello", 123)) should be ("[\"hello\",123]")
+  "Encoder" should "automatically format primitives and options" in {
+    Encoder.json(null) should be ("null")
+    Encoder.json(100) should be ("100")
+    Encoder.json(1000L) should be ("1000")
+    Encoder.json("text") should be ("\"text\"")
+    Encoder.json(None) should be ("null")
+    Encoder.json(Some(100)) should be ("100")
   }
 
 }

@@ -19,7 +19,8 @@
 
 package io.amient.affinity.core.http
 
-import java.io.{ByteArrayOutputStream, OutputStreamWriter, Writer}
+import java.io.{ByteArrayOutputStream, OutputStream, OutputStreamWriter}
+import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPOutputStream
 
 import akka.http.scaladsl.model._
@@ -39,7 +40,7 @@ object Encoder {
   def json(value: Any): String = {
     val out = new ByteArrayOutputStream()
     val writer = new OutputStreamWriter(out)
-    jsonWrite(value, writer)
+    jsonWrite(value, out)
     val result = out.toString("UTF-8")
     writer.close()
     result
@@ -54,72 +55,66 @@ object Encoder {
   }
 
   def json(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`application/json`, gzip) { (writer) =>
-      jsonWrite(value, writer)
-      writer.close()
+    encode(ContentTypes.`application/json`, gzip) { (out) =>
+      jsonWrite(value, out)
+      out.close()
     }
   }
 
-  private def jsonWrite(value: Any, writer: Writer): Unit = {
+  private def jsonWrite(value: Any, out: OutputStream): Unit = {
 
-    def jsonWriteRecursive(value: Any, writer: Writer): Unit = {
+    def jsonWriteRec(value: Any) {
       value match {
-        case j: JsonNode => writer.append(j.toString())
-        case null => writer.append("null")
-        case b: Boolean => writer.append(b.toString)
-        case b: Byte => writer.append(b.toString)
-        case i: Int => writer.append(i.toString)
-        case l: Long => writer.append(l.toString)
-        case f: Float => writer.append(f.toString)
-        case d: Double => writer.append(d.toString)
-        case s: String => writer.append("\"").append(s.replace("\"", "\\\"")).append("\"")
-        case record: IndexedRecord =>
-          val schema = record.getSchema
-          writer.append("{\"type\":\"" + schema.getFullName+ "\",\"data\":")
-          writer.flush
-          AvroJsonConverter.toJson(writer, schema, value)
-          writer.append("}")
-          writer.flush
-
-        case None => jsonWriteRecursive(null, writer)
-        case Some(optional) => jsonWriteRecursive(optional, writer)
+        case null => out.write("null".getBytes)
+        case None => jsonWriteRec(null)
+        case Some(x) => jsonWrite(x, out)
+        case j: JsonNode => out.write(j.toString.getBytes(StandardCharsets.UTF_8))
         case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_, _)] && i.head.asInstanceOf[(_, _)]._1.isInstanceOf[String]) =>
-          writer.append("{")
-          writer.flush()
+          out.write("{".getBytes)
+          out.flush()
           var first = true
           i.foreach { case (k, v) =>
             if (first) first = false
             else {
-              writer.append(",")
-              writer.flush()
+              out.write(",".getBytes)
+              out.flush()
             }
-            jsonWriteRecursive(k, writer)
-            writer.append(":")
-            writer.flush()
-            jsonWriteRecursive(v, writer)
+            jsonWriteRec(k)
+            out.write(":".getBytes)
+            out.flush()
+            jsonWrite(v, out)
           }
-          writer.append("}")
-          writer.flush()
+          out.write("}".getBytes)
+          out.flush()
         case i: TraversableOnce[_] =>
-          writer.append("[")
-          writer.flush()
+          out.write("[".getBytes)
+          out.flush()
           var first = true
           i.foreach { el =>
             if (first) first = false
             else {
-              writer.append(",")
-              writer.flush()
+              out.write(",".getBytes)
+              out.flush()
             }
-            jsonWriteRecursive(el, writer)
+            jsonWrite(el, out)
           }
-          writer.append("]")
-          writer.flush()
-        case p: Product => jsonWriteRecursive(p.productIterator, writer)
-        case other => throw new IllegalArgumentException(s"Unsupported Conversion for type ${other.getClass}")
+          out.write("]".getBytes)
+          out.flush()
+
+        case other => AvroJsonConverter.toJson(out, other, false)
       }
     }
-    jsonWriteRecursive(value, writer)
-    writer.flush()
+
+    value match {
+      case record: IndexedRecord =>
+        val schema = record.getSchema
+        out.write(("{\"type\":\"" + schema.getFullName + "\",\"data\":").getBytes(StandardCharsets.UTF_8))
+        out.flush
+        AvroJsonConverter.toJson(out, schema, value, false)
+        out.write("}".getBytes(StandardCharsets.UTF_8))
+        out.flush
+      case other => jsonWriteRec(other)
+    }
   }
 
   def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
@@ -130,9 +125,9 @@ object Encoder {
   }
 
   def html(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`text/html(UTF-8)`, gzip) { (writer) =>
-      writer.append(value.toString)
-      writer.close()
+    encode(ContentTypes.`text/html(UTF-8)`, gzip) { (out) =>
+      out.write(value.toString.getBytes(StandardCharsets.UTF_8))
+      out.close()
     }
   }
 
@@ -144,18 +139,17 @@ object Encoder {
   }
 
   def text(value: Any, gzip: Boolean): MessageEntity = {
-    encode(ContentTypes.`text/plain(UTF-8)`, gzip) { (writer) =>
-      writer.append(value.toString)
-      writer.close()
+    encode(ContentTypes.`text/plain(UTF-8)`, gzip) { (out) =>
+      out.write(value.toString.getBytes(StandardCharsets.UTF_8))
+      out.close()
     }
   }
 
-  private def encode(contentType: ContentType, gzip: Boolean )(f: (Writer) => Unit): MessageEntity = {
+  private def encode(contentType: ContentType, gzip: Boolean)(f: (OutputStream) => Unit): MessageEntity = {
 
     val out = new ByteBufferOutputStream()
     val gout = if (gzip) new GZIPOutputStream(out) else out
-    val writer = new OutputStreamWriter(gout)
-    f(writer)
+    f(gout)
     val buffers = out.getBufferList
 
     buffers.size match {

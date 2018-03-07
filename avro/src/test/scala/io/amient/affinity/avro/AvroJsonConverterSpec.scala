@@ -28,20 +28,36 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
 
   it should "serialize to and from case class <-> avro <-> json with identical result to circe lib" in {
     val msg = AvroNamedRecords(SimpleKey(99), Some(SimpleKey(99)), None, List(SimpleKey(99), SimpleKey(100)), List(None, Some(SimpleKey(99)), None))
-    val avroJson = AvroJsonConverter.toJson(msg)
-
+    val avroJson = AvroJsonConverter.toJson(msg, false)
     avroJson should be ("{\"e\":{\"id\":99},\"rn\":{\"id\":99},\"rs\":null,\"l\":[{\"id\":99},{\"id\":100}],\"lo\":[null,{\"id\":99},null]}")
-
     AvroJsonConverter.toAvro(avroJson, msg.getSchema()) should be (msg)
-
-    val msg2 = AvroEnums(SimpleEnum.B, Some(SimpleEnum.B), None, List(SimpleEnum.A, SimpleEnum.B), List(None, Some(SimpleEnum.B)))
-    val avroJson2 = AvroJsonConverter.toJson(msg2)
-    avroJson2 should be("{\"raw\":\"B\",\"on\":\"B\",\"sd\":null,\"l\":[\"A\",\"B\"],\"lo\":[null,\"B\"]}")
-    AvroJsonConverter.toAvro(avroJson2, msg2.getSchema()) should be (msg2)
-
   }
 
-  it should "serailize fixed field variants" ignore {
+  it should "handle primitives, strings and nulls" in {
+    val msg = AvroPrmitives()
+    val avroJson = AvroJsonConverter.toJson(msg)
+    avroJson should be("{\"bn\":null,\"bs\":true,\"in\":null,\"is\":-2147483648,\"ln\":null,\"ls\":-9223372036854775808,\"fn\":null,\"fs\":-3.4028235E38,\"dn\":null,\"ds\":-1.7976931348623157E308,\"sn\":null,\"ss\":\"Hello\"}")
+    AvroJsonConverter.toAvro(avroJson, msg.getSchema()) should be (msg)
+  }
+
+  it should "handle enums" in {
+    val msg = AvroEnums(SimpleEnum.B, Some(SimpleEnum.B), None, List(SimpleEnum.A, SimpleEnum.B), List(None, Some(SimpleEnum.B)))
+    val avroJson = AvroJsonConverter.toJson(msg)
+    avroJson should be("{\"raw\":\"B\",\"on\":\"B\",\"sd\":null,\"l\":[\"A\",\"B\"],\"lo\":[null,\"B\"]}")
+    AvroJsonConverter.toAvro(avroJson, msg.getSchema()) should be (msg)
+  }
+
+  it should "handle bytes" in {
+    val msg = AvroBytes(Array[Byte](1,2,3), Some(Array[Byte]()), List(Array[Byte](1,2,3), Array[Byte](4)))
+    val avroJson = AvroJsonConverter.toJson(msg)
+    val avroMsg = AvroJsonConverter.toAvro(avroJson, msg.getSchema()).asInstanceOf[AvroBytes]
+    avroMsg.raw should be (Array[Byte](1,2,3))
+    avroMsg.optional.get should be (Array[Byte]())
+    avroMsg.listed(0) should be(Array[Byte](1,2,3))
+    avroMsg.listed(1) should be(Array[Byte](4))
+  }
+
+  it should "handle fixed field variants" in {
     val msg = LongCompoundKey(100L, "UK", "C001", 9.9)
     val avroJson = AvroJsonConverter.toJson(msg)
     println(avroJson)
