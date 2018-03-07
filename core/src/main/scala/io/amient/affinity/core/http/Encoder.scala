@@ -67,7 +67,7 @@ object Encoder {
       value match {
         case null => out.write("null".getBytes)
         case None => jsonWriteRec(null)
-        case Some(x) => jsonWriteRec(x)
+        case Some(x) => jsonWrite(x, out)
         case j: JsonNode => out.write(j.toString.getBytes(StandardCharsets.UTF_8))
         case i: Iterable[_] if (i.size > 0 && i.head.isInstanceOf[(_, _)] && i.head.asInstanceOf[(_, _)]._1.isInstanceOf[String]) =>
           out.write("{".getBytes)
