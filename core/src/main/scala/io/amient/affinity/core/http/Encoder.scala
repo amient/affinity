@@ -100,6 +100,7 @@ object Encoder {
           }
           out.write("]".getBytes)
           out.flush()
+
         case other => AvroJsonConverter.toJson(out, other, false)
       }
     }
@@ -144,9 +145,7 @@ object Encoder {
     }
   }
 
-  private def encode(contentType: ContentType, gzip: Boolean)(f: (OutputStream) => Unit): MessageEntity
-
-  = {
+  private def encode(contentType: ContentType, gzip: Boolean)(f: (OutputStream) => Unit): MessageEntity = {
 
     val out = new ByteBufferOutputStream()
     val gout = if (gzip) new GZIPOutputStream(out) else out

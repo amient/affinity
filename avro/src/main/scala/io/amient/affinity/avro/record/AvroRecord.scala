@@ -391,7 +391,7 @@ object AvroRecord extends AvroExtractors {
           }
           assembler.endRecord()
         } else {
-          throw new IllegalArgumentException("Unsupported Avro Case Class type " + tpe.toString)
+          throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
         }
       }
     })

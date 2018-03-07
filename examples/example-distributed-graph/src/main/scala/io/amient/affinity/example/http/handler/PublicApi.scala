@@ -73,7 +73,7 @@ trait PublicApi extends ExampleGatewayRoot {
             }
         }
       } catch {
-        case e: IllegalAccessError => response.success(Encoder.json(Unauthorized, "Unauthorized, expecting " -> e.getMessage))
+        case e: IllegalAccessError => response.success(Encoder.json(Unauthorized, "Unauthorized"))
         case e: Throwable => response.success(handleException(e))
       }
     }
