@@ -79,7 +79,7 @@ trait AvroSchemaRegistry extends Closeable {
     * @param other schema version
     * @return
     */
-  final def getRuntimeSchema(other: Schema): (Int, Schema) = getRuntimeSchema(fqn = other.getFullName)
+  final def getRuntimeSchema(other: Schema): (Int, Schema) = FQNs.getOrInitialize(other.getFullName)
 
   /**
     *
@@ -136,8 +136,13 @@ trait AvroSchemaRegistry extends Closeable {
     def getOrInitialize(fqn: String): (Int, Schema) = {
       getOrInitialize(fqn, new Supplier[(Int, Schema)] {
         override def get(): (Int, Schema) = {
-          val schema = AvroRecord.inferSchema(fqn)
-          (Versions.getOrInitialize(schema.getFullName, schema), schema)
+          try {
+            val schema = AvroRecord.inferSchema(fqn)
+            (Versions.getOrInitialize(schema.getFullName, schema), schema)
+          } catch {
+            //the fact that there is no runtime class for this schema will be also cached
+            case _: java.lang.ClassNotFoundException => (-1, null)
+          }
         }
       })
     }

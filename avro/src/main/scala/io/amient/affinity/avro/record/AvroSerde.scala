@@ -176,10 +176,17 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
     val writerSchema = getSchema(schemaId)
     val (_, readerSchema) = getRuntimeSchema(writerSchema)
-    //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
-    val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-    val record = reader.read(null, decoder)
-    AvroRecord.read(record, readerSchema)
+    if (readerSchema == null) {
+      //if runtime/readerSchema could not be determinted, the best we can do is return a generic record how it was written
+      //TODO this doesn't have any test to protected against regression
+      val reader = new GenericDatumReader[Any](writerSchema)
+      reader.read(null, decoder)
+    } else {
+      //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
+      val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
+      val record = reader.read(null, decoder)
+      AvroRecord.read(record, readerSchema)
+    }
   }
 
   /**

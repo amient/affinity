@@ -367,6 +367,7 @@ trait WebSocketSupport extends GatewayHttp {
         case text: TextMessage =>
           val schemaFqn = text.getStrictText
           val (schemaId, _) = avroSerde.getRuntimeSchema(schemaFqn)
+          require(schemaId >= 0, s"Could not determine runtime schema for $schemaFqn")
           upstream ! buildSchemaPushMessage(schemaId)
         case binary: BinaryMessage =>
           try {
