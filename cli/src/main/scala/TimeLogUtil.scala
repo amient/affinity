@@ -27,8 +27,10 @@ object TimeLogUtil {
   private var plotted = false
 
   def apply(args: List[String]): Unit = args match {
-    case bootstrap :: topic :: partition :: fuzz :: fromDT :: toDT :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(fromDT, toDT))
-    case bootstrap :: topic :: partition :: fuzz :: fromDT :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.since(fromDT))
+    case bootstrap :: topic :: partition :: fuzz :: from :: until :: Nil if (from.contains("T")) => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(from, until))
+    case bootstrap :: topic :: partition :: fuzz :: from :: Nil if (from.contains("T")) => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.since(from))
+    case bootstrap :: topic :: partition :: fuzz :: from :: until :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.UNBOUNDED, from.toLong -> until.toLong)
+    case bootstrap :: topic :: partition :: fuzz :: from :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.UNBOUNDED, from.toLong -> Long.MaxValue)
     case bootstrap :: topic :: partition :: fuzz :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt)
     case bootstrap :: topic :: partition :: Nil => apply(bootstrap, topic, partition.toInt)
     case bootstrap :: topic :: Nil => apply(bootstrap, topic)
@@ -43,10 +45,13 @@ object TimeLogUtil {
     println("Available partitions: 0 - " + (getKafkaLog(bootstrap, topic).getNumPartitions-1))
   }
 
-  def apply(bootstrap: String, topic: String, partition: Int, fuzzMinutes: Long = 5, range: TimeRange = TimeRange.UNBOUNDED) {
+  def apply(bootstrap: String, topic: String, partition: Int, fuzzMinutes: Long = 5, range: TimeRange = TimeRange.UNBOUNDED, offsetRange: (Long, Long) = (Long.MinValue, Long.MaxValue)) {
     val log = getKafkaLog(bootstrap, topic)
     logger.info(s"calculating compaction stats for range: $range..\n")
     log.reset(partition, range)
+    val (limitOffsetStart, limitOffsetStop) = offsetRange
+    if (limitOffsetStart> 0) log.reset(partition, limitOffsetStart)
+
     var blockmints = Long.MaxValue
     var blockmaxts = Long.MinValue
     var startpos = -1L
@@ -67,7 +72,7 @@ object TimeLogUtil {
       if (entry.timestamp > lastts - fuzzMinutes * 60000 && entry.timestamp < lastts + fuzzMinutes * 60000) return
       addblock()
     }
-    log.boundedIterator.asScala.foreach {
+    log.boundedIterator.asScala.takeWhile(_.position < limitOffsetStop).foreach {
       entry =>
         maybeAddBlock(entry)
         if (startpos == -1) startpos = entry.position
