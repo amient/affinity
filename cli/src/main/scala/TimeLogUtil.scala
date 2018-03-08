@@ -56,7 +56,7 @@ object TimeLogUtil {
     }
     log.boundedIterator.asScala.foreach {
       entry =>
-        if (startpos > -1 && entry.position > endpos + 1) addblock()
+//        if (startpos > -1 && entry.position > endpos + 1) addblock()
         if (lastts > -1 && entry.timestamp < lastts - fuzzMinutes * 60000) addblock()
         if (lastts > -1 && entry.timestamp > lastts + fuzzMinutes * 60000) addblock()
         if (startpos == -1) startpos = entry.position
@@ -101,7 +101,7 @@ object TimeLogUtil {
             if (h > 3) {
               builder.element(new Label(endpos.toString.reverse.padTo(19, ' ').reverse, x + w - 20, y + 2))
             }
-            if (w > 42) {
+            if (w > 42 || h > 4) {
               builder.element(new Label(startpos.toString, x + 1, y + h - 3))
               if (h > 3) {
                 builder.element(new Label(pretty(timerange.start).toString, x + 1, y + h - 2))
