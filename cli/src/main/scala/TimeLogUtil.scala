@@ -27,6 +27,8 @@ object TimeLogUtil {
   private var plotted = false
 
   def apply(args: List[String]): Unit = args match {
+    case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: toOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(from, until), fromOffset.toLong -> toOffset.toLong)
+    case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(from, until), fromOffset.toLong -> Long.MaxValue)
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: Nil if (from.contains("T")) => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(from, until))
     case bootstrap :: topic :: partition :: fuzz :: from :: Nil if (from.contains("T")) => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.since(from))
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.UNBOUNDED, from.toLong -> until.toLong)
