@@ -63,7 +63,7 @@ object TimeLogUtil {
     def maybeAddBlock(entry: LogEntry[java.lang.Long]): Unit = {
       if (lastts == Long.MinValue) return
       if (entry.timestamp > lastts - fuzzMinutes * 60000 && entry.timestamp < lastts + fuzzMinutes * 60000) return
-      println(s"${entry.timestamp} > $lastts - $fuzzMinutes * 60000 && ${entry.timestamp} < $lastts + $fuzzMinutes * 60000}")
+      println(s"'${EventTime.local(lastts - fuzzMinutes * 60000)} < ${EventTime.local(entry.timestamp)}  > ${EventTime.local(lastts + fuzzMinutes * 60000)}")
       addblock()
 
 
