@@ -20,7 +20,7 @@ object TimeLogUtil {
   }
 
   def printHelp(): Unit = {
-    "Usage: timelog <kafka-bootstarp> <topic> [<partition> [<fuzz-minutes>]]"
+    println("Usage: timelog <kafka-bootstrap> <topic> [<partition> [<fuzz-minutes>]]\n")
   }
 
   def apply(bootstrap: String, topic: String): Unit = {
@@ -84,8 +84,6 @@ object TimeLogUtil {
     val height = 41
     val footer = 0
     builder.width(width).height(height)
-//    builder.element(new Label("|" + pretty(minTimestamp).toString, 0, height-2))
-//    builder.element(new Label(pretty(maxTimestamp).toString+"|", width - 21, height-2))
     val xratio = width.toDouble / (maxTimestamp - minTimestamp)
     val yratio = (height-footer).toDouble / (maxPosition - minPosition)
     blocks.result().foreach {
