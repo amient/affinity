@@ -1,17 +1,19 @@
-import com.indvd00m.ascii.render.{Point, Region, Render}
 import com.indvd00m.ascii.render.api.{ICanvas, IContextBuilder, IRender}
-import com.indvd00m.ascii.render.elements.{Dot, Label, Line, Rectangle}
-import com.indvd00m.ascii.render.elements.plot.{Axis, AxisLabels}
+import com.indvd00m.ascii.render.elements.{Label, Line, Rectangle}
+import com.indvd00m.ascii.render.{Point, Render}
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.core.storage.{LogEntry, LogStorage, LogStorageConf}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.kafka.KafkaLogStorage
 import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
 object TimeLogUtil {
+
+  private val logger = LoggerFactory.getLogger(this.getClass)
 
   val width = 180
   val height = 41
@@ -43,7 +45,7 @@ object TimeLogUtil {
 
   def apply(bootstrap: String, topic: String, partition: Int, fuzzMinutes: Long = 5, range: TimeRange = TimeRange.UNBOUNDED) {
     val log = getKafkaLog(bootstrap, topic)
-    println(s"calculating compaction stats for range: $range..\n")
+    logger.info(s"calculating compaction stats for range: $range..\n")
     log.reset(partition, range)
     var blockmints = Long.MaxValue
     var blockmaxts = Long.MinValue
@@ -53,7 +55,7 @@ object TimeLogUtil {
     def addblock(): Unit = {
       val timerange: TimeRange = new TimeRange(blockmints, blockmaxts)
       blocks += ((timerange, startpos, endpos))
-      println(s"Block $startpos : $endpos -> $timerange")
+      logger.info(s"Block $startpos : $endpos -> $timerange")
       startpos = -1L
       endpos = -1L
       blockmaxts = Long.MinValue
@@ -80,16 +82,16 @@ object TimeLogUtil {
         numRecords += 1
     }
     if (startpos > -1) addblock()
-    println("number of records: " + numRecords)
-    println("minimum timestamp: " + pretty(minTimestamp))
-    println("maximum timestamp: " + pretty(maxTimestamp))
-    println("minimum offset: " + minPosition)
-    println("maximum offset: " + maxPosition)
+    logger.info("number of records: " + numRecords)
+    logger.info("minimum timestamp: " + pretty(minTimestamp))
+    logger.info("maximum timestamp: " + pretty(maxTimestamp))
+    logger.info("minimum offset: " + minPosition)
+    logger.info("maximum offset: " + maxPosition)
     plot(blocks.toList)
   }
 
   private def getKafkaLog(bootstrap: String, topic: String): KafkaLogStorage = {
-    println(s"initializing $bootstrap / $topic")
+    logger.info(s"initializing $bootstrap / $topic")
     val conf = new LogStorageConf().apply(ConfigFactory.parseMap(Map(
       LogStorage.StorageConf.Class.path -> classOf[KafkaLogStorage].getName(),
       KafkaStorageConf.BootstrapServers.path -> bootstrap,
