@@ -23,7 +23,8 @@ import java.io.NotSerializableException
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.serialization._
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
+import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.core.serde.primitive.ByteArraySerde
 
 import scala.collection.immutable
@@ -65,7 +66,9 @@ object Serde {
   def tools(config: Config): Serdes = {
     _tools.get(config) match {
       case null => {
-        val s = new Serdes(config)
+        val s = new Serdes(config
+          .withFallback(AffinityActorSystem.defaultConfig)
+          .withFallback(ConfigFactory.defaultReference))
         _tools.putIfAbsent(config, s) match {
           case null => s
           case some => some

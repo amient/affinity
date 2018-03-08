@@ -130,7 +130,7 @@ class AkkaSerializationSpec extends IntegrationTestBase {
     }
 
     "be constructible from a simple Config" in {
-      Serde.of[List[Long]](ConfigFactory.defaultReference.withValue(
+      Serde.of[List[Long]](ConfigFactory.empty.withValue(
         Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName)))
         .isInstanceOf[SeqSerde] should be(true)
     }

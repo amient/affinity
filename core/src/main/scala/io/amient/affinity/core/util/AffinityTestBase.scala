@@ -59,13 +59,12 @@ trait AffinityTestBase {
 
   implicit def nodeToNodeWithTestMethods(node: Node): NodeWithTestMethods = new NodeWithTestMethods(node)
 
-  final def configure(): Config = configure(ConfigFactory.defaultReference)
+  final def configure(): Config = configure(ConfigFactory.empty)
 
   final def configure(config: Config): Config = configure(config, None, None)
 
   final def configure(confname: String, zkConnect: Option[String] = None, kafkaBootstrap: Option[String] = None): Config = {
-    configure(ConfigFactory.load(confname)
-      .withFallback(ConfigFactory.defaultReference), zkConnect, kafkaBootstrap)
+    configure(ConfigFactory.load(confname), zkConnect, kafkaBootstrap)
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {

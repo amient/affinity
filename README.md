@@ -286,11 +286,12 @@ a single actor guarding it.
 
 # Configuration
 
-Affinity uses HOCON configuration which is layered on top of set of reference.conf files
-that includes Akka default and Affinity defaults.
-
-Applications typically have their own default configuration layered on top of the reference
-files and a set of thin, deployment specific conf files.
+Affinity uses HOCON configuration which has a default under core/affinity.conf.
+This file mostly contains akka defaults and is separate from Akka's reference.conf
+to avoid collisions. Applications typically have their own configuration layered
+on top of the default affinity.conf and these may themselves be multilayered - e.g.
+there is one conf file that describes the application without deployment details
+and then there are thin deployment-specific conf files for various environments.
 
 Internally Affinity has its own type-safe configuration abstraction that is initialized
 from the HOCON conf files. These type-safe configuration descriptors handle validation,

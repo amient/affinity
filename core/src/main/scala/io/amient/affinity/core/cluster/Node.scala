@@ -23,16 +23,16 @@ package io.amient.affinity.core.cluster
 import java.nio.file.Paths
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, Props}
 import akka.event.Logging
 import akka.util.Timeout
 import com.typesafe.config.Config
-import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor.Gateway.{GatewayClusterStatus, GatewayConf}
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
+import io.amient.affinity.{AffinityActorSystem, Conf}
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -61,7 +61,7 @@ class Node(config: Config) {
   val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
   val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
-  implicit val system = ActorSystem.create(actorSystemName, config)
+  implicit val system = AffinityActorSystem.create(actorSystemName, config)
 
   private val terminated = system.whenTerminated
 

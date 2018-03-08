@@ -19,10 +19,10 @@
 
 package io.amient.affinity.core.http
 
-import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethods.GET
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
+import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers.HTTP
@@ -35,7 +35,7 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
 
   def config = configure("tlstests")
 
-  val system = ActorSystem.create("TlsGatewayTest", config)
+  val system = AffinityActorSystem.create("TlsGatewayTest", config)
 
   val node = new Node(config)
 

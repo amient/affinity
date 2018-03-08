@@ -24,6 +24,7 @@ import java.util
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.ConfigFactory
+import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.Murmur2Partitioner
 import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
@@ -58,9 +59,8 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
 
     val key = "6290853012217500191217"
 
-    val system = ActorSystem.create("test",
-      ConfigFactory.parseMap(cfg.map { case (k, v) => ("affinity.avro." + k, v) })
-        .withFallback(ConfigFactory.defaultReference()))
+    val system = AffinityActorSystem.create("test",
+      ConfigFactory.parseMap(cfg.map { case (k, v) => ("affinity.avro." + k, v) }))
     val akkaSerializedKey = try {
       val serialization = SerializationExtension(system)
       serialization.serialize(key).get

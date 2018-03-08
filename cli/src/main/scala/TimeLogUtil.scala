@@ -24,7 +24,6 @@ object TimeLogUtil {
   private var minPosition = Long.MaxValue
   private var numRecords = 0
   private val blocks = ListBuffer[(TimeRange, Long, Long)]()
-  private var plotted = false
 
   def apply(args: List[String]): Unit = args match {
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: toOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(from, until), fromOffset.toLong -> toOffset.toLong)
@@ -116,7 +115,6 @@ object TimeLogUtil {
   }
 
   private def plot(blocks: List[(TimeRange, Long, Long)]) {
-    if (plotted) print(String.format("\033[2J"))
     val render: IRender = new Render
     val builder: IContextBuilder = render.newBuilder
     builder.width(width).height(height)

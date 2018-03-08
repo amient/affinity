@@ -21,11 +21,11 @@ package io.amient.affinity.avro
 
 import java.nio.file.Files
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import org.apache.avro.Schema
 
 import scala.collection.JavaConverters._
@@ -46,8 +46,7 @@ object LocalSchemaRegistry {
 
 class LocalSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
 
-  val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
-  val conf = new LocalAvroConf().apply(merged)
+  val conf = new LocalAvroConf().apply(config)
   val dataPath = conf.DataPath()
 
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)

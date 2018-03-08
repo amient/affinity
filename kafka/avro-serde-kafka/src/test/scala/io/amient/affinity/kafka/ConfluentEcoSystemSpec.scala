@@ -69,7 +69,6 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
   val config = ConfigFactory.parseMap(Map(
       Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName,
       CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path -> registryUrl))
-    .withFallback(ConfigFactory.defaultReference)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val topic = "visibility-test"

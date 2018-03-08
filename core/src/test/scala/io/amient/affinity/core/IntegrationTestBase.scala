@@ -25,11 +25,11 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Keyspace.KeyspaceStatus
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.http.HttpExchange
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, Matchers, Suite, WordSpecLike}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -41,10 +41,9 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
 
   self: Suite =>
 
-  val system: ActorSystem = ActorSystem.create("IntegrationTestSystem",
-    ConfigFactory.load("integrationtests").withValue(
-      EmbedConf(Conf.Affi.Coordinator).ID.path, ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet()))
-  )
+  val system: ActorSystem = AffinityActorSystem.create("IntegrationTestSystem",
+    ConfigFactory.load("integrationtests").withValue(EmbedConf(Conf.Affi.Coordinator).ID.path,
+      ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet())))
 
   implicit val materializer = ActorMaterializer.create(system)
 

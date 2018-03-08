@@ -22,7 +22,7 @@ package io.amient.affinity.avro
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.Config
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
@@ -49,8 +49,7 @@ object ConfluentSchemaRegistry {
 class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends AvroSerde with AvroSchemaRegistry {
 
   def this(config: Config) = this {
-    val merged = config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path))
-    val conf = CfAvroConf(merged)
+    val conf = CfAvroConf(config)
     new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
   }
 

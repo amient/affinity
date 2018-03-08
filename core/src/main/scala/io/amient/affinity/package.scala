@@ -19,7 +19,8 @@
 
 package io.amient
 
-import com.typesafe.config.Config
+import akka.actor.ActorSystem
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.actor.Keyspace.KeyspaceConf
 import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
@@ -49,6 +50,13 @@ package object affinity {
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
     val Global: CfgGroup[StateConf] = group("global", classOf[StateConf], false)
     val Node = struct("node", new NodeConf)
+  }
+
+  object AffinityActorSystem {
+    val defaultConfig = ConfigFactory.parseResources(getClass.getClassLoader, "affinity.conf")
+    require(defaultConfig.hasPath("akka.actor.serializers.avro"))
+    def apply(config: Config): Config = config.withFallback(defaultConfig)
+    def create(name: String, config: Config): ActorSystem = ActorSystem.create(name, apply(config))
   }
 
 }

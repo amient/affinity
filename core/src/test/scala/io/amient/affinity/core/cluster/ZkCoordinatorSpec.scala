@@ -19,11 +19,11 @@
 
 package io.amient.affinity.core.cluster
 
-import akka.actor.ActorSystem
 import com.typesafe.config.ConfigValueFactory
+import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.{GatewayHttp, Routed}
-import io.amient.affinity.core.util.{Reply, AffinityTestBase}
+import io.amient.affinity.core.util.{AffinityTestBase, Reply}
 import io.amient.affinity.kafka.EmbeddedZooKeeper
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -39,7 +39,7 @@ class ZkCoordinatorSpec extends FlatSpec with AffinityTestBase with EmbeddedZooK
 
   def config = configure("distributedit", zkConnect = Some(zkConnect))
 
-  val system = ActorSystem.create("test", config)
+  val system = AffinityActorSystem.create("test", config)
   val node1 = new Node(config)
   node1.startGateway(new GatewayHttp {
 

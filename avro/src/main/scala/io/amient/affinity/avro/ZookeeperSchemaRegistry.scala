@@ -19,7 +19,7 @@
 
 package io.amient.affinity.avro
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
@@ -60,7 +60,7 @@ class ZookeeperSchemaRegistry(zkRoot: String, zk: ZkClient) extends AvroSerde wi
   })
 
   def this(config: Config) = this {
-    new ZkAvroConf().apply(config.withFallback(ConfigFactory.defaultReference.getConfig(AvroSerde.AbsConf.Avro.path)))
+    new ZkAvroConf().apply(config)
   }
 
   override def close(): Unit = ZkClients.close(zk)

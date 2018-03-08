@@ -21,7 +21,6 @@ package io.amient.affinity.kafka
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.ConfluentSchemaRegistry
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroRecord
@@ -99,11 +98,6 @@ class KafkaAvroSpec extends FlatSpec with Suite
   }
 
   it should "write case classes via pre-configured confluent registry and read with affinity deserializer" in {
-
-    object TestRegistry extends ConfluentSchemaRegistry(ConfigFactory.defaultReference
-      .withValue(new CfAvroConf().ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))) {
-      register[TestRecord]
-    }
 
     val topic = "test"
     val numWrites = new AtomicInteger(0)

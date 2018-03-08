@@ -21,7 +21,7 @@ package io.amient.affinity.core.storage
 
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.Conf
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
@@ -39,12 +39,12 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   val specTimeout = 5 seconds
 
-  val system = ActorSystem.create("test",
+  val system = AffinityActorSystem.create("test",
     ConfigFactory.parseMap(Map(
       Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
       Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
       Conf.Affi.Node.Gateway.Http.Port.path -> "0"
-    )).withFallback(ConfigFactory.defaultReference))
+    )))
 
   override def afterAll {
     Await.ready(system.terminate(), 15 seconds)

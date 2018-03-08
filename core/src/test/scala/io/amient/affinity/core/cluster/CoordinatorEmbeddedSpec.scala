@@ -21,11 +21,11 @@ package io.amient.affinity.core.cluster
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, Props}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{FlatSpec, Matchers}
 
 class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
@@ -34,7 +34,7 @@ class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
     val config = ConfigFactory.empty()
       .withValue(Conf.Affi.Coordinator.Class.path, ConfigValueFactory.fromAnyRef(classOf[CoordinatorEmbedded].getName))
       .withValue(EmbedConf(Conf.Affi.Coordinator).ID.path, ConfigValueFactory.fromAnyRef("101"))
-    val system = ActorSystem.create("test", config)
+    val system = AffinityActorSystem.create("test", config)
     try {
       val coordinator1 = Coordinator.create(system, "group1")
       val actor1 = system.actorOf(Props(new Actor {

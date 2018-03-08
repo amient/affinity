@@ -21,16 +21,15 @@ package io.amient.affinity.kafka
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.core.util.{ByteUtils, AffinityTestBase}
+import io.amient.affinity.core.util.{AffinityTestBase, ByteUtils}
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
@@ -69,7 +68,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
-  val system = ActorSystem.create("KafkaEcoSystem", config)
+  val system = AffinityActorSystem.create("KafkaEcoSystem", config)
 
   import system.dispatcher
 

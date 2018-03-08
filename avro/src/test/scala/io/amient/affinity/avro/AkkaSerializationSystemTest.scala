@@ -19,13 +19,12 @@
 
 package io.amient.affinity.avro
 
-import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.Conf
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.kafka.EmbeddedConfluentRegistry
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.FlatSpec
 
 
@@ -35,7 +34,7 @@ case class ExampleType(val id: Int) extends AvroRecord {
 
 class AkkaSerializationSystemTest extends FlatSpec with EmbeddedConfluentRegistry {
 
-  val config = ConfigFactory.defaultReference
+  val config = ConfigFactory.empty
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ConfluentSchemaRegistry].getName))
     .withValue(CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
 
@@ -45,7 +44,7 @@ class AkkaSerializationSystemTest extends FlatSpec with EmbeddedConfluentRegistr
   override def numPartitions = 2
 
   "Confluent Schema Registry " should "be available via akka SerializationExtension" in {
-    val system = ActorSystem.create("CfTest", config)
+    val system = AffinityActorSystem.create("CfTest", config)
     try {
       val serialization = SerializationExtension(system)
       val serde = serialization.serializerFor(classOf[ExampleType])
