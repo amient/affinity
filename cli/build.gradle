@@ -1,0 +1,43 @@
+group = parent.group
+version = parent.version
+
+apply plugin: 'java'
+apply plugin: 'scala'
+apply plugin: "com.github.johnrengelman.shadow"
+
+ext {
+    mainClass = "AffinityCli"
+    mainScript = "affinity-cli"
+}
+
+repositories {
+    maven { url "https://github.com/indvd00m/maven-repo/raw/master/repository" } // ascii-render
+}
+
+dependencies {
+    compile project(':core')
+    compile project(':kafka:storage-kafka')
+    compile group: 'com.indvd00m.ascii.render', name: 'ascii-render', version: '1.2.1'
+    compile group: 'org.slf4j', name: 'slf4j-nop', version: slf4jVersion
+}
+
+build.dependsOn shadowJar
+shadowJar {
+    from { project.configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    append 'reference.conf'
+    manifest {
+        attributes(
+                'Main-Class': mainClass,
+                'version': project.version,
+        )
+    }
+}
+
+task createStartScripts(type: CreateStartScripts) {
+    outputDir = file("build/scripts")
+    mainClassName = mainClass
+    applicationName = mainScript
+    classpath = shadowJar.outputs.files
+}
+
+build.dependsOn createStartScripts

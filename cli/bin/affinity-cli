@@ -1,0 +1,28 @@
+#!/bin/bash
+
+base_dir="$( cd "$( dirname ${BASH_SOURCE[0]} )"/../. && pwd )"
+
+printUsage() {
+    echo "Usage: "
+    echo "      affinity-cli timelog                - utility for analyzing log compaction "
+}
+
+if [ -z "$1" ] || [ "$1" == "help" ]; then
+    printUsage
+    exit 0;
+fi
+
+echo "checking for affinity-cli updates.."
+cd $base_dir/../
+./gradlew :cli:build -q --exclude-task test
+
+if [ $? -eq 0 ]; then
+    script="$base_dir/build/scripts/affinity-cli"
+
+    $script $*
+
+    if [ $? -ne 0 ]; then
+        printUsage
+        exit $?
+    fi
+fi
