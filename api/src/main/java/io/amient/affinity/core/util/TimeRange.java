@@ -76,6 +76,10 @@ public class TimeRange implements Serializable {
         return since(datetime.toInstant().toEpochMilli());
     }
 
+    public static TimeRange since(String dt) {
+        return since(EventTime.unix(dt));
+    }
+
     public static TimeRange since(long unixtimestamp) {
         return new TimeRange(unixtimestamp, UNBOUNDED_MAX_TIME);
     }
@@ -175,6 +179,9 @@ public class TimeRange implements Serializable {
         this(Instant.from(until.subtractFrom(end)).toEpochMilli(), end.toEpochMilli());
     }
 
+    public TimeRange(String startDt, String endDt) {
+        this(EventTime.unix(startDt), EventTime.unix(endDt));
+    }
     public TimeRange(long startEpochMs, long endEpochMs) {
         this.start = Math.max(0, startEpochMs);
         this.end = Math.max(start, endEpochMs);

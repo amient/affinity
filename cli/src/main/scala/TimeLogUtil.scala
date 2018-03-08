@@ -25,7 +25,8 @@ object TimeLogUtil {
   private var plotted = false
 
   def apply(args: List[String]): Unit = args match {
-    //case bootstrap :: topic :: partition :: fuzz :: fromDT :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt)
+    case bootstrap :: topic :: partition :: fuzz :: fromDT :: toDT :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, new TimeRange(fromDT, toDT))
+    case bootstrap :: topic :: partition :: fuzz :: fromDT :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt, TimeRange.since(fromDT))
     case bootstrap :: topic :: partition :: fuzz :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toInt)
     case bootstrap :: topic :: partition :: Nil => apply(bootstrap, topic, partition.toInt)
     case bootstrap :: topic :: Nil => apply(bootstrap, topic)
@@ -33,16 +34,15 @@ object TimeLogUtil {
   }
 
   def printHelp(): Unit = {
-    println("Usage: timelog <kafka-bootstrap> <topic> [<partition> [<fuzz-minutes>] [<from-datetime> [<to-datetime>]]]\n")
+    println("Usage: timelog <kafka-bootstrap> <topic> [<partition> [<resolution-minutes>] [<from-datetime> [<to-datetime>]]]\n")
   }
 
   def apply(bootstrap: String, topic: String): Unit = {
     println("Available partitions: 0 - " + (getKafkaLog(bootstrap, topic).getNumPartitions-1))
   }
 
-  def apply(bootstrap: String, topic: String, partition: Int, fuzzMinutes: Long = 5 ): Unit = {
+  def apply(bootstrap: String, topic: String, partition: Int, fuzzMinutes: Long = 5, range: TimeRange = TimeRange.UNBOUNDED) {
     val log = getKafkaLog(bootstrap, topic)
-    val range = TimeRange.UNBOUNDED
     println(s"calculating compaction stats for range: $range..\n")
     log.reset(partition, range)
     var blockmints = Long.MaxValue
@@ -63,10 +63,7 @@ object TimeLogUtil {
     def maybeAddBlock(entry: LogEntry[java.lang.Long]): Unit = {
       if (lastts == Long.MinValue) return
       if (entry.timestamp > lastts - fuzzMinutes * 60000 && entry.timestamp < lastts + fuzzMinutes * 60000) return
-      println(s"'${EventTime.local(lastts - fuzzMinutes * 60000)} < ${EventTime.local(entry.timestamp)}  > ${EventTime.local(lastts + fuzzMinutes * 60000)}")
       addblock()
-
-
     }
     log.boundedIterator.asScala.foreach {
       entry =>
@@ -133,7 +130,7 @@ object TimeLogUtil {
             }
             if (w > 42 || h > 4) {
               builder.element(new Label(startpos.toString, x + 1, y + h - 3))
-              if (h > 3) {
+              if (h > 1) {
                 builder.element(new Label(pretty(timerange.start).toString, x + 1, y + h - 2))
               }
             } else if (h > 3) {
