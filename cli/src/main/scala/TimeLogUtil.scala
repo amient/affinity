@@ -50,18 +50,23 @@ object TimeLogUtil {
     var startpos = -1L
     var endpos = -1L
     var lastts = Long.MinValue
-    def maybeAddBlock(entry: LogEntry[java.lang.Long]): Unit = {
-      if (lastts == Long.MinValue) return
-      if (entry.timestamp > lastts - fuzzMinutes * 60000 && entry.timestamp < lastts + fuzzMinutes * 60000) return
-
+    def addblock(): Unit = {
       val timerange: TimeRange = new TimeRange(blockmints, blockmaxts)
       blocks += ((timerange, startpos, endpos))
-      println(s"Block $startpos : $endpos -> $timerange : ${entry.timestamp} > $lastts - $fuzzMinutes * 60000 && ${entry.timestamp} < $lastts + $fuzzMinutes * 60000}")
+      println(s"Block $startpos : $endpos -> $timerange")
       startpos = -1L
       endpos = -1L
       blockmaxts = Long.MinValue
       blockmints = Long.MaxValue
       lastts = Long.MinValue
+    }
+    def maybeAddBlock(entry: LogEntry[java.lang.Long]): Unit = {
+      if (lastts == Long.MinValue) return
+      if (entry.timestamp > lastts - fuzzMinutes * 60000 && entry.timestamp < lastts + fuzzMinutes * 60000) return
+      println(s"${entry.timestamp} > $lastts - $fuzzMinutes * 60000 && ${entry.timestamp} < $lastts + $fuzzMinutes * 60000}")
+      addblock()
+
+
     }
     log.boundedIterator.asScala.foreach {
       entry =>
@@ -77,7 +82,7 @@ object TimeLogUtil {
         maxTimestamp = math.max(maxTimestamp, entry.timestamp)
         numRecords += 1
     }
-    if (startpos > -1) maybeAddBlock()
+    if (startpos > -1) addblock()
     println("number of records: " + numRecords)
     println("minimum timestamp: " + pretty(minTimestamp))
     println("maximum timestamp: " + pretty(maxTimestamp))
