@@ -30,17 +30,25 @@ class EncoderSpec extends FlatSpec with Matchers {
     Encoder.json(TestRecord("hello", 123)) should be ("{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"hello\",\"b\":123}}")
   }
 
-  "Encoder" should "automatically format Maps" in {
-    Encoder.json(Map("a" -> "hello", "b" -> 123)) should be ("{\"a\":\"hello\",\"b\":123}")
+  "Encoder" should "automatically format Maps and unwrap neted records recursively" in {
+    Encoder.json(Map(
+      "a" -> "hello",
+      "b" -> 123,
+      "c" -> TestRecord("nested", 777)
+    )) should be ("{\"a\":\"hello\",\"b\":123,\"c\":{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"nested\",\"b\":777}}}")
   }
 
-  "Encoder" should "automatically format primitives and options" in {
+  "Encoder" should "automatically format primitives and options of primitives" in {
     Encoder.json(null) should be ("null")
     Encoder.json(100) should be ("100")
     Encoder.json(1000L) should be ("1000")
     Encoder.json("text") should be ("\"text\"")
     Encoder.json(None) should be ("null")
     Encoder.json(Some(100)) should be ("100")
+  }
+
+  "Encoder" should "unwarp options of records recursively " in {
+    Encoder.json(Some(TestRecord("hello", 777))) should be ("{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"hello\",\"b\":777}}")
   }
 
 }
