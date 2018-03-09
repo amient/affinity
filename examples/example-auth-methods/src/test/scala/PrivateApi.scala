@@ -17,31 +17,34 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.http.handler
+package handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{HttpResponse, headers}
-import akka.pattern.ask
-import akka.util.Timeout
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
+import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
-import io.amient.affinity.core.util.TimeCryptoProof
-import io.amient.affinity.example.rest.ExampleGatewayRoot
-import io.amient.affinity.example.graph.message.ConfigEntry
+import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.util.{TimeCryptoProof, TimeCryptoProofSHA256}
+import org.codehaus.jackson.annotate.JsonIgnore
 
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
-trait Admin extends ExampleGatewayRoot {
+final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord {
+  @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
+}
+
+trait PrivateApi extends GatewayHttp {
 
   import context.dispatcher
 
-  private val graphService = keyspace("graph")
+  val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   abstract override def handle: Receive = super.handle orElse {
 
@@ -68,13 +71,6 @@ trait Admin extends ExampleGatewayRoot {
             settings.replace(key, ConfigEntry(key, salt))
             Encoder.json(OK, salt)
         }
-      }
-    }
-
-    case http@HTTP(GET, PATH("status", INT(p)), _, response) => AUTH_ADMIN(http) { (user: String) =>
-      implicit val timeout = Timeout(1 second)
-      graphService ? (p.toInt, "status") map {
-        case any => Encoder.json(OK, any)
       }
     }
 

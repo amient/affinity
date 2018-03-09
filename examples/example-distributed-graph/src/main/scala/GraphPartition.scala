@@ -17,12 +17,10 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph
-
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.State
-import io.amient.affinity.example.graph.message._
+import message.{Component, GOP, VertexProps, _}
 
 import scala.collection.immutable.Set
 

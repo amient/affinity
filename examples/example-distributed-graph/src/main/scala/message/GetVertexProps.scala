@@ -17,12 +17,12 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
+package message
 
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.Routed
 import io.amient.affinity.core.util.Reply
 
-final case class GetComponent(cid: Int) extends AvroRecord with Routed with Reply[Option[Component]] {
-  override def key = cid
+final case class GetVertexProps(vertex: Int) extends AvroRecord with Routed with Reply[Option[VertexProps]] {
+  override def key = vertex
 }

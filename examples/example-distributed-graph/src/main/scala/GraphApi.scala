@@ -17,19 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph
-
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Gateway
-import io.amient.affinity.example.graph.message._
+import message._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait GraphLogic extends Gateway {
+trait GraphApi extends Gateway {
 
   import context.dispatcher
 

@@ -17,31 +17,20 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
-
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.http.javadsl.model.headers._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.util.{AffinityTestBase, TimeCryptoProofSHA256}
-import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
-import io.amient.affinity.example.rest.ExampleGatewayRoot
-import io.amient.affinity.example.rest.handler.Ping
+import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.ws.WebSocketClient
 import io.amient.affinity.ws.WebSocketClient.AvroMessageHandler
 import org.apache.avro.generic.{GenericData, GenericRecord}
-import org.codehaus.jackson.JsonNode
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
@@ -59,7 +48,7 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
   override def beforeAll(): Unit = try {
-    node1.startGateway(new ExampleGatewayRoot with Ping with Admin with PublicApi with Graph)
+    node1.startGateway(new ExampleGateway)
     node2.startContainer("graph", List(0, 1))
     node1.awaitClusterReady
   } finally {
@@ -71,49 +60,6 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     node1.shutdown()
   } finally {
     super.afterAll()
-  }
-
-  "ExampleApp Gateway" should "be able to play ping pong" in {
-    node1.http_get("/ping").entity should be(jsonStringEntity("pong"))
-  }
-
-  "Admin requests" should "be authenticated with Basic Auth" in {
-    val response1 = node1.http_get("/settings")
-    response1.status should be(Unauthorized)
-    val authHeader = response1.header[WWWAuthenticate].get
-    val challenge = authHeader.getChallenges.iterator().next
-    challenge.realm() should be("Create admin password")
-    challenge.scheme() should be("BASIC")
-    node1.http_get("/settings", List(Authorization.basic("admin", "1234"))).status should be(OK)
-    node1.http_get("/settings", List(Authorization.basic("admin", "wrong-password"))).status should be(Unauthorized)
-  }
-
-  "Public API requests" should "be allowed only with valid salted and time-based signature" in {
-    val publicKey = "pkey1"
-    val createApiKey = node1.http_post(s"/settings/add?key=$publicKey", Array(), List(Authorization.basic("admin", "1234")))
-    createApiKey.status should be(OK)
-    implicit val materializer = ActorMaterializer.create(node1.system)
-    val salt = node1.get_json(createApiKey).getTextValue
-    val crypto = new TimeCryptoProofSHA256(salt)
-
-    val requestPath = "/profile/mypii"
-    //unsigned request should be rejected
-    val response1 = node1.http_get(requestPath)
-    response1.status should be(Unauthorized)
-
-    //signed request should have a valid response
-    val requestSignature = crypto.sign(requestPath)
-    val signedRequestUrl = requestPath + "?signature=" + publicKey + ":" + requestSignature
-    val response2 = node1.http_get(signedRequestUrl)
-    response2.status should be(OK)
-
-    //the response should also be signed by the server and the response signature must be valid
-    val json2 = Await.result(response2.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
-    val jsonNode = node1.mapper.readValue(json2, classOf[JsonNode])
-    jsonNode.get("pii").getTextValue should be("mypii")
-    val responseSignature = jsonNode.get("signature").getTextValue
-    crypto.verify(responseSignature, requestSignature + "!")
-
   }
 
   "Graph API" should "should maintain connected components when adding and removing edges" in {

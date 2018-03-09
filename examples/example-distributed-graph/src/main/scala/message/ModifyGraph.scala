@@ -17,9 +17,19 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
+package message
+
+import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.util.Reply
 
 object GOP extends Enumeration {
   type Side = Value
   val ADD, REMOVE = Value
+}
+
+final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Routed with Reply[VertexProps] {
+
+  override def key = vertex
+
 }

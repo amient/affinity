@@ -17,14 +17,12 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
+package message
 
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.util.Reply
 
-final case class ModifyGraph(vertex: Int, edge: Edge, op: GOP.Value = GOP.ADD) extends AvroRecord with Routed with Reply[VertexProps] {
+final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord
 
-  override def key = vertex
-
+object Edges {
+  def unapply(edges: Set[Edge]): Option[Set[Int]] = Some(edges.map(_.target))
 }

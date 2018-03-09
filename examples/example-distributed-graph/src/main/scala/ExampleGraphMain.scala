@@ -17,8 +17,30 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
+import com.typesafe.config._
+import io.amient.affinity.core.cluster.Node
 
-object Edges {
-  def unapply(edges: Set[Edge]): Option[Set[Int]] = Some(edges.map(_.target))
+import scala.util.control.NonFatal
+
+class ExampleGateway extends GraphHttp with GraphApi
+
+object ExampleGraphMain extends App {
+
+  try {
+
+    val config = ConfigFactory.load("example")
+    val node1config = ConfigFactory.parseResources("example-node1.conf").withFallback(config)
+
+    require(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
+    require(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
+
+    new Node(node1config).start()
+    new Node(ConfigFactory.parseResources("example-node2.conf").withFallback(config)).start()
+
+  } catch {
+    case NonFatal(e) =>
+      e.printStackTrace()
+      System.exit(1)
+  }
+
 }

@@ -16,8 +16,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.amient.affinity.example.graph.message
+
+package message
 
 import io.amient.affinity.avro.record.AvroRecord
 
-final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord
+final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord {
+  def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)
+  def withEdges(newEdges: Set[Edge]) = VertexProps(System.currentTimeMillis, component, newEdges)
+}

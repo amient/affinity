@@ -17,11 +17,14 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
-
 import io.amient.affinity.avro.record.AvroRecord
+import message.Component
+import org.scalatest.{FlatSpec, Matchers}
 
-final case class VertexProps(ts: Long = 1475178519756L, component: Int = -1, edges: Set[Edge] = Set()) extends AvroRecord {
-  def withComponent(cid: Int) = VertexProps(System.currentTimeMillis, cid, edges)
-  def withEdges(newEdges: Set[Edge]) = VertexProps(System.currentTimeMillis, component, newEdges)
+class DomainSpec extends FlatSpec with Matchers {
+
+  val c = Component(0, Set(101, 102))
+  val bytes = AvroRecord.write(c, c.schema)
+  AvroRecord.read[Component](bytes, c.schema) should be (c)
+
 }

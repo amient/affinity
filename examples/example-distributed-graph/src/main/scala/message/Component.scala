@@ -16,13 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package io.amient.affinity.example.graph.message
+package message
 
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.util.Reply
 
-final case class UpdateComponent(cid: Int, component: Component) extends AvroRecord with Routed with Reply[Option[Component]] {
-  override def key = cid
-}
+final case class Component(ts: Long = 0L, connected: Set[Int] = Set()) extends AvroRecord

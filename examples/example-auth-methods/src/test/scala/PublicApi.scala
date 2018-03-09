@@ -16,21 +16,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.amient.affinity.example.http.handler
+package handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.example.rest.ExampleGatewayRoot
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
+import io.amient.affinity.core.storage.State
 
 import scala.concurrent.Promise
+import scala.language.postfixOps
 
+trait PublicApi extends GatewayHttp {
 
-trait PublicApi extends ExampleGatewayRoot {
-
+  val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   abstract override def handle: Receive = super.handle orElse {
 

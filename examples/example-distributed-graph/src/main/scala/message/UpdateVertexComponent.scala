@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
+package message
 
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.Routed

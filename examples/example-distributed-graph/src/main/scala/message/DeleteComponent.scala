@@ -16,26 +16,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package message
 
-package io.amient.affinity.example.rest.handler
+import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.util.Reply
 
-import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.StatusCodes._
-import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.example.rest.ExampleGatewayRoot
-
-import scala.language.postfixOps
-
-trait Ping extends ExampleGatewayRoot {
-
-  abstract override def handle: Receive = super.handle orElse {
-
-    /**
-      * GET /ping
-      */
-    case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong"))
-
-  }
-
+final case class DeleteComponent(cid: Int) extends AvroRecord with Routed with Reply[Option[Component]] {
+  override def key = cid
 }

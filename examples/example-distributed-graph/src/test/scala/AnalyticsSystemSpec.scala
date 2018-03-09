@@ -17,7 +17,6 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
@@ -26,12 +25,9 @@ import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.LogStorage
 import io.amient.affinity.core.util.AffinityTestBase
-import io.amient.affinity.example.graph.message.{Component, VertexProps}
-import io.amient.affinity.example.http.handler.{Admin, Graph, PublicApi}
-import io.amient.affinity.example.rest.ExampleGatewayRoot
-import io.amient.affinity.example.rest.handler.Ping
 import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.spark.LogRDD
+import message.{Component, VertexProps}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
@@ -39,7 +35,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.reflect.ClassTag
 
-class AnalyticsSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
+class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 4
 
@@ -51,7 +47,7 @@ class AnalyticsSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKa
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
   override def beforeAll(): Unit = try {
-    node1.startGateway(new ExampleGatewayRoot with Ping with Admin with PublicApi with Graph)
+    node1.startGateway(new ExampleGateway)
     node2.startContainer("graph", List(0, 1, 2, 3))
     node1.awaitClusterReady
     node1.http_post("/connect/1/2").status should be(SeeOther)

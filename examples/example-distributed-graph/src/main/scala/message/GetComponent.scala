@@ -17,15 +17,12 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.graph.message
+package message
 
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.util.TimeCryptoProofSHA256
-import org.codehaus.jackson.annotate.JsonIgnore
+import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.util.Reply
 
-
-final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord {
-  @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
+final case class GetComponent(cid: Int) extends AvroRecord with Routed with Reply[Option[Component]] {
+  override def key = cid
 }
-
-
