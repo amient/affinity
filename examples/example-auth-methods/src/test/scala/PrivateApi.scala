@@ -17,8 +17,6 @@
  * limitations under the License.
  */
 
-package handler
-
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
@@ -44,7 +42,7 @@ trait PrivateApi extends GatewayHttp {
 
   import context.dispatcher
 
-  val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
+  private val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   abstract override def handle: Receive = super.handle orElse {
 

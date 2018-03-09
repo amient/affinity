@@ -16,12 +16,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package handler
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
+import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -30,17 +30,23 @@ import io.amient.affinity.core.storage.State
 import scala.concurrent.Promise
 import scala.language.postfixOps
 
+case class ProtectedProfile(hello: String = "world") extends AvroRecord
+
 trait PublicApi extends GatewayHttp {
 
-  val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
+  private val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   abstract override def handle: Receive = super.handle orElse {
 
     case HTTP(GET, uri@PATH("profile", pii), query, response) => AUTH_DSA(uri, query, response) { (sig: String) =>
       Encoder.json(OK, Map(
         "signature" -> sig,
-        "pii" -> pii
+        "profile" -> ProtectedProfile()
       ))
+    }
+
+    case HTTP(GET, uri@PATH("verify"), query, response) => AUTH_DSA(uri, query, response) { (sig: String) =>
+      Encoder.json(OK, Some(ProtectedProfile()))
     }
 
   }
