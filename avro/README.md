@@ -43,19 +43,23 @@ Below is the table of all supported types, all which support default values.
     Null                            null
     Boolean                         boolean
     Int                             int
-    @Fixed Int                      fixed(4)
+    @Fixed Int                      fixed(4)             Big endian
     Long                            long
-    @Fixed Long                     fixed(8)
+    @Fixed Long                     fixed(8)             Big endian
     Float                           float
     Double                          double
-    String                          string 
-    @Fixed(size) String             fixed(size) 
-    Array[Byte]                     bytes               
-    Map[String, T]                  map(T)              Maps have to have String keys
-    Iterable[T]                     array(T)            List[T], Seq[T], Set[T], etc.
-    Enumeration                     enum                only scala enums are suppored
-    Option[T]                       union(null,T)
-    case class                      record              nested schemas are allowed
+    String                          string               UTF-8
+    @Fixed(size) String             fixed(size)          ASCII
+    Array[Byte]                     bytes                
+    Map[String, T]   †              map(T)               Maps have to have String keys
+    Iterable[T]      †              array(T)             List[T], Seq[T], Set[T], etc.
+    Enumeration      †              enum                 only scala enums are suppored
+    Option[T]        †              union(null,T)        
+    case class                      record               nested schemas are allowed
+    ----------------------------------------------------------------------------------------------------    
+    † Generic types cannot be top-level schemas, they can be nested in a case class record - this is because
+      generics don't have concrete static type so have to be evaluated at runtime and cannot be efficiently cached. 
+      There would be a significant pefromance penalty for that although conceptually it could be possible.
 
 ### Note on Top-level primitive types
 
