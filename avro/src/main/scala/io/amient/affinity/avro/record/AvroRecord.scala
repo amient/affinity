@@ -43,6 +43,24 @@ final class Alias(aliases: String*) extends StaticAnnotation
 
 final class Fixed(len: Int = -1) extends StaticAnnotation
 
+abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
+
+  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
+
+  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
+
+  override def getSchema: Schema = schema
+
+  final override def get(i: Int): AnyRef = {
+    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
+  }
+
+  final override def put(i: Int, v: scala.Any): Unit = {
+    throw new AvroRuntimeException("Scala AvroRecord is immutable")
+  }
+
+}
+
 object AvroRecord extends AvroExtractors {
 
   def stringToFixed(value: String, getFixedSize: Int): Array[Byte] = {
@@ -189,10 +207,11 @@ object AvroRecord extends AvroExtractors {
       getOrInitialize(tpe, new Supplier[Any => Any] {
         override def get(): Any => Any = {
           if (tpe <:< typeOf[Option[Any]]) {
-            (datum) => datum match {
-              case null => None
-              case some => Some(readField(some, schema.getTypes.get(1), tpe.typeArgs(0)))
-            }
+            (datum) =>
+              datum match {
+                case null => None
+                case some => Some(readField(some, schema.getTypes.get(1), tpe.typeArgs(0)))
+              }
           } else {
             throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $schema")
           }
@@ -428,27 +447,4 @@ object AvroRecord extends AvroExtractors {
       }
     })
   }
-}
-
-abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
-
-  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
-
-  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
-
-  override def getSchema: Schema = schema
-
-  // TODO there is a way to optimize writes by the get(i) method a) by caching the result b) when reading fields from generic, initialize the cache right away
-  //  private[record] val generic = mutable.Map[Int, AnyRef]()
-  //  final override def get(i: Int): AnyRef = generic.getOrElseUpdate(i, {
-  //    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
-  //  })
-  final override def get(i: Int): AnyRef = {
-    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
-  }
-
-  final override def put(i: Int, v: scala.Any): Unit = {
-    throw new AvroRuntimeException("Scala AvroRecord is immutable")
-  }
-
 }
