@@ -196,7 +196,6 @@ object AvroRecord extends AvroExtractors {
     private val projectedSchema = if (readerSchema != null) readerSchema else writerSchema
     private lazy val reader = new GenericDatumReader[Any](writerSchema, projectedSchema)
     private lazy val writer = new GenericDatumWriter[Any](projectedSchema)
-    private lazy val record = if (projectedSchema.getType == RECORD) new GenericData.Record(projectedSchema) else null
 
     def write[O <: OutputStream](value: Any, output: O): O = {
       val encoder = EncoderFactory.get().binaryEncoder(output, null)
@@ -220,7 +219,7 @@ object AvroRecord extends AvroExtractors {
 
     def convert(bytes: Array[Byte], offset: Int = 0): Any = {
       val decoder = DecoderFactory.get().binaryDecoder(bytes, offset, bytes.length - offset, null)
-      val datum = reader.read(record, decoder)
+      val datum = reader.read(null, decoder)
       //if runtime/readerSchema could not be determinted, the best we can do is return a generic datum how it was written, e.g. Record or primitive
       //TODO this doesn't have any test to protected against regression
       if (readerSchema == null) datum else read(datum, readerSchema)
@@ -228,7 +227,7 @@ object AvroRecord extends AvroExtractors {
 
     def convert(bytes: InputStream): Any = {
       val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
-      val datum = reader.read(record, decoder)
+      val datum = reader.read(null, decoder)
       if (readerSchema == null) datum else read(datum, readerSchema)
     }
   }
