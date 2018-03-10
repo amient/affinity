@@ -264,12 +264,16 @@ object AvroRecord extends AvroExtractors {
         case ENUM => enumCache.getOrInitialize(tpe).apply(datum.asInstanceOf[EnumSymbol].toString)
         case UNION => unionCache.getOrInitialize(tpe, schema, readField)(datum)
         case MAP =>
+          val valueSchema = schema.getValueType
+          val valueType = tpe.typeArgs(1)
           datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
-            .map { case (k, v) => (k.toString, readField(v, schema.getValueType, tpe.typeArgs(1))) }
+            .map { case (k, v) => (k.toString, readField(v, valueSchema, valueType)) }
         case ARRAY =>
           iterableCache.getOrInitialize(tpe) {
+            val elementSchema = schema.getElementType
+            val elementType = tpe.typeArgs(0)
             datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
-              item => readField(item, schema.getElementType, tpe.typeArgs(0)))
+              item => readField(item, elementSchema, elementType))
           }
         case _ => read(datum, schema)
       }
