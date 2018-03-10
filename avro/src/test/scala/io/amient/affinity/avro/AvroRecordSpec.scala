@@ -159,17 +159,18 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   it should "have minimum read/write throughput" in {
     val n = 300000
     val writeStart = System.currentTimeMillis
-    val x: Seq[Array[Byte]] = for (i <- 1 to n) yield {
+    for (i <- 1 to n) {
       newSerde.toBytes(SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20))))
     }
     val writeEnd = System.currentTimeMillis()
+    val bytes = newSerde.toBytes(SimpleRecord(SimpleKey(Int.MaxValue), SimpleEnum.C, Seq(SimpleKey(Int.MaxValue % 20))))
     println(s"AvroSerde Writes/Sec: ${n.toLong * 1000 / (writeEnd - writeStart)}")
     val readStart = System.currentTimeMillis
-    for(bytes <- x) {
+    for (i <- 1 to n) {
       newSerde.fromBytes(bytes)
     }
     val readEnd = System.currentTimeMillis()
-    println(s"AvroSerde Reads/Sec: ${x.size.toLong * 1000 / (readEnd - readStart)}")
+    println(s"AvroSerde Reads/Sec: ${n.toLong * 1000 / (readEnd - readStart)}")
 
   }
 
