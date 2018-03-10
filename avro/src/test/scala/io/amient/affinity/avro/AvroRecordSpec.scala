@@ -52,14 +52,14 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "Data written with an older serde" should "be rendered into the current representation in a backward-compatible way" in {
     val oldValue = oldSerde.toBytes(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 10))
-    oldValue.mkString(".") should be("0.0.0.0.8.2.2.0.0.0.20")
+    oldValue.mkString(".") should be("0.0.0.0.8.2.2.0.0.0.0.20")
     val renderedValue = newSerde.fromBytes(oldValue)
     renderedValue should be(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map()))
   }
 
   "Data Written with a newer serde" should "be rendered into the the current representation in a forward-compatible way" in {
     val newValue = newSerde.toBytes(Record_Current(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), Map("1" -> SimpleRecord(SimpleKey(1), SimpleEnum.A))))
-    newValue.mkString(",") should be("0,0,0,0,9,2,2,0,0,0,2,2,49,2,0,0,0,0")
+    newValue.mkString(",") should be("0,0,0,0,9,2,2,0,0,0,0,2,2,49,2,0,0,0,0,0")
     val downgradedValue = oldSerde.fromBytes(newValue)
     downgradedValue should be(Record_V1(Seq(SimpleRecord(SimpleKey(1), SimpleEnum.A)), 0))
   }
@@ -158,13 +158,13 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
   it should "have minimum read/write throughput" in {
-    val n = 300000
+    val n = 1000000
     val writeStart = System.currentTimeMillis
     for (i <- 1 to n) {
       newSerde.toBytes(SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20))))
     }
     val writeEnd = System.currentTimeMillis()
-    val bytes = newSerde.toBytes(SimpleRecord(SimpleKey(Int.MaxValue), SimpleEnum.C, Seq(SimpleKey(Int.MaxValue % 20))))
+    val bytes = newSerde.toBytes(SimpleRecord(SimpleKey(Int.MaxValue), SimpleEnum.C, Seq(SimpleKey(Int.MaxValue % 20)), Some(SimpleEnum.A)))
     println(s"AvroSerde Writes/Sec: ${n.toLong * 1000 / (writeEnd - writeStart)}")
     val readStart = System.currentTimeMillis
     for (i <- 1 to n) {

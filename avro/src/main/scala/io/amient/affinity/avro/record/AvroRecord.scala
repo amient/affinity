@@ -184,6 +184,23 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
+  private object unionCache extends ThreadLocalCache[Type, (Any) => Any] {
+    def getOrInitialize(tpe: universe.Type, schema: Schema, readField: (Any, Schema, universe.Type) => Any): (Any) => Any = {
+      getOrInitialize(tpe, new Supplier[Any => Any] {
+        override def get(): Any => Any = {
+          if (tpe <:< typeOf[Option[Any]]) {
+            (datum) => datum match {
+              case null => None
+              case some => Some(readField(some, schema.getTypes.get(1), tpe.typeArgs(0)))
+            }
+          } else {
+            throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $schema")
+          }
+        }
+      })
+    }
+  }
+
   private object ScalaAvroProjectorCache extends ThreadLocalCache[(Schema, Schema), ScalaAvroProjector] {
     def getOrInitialize(writerSchema: Schema, readerSchema: Schema): ScalaAvroProjector = {
       getOrInitialize((writerSchema, readerSchema), new Supplier[ScalaAvroProjector] {
@@ -233,8 +250,6 @@ object AvroRecord extends AvroExtractors {
   }
 
 
-  val anyOption = typeOf[Option[Any]]
-
   /**
     * Read avro value, e.g. GenericRecord or primitive into scala case class or scala primitive
     *
@@ -247,6 +262,7 @@ object AvroRecord extends AvroExtractors {
     def readField(datum: Any, schema: Schema, tpe: Type): Any = {
       schema.getType match {
         case ENUM => enumCache.getOrInitialize(tpe).apply(datum.asInstanceOf[EnumSymbol].toString)
+        case UNION => unionCache.getOrInitialize(tpe, schema, readField)(datum)
         case MAP =>
           datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
             .map { case (k, v) => (k.toString, readField(v, schema.getValueType, tpe.typeArgs(1))) }
@@ -255,11 +271,6 @@ object AvroRecord extends AvroExtractors {
             datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
               item => readField(item, schema.getElementType, tpe.typeArgs(0)))
           }
-        case UNION if schema.getTypes.size == 2 && tpe <:< anyOption => datum match {
-          case null => None
-          case some => Some(readField(some, schema.getTypes.get(1), tpe.typeArgs(0)))
-        }
-        case UNION => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $schema")
         case _ => read(datum, schema)
       }
     }
