@@ -157,26 +157,22 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
   it should "have minimum read/write throughput" in {
-    val n = 200000
-    val x: Seq[Array[Byte]] = for(i <- 1 to n) yield {
-      val rec = SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20)))
-      newSerde.toBytes(rec)
+    val n = 1000000
+    val writeStart = System.currentTimeMillis
+    val x: Seq[Array[Byte]] = for (i <- 1 to n) yield {
+      newSerde.toBytes(SimpleRecord(SimpleKey(i), SimpleEnum.C, Seq(SimpleKey(i % 20))))
     }
-    val start = System.currentTimeMillis
-    var r = System.currentTimeMillis()
-    var done = 0
-    x.foreach{ bytes =>
+    val writeEnd = System.currentTimeMillis()
+    println(s"AvroSerde Writes/Sec: ${n.toLong * 1000 / (writeEnd - writeStart)}")
+    val readStart = System.currentTimeMillis
+    for(bytes <- x) {
       newSerde.fromBytes(bytes)
-      done += 1
-      val now = System.currentTimeMillis()
-      if (now - r > 5000) {
-        r = now
-        println(s"interim tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
-      }
     }
-    println(s"final tps: ${done * 1000 / (System.currentTimeMillis() - start)}")
+    val readEnd = System.currentTimeMillis()
+    println(s"AvroSerde Reads/Sec: ${x.size.toLong * 1000 / (readEnd - readStart)}")
 
   }
+
 
   "Compound Key" should "have the same binary prefix as the whole key" in {
     def f(city: String, num: Int): CompoundKey = {
