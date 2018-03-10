@@ -174,6 +174,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   }
 
+
   "Compound Key" should "have the same binary prefix as the whole key" in {
     def f(city: String, num: Int): CompoundKey = {
       val ck = new CompoundKey("UK", city, num)
