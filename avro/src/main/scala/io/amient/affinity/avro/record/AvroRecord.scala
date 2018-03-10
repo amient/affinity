@@ -21,13 +21,13 @@ package io.amient.affinity.avro.record
 
 import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
-import java.util.function.{Supplier, UnaryOperator}
+import java.util.function.Supplier
 
 import io.amient.affinity.core.util.{ByteUtils, ThreadLocalCache}
 import org.apache.avro.Schema.Type._
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
-import org.apache.avro.io.{BinaryDecoder, DecoderFactory, EncoderFactory}
+import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
@@ -67,52 +67,11 @@ object AvroRecord extends AvroExtractors {
   val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
 
   def write(value: Any, schema: Schema): Array[Byte] = {
-    val output = new ByteArrayOutputStream()
-    try {
-      write(value, schema, output)
-      output.toByteArray
-    } finally {
-      output.close
-    }
+    ScalaAvroProjectorCache.getOrInitialize(schema, schema).write(value)
   }
 
   def write[O <: OutputStream](value: Any, schema: Schema, output: O): O = {
-    val encoder = EncoderFactory.get().binaryEncoder(output, null)
-    val writer = new GenericDatumWriter[Any](schema)
-    writer.write(extract(value, List(schema)), encoder)
-    encoder.flush()
-    output
-  }
-
-  private object ScalaAvroConverterCache extends ThreadLocalCache[(Schema, Schema), ScalaAvroConverter] {
-    def getOrInitialize(writerSchema: Schema, readerSchema: Schema): ScalaAvroConverter = {
-      getOrInitialize((writerSchema, readerSchema), new Supplier[ScalaAvroConverter] {
-        override def get() = new ScalaAvroConverter(writerSchema, readerSchema)
-      })
-    }
-  }
-
-  private class ScalaAvroConverter(writerSchema: Schema, readerSchema: Schema) {
-    private val projectedSchema = if (readerSchema != null) readerSchema else writerSchema
-    private var decoder: BinaryDecoder = null
-    private val reader = new GenericDatumReader[Any](writerSchema, projectedSchema)
-    private val record = if (projectedSchema.getType == RECORD) new GenericData.Record(projectedSchema) else null
-
-    def convert(record: GenericContainer): Any = read(record, projectedSchema)
-
-    def convert(bytes: Array[Byte], offset: Int = 0): Any = {
-      decoder = DecoderFactory.get().binaryDecoder(bytes, offset, bytes.length - offset, decoder)
-      val datum = reader.read(record, decoder)
-      //if runtime/readerSchema could not be determinted, the best we can do is return a generic datum how it was written, e.g. Record or primitive
-      //TODO this doesn't have any test to protected against regression
-      if (readerSchema == null) datum else read(datum, readerSchema)
-    }
-
-    def convert(bytes: InputStream): Any = {
-      decoder = DecoderFactory.get().binaryDecoder(bytes, decoder)
-      val datum = reader.read(record, decoder)
-      if (readerSchema == null) datum else read(datum, readerSchema)
-    }
+    ScalaAvroProjectorCache.getOrInitialize(schema, schema).write(value, output)
   }
 
   def read[T](bytes: Array[Byte], schema: Schema): T = read[T](bytes, schema, 0)
@@ -120,11 +79,11 @@ object AvroRecord extends AvroExtractors {
   def read[T](bytes: Array[Byte], schema: Schema, offset: Int): T = read(bytes, schema, schema, offset).asInstanceOf[T]
 
   def read(bytes: Array[Byte], writerSchema: Schema, readerSchema: Schema, offset: Int): Any = {
-    ScalaAvroConverterCache.getOrInitialize(writerSchema, readerSchema).convert(bytes, offset)
+    ScalaAvroProjectorCache.getOrInitialize(writerSchema, readerSchema).convert(bytes, offset)
   }
 
   def read(bytes: InputStream, writerSchema: Schema, readerSchema: Schema): Any = {
-    ScalaAvroConverterCache.getOrInitialize(writerSchema, readerSchema).convert(bytes)
+    ScalaAvroProjectorCache.getOrInitialize(writerSchema, readerSchema).convert(bytes)
   }
 
   private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
@@ -224,6 +183,56 @@ object AvroRecord extends AvroExtractors {
       })
     }
   }
+
+  private object ScalaAvroProjectorCache extends ThreadLocalCache[(Schema, Schema), ScalaAvroProjector] {
+    def getOrInitialize(writerSchema: Schema, readerSchema: Schema): ScalaAvroProjector = {
+      getOrInitialize((writerSchema, readerSchema), new Supplier[ScalaAvroProjector] {
+        override def get() = new ScalaAvroProjector(writerSchema, readerSchema)
+      })
+    }
+  }
+
+  private class ScalaAvroProjector(writerSchema: Schema, readerSchema: Schema) {
+    private val projectedSchema = if (readerSchema != null) readerSchema else writerSchema
+    private lazy val reader = new GenericDatumReader[Any](writerSchema, projectedSchema)
+    private lazy val writer = new GenericDatumWriter[Any](projectedSchema)
+    private lazy val record = if (projectedSchema.getType == RECORD) new GenericData.Record(projectedSchema) else null
+
+    def write[O <: OutputStream](value: Any, output: O): O = {
+      val encoder = EncoderFactory.get().binaryEncoder(output, null)
+      writer.write(extract(value, List(projectedSchema)), encoder)
+      encoder.flush()
+      output
+    }
+
+    def write(value: Any): Array[Byte] = {
+      val output = new ByteArrayOutputStream()
+      try {
+        write(value, output)
+        output.toByteArray
+      } finally {
+        output.close
+      }
+    }
+
+
+    def convert(record: GenericContainer): Any = read(record, projectedSchema)
+
+    def convert(bytes: Array[Byte], offset: Int = 0): Any = {
+      val decoder = DecoderFactory.get().binaryDecoder(bytes, offset, bytes.length - offset, null)
+      val datum = reader.read(record, decoder)
+      //if runtime/readerSchema could not be determinted, the best we can do is return a generic datum how it was written, e.g. Record or primitive
+      //TODO this doesn't have any test to protected against regression
+      if (readerSchema == null) datum else read(datum, readerSchema)
+    }
+
+    def convert(bytes: InputStream): Any = {
+      val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
+      val datum = reader.read(record, decoder)
+      if (readerSchema == null) datum else read(datum, readerSchema)
+    }
+  }
+
 
   val anyOption = typeOf[Option[Any]]
 
