@@ -19,7 +19,7 @@
 
 package io.amient.affinity.avro.record
 
-import java.io.{ByteArrayOutputStream, OutputStream}
+import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
 import java.util.function.Supplier
 
@@ -42,6 +42,24 @@ import scala.reflect.runtime.{universe, _}
 final class Alias(aliases: String*) extends StaticAnnotation
 
 final class Fixed(len: Int = -1) extends StaticAnnotation
+
+abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
+
+  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
+
+  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
+
+  override def getSchema: Schema = schema
+
+  final override def get(i: Int): AnyRef = {
+    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
+  }
+
+  final override def put(i: Int, v: scala.Any): Unit = {
+    throw new AvroRuntimeException("Scala AvroRecord is immutable")
+  }
+
+}
 
 object AvroRecord extends AvroExtractors {
 
@@ -67,36 +85,23 @@ object AvroRecord extends AvroExtractors {
   val NULL_SCHEMA = Schema.create(Schema.Type.NULL)
 
   def write(value: Any, schema: Schema): Array[Byte] = {
-    val output = new ByteArrayOutputStream()
-    try {
-      write(value, schema, output)
-      output.toByteArray
-    } finally {
-      output.close
-    }
+    ScalaAvroProjectorCache.getOrInitialize(schema, schema).write(value)
   }
 
   def write[O <: OutputStream](value: Any, schema: Schema, output: O): O = {
-    val encoder = EncoderFactory.get().binaryEncoder(output, null)
-    val writer = new GenericDatumWriter[Any](schema)
-    writer.write(extract(value, List(schema)), encoder)
-    encoder.flush()
-    output
+    ScalaAvroProjectorCache.getOrInitialize(schema, schema).write(value, output)
   }
 
-  def read[T: TypeTag](bytes: Array[Byte], schema: Schema): T = read(bytes, schema, schema)
+  def read[T](bytes: Array[Byte], schema: Schema): T = read[T](bytes, schema, 0)
 
-  def read[T: TypeTag](record: GenericContainer): T = {
-    readDatum(record, typeOf[T], record.getSchema).asInstanceOf[T]
+  def read[T](bytes: Array[Byte], schema: Schema, offset: Int): T = read(bytes, schema, schema, offset).asInstanceOf[T]
+
+  def read(bytes: Array[Byte], writerSchema: Schema, readerSchema: Schema, offset: Int): Any = {
+    ScalaAvroProjectorCache.getOrInitialize(writerSchema, readerSchema).convert(bytes, offset)
   }
 
-  def read[T: TypeTag](bytes: Array[Byte], writerSchema: Schema, readerSchema: Schema): T = {
-    val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
-    val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-    reader.read(null, decoder) match {
-      case record: GenericRecord => read(record)
-      case other => readDatum(other, typeOf[T], readerSchema).asInstanceOf[T]
-    }
+  def read(bytes: InputStream, writerSchema: Schema, readerSchema: Schema): Any = {
+    ScalaAvroProjectorCache.getOrInitialize(writerSchema, readerSchema).convert(bytes)
   }
 
   private object fqnMirrorCache extends ThreadLocalCache[String, universe.Mirror] {
@@ -197,48 +202,111 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-  private object unionCache extends ThreadLocalCache[Type, (Any, Schema) => Any] {
-    def getOrInitialize(tpe: Type): (Any, Schema) => Any = {
-      getOrInitialize(tpe, new Supplier[(Any, Schema) => Any] {
-        override def get(): (Any, Schema) => Any = {
+  private object unionCache extends ThreadLocalCache[Type, (Any) => Any] {
+    def getOrInitialize(tpe: universe.Type, schema: Schema, readField: (Any, Schema, universe.Type) => Any): (Any) => Any = {
+      getOrInitialize(tpe, new Supplier[Any => Any] {
+        override def get(): Any => Any = {
           if (tpe <:< typeOf[Option[Any]]) {
-            (datum, schema) =>
+            (datum) =>
               datum match {
                 case null => None
-                case some => Some(readDatum(some, tpe.typeArgs(0), schema.getTypes.get(1)))
+                case some => Some(readField(some, schema.getTypes.get(1), tpe.typeArgs(0)))
               }
           } else {
-            (_, _) => throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $tpe")
+            throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $schema")
           }
         }
       })
     }
   }
 
+  private object ScalaAvroProjectorCache extends ThreadLocalCache[(Schema, Schema), ScalaAvroProjector] {
+    def getOrInitialize(writerSchema: Schema, readerSchema: Schema): ScalaAvroProjector = {
+      getOrInitialize((writerSchema, readerSchema), new Supplier[ScalaAvroProjector] {
+        override def get() = new ScalaAvroProjector(writerSchema, readerSchema)
+      })
+    }
+  }
+
+  private class ScalaAvroProjector(writerSchema: Schema, readerSchema: Schema) {
+    private val projectedSchema = if (readerSchema != null) readerSchema else writerSchema
+    private lazy val reader = new GenericDatumReader[Any](writerSchema, projectedSchema)
+    private lazy val writer = new GenericDatumWriter[Any](projectedSchema)
+
+    def write[O <: OutputStream](value: Any, output: O): O = {
+      val encoder = EncoderFactory.get().binaryEncoder(output, null)
+      writer.write(extract(value, List(projectedSchema)), encoder)
+      encoder.flush()
+      output
+    }
+
+    def write(value: Any): Array[Byte] = {
+      val output = new ByteArrayOutputStream()
+      try {
+        write(value, output)
+        output.toByteArray
+      } finally {
+        output.close
+      }
+    }
+
+
+    def convert(record: GenericContainer): Any = read(record, projectedSchema)
+
+    def convert(bytes: Array[Byte], offset: Int = 0): Any = {
+      val decoder = DecoderFactory.get().binaryDecoder(bytes, offset, bytes.length - offset, null)
+      val datum = reader.read(null, decoder)
+      //if runtime/readerSchema could not be determinted, the best we can do is return a generic datum how it was written, e.g. Record or primitive
+      //TODO this doesn't have any test to protected against regression
+      if (readerSchema == null) datum else read(datum, readerSchema)
+    }
+
+    def convert(bytes: InputStream): Any = {
+      val decoder = DecoderFactory.get().binaryDecoder(bytes, null)
+      val datum = reader.read(null, decoder)
+      if (readerSchema == null) datum else read(datum, readerSchema)
+    }
+  }
+
+
   /**
     * Read avro value, e.g. GenericRecord or primitive into scala case class or scala primitive
     *
-    * @param record
+    * @param datum
     * @param schema
     * @return
     */
-  def read(record: Any, schema: Schema): Any = {
-    val tpe = schema.getType match {
-      case NULL => typeOf[Null]
-      case BOOLEAN => typeOf[Boolean]
-      case INT => typeOf[Int]
-      case LONG => typeOf[Long]
-      case FLOAT => typeOf[Float]
-      case DOUBLE => typeOf[Double]
-      case STRING => typeOf[String]
-      case BYTES => typeOf[Array[Byte]]
-      case _ => fqnTypeCache.getOrInitialize(schema.getFullName)
-    }
-    readDatum(record, tpe, schema)
-  }
+  def read(datum: Any, schema: Schema): Any = {
 
-  def readDatum(datum: Any, tpe: Type, schema: Schema): Any = {
+    def readField(datum: Any, schema: Schema, tpe: Type): Any = {
+      schema.getType match {
+        case ENUM => enumCache.getOrInitialize(tpe).apply(datum.asInstanceOf[EnumSymbol].toString)
+        case UNION => unionCache.getOrInitialize(tpe, schema, readField)(datum)
+        case MAP =>
+          val valueSchema = schema.getValueType
+          val valueType = tpe.typeArgs(1)
+          datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
+            .map { case (k, v) => (k.toString, readField(v, valueSchema, valueType)) }
+        case ARRAY =>
+          iterableCache.getOrInitialize(tpe) {
+            val elementSchema = schema.getElementType
+            val elementType = tpe.typeArgs(0)
+            datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
+              item => readField(item, elementSchema, elementType))
+          }
+        case _ => read(datum, schema)
+      }
+    }
+
     schema.getType match {
+      case RECORD if datum == null => null
+      case RECORD =>
+        val record = datum.asInstanceOf[IndexedRecord]
+        val (params: Seq[Type], constructorMirror) = fqnConstructorCache.getOrInitialize(record.getSchema.getFullName)
+        val arguments = record.getSchema.getFields.asScala.map { field =>
+          readField(record.get(field.pos), field.schema, params(field.pos))
+        }
+        constructorMirror(arguments: _*).asInstanceOf[AvroRecord]
       case BOOLEAN => datum.asInstanceOf[Boolean]
       case INT => datum.asInstanceOf[Int]
       case NULL => null
@@ -247,36 +315,19 @@ object AvroRecord extends AvroExtractors {
       case LONG => datum.asInstanceOf[Long]
       case BYTES => ByteUtils.bufToArray(datum.asInstanceOf[java.nio.ByteBuffer])
       case STRING if datum == null => null
-      case STRING => String.valueOf(datum.asInstanceOf[Utf8])
-      case ENUM => enumCache.getOrInitialize(tpe).apply(datum.asInstanceOf[EnumSymbol].toString)
-      case UNION => unionCache.getOrInitialize(tpe)(datum, schema)
-      case RECORD if datum == null => null
-      case RECORD =>
-        val record = datum.asInstanceOf[IndexedRecord]
-        val (params: Seq[Type], constructorMirror) = fqnConstructorCache.getOrInitialize(record.getSchema.getFullName)
-        val arguments = record.getSchema.getFields.asScala.map { field =>
-          readDatum(record.get(field.pos), params(field.pos), field.schema)
-        }
-        constructorMirror(arguments: _*).asInstanceOf[AvroRecord]
-      case MAP => datum.asInstanceOf[java.util.Map[Utf8, _]].asScala.toMap
-        .map { case (k, v) => (
-          k.toString,
-          readDatum(v, tpe.typeArgs(1), schema.getValueType))
-        }
-      case ARRAY =>
-        iterableCache.getOrInitialize(tpe) {
-          datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
-            item => readDatum(item, tpe.typeArgs(0), schema.getElementType))
-        }
+      case STRING => datum.asInstanceOf[Utf8].toString
       //TODO case FIXED if schema.getProp("runtime") == "uuid"
-      case FIXED if schema.getProp("runtime") == "int" || tpe =:= typeOf[Int] =>
+      case FIXED if schema.getProp("runtime") == "int" || datum.isInstanceOf[Int] =>
         ByteUtils.asIntValue(datum.asInstanceOf[GenericFixed].bytes())
 
-      case FIXED if schema.getProp("runtime") == "long" || tpe =:= typeOf[Long] =>
+      case FIXED if schema.getProp("runtime") == "long" || datum.isInstanceOf[Long] =>
         ByteUtils.asLongValue(datum.asInstanceOf[GenericFixed].bytes())
 
       case FIXED => AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
+
+      case invalidTopLevel => throw new IllegalArgumentException(s"$invalidTopLevel is not allowed as a top-level avro type")
     }
+
   }
 
   def inferSchema[T: TypeTag]: Schema = inferSchema(typeOf[T])
@@ -396,29 +447,4 @@ object AvroRecord extends AvroExtractors {
       }
     })
   }
-}
-
-abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
-
-  @JsonIgnore val schema: Schema = AvroRecord.inferSchema(getClass)
-
-  @transient private[avro] var _serializedInstanceBytes: Array[Byte] = null
-
-  private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
-
-  override def getSchema: Schema = schema
-
-  // TODO there is a way to optimize writes by the get(i) method a) by caching the result b) when reading fields from generic, initialize the cache right away
-//  private[record] val generic = mutable.Map[Int, AnyRef]()
-//  final override def get(i: Int): AnyRef = generic.getOrElseUpdate(i, {
-//    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
-//  })
-  final override def get(i: Int): AnyRef = {
-    AvroRecord.extract(fields(i).get(this), List(schema.getFields.get(i).schema))
-  }
-
-  final override def put(i: Int, v: scala.Any): Unit = {
-    throw new AvroRuntimeException("Scala AvroRecord is immutable")
-  }
-
 }

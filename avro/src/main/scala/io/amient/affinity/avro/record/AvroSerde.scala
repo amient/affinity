@@ -19,7 +19,7 @@
 
 package io.amient.affinity.avro.record
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
+import java.io.{ByteArrayOutputStream, InputStream}
 import java.nio.ByteBuffer
 import java.util
 
@@ -30,8 +30,7 @@ import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema
-import org.apache.avro.generic.{GenericDatumReader, IndexedRecord}
-import org.apache.avro.io.{BinaryDecoder, DecoderFactory}
+import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferInputStream
 
 import scala.collection.JavaConversions._
@@ -122,7 +121,6 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     require(schemaId >= 0)
     value match {
       case null => null
-      case record: AvroRecord if record._serializedInstanceBytes != null => record._serializedInstanceBytes
       case any: Any =>
         val valueOut = new ByteArrayOutputStream()
         try {
@@ -155,9 +153,14 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     *         null if bytes are null
     */
   def read(bytes: Array[Byte]): Any = {
-    if (bytes == null) null else read(new ByteArrayInputStream(bytes)) match {
-      case a: AvroRecord => a._serializedInstanceBytes = bytes; a
-      case other => other
+    if (bytes == null) null else {
+      require(bytes.length > 5)
+      require(bytes(0) == AvroSerde.MAGIC)
+      val schemaId = ByteUtils.asIntValue(bytes, 1)
+      require(schemaId >= 0)
+      val writerSchema = getSchema(schemaId)
+      val (_, readerSchema) = getRuntimeSchema(writerSchema)
+      AvroRecord.read(bytes, writerSchema, readerSchema, 5)
     }
   }
 
@@ -173,20 +176,9 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     require(bytesIn.read() == AvroSerde.MAGIC)
     val schemaId = ByteUtils.readIntValue(bytesIn)
     require(schemaId >= 0)
-    val decoder: BinaryDecoder = DecoderFactory.get().binaryDecoder(bytesIn, null)
     val writerSchema = getSchema(schemaId)
     val (_, readerSchema) = getRuntimeSchema(writerSchema)
-    if (readerSchema == null) {
-      //if runtime/readerSchema could not be determinted, the best we can do is return a generic record how it was written
-      //TODO this doesn't have any test to protected against regression
-      val reader = new GenericDatumReader[Any](writerSchema)
-      reader.read(null, decoder)
-    } else {
-      //http://avro.apache.org/docs/1.7.2/api/java/org/apache/avro/io/parsing/doc-files/parsing.html
-      val reader = new GenericDatumReader[Any](writerSchema, readerSchema)
-      val record = reader.read(null, decoder)
-      AvroRecord.read(record, readerSchema)
-    }
+    AvroRecord.read(bytesIn, writerSchema, readerSchema)
   }
 
   /**

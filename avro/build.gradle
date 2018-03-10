@@ -31,6 +31,7 @@ dependencies {
     compile 'org.scala-lang:scala-reflect:' + rootProject.scalaVersion
     compile group: 'com.101tec', name: 'zkclient', version: rootProject.zkClientVersion
     compile group: 'org.apache.avro', name: 'avro', version: rootProject.avroVersion
+
     testCompile project(':core')
     testCompile project(':kafka:test-util-kafka')
 }
