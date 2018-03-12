@@ -95,13 +95,13 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
   behavior of "KafkaStorage"
 
   //FIXME #155
-  it should "survive failing writes" ignore {
-    config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
-    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+  it should "survive failing writes" in {
+    config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
+    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
     val stateStoreName = "failure-test"
     val topic = KafkaStorage.StateConf(Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
     val state = createStateStoreForPartition("keyspace1", partition = 0, stateStoreName)
-    runTestWithState(state, topic, 100)
+    runTestWithState(state, topic, 1000)
   }
 
   it should "fast forward to a min.timestamp on bootstrap if bigger than now - ttl" ignore {
@@ -124,8 +124,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
 
-    config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
-    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be (classOf[ZookeeperSchemaRegistry].getName)
+    config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
+    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
     val topic = KafkaStorage.StateConf(Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
@@ -138,13 +138,16 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()
     val updates = Future.sequence(for (i <- (1 to numToWrite)) yield {
-      state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) transform(
-        (s) => s, (e: Throwable) => { numWrites.decrementAndGet(); e })
+      state.replace(i, TestRecord(KEY(i), UUID.random, System.currentTimeMillis(), s"test value $i")) recover {
+        case _: Throwable => numWrites.decrementAndGet()
+      }
     })
     Await.ready(updates, specTimeout)
-    numWrites.get should be >= 0
+    val written = numWrites.get
+    written should be >= 0
     log.info(s"written ${numWrites.get} records of state data in ${System.currentTimeMillis() - l} ms")
-    synchronized(state).iterator.size() should equal(numWrites.get)
+    state.iterator.size() should equal(written)
+    numWrites.get should be(written)
 
     val consumerProps = Map(
       "bootstrap.servers" -> kafkaBootstrap,
