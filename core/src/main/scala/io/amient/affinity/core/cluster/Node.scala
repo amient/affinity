@@ -125,11 +125,11 @@ class Node(config: Config) {
 
   def startContainers() {
     if (conf.Affi.Node.Containers.isDefined) {
-      Future.sequence(conf.Affi.Node.Containers().map {
+      conf.Affi.Node.Containers().foreach {
         case (group: String, value: CfgIntList) =>
           val partitions = value().map(_.toInt).toList
           startContainer(group, partitions)
-      })
+      }
     }
   }
 

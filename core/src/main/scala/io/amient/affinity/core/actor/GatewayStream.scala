@@ -175,7 +175,7 @@ trait GatewayStream extends Gateway {
             //flush all outputs in parallel - these are all outputs declared in this gateway
             outpuStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
-            Await.ready(Future.sequence(work.result), commitInterval)
+            Await.result(Future.sequence(work.result), commitInterval)
             //commit the records processed by this processor only since the last commit
             lastCommit = consumer.commit() //trigger new commit
             //TODO here the underlying commit future would distribute on completion the partial watermark to registered accumulator actors
