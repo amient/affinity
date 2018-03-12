@@ -33,6 +33,7 @@ import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
@@ -55,12 +56,10 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   implicit val timeout = Timeout(specTimeout)
 
   controller ? CreateContainer("region", List(0, 1, 2, 3), Props(new Partition() {
-    val data = state[Int, Base]("test")
+    val data = state[Int, Envelope]("test")
 
     override def handle: Receive = {
-      case base: Base =>
-        data.replace(base.id.id, base)
-        sender ! true
+      case query@Envelope(id, side, seq) => sender.replyWith(query)(data.replace(id.id, query))
       case ID(s) => data.push(s, ID(s+1))
     }
   }))
@@ -79,7 +78,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
         }
 
       case HTTP(HttpMethods.GET, PATH("update-it"), _, response) =>
-        accept(response, regionService ? Base(ID(2), Side.RIGHT))
+        accept(response, regionService ? Envelope(ID(2), Side.RIGHT))
 
       case WEBSOCK(PATH("test-json-socket"), _, socket) =>
         connectKeyValueMediator(regionService, "test", 2) map {
@@ -111,7 +110,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
           }, new UpstreamActor {
             override def handle: Receive = {
               case None => push("{}")
-              case Some(base@Base(id, side, _)) => push(Encoder.json(base))
+              case Some(base@Envelope(id, side, _)) => push(Encoder.json(base))
               case id:ID => push(Encoder.json(id))
             }
           })
@@ -121,11 +120,16 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     case port: Int => port
   }, timeout.duration)
 
-  awaitServiceReady("region")
+  override def beforeAll(): Unit = try {
+    awaitServiceReady("region")
+  } finally {
+    super.beforeAll()
+  }
 
-  override def afterAll: Unit = {
+  override def afterAll: Unit = try {
     controller ! GracefulShutdown()
     Await.ready(system.whenTerminated, specTimeout)
+  } finally {
     super.afterAll
   }
 
@@ -155,9 +159,9 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
         override def onMessage(message: AnyRef): Unit = if (message != null) wsqueue.add(message)
       })
       try {
-        val schema = ws.getSchema(classOf[Base].getName)
-        schema should equal(AvroRecord.inferSchema(classOf[Base]))
-        ws.send(Base(ID(101), Side.LEFT, Seq(ID(2000))))
+        val schema = ws.getSchema(classOf[Envelope].getName)
+        schema should equal(AvroRecord.inferSchema(classOf[Envelope]))
+        ws.send(Envelope(ID(101), Side.LEFT, Seq(ID(2000))))
         val push1 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
         push1 should not be (null)
         val record = push1.asInstanceOf[GenericData.Record]
@@ -202,7 +206,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
         push1 should be(Decoder.json("{}"))
         http_get(Uri(s"http://127.0.0.1:$httpPort/update-it"))
         val push2 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
-        push2 should be(Decoder.json("{\"type\":\"io.amient.affinity.core.http.Base\",\"data\":{\"id\":{\"id\":2},\"side\":\"RIGHT\",\"seq\":[]}}"))
+        push2 should be(Decoder.json("{\"type\":\"io.amient.affinity.core.http.Envelope\",\"data\":{\"id\":{\"id\":2},\"side\":\"RIGHT\",\"seq\":[]}}"))
       } finally {
         ws.close()
       }

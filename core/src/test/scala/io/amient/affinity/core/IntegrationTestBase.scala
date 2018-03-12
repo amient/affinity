@@ -19,6 +19,8 @@
 
 package io.amient.affinity.core
 
+import java.util.concurrent.TimeoutException
+
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
@@ -45,17 +47,13 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
     ConfigFactory.load("integrationtests").withValue(EmbedConf(Conf.Affi.Coordinator).ID.path,
       ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet())))
 
-  implicit val materializer = ActorMaterializer.create(system)
-
-  implicit val scheduler = system.scheduler
-
   private val servicesReady = scala.collection.mutable.Set[String]()
   system.eventStream.subscribe(system.actorOf(Props(new Actor {
     override def receive: Receive = {
       case KeyspaceStatus(g, false) => {
         servicesReady.synchronized {
           servicesReady.add(g)
-          servicesReady.notify
+          servicesReady.notifyAll()
         }
       }
     }
@@ -69,11 +67,13 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
     val t = System.currentTimeMillis()
     servicesReady.synchronized {
       while (!servicesReady.contains(group)) {
-        servicesReady.wait(5000)
-        if (System.currentTimeMillis() - t > 15000) require(servicesReady.contains(group))
+        if (System.currentTimeMillis() - t > 15000) throw new TimeoutException("Service didn't start within 15 seconds")
+        servicesReady.wait(1000)
       }
     }
   }
+
+  implicit val materializer = ActorMaterializer.create(system)
 
   def http_get(uri: Uri): String = {
     val promise = Promise[HttpResponse]()

@@ -57,11 +57,12 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
-      case HTTP(GET, PATH("clusterping"), _, response) =>
+      case HTTP(GET, PATH("clusterping"), _, response) => handleWith(response) {
         implicit val timeout = Timeout(1 second)
-        delegateAndHandleErrors(response, ks gather ClusterPing()) {
+        ks gather ClusterPing() map {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
+      }
       case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
         response.success(Encoder.json(OK, Decoder.json(entity), gzip = true))
     }

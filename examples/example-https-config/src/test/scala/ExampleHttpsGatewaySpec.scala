@@ -27,7 +27,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class SimpleApiSpec extends FlatSpec with AffinityTestBase with Matchers {
+class ExampleHttpsGatewaySpec extends FlatSpec with AffinityTestBase with Matchers {
 
   val config = ConfigFactory.load("https-example-test")
 

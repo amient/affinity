@@ -21,6 +21,7 @@ package io.amient.affinity.core.http
 
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.util.Reply
 
 
 object Side extends Enumeration {
@@ -32,8 +33,8 @@ case class ID(id: Int) extends AvroRecord with Routed {
   override def key = id
 }
 
-case class Base(id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq())
-  extends AvroRecord with Routed {
+case class Envelope(id: ID = ID(0), val side: Side.Value = Side.LEFT, val seq: Seq[ID] = Seq())
+  extends AvroRecord with Routed with Reply[Option[Envelope]] {
   override def key = id.id
 }
 

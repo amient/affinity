@@ -181,9 +181,11 @@ trait GatewayHttp extends Gateway {
   def accept(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
     val data = dataGenerator
     data match {
-      case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
-        case None => HttpResponse(NotFound)
-        case _ => HttpResponse(Accepted)
+      case delegate: Future[_] => handleWith(response) {
+        delegate map {
+          case None => HttpResponse(NotFound)
+          case _ => HttpResponse(Accepted)
+        }
       }
       case None => HttpResponse(NotFound)
       case _ => HttpResponse(Accepted)
@@ -203,10 +205,12 @@ trait GatewayHttp extends Gateway {
   def handleAs(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List())(f: (Any) => HttpResponse): Unit = try {
     val data = dataGenerator
     data match {
-      case delegate: Future[_] => delegateAndHandleErrors(response, delegate) {
-        case None => HttpResponse(NotFound)
-        case Some(value) => f(value)
-        case any => f(any)
+      case delegate: Future[_] => handleWith(response) {
+        delegate map {
+          case None => HttpResponse(NotFound)
+          case Some(value) => f(value)
+          case any => f(any)
+        }
       }
       case _ => response.success(try {
         data match {
@@ -223,15 +227,10 @@ trait GatewayHttp extends Gateway {
   }
 
 
-  def fulfillAndHandleErrors(promise: Promise[HttpResponse])(f: => Future[HttpResponse])
-                            (implicit ctx: ExecutionContext) {
+  def handleWith(promise: Promise[HttpResponse])(f: => Future[HttpResponse])(implicit ctx: ExecutionContext) {
     promise.completeWith(f recover handleException)
   }
 
-  def delegateAndHandleErrors[T](promise: Promise[HttpResponse], delegate: Future[T])
-                             (f: T => HttpResponse)(implicit ctx: ExecutionContext) {
-    promise.completeWith(delegate map f recover handleException)
-  }
 
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 

@@ -101,7 +101,7 @@ trait PrivateApi extends GatewayHttp {
         case None =>
           credentials match {
             case Some(BasicHttpCredentials(username, newAdminPassword)) if username == "admin" =>
-              fulfillAndHandleErrors(response) {
+              handleWith(response) {
                 settings.replace("admin", ConfigEntry("Administrator Account", TimeCryptoProof.toHex(newAdminPassword.getBytes))) flatMap {
                   _ => executeCode(username)
                 }
@@ -113,7 +113,7 @@ trait PrivateApi extends GatewayHttp {
           case Some(BasicHttpCredentials(username, password)) if username == "admin"
             && TimeCryptoProof.toHex(password.getBytes) == adminPassword =>
 
-            fulfillAndHandleErrors(response) {
+            handleWith(response) {
               executeCode(username)
             }
           case _ =>

@@ -53,13 +53,12 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * GET /vertex/<vertex>
       */
-    case HTTP(GET, PATH("vertex", INT(vid)), query, response) =>
-      delegateAndHandleErrors(response, getVertexProps(vid)) {
-        _ match {
-          case None => throw new NoSuchElementException
-          case Some(vertexProps) => Encoder.json(OK, vertexProps)
-        }
-      }
+    case HTTP(GET, PATH("vertex", INT(vid)), _, response) => handleWith(response) {
+      getVertexProps(vid) map (_ match {
+        case None => HttpResponse(StatusCodes.NotFound)
+        case Some(vertexProps) => Encoder.json(OK, vertexProps)
+      })
+    }
 
     /**
       * WebSocket GET /component?id=<vid>
@@ -73,29 +72,30 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * GET /component/<component>
       */
-    case HTTP(GET, PATH("component", INT(cid)), query, response) =>
-      delegateAndHandleErrors(response, getGraphComponent(cid)) {
-        _ match {
-          case None => throw new NoSuchElementException
-          case Some(component) => Encoder.json(OK, component)
-        }
-      }
+    case HTTP(GET, PATH("component", INT(cid)), _, response) => handleWith(response) {
+      getGraphComponent(cid) map (_ match {
+        case None => HttpResponse(StatusCodes.NotFound)
+        case Some(component) => Encoder.json(OK, component)
+      })
+    }
 
     /**
       * POST /connect/<vertex1>/<vertex2>
       */
-    case HTTP(POST, PATH("connect", INT(id), INT(id2)), query, response) =>
-      delegateAndHandleErrors(response, connect(id, id2)) {
-        case _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+    case HTTP(POST, PATH("connect", INT(id), INT(id2)), _, response) => handleWith(response) {
+      connect(id, id2) map {
+        _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }
+    }
 
     /**
       * POST /disconnect/<vertex1>/<vertex2>
       */
-    case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), query, response) =>
-      delegateAndHandleErrors(response, disconnect(id, id2)) {
-        case _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+    case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), query, response) => handleWith(response) {
+      disconnect(id, id2) map {
+        _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }
+    }
 
   }
 

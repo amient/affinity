@@ -50,8 +50,12 @@ class ExampleApiGateway extends Gateway {
   def putData(key: String, value: String): Future[Option[String]] = simpleService ack PutValue(key, value)
 
   override def handle: Receive = super.handle orElse {
-    case request@GetData(key) => sender.replyWith(request) { getData(key) }
-    case cmd@PutData(key, value) => sender.replyWith(cmd) { putData(key, value) }
+    case request@GetData(key) => sender.replyWith(request) {
+      getData(key)
+    }
+    case cmd@PutData(key, value) => sender.replyWith(cmd) {
+      putData(key, value)
+    }
   }
 
 }
@@ -64,16 +68,19 @@ class ExampleHttpsGateway extends ExampleApiGateway with GatewayHttp {
 
     case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong"))
 
-    case HTTP(GET, PATH("store", key), _, response) =>
-      delegateAndHandleErrors(response, getData(key)) {
+    case HTTP(GET, PATH("store", key), _, response) => handleWith(response) {
+      getData(key) map {
         case None => HttpResponse(NotFound)
         case Some(value: String) => HttpResponse(OK, entity = value)
       }
+    }
 
     case HTTP(PUT, PATH("store", key), QUERY(("value", value)), response) =>
-      delegateAndHandleErrors(response, putData(key, value)) {
-        case None => HttpResponse(Accepted)
-        case Some(prevValue: String) => HttpResponse(OK, entity = prevValue)
+      handleWith(response) {
+        putData(key, value) map {
+          case None => HttpResponse(Accepted)
+          case Some(prevValue: String) => HttpResponse(OK, entity = prevValue)
+        }
       }
 
   }
