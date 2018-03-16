@@ -46,7 +46,13 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
     storage.reset(split.index, range)
     context.addTaskCompletionListener(_ => storage.close)
     val compactor = (r1: LogEntry[POS], r2: LogEntry[POS]) => if (r1.timestamp > r2.timestamp) r1 else r2
-    val logRecords = storage.boundedIterator().asScala.map(record => (new ByteKey(record.key), record))
+    val logRecords = storage.boundedIterator().asScala.map { record =>
+      if (record.key != null) (new ByteKey(record.key), record) else {
+        if (!compacted) (null, record) else {
+          throw new IllegalArgumentException("null key encountered on a compacted stream")
+        }
+      }
+    }
     if (!compacted) logRecords else {
       val spillMap = new ExternalAppendOnlyMap[ByteKey, LogEntry[POS], LogEntry[POS]]((v) => v, compactor, compactor)
       spillMap.insertAll(logRecords)
