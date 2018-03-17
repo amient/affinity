@@ -20,6 +20,7 @@
 package io.amient.affinity.core.http
 
 import akka.http.javadsl.model.ContentTypes
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
@@ -125,11 +126,9 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
 
   "Gateway" should "not restart after illegal argument exception from a handler" in {
     node1.http(HttpRequest(HttpMethods.GET, node1.uri("/resumable")))
+    implicit val system = node1.system
+    Http().shutdownAllConnectionPools()
     node1.http_get("/ping").status should be (OK)
   }
-
-  "Gateway" should "restart after Exception argument exception from a handler" in {
-    node1.http(HttpRequest(HttpMethods.GET, node1.uri("/restartable")))
-    node1.http_get("/ping").status should be (OK)
-  }
+  
 }
