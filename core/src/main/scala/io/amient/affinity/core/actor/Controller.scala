@@ -20,7 +20,8 @@
 package io.amient.affinity.core.actor
 
 import akka.AkkaException
-import akka.actor.{Actor, InvalidActorNameException, Props, Terminated}
+import akka.actor.SupervisorStrategy.{Escalate, Restart, Resume}
+import akka.actor.{Actor, InvalidActorNameException, OneForOneStrategy, Props, Terminated}
 import akka.event.Logging
 import akka.pattern.ask
 import akka.util.Timeout
@@ -69,6 +70,19 @@ class Controller extends Actor {
   import system.dispatcher
 
   implicit val scheduler = context.system.scheduler
+
+  override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1 minute) {
+    case _: IllegalArgumentException ⇒ Resume
+    case _: NoSuchElementException ⇒ Resume
+    case _: NullPointerException ⇒ Resume
+    case _: IllegalStateException ⇒ Resume
+    case _: IllegalAccessException ⇒ Resume
+    case _: SecurityException ⇒ Resume
+    case _: NotImplementedError ⇒ Resume
+    case _: UnsupportedOperationException ⇒ Resume
+    case _: Exception ⇒ Restart
+    case _: Throwable ⇒ Escalate
+  }
 
   override def receive: Receive = {
 

@@ -20,6 +20,7 @@
 package io.amient.affinity.core.http
 
 import akka.http.javadsl.model.ContentTypes
+import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.stream.ActorMaterializer
@@ -28,7 +29,7 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
-import io.amient.affinity.core.util.{Scatter, AffinityTestBase}
+import io.amient.affinity.core.util.{AffinityTestBase, Scatter}
 import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -54,6 +55,12 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
 
     val ks = keyspace("region")
 
+    object ERROR {
+      def unapply(http: HttpExchange): Option[HttpExchange] = {
+        throw new IllegalArgumentException("Simulated resumable exception")
+      }
+    }
+
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
       case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
@@ -65,6 +72,10 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
       }
       case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
         response.success(Encoder.json(OK, Decoder.json(entity), gzip = true))
+
+      case HTTP(GET, PATH("restartable"), _, _) => throw new Exception("Simulated restartable exception")
+
+      case ERROR(HTTP(GET, PATH("resumable"), _, response)) => response.success(HttpResponse(OK))
     }
   })
 
@@ -110,5 +121,15 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     json.put("hello", "hello")
     Encoder.json(json) should be("{\"hello\":\"hello\"}")
     node1.get_json(node1.http_post_json("/ping", json)) should be(json)
+  }
+
+  "Gateway" should "not restart after illegal argument exception from a handler" in {
+    node1.http(HttpRequest(HttpMethods.GET, node1.uri("/resumable")))
+    node1.http_get("/ping").status should be (OK)
+  }
+
+  "Gateway" should "restart after Exception argument exception from a handler" in {
+    node1.http(HttpRequest(HttpMethods.GET, node1.uri("/restartable")))
+    node1.http_get("/ping").status should be (OK)
   }
 }

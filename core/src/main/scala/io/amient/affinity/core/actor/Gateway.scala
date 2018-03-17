@@ -157,6 +157,8 @@ trait Gateway extends ActorHandler {
     }
   }
 
+  abstract override def postStop(): Unit = try shutdown() finally super.postStop()
+
   abstract override def shutdown(): Unit = {
     globals.foreach {
       case (identifier, state) => try {
@@ -173,13 +175,13 @@ trait Gateway extends ActorHandler {
         case NonFatal(e) => log.warning(s"Could not close coordinators for keyspace: $identifier", e);
       }
     }
-    log.info("Gateway shutdown completed")
   }
 
   abstract override def manage = super.manage orElse {
 
     case request@GracefulShutdown() => sender.reply(request) {
       shutdown()
+      log.info("Gateway shutdown completed")
       context.stop(self)
     }
 

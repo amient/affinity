@@ -75,7 +75,9 @@ public class MemStoreMapDb extends MemStore {
     }
 
     synchronized private static final void releaseDbInstance(Path pathToData) {
-        if (refs.getOrDefault(pathToData, 0L) > 1) {
+        if (!refs.containsKey(pathToData)) {
+            return;
+        } else if (refs.getOrDefault(pathToData, 0L) > 1) {
             refs.put(pathToData, refs.get(pathToData) - 1);
         } else {
             refs.remove(pathToData);

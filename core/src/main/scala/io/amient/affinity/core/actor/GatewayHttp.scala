@@ -134,6 +134,14 @@ trait GatewayHttp extends Gateway {
     context.parent ! Controller.GatewayCreated(listener.getPort)
   }
 
+  abstract override def postStop(): Unit = try {
+    httpInterface.close()
+    log.info("Http Interface closed")
+    Http().shutdownAllConnectionPools()
+  } finally {
+    super.postStop()
+  }
+
   abstract override def onClusterStatus(suspended: Boolean): Unit = {
     super.onClusterStatus(suspended)
     if (isSuspended != suspended) {
@@ -146,13 +154,6 @@ trait GatewayHttp extends Gateway {
         reprocess.foreach(handle(_))
       }
     }
-  }
-
-  abstract override def shutdown(): Unit = {
-    httpInterface.close()
-    log.info("Http Interface closed")
-    Http().shutdownAllConnectionPools()
-    super.shutdown()
   }
 
   abstract override def manage: Receive = super.manage orElse {

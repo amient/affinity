@@ -194,11 +194,11 @@ class NodeWithTestMethods(underlying: Node) {
     Await.result(http(HttpRequest(entity = HttpEntity(ContentTypes.`application/json`, Encoder.json(json)), method = HttpMethods.POST, uri = https_uri(path), headers = headers)), 30 seconds)
   }
 
-  private def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
+  def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
 
-  private def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
+  def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
 
-  private def http(req: HttpRequest) = {
+  def http(req: HttpRequest) = {
     val decodedResponse: Future[HttpResponse] = Http().singleRequest(req, testSSLContext) flatMap {
       response =>
         response.header[headers.`Content-Encoding`] match {

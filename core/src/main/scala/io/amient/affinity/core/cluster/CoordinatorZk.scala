@@ -73,7 +73,7 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
 
   override def unregister(handle: String) = zk.delete(handle)
 
-  override def close(): Unit = {
+  override def close(): Unit = if (!closed.get) {
     super.close()
     ZkClients.close(zk);
   }

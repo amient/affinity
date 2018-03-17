@@ -103,7 +103,7 @@ trait GatewayStream extends Gateway {
   }
 
   abstract override def shutdown(): Unit = {
-    try {
+    try if (!closed) {
       lock.synchronized {
         closed = true
         lock.notifyAll()
