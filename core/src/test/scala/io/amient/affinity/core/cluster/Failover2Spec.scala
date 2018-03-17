@@ -19,12 +19,12 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
+import akka.http.scaladsl.model._
 import akka.util.Timeout
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.Conf
@@ -142,14 +142,11 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     client.start
     client.join(specTimeout.toMillis)
     errorCount.get should be(0L)
-    val x = Await.result(Future.sequence(expected.asScala.map { case (key, value) =>
-      node1.http(GET, s"/$key").map {
-        response =>
-          (response.entity, jsonStringEntity(value))
-      }
-    }), specTimeout)
-    x.count { case (entity, expected) => entity != expected } should be(0)
-
+    expected.asScala.foreach{ case (key, value) =>
+      val y = Await.result(node1.http(GET, s"/$key").map { response => response.entity }, specTimeout / 3)
+      val x = jsonStringEntity(value)
+      y should be (x)
+    }
   }
 
 }
