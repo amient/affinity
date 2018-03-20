@@ -23,35 +23,51 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
+import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.concurrent.Promise
+import scala.util.control.NonFatal
 
 object RequestMatchers {
 
+  private val logger = LoggerFactory.getLogger(RequestMatchers.getClass)
+
   object WEBSOCK {
-    def unapply(exchange: HttpExchange): Option[(Path, Query, WebSocketExchange)] = {
+    def unapply(exchange: HttpExchange): Option[(Path, Query, WebSocketExchange)] = try {
       exchange.request.header[UpgradeToWebSocket] map {
-        case upgrade: UpgradeToWebSocket => (exchange.request.uri.path,exchange.request.uri.query(),  WebSocketExchange(upgrade, exchange.promise))
+        case upgrade: UpgradeToWebSocket => (exchange.request.uri.path, exchange.request.uri.query(), WebSocketExchange(upgrade, exchange.promise))
       }
+    } catch {
+      case NonFatal(e) =>
+        logger.warn("Error while matching WEBSOCK request", e)
+        None
     }
   }
 
   object HTTP {
-    def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = {
+    def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = try {
       exchange.request.header[UpgradeToWebSocket] match {
         case None => Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
         case _ => None
       }
+    } catch {
+      case NonFatal(e) =>
+        logger.warn("Error while matching HTTP request", e)
+        None
     }
   }
 
-  def HTTP_(method: HttpMethod, exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = {
+  private def HTTP_(method: HttpMethod, exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = try {
     exchange.request.method match {
       case `method` =>
         Some(exchange.request.entity.contentType, exchange.request.entity, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
       case _ => None
     }
+  } catch {
+    case NonFatal(e) =>
+      logger.warn(s"Error while matching HTTP($method) request", e)
+      None
   }
 
   object HTTP_POST {
@@ -63,7 +79,7 @@ object RequestMatchers {
   }
 
   object PATH {
-    def unapplySeq(path: Path): Option[Seq[String]] = {
+    def unapplySeq(path: Path): Option[Seq[String]] = try {
       @tailrec
       def r(p: Path, acc: Seq[String] = Seq()): Seq[String] =
         if (p.isEmpty) acc
@@ -72,31 +88,41 @@ object RequestMatchers {
         else r(p.tail, acc :+ p.head.toString)
 
       Some(r(path))
+    } catch {
+      case NonFatal(e) =>
+        logger.warn(s"Error while matching request PATH($path)", e)
+        None
     }
   }
 
   object INT {
-    def unapply(any: Any): Option[Int] = {
-      try {
-        Some(Integer.parseInt(any.toString))
-      } catch {
-        case e: NumberFormatException => None
-      }
+    def unapply(any: Any): Option[Int] = try {
+      Some(Integer.parseInt(any.toString))
+    } catch {
+      case NonFatal(e) =>
+        logger.warn(s"Error while matching INT($any) request path component", e)
+        None
     }
   }
 
   object LONG {
-    def unapply(any: Any): Option[Long] = {
-      try {
-        Some(java.lang.Long.parseLong(any.toString))
-      } catch {
-        case e: NumberFormatException => None
-      }
+    def unapply(any: Any): Option[Long] = try {
+      Some(java.lang.Long.parseLong(any.toString))
+    } catch {
+      case NonFatal(e) =>
+        logger.warn(s"Error while matching LONG($any) request path component", e)
+        None
     }
   }
 
   object QUERY {
-    def unapplySeq(query: Query): Option[Seq[(String, String)]] = Some(query.sortBy(_._1))
+    def unapplySeq(query: Query): Option[Seq[(String, String)]] = try {
+      Some(query.sortBy(_._1))
+    } catch {
+      case NonFatal(e) =>
+        logger.warn(s"Error while matching request QUERY($query)", e)
+        None
+    }
   }
 
 }
