@@ -247,9 +247,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
-      val consumerConfig = kafkaStorageConf.Consumer.config()
-      consumerConfig.entrySet().foreach { case (entry) =>
-        put(entry.getKey, entry.getValue.unwrapped())
+      if (kafkaStorageConf.Consumer.isDefined) {
+        val consumerConfig = kafkaStorageConf.Consumer.config()
+        consumerConfig.entrySet().foreach { case (entry) =>
+          put(entry.getKey, entry.getValue.unwrapped())
+        }
       }
     }
     val admin = AdminClient.create(adminProps)
