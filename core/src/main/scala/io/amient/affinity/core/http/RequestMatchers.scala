@@ -39,9 +39,8 @@ object RequestMatchers {
         case upgrade: UpgradeToWebSocket => (exchange.request.uri.path, exchange.request.uri.query(), WebSocketExchange(upgrade, exchange.promise))
       }
     } catch {
-      case NonFatal(e) =>
-        logger.warn("Error while matching WEBSOCK request", e)
-        None
+      case e: ExceptionWithErrorInfo => logger.warn(e.getMessage); None
+      case NonFatal(e) => logger.warn("Error while matching WEBSOCK request", e); None
     }
   }
 
@@ -52,9 +51,8 @@ object RequestMatchers {
         case _ => None
       }
     } catch {
-      case NonFatal(e) =>
-        logger.warn("Error while matching HTTP request", e)
-        None
+      case e: ExceptionWithErrorInfo => logger.warn(e.getMessage); None
+      case NonFatal(e) => logger.warn("Error while matching HTTP request", e); None
     }
   }
 
@@ -65,9 +63,8 @@ object RequestMatchers {
       case _ => None
     }
   } catch {
-    case NonFatal(e) =>
-      logger.warn(s"Error while matching HTTP($method) request", e)
-      None
+    case e: ExceptionWithErrorInfo => logger.warn(e.getMessage); None
+    case NonFatal(e) => logger.warn(s"Error while matching HTTP($method) request", e); None
   }
 
   object HTTP_POST {
@@ -89,9 +86,8 @@ object RequestMatchers {
 
       Some(r(path))
     } catch {
-      case NonFatal(e) =>
-        logger.warn(s"Error while matching request PATH($path)", e)
-        None
+      case e: ExceptionWithErrorInfo => logger.warn(e.getMessage); None
+      case NonFatal(e) => logger.warn(s"Error while matching request PATH($path)", e); None
     }
   }
 
@@ -99,9 +95,8 @@ object RequestMatchers {
     def unapply(any: Any): Option[Int] = try {
       Some(Integer.parseInt(any.toString))
     } catch {
-      case NonFatal(e) =>
-        logger.warn(s"Error while matching INT($any) request path component", e)
-        None
+      case e: NumberFormatException => logger.warn(e.getMessage); None
+      case NonFatal(e) => logger.warn(s"Error while matching INT($any) request path component", e); None
     }
   }
 
@@ -109,9 +104,8 @@ object RequestMatchers {
     def unapply(any: Any): Option[Long] = try {
       Some(java.lang.Long.parseLong(any.toString))
     } catch {
-      case NonFatal(e) =>
-        logger.warn(s"Error while matching LONG($any) request path component", e)
-        None
+      case e: NumberFormatException => logger.warn(e.getMessage); None
+      case NonFatal(e) => logger.warn(s"Error while matching LONG($any) request path component", e); None
     }
   }
 
@@ -119,9 +113,7 @@ object RequestMatchers {
     def unapplySeq(query: Query): Option[Seq[(String, String)]] = try {
       Some(query.sortBy(_._1))
     } catch {
-      case NonFatal(e) =>
-        logger.warn(s"Error while matching request QUERY($query)", e)
-        None
+      case NonFatal(e) => logger.warn(s"Error while matching request QUERY($query)", e); None
     }
   }
 
