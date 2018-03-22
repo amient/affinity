@@ -24,8 +24,8 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.typesafe.config.Config
+import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.avro.record.AvroSerde.MAGIC
-import io.amient.affinity.avro.{AvroSchemaRegistry, MemorySchemaRegistry}
 import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.ByteUtils
@@ -34,6 +34,7 @@ import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferInputStream
 
 import scala.collection.JavaConversions._
+import scala.util.control.NonFatal
 
 object AvroSerde {
 
@@ -52,7 +53,7 @@ object AvroSerde {
   }
 
   class AvroConf extends CfgStruct[AvroConf] {
-    val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], classOf[MemorySchemaRegistry])
+    val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], true)
 
     override protected def specializations(): util.Set[String] = {
       Set("schema.registry")
@@ -158,7 +159,12 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
       require(bytes(0) == AvroSerde.MAGIC)
       val schemaId = ByteUtils.asIntValue(bytes, 1)
       require(schemaId >= 0)
-      val writerSchema = getSchema(schemaId)
+      val writerSchema = try {
+        getSchema(schemaId)
+      } catch {
+        case NonFatal(e) =>
+          throw new RuntimeException(s"Could not get schema id : $schemaId", e)
+      }
       val (_, readerSchema) = getRuntimeSchema(writerSchema)
       AvroRecord.read(bytes, writerSchema, readerSchema, 5)
     }
