@@ -165,9 +165,10 @@ allprojects {
 
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'
-            //jvmArgs = ['-Djava.util.logging.config.file=' + rootProject.projectDir + '/api/src/test/resources/logging.properties']
-            args = ['-R', 'build/classes/test', '-o', '-P1']
+            args = ['-R', "${project.buildDir}/classes/scala/integrationTest", '-o', '-h', "${project.buildDir}/test-results", '-u', "${project.buildDir}/ittest-results"]
             classpath = sourceSets.test.runtimeClasspath
+            inputs.files(sourceSets.test.compileClasspath)
+            outputs.dir(file("${project.buildDir}/test-results"))
         }
         test.dependsOn scalaTest
 
@@ -181,18 +182,11 @@ allprojects {
         dependencies {
             testRuntime 'org.pegdown:pegdown:1.6.0'
         }
-
-//        test {
-//            reports {
-//                junitXml.enabled true
-//                junitXml.destination file("${project.buildDir}/test-results")
-//                html.destination file("${project.buildDir}/test-results")
-//            }
-//        }
     }
 
-//    tasks.withType(ScalaCompile) {
-//        scalaCompileOptions.additionalParameters = ["-feature",
+    tasks.withType(ScalaCompile) {
+        scalaCompileOptions.additionalParameters = [
+//                                                   "-feature",
 //                                                    "-target:jvm-" + javaVersion,
 //                                                    "-encoding", rootProject.encoding,
 //                                                    "-unchecked",
@@ -200,7 +194,8 @@ allprojects {
 //                                                    "-Xfuture",
 //                                                    "-Yno-adapted-args",
 //                                                    "-Ywarn-dead-code",
-//                                                    "-Ywarn-numeric-widen",
-//                                                    "-Ywarn-unused"]
-//    }
+                                                    "-Ywarn-numeric-widen",
+                                                    "-Ywarn-unused"
+                                                    ]
+    }
 }
