@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 public class Log<POS extends Comparable<POS>> extends Thread implements Closeable {
 
@@ -33,6 +34,9 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
 
     final private boolean enabled;
     final private Path checkpointFile;
+
+    //TODO make checkpoint interval configurable
+    final private int checkpointIntervalMs = 10000;
 
     final private LogStorage<POS> storage;
 
@@ -63,6 +67,26 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     public POS getCheckpoint() {
         return checkpoint.get();
     }
+
+    final private Consumer<Long> checkpointWriter = new Consumer<Long>() {
+        private long lastWritten = 0L;
+        @Override
+        public void accept(Long time) {
+            if (time <= 0L || lastWritten + checkpointIntervalMs < time) try {
+                lastWritten = time;
+                if (enabled && checkpointModified) {
+                    POS position = checkpoint.get();
+                    log.debug("Writing checkpoint " + position + " to file: " + checkpointFile);
+                    ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(checkpointFile.toFile()));
+                    oos.writeObject(position);
+                    oos.close();
+                    checkpointModified = false;
+                }
+            } catch (IOException e) {
+                log.warn("Failed to update bootstrap checkpoint: ", e);
+            }
+        }
+    };
 
     private void fsmEnterWriteState() {
         switch(fsm) {
@@ -105,21 +129,24 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             case INIT: case BOOT: break;
         }
         fsm = FSM.BOOT;
+
         POS checkpoint = getCheckpoint();
         log.debug("Bootstrap " + identifier + " from checkpoint " + checkpoint + ":end-offset");
         long t = EventTime.unix();
-        POS endOffsest = storage.reset(partition, checkpoint);
+        POS endOffset = storage.reset(partition, checkpoint);
         long numRecordsProcessed = 0L;
-        if (endOffsest != null) {
+        if (endOffset != null) {
             Iterator<LogEntry<POS>> i = storage.boundedIterator();
             while (i.hasNext()) {
                 LogEntry<POS> entry = i.next();
                 if (checkpoint == null || entry.position.compareTo(checkpoint) > 0) {
                     modifyState(kvstore, entry, observableState);
                     numRecordsProcessed += 1;
+                    checkpointWriter.accept(System.currentTimeMillis());
                 }
             }
-            updateCheckpoint(endOffsest);
+            updateCheckpoint(endOffset);
+            checkpointWriter.accept(0L);
         }
         log.debug("Bootstrap - completed: " + identifier + ", new checkpoint= " + getCheckpoint() +  ", duration.ms = " + (EventTime.unix() - t));
         return numRecordsProcessed;
@@ -172,7 +199,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 if (fsm == FSM.TAIL) stopLogSync();
             } finally {
                 fsm = FSM.INIT;
-                if (enabled) writeCheckpoint();
+                checkpointWriter.accept(0L);
             }
         } finally {
             stopped = true;
@@ -184,10 +211,8 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         try {
             stopped = false;
             while (!stopped) {
-                TimeUnit.SECONDS.sleep(10); //TODO make checkpoint interval configurable
-                if (enabled && checkpointModified) {
-                    writeCheckpoint();
-                }
+                TimeUnit.MILLISECONDS.sleep(checkpointIntervalMs);
+                if (checkpointModified) checkpointWriter.accept(0L);
             }
         } catch (Exception e) {
             log.error("Error in the manager thread", e);
@@ -236,15 +261,6 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 return chk;
             }
         });
-    }
-
-    private void writeCheckpoint() throws IOException {
-        POS position = checkpoint.get();
-        log.debug("Writing checkpoint " + position + " to file: " + checkpointFile);
-        ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(checkpointFile.toFile()));
-        oos.writeObject(position);
-        oos.close();
-        checkpointModified = false;
     }
 
 }

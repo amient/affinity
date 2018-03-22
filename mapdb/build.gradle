@@ -8,7 +8,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    mapDbVersion = '3.0.2'
+    mapDbVersion = '3.0.5'
 }
 
 publishing {
