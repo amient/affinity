@@ -21,6 +21,7 @@ import akka.http.javadsl.model.headers._
 import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
+import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.MemStoreSimpleMap
@@ -33,6 +34,7 @@ import scala.language.postfixOps
 class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with BeforeAndAfterAll {
 
   val config = ConfigFactory.parseMap(Map(
+    Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
     Conf.Affi.Global("settings").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
     Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
     Conf.Affi.Node.Gateway.Http.Port.path -> "0"
