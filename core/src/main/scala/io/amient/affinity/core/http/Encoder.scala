@@ -63,7 +63,7 @@ object Encoder {
 
   private def jsonWrite(value: Any, out: OutputStream): Unit = {
 
-    def jsonWriteRec(value: Any) {
+    def jsonWriteRec(value: Any): Unit = {
       value match {
         case null => out.write("null".getBytes)
         case None => jsonWriteRec(null)

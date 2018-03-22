@@ -1,8 +1,8 @@
 group = rootProject.group
 version = rootProject.version
 
-apply plugin: 'java'
 apply plugin: 'scala'
+apply plugin: "com.github.maiflai.scalatest"
 apply plugin: "com.github.johnrengelman.shadow"
 
 ext {

@@ -1,8 +1,8 @@
 group = parent.group
 version = parent.version
 
-apply plugin: 'java'
 apply plugin: 'scala'
+apply plugin: "com.github.maiflai.scalatest"
 apply plugin: "com.github.johnrengelman.shadow"
 
 ext {

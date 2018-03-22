@@ -35,12 +35,13 @@ import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.storage.State
-
+import scala.language.postfixOps
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
+import scala.language.implicitConversions
 
 object Gateway {
 
@@ -65,7 +66,7 @@ trait Gateway extends ActorHandler {
 
   private val conf = Conf(context.system.settings.config).Affi
 
-  private implicit val scheduler = context.system.scheduler
+//  private implicit val scheduler = context.system.scheduler
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
 
@@ -114,7 +115,7 @@ trait Gateway extends ActorHandler {
         val ks = context.actorOf(Props(new Keyspace(serviceConf.config())), name = group)
         val coordinator = Coordinator.create(context.system, group)
         context.watch(ks)
-        declaredKeyspaces += (group -> (coordinator, ks, new AtomicBoolean(true)))
+        declaredKeyspaces += (group -> ((coordinator, ks, new AtomicBoolean(true))))
         ks
     }
   }

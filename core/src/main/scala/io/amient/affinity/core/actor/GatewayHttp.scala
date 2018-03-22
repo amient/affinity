@@ -34,7 +34,6 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.pattern.ask
-import akka.serialization.SerializationExtension
 import akka.stream.ActorMaterializer
 import akka.stream.actor.ActorPublisher
 import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
@@ -228,7 +227,7 @@ trait GatewayHttp extends Gateway {
   }
 
 
-  def handleWith(promise: Promise[HttpResponse])(f: => Future[HttpResponse])(implicit ctx: ExecutionContext) {
+  def handleWith(promise: Promise[HttpResponse])(f: => Future[HttpResponse])(implicit ctx: ExecutionContext): Unit = {
     promise.completeWith(f recover handleException)
   }
 
@@ -273,7 +272,7 @@ trait WebSocketSupport extends GatewayHttp {
       None
   }
 
-  private val serializers = SerializationExtension(context.system).serializerByIdentity
+//  private val serializers = SerializationExtension(context.system).serializerByIdentity
 
   private val avroSerde = AvroSerde.create(config)
 
@@ -303,7 +302,7 @@ trait WebSocketSupport extends GatewayHttp {
     * @param exchange web socket echange as captured in the http interface
     * @param mediator key-value mediator create using connectKeyValueMediator()
     */
-  def jsonWebSocket(exchange: WebSocketExchange, mediator: ActorRef) {
+  def jsonWebSocket(exchange: WebSocketExchange, mediator: ActorRef): Unit = {
     customWebSocket(exchange, new DownstreamActor {
       override def onOpen(upstream: ActorRef): Unit = mediator ! RegisterMediatorSubscriber(upstream)
 
@@ -436,7 +435,7 @@ trait WebSocketSupport extends GatewayHttp {
     * @param upstream   actor which will handle messages directed at the client
     */
   def customWebSocket(exchange: WebSocketExchange, downstream: => DownstreamActor, upstream: => UpstreamActor): Unit = {
-    implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
+    //implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
     val downstreamRef = context.actorOf(Props(downstream))
     val upstreamRef = context.actorOf(Props(upstream))
     implicit val timeout = Timeout(100 milliseconds)

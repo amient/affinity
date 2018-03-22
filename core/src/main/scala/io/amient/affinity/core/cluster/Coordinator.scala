@@ -105,7 +105,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * @param handle handler returned from the prior register() method call
     * @return
     */
-  def unregister(handle: String)
+  def unregister(handle: String): Unit
 
   /**
     * watch changes in the coordinate group of routees in the whole cluster.

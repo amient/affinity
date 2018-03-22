@@ -89,7 +89,7 @@ class Node(config: Config) {
     * Await all partitions in all keyspaces to have masters
     * @return httpPort or -1 if gateway doesn't have http interface attached
     */
-  def awaitClusterReady() {
+  def awaitClusterReady(): Unit = {
     clusterReady.await(15, TimeUnit.SECONDS)
   }
 
@@ -110,12 +110,12 @@ class Node(config: Config) {
     Props(creator)
   }
 
-  def start() {
+  def start(): Unit = {
     startContainers()
     startGateway()
   }
 
-  def startGateway() {
+  def startGateway(): Unit = {
     if (conf.Affi.Node.Gateway.Class.isDefined) {
       startGateway(conf.Affi.Node.Gateway.Class().newInstance())
     } else {
@@ -123,7 +123,7 @@ class Node(config: Config) {
     }
   }
 
-  def startContainers() {
+  def startContainers(): Unit = {
     if (conf.Affi.Node.Containers.isDefined) {
       conf.Affi.Node.Containers().foreach {
         case (group: String, value: CfgIntList) =>
@@ -155,7 +155,7 @@ class Node(config: Config) {
     * @param tag
     * @tparam T
     */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T])  {
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
     implicit val timeout = Timeout(startupTimeout)
     httpGatewayPort.completeWith(startupFutureWithShutdownFuse {
       controller ack CreateGateway(Props(creator))

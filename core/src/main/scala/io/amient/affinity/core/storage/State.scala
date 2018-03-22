@@ -521,7 +521,7 @@ class State[K, V](val identifier: String,
     val start = System.currentTimeMillis
     while (locks.putIfAbsent(key, l) != null) {
       counter += 1
-      val sleepTime = math.log(counter).round
+      val sleepTime = math.log(counter.toDouble).round
       if (sleepTime > 0) {
         if (System.currentTimeMillis - start > lockTimeoutMs) {
           throw new TimeoutException(s"Could not acquire lock for $key in $lockTimeoutMs ms")

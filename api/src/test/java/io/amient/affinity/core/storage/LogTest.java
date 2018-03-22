@@ -44,7 +44,7 @@ public class LogTest {
             put(template.MemStore.Class.path(), MemStoreSimpleMap.class.getName());
         }}));
         MemStore kvstore = new MemStoreSimpleMap(stateConf);
-        LogStorage storage = new MemoryLogStorage(stateConf.Storage);
+        LogStorage<Long> storage = new MemoryLogStorage(stateConf.Storage);
         Future<Long> w1 = storage.append(new Record<>("key1".getBytes(), "value1".getBytes(), 1L));
         Future<Long> w2 = storage.append(new Record<>("key2".getBytes(), "value2".getBytes(), 1L));
         Future<Long> w3 = storage.append(new Record<>("key1".getBytes(), "value10".getBytes(), 2L));

@@ -45,7 +45,7 @@ trait AvroExtractors {
 
     object AvroByte {
       def unapply(b: Byte): Option[java.lang.Integer] = {
-        typeIsAllowed(Schema.Type.INT) map (_ => new Integer(b))
+        typeIsAllowed(Schema.Type.INT) map (_ => new Integer(b.toInt))
       }
     }
 

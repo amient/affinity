@@ -1,7 +1,21 @@
+buildscript {
+    repositories {
+        jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "gradle.plugin.com.github.maiflai:gradle-scalatest:0.19"
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
+//        classpath "com.avast.gradle:gradle-docker-compose-plugin:0.7.1"
+    }
+}
+
 group = 'io.amient.affinity'
 version = '0.6.3-SNAPSHOT'
 
 ext {
+    encoding = "UTF-8"
+
     javaVersion = '1.8'
     junitVersion = '4.12'
     typesafeConfigVersion = '1.3.0'
@@ -21,29 +35,20 @@ ext {
 
 }
 
-task compile {
-    //dummy task for different modules to attach to
-}
-
 task wrapper(type: Wrapper) {
     gradleVersion = '4.6'
 }
 
 allprojects {
 
-    apply plugin: 'idea'
-
     version = rootProject.version
 
-    buildscript {
-        repositories {
-            maven {
-                url "https://plugins.gradle.org/m2/"
-            }
-        }
-        dependencies {
-            classpath "com.github.jengelman.gradle.plugins:shadow:2.0.1"
-        }
+    task compile {}
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven { url "http://packages.confluent.io/maven/" }
     }
 
     plugins.withType(MavenPlugin).whenPluginAdded {
@@ -130,12 +135,6 @@ allprojects {
         compile.dependsOn compileJava
         compile.dependsOn compileTestJava
 
-        repositories {
-            mavenCentral()
-            maven { url "http://packages.confluent.io/maven/" }
-            mavenLocal()
-        }
-
         configurations {
             provided
             testCompile.extendsFrom provided
@@ -147,12 +146,6 @@ allprojects {
             test {
                 compileClasspath += configurations.provided
                 runtimeClasspath += configurations.provided
-            }
-        }
-
-        idea {
-            module {
-                scopes.PROVIDED.plus += [configurations.provided]
             }
         }
 
@@ -183,10 +176,31 @@ allprojects {
             testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
         }
     }
-}
 
-//monkey patch for IDEA vs. Gradle 3.+
-ScalaCompileOptions.metaClass.daemonServer = true
-ScalaCompileOptions.metaClass.fork = true
-ScalaCompileOptions.metaClass.useAnt = false
-ScalaCompileOptions.metaClass.useCompileDaemon = false
+    plugins.withType(com.github.maiflai.ScalaTestPlugin).whenPluginAdded {
+        dependencies {
+            testRuntime 'org.pegdown:pegdown:1.6.0'
+        }
+
+//        test {
+//            reports {
+//                junitXml.enabled true
+//                junitXml.destination file("${project.buildDir}/test-results")
+//                html.destination file("${project.buildDir}/test-results")
+//            }
+//        }
+    }
+
+//    tasks.withType(ScalaCompile) {
+//        scalaCompileOptions.additionalParameters = ["-feature",
+//                                                    "-target:jvm-" + javaVersion,
+//                                                    "-encoding", rootProject.encoding,
+//                                                    "-unchecked",
+//                                                    "-deprecation",
+//                                                    "-Xfuture",
+//                                                    "-Yno-adapted-args",
+//                                                    "-Ywarn-dead-code",
+//                                                    "-Ywarn-numeric-widen",
+//                                                    "-Ywarn-unused"]
+//    }
+}

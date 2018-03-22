@@ -125,7 +125,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
       case any: Any =>
         val valueOut = new ByteArrayOutputStream()
         try {
-          valueOut.write(MAGIC)
+          valueOut.write(MAGIC.toInt)
           ByteUtils.writeIntValue(schemaId, valueOut)
           AvroRecord.write(value, schema, valueOut)
           valueOut.toByteArray

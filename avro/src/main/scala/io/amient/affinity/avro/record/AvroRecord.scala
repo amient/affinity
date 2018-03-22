@@ -366,8 +366,6 @@ object AvroRecord extends AvroExtractors {
     }
   }
 
-  private object classTypeCache extends ThreadLocalCache[Class[_], Type]()
-
   private object typeSchemaCache extends ThreadLocalCache[Type, Schema]()
 
   def inferSchema(tpe: Type): Schema = {

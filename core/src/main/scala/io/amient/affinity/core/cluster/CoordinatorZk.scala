@@ -80,10 +80,10 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
 
   private def listAsIndexedSeq(list: util.List[String]) = list.asScala.toIndexedSeq
 
-  private def updateChildren(children: util.List[String]) = {
+  private def updateChildren(children: util.List[String]): Unit = {
     if (children != null) {
       val newHandles = listAsIndexedSeq(children).map(id => s"$groupRoot/$id")
-      val newState = newHandles.map(handle => (handle, zk.readData(handle).asInstanceOf[String]))
+      val newState = newHandles.map(handle => (handle, zk.readData(handle)))
       updateGroup(newState.toMap)
     }
   }

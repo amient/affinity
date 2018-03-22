@@ -47,7 +47,7 @@ object RequestMatchers {
   object HTTP {
     def unapply(exchange: HttpExchange): Option[(HttpMethod, Path, Query, Promise[HttpResponse])] = try {
       exchange.request.header[UpgradeToWebSocket] match {
-        case None => Some(exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
+        case None => Some((exchange.request.method, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise))
         case _ => None
       }
     } catch {
@@ -59,7 +59,7 @@ object RequestMatchers {
   private def HTTP_(method: HttpMethod, exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = try {
     exchange.request.method match {
       case `method` =>
-        Some(exchange.request.entity.contentType, exchange.request.entity, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise)
+        Some((exchange.request.entity.contentType, exchange.request.entity, exchange.request.uri.path, exchange.request.uri.query(), exchange.promise))
       case _ => None
     }
   } catch {
