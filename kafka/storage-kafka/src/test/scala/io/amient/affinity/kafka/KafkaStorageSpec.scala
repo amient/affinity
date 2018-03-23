@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 
 object UUID {
   def apply(uuid: java.util.UUID): UUID = apply(ByteUtils.uuid(uuid))

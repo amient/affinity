@@ -20,19 +20,19 @@
 package io.amient.affinity.example
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.LongAdder
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.HttpMethods.GET
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
+import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.util.Scatter
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class ExampleESGateway extends GatewayHttp {
 

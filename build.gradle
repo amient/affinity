@@ -186,7 +186,7 @@ allprojects {
 
     tasks.withType(ScalaCompile) {
         scalaCompileOptions.additionalParameters = [
-//                                                   "-feature",
+                                                   "-feature",
                                                     "-target:jvm-" + javaVersion,
                                                     "-encoding", rootProject.encoding,
                                                     "-unchecked",

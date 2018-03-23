@@ -29,6 +29,7 @@ import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util.{EventTime, Reply, Scatter, TimeRange}
 
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 case class Account(sortcode: String, number: Int) extends AvroRecord
 case class Transaction(id: Long, amount: Double, timestamp: Long) extends AvroRecord with EventTime {
