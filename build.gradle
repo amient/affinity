@@ -191,7 +191,7 @@ allprojects {
                                                     "-encoding", rootProject.encoding,
                                                     "-unchecked",
                                                     "-deprecation",
-//                                                    "-Xfuture",
+                                                    "-Xfuture",
                                                     "-Yno-adapted-args",
                                                     "-Ywarn-dead-code",
                                                     "-Ywarn-numeric-widen",

@@ -72,7 +72,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
   "Array[Byte]" should "be treated as Avro Bytes underlied by nio.ByteBuffer" in {
-    def compare(x: AvroBytes, y: AvroBytes) {
+    def compare(x: AvroBytes, y: AvroBytes): Unit = {
       ByteUtils.equals(x.raw, y.raw) should be(true)
       ByteUtils.equals(x.optional.get, y.optional.get) should be(true)
       x.listed.zip(y.listed).foreach { case (a, b) => ByteUtils.equals(a, b) should be(true) }

@@ -86,7 +86,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     testExternalKafkaConsumer("failure-test")
   }
 
-  private def testExternalKafkaConsumer(topic: String) {
+  private def testExternalKafkaConsumer(topic: String): Unit = {
     val state = createStateStoreForPartition(topic, 0)
     val numWrites = new AtomicInteger(5000)
     val numToWrite = numWrites.get

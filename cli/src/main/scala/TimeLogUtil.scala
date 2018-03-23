@@ -46,7 +46,12 @@ object TimeLogUtil {
     println("Available partitions: 0 - " + (getKafkaLog(bootstrap, topic).getNumPartitions-1))
   }
 
-  def apply(bootstrap: String, topic: String, partition: Int, fuzzMinutes: Long = 5, range: TimeRange = TimeRange.UNBOUNDED, offsetRange: (Long, Long) = (Long.MinValue, Long.MaxValue)) {
+  def apply(bootstrap: String,
+            topic: String,
+            partition: Int,
+            fuzzMinutes: Long = 5,
+            range: TimeRange = TimeRange.UNBOUNDED,
+            offsetRange: (Long, Long) = (Long.MinValue, Long.MaxValue)): Unit = {
     val log = getKafkaLog(bootstrap, topic)
     logger.info(s"calculating compaction stats for range: $range..\n")
     log.reset(partition, range)
@@ -114,7 +119,7 @@ object TimeLogUtil {
     EventTime.local(unix).toString.replace("Z", "").replace("T", " ")
   }
 
-  private def plot(blocks: List[(TimeRange, Long, Long)]) {
+  private def plot(blocks: List[(TimeRange, Long, Long)]): Unit = {
     val render: IRender = new Render
     val builder: IContextBuilder = render.newBuilder
     builder.width(width).height(height)

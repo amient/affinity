@@ -19,12 +19,11 @@
 
 package io.amient.affinity.core.storage
 
-import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.{AffinityActorSystem, Conf}
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.JavaConversions._
@@ -46,7 +45,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
       Conf.Affi.Node.Gateway.Http.Port.path -> "0"
     )))
 
-  override def afterAll {
+  override def afterAll: Unit = {
     Await.ready(system.terminate(), 15 seconds)
   }
 

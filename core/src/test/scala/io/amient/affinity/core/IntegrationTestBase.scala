@@ -59,11 +59,11 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
     }
   })), classOf[KeyspaceStatus])
 
-  override def afterAll {
+  override def afterAll: Unit = {
     Await.ready(system.terminate(), 15 seconds)
   }
 
-  def awaitServiceReady(group: String) {
+  def awaitServiceReady(group: String): Unit = {
     val t = System.currentTimeMillis()
     servicesReady.synchronized {
       while (!servicesReady.contains(group)) {

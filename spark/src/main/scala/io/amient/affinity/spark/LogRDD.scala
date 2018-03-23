@@ -1,7 +1,6 @@
 package io.amient.affinity.spark
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.{ByteKey, LogEntry, LogStorage, Record}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
@@ -9,7 +8,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{Partition, SparkContext, TaskContext}
-import org.xml.sax.InputSource
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
@@ -227,7 +225,7 @@ object LogRDD {
 
     sc.register(produced)
 
-    def updatePartition(context: TaskContext, partition: Iterator[(K, V)]) {
+    def updatePartition(context: TaskContext, partition: Iterator[(K, V)]): Unit = {
       val storage = storageBinder
       val keySerde = keySerdeBinder
       val valueSerde = valueSerdeBinder

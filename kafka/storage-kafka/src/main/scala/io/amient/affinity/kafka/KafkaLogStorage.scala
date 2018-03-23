@@ -241,7 +241,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def isTombstone(entry: LogEntry[lang.Long]) = entry.value == null
 
-  override def ensureCorrectConfiguration(ttlMs: Long, numPartitions: Int, readonly: Boolean) {
+  override def ensureCorrectConfiguration(ttlMs: Long, numPartitions: Int, readonly: Boolean): Unit = {
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered

@@ -133,7 +133,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     runTestWithState(state, topic, 10)
   }
 
-  private def runTestWithState(state: State[Int, TestRecord], topic: String, numRecords: Int) {
+  private def runTestWithState(state: State[Int, TestRecord], topic: String, numRecords: Int): Unit = {
     val numWrites = new AtomicInteger(numRecords)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()

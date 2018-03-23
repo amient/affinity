@@ -83,7 +83,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
     .set("spark.kryo.classesToRegister", "io.amient.affinity.spark.CompactionTestEvent"))
 
 
-  override def beforeAll() {
+  override def beforeAll(): Unit = {
     super.beforeAll()
 
     val stream = new OutputDataStream[Int, CompactionTestEvent](
