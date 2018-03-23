@@ -30,6 +30,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
+import io.amient.affinity.core.config.CfgInt
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
@@ -61,9 +62,8 @@ object State {
       }
     }
     if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
-      AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord])).foreach {
-        prefixLen: Int => stateConf.MemStore.KeyPrefixSize.setValue(prefixLen)
-      }
+      val prefixLen = AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord]))
+      if (prefixLen.isDefined) stateConf.MemStore.KeyPrefixSize.setValue(prefixLen.get)
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
     try {
