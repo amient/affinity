@@ -62,7 +62,7 @@ object State {
     }
     if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
       AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord])).foreach {
-        prefixLen: Int => stateConf.MemStore.KeyPrefixSize.setValue(prefixLen); ()
+        prefixLen: Int => stateConf.MemStore.KeyPrefixSize.setValue(prefixLen)
       }
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
