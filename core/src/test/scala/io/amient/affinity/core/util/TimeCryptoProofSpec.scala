@@ -50,7 +50,7 @@ class TimeCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
       val crypto = new TimeCryptoProofSHA256(salt)
       val signature: String = crypto.sign(arg)
 
-      val hexSalt = TimeCryptoProof.toHex(salt)
+      TimeCryptoProof.toHex(salt)
       val hexProof = new TimeCryptoProofSHA256(salt)
       val hexSignature = hexProof.sign(arg)
       signature should equal(hexSignature)
@@ -79,7 +79,6 @@ class TimeCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("example function generates different signatures for different salts") {
-    val apiKey = "somekey"
     forAll(hexSalts, hexSalts) { case (salt1, salt2) =>
       whenever(salt1 != salt2) {
         val crypto1 = new TimeCryptoProofSHA256(salt1)
@@ -91,6 +90,7 @@ class TimeCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
         val sig2 = crypto2.sign(url.toString)
         val sig2NoQuery = crypto2.sign(urlNoQuery.toString)
         assert(sig1 != sig2)
+        assert(sig1NoQuery != sig2NoQuery)
       }
     }
   }

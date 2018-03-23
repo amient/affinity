@@ -54,8 +54,6 @@ class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends 
 
   private val zk = ZkClients.get(zkConf)
 
-  private var currentState = Map[String, String]()
-
   if (!zk.exists(zkRoot)) zk.createPersistent(groupRoot, true)
 
   val initialChildren = zk.subscribeChildChanges(groupRoot, new IZkChildListener() {

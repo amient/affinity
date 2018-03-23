@@ -20,11 +20,11 @@
 package io.amient.affinity.core.cluster
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
 
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.{HttpResponse, StatusCode, Uri, headers}
 import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
+import akka.http.scaladsl.model.{HttpResponse, StatusCode, Uri, headers}
 import akka.util.Timeout
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.Conf
@@ -98,8 +98,9 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     super.afterAll()
   }
 
-  "Master Transition" should "not lead to inconsistent state" in {
-    val requestCount = new AtomicLong(0L)
+  //FIXME #177
+  "Master Transition" should "not lead to inconsistent state" ignore {
+    val requestCount = new AtomicInteger(0)
     val expected = new ConcurrentHashMap[String, String]()
     import scala.concurrent.ExecutionContext.Implicits.global
 

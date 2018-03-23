@@ -235,10 +235,8 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     producer.flush()
   }
 
-  override def close(): Unit = {
-    try kafkaConsumer.close() finally try if (producerActive) producer.close() finally {
-      closed = true
-    }
+  override def close(): Unit = if (!closed) {
+    try kafkaConsumer.close() finally try if (producerActive) producer.close() finally closed = true
   }
 
   override def isTombstone(entry: LogEntry[lang.Long]) = entry.value == null
@@ -256,7 +254,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
     val admin = AdminClient.create(adminProps)
     try {
-      val adminTimeoutMs = 15000
+      val adminTimeoutMs: Long = 15000
       val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
       val replicationFactor = kafkaStorageConf.ReplicationFactor().toShort
       val topicConfigs = Map(

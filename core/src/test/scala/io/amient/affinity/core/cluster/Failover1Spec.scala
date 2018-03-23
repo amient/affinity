@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.cluster
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
@@ -121,7 +121,7 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     node1.http_post("/A/updatedValueA").status.intValue should be(303)
     node1.http_get("/A").entity should be(jsonStringEntity("updatedValueA"))
 
-    val errorCount = new AtomicLong(0L)
+    val errorCount = new AtomicInteger(0)
     val stopSignal = new AtomicBoolean(false)
 
     val client = new Thread {

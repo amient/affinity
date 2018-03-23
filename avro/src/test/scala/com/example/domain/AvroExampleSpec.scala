@@ -44,16 +44,16 @@ class AvroExampleSpec extends WordSpec with Matchers {
   val bytes = AvroRecord.write(person, person.getSchema, new ByteArrayOutputStream).toByteArray
 
   "AvroRecord global object provides some useful factory methods" in {
-    val schema1 = AvroRecord.inferSchema[Person]
-    val schema2 = AvroRecord.inferSchema(classOf[Person])
-    val schema3 = AvroRecord.inferSchema("com.example.domain.Person")
+    /*val schema1 = */ AvroRecord.inferSchema[Person]
+    /*val schema2 = */ AvroRecord.inferSchema(classOf[Person])
+    /*val schema3 = */ AvroRecord.inferSchema("com.example.domain.Person")
   }
 
   "All of the schemas are equivalent and can be used in various scenarios\n" +
     "but an instance of this class also has all the methods of a Specific record\n" +
     ", including getSchema:" in {
 
-    val schema = person.getSchema
+    /*val schema = */person.getSchema
     println(person.getSchema)
   }
 
@@ -63,22 +63,22 @@ class AvroExampleSpec extends WordSpec with Matchers {
     val writer = new GenericDatumWriter[Any](person.schema)
     writer.write(person, encoder)
     encoder.flush()
-    val bytes: Array[Byte] = output.toByteArray
+    /*val bytes: Array[Byte] = */ output.toByteArray
   }
 
   "which is the same thing using the AvroRecord compation object method:" in {
     val output = new ByteArrayOutputStream()
     AvroRecord.write(person, person.getSchema, output)
-    val bytes: Array[Byte] = output.toByteArray
+    /*val bytes: Array[Byte] = */output.toByteArray
   }
 
   "or if you want Array[Byte] directly:" in {
-    val bytes: Array[Byte] = AvroRecord.write(person, person.getSchema)
+    /*val bytes: Array[Byte] = */AvroRecord.write(person, person.getSchema)
   }
 
   "converting bytes back to case class requires a type tag" in {
     val readerSchema = AvroRecord.inferSchema[Person]
-    val person: Person = AvroRecord.read[Person](bytes, readerSchema)
+    /*val person: Person = */AvroRecord.read[Person](bytes, readerSchema)
   }
 
 }

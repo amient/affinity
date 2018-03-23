@@ -110,7 +110,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
     ).mapValues(_.asInstanceOf[AnyRef]))
 
-    val updates = for (i <- (1 to 10)) yield {
+    for (i <- (1 to 10)) yield {
       producer.send(new ProducerRecord[Int, TestRecord](
         topic, i, TestRecord(i, System.currentTimeMillis(), s"test value $i"))).get
       numWrites.incrementAndGet

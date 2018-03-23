@@ -94,7 +94,7 @@ trait GatewayHttp extends Gateway {
 
   import context.{dispatcher, system}
 
-  private implicit val scheduler = context.system.scheduler
+//  private implicit val scheduler = context.system.scheduler
 
   private var isSuspended = true
 
