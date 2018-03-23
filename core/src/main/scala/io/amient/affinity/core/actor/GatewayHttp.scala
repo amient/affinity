@@ -52,7 +52,7 @@ import io.amient.affinity.core.util.ByteUtils
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-import scala.language.postfixOps
+import scala.language.{implicitConversions, postfixOps}
 import scala.util.control.NonFatal
 
 object GatewayHttp {

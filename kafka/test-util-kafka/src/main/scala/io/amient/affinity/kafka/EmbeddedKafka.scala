@@ -20,7 +20,6 @@
 package io.amient.affinity.kafka
 
 import java.io.File
-import java.nio.file.Files
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 
@@ -33,9 +32,10 @@ import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.slf4j.LoggerFactory
-import scala.collection.JavaConverters._
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.language.postfixOps
 
 trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
 

@@ -10,6 +10,7 @@ import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.collection.JavaConverters._
+import scala.language.existentials
 import scala.reflect.ClassTag
 import scala.xml.{Elem, XML}
 

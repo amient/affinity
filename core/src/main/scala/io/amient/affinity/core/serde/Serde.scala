@@ -29,6 +29,7 @@ import io.amient.affinity.core.serde.primitive.ByteArraySerde
 
 import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
+import scala.language.existentials
 import scala.reflect.ClassTag
 
 trait Serde[T] extends JSerializer with AbstractSerde[T] {

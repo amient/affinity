@@ -23,6 +23,7 @@ import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.language.existentials
 
 class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
 

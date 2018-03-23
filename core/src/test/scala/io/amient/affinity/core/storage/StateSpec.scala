@@ -25,7 +25,7 @@ import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-
+import scala.language.postfixOps
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}

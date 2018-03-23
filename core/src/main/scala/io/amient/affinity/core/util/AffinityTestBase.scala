@@ -49,7 +49,7 @@ import org.codehaus.jackson.map.ObjectMapper
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.language.postfixOps
+import scala.language.{implicitConversions, postfixOps}
 
 object AffinityTestBase {
   val akkaPort = new AtomicInteger(15001)

@@ -33,7 +33,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.parallel.immutable.ParSeq
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.language.postfixOps
+import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
 
 trait GatewayStream extends Gateway {

@@ -30,14 +30,13 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
-import io.amient.affinity.core.config.CfgInt
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
-import scala.language.{existentials, postfixOps}
+import scala.language.{existentials, implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
