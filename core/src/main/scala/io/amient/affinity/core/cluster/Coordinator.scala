@@ -29,7 +29,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.config.CfgStruct
-import io.amient.affinity.core.util.Reply
+import io.amient.affinity.core.util.{ByteUtils, Reply}
 
 import scala.collection.JavaConversions._
 import scala.collection.Set
@@ -186,9 +186,12 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   }
 
+  //this is the method that is deterministic across all nodes. it resolves which one of the
+  //replicas is the master for each partition applying a murmur2 hash on the actor handle
+  //selecting the actor with the smallest hash
   private def getCurrentMasters: Set[ActorRef] = {
     handles.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
-      handles.filter(_._2.path.toStringWithoutAddress == relPath).minBy(_._1)._2
+      handles.filter(_._2.path.toStringWithoutAddress == relPath).minBy(x => ByteUtils.murmur2(x._1.getBytes))._2
     }
   }
 
