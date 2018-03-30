@@ -19,9 +19,10 @@
 
 package io.amient.affinity.avro
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path}
 
 import com.typesafe.config.Config
+import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
@@ -44,11 +45,11 @@ object LocalSchemaRegistry {
 }
 
 
-class LocalSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegistry {
+class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegistry {
 
-  val conf = new LocalAvroConf().apply(config)
-  val dataPath = conf.DataPath()
+  def this(config: Config) = this(LocalAvroConf(config).DataPath())
 
+  require(dataPath != null)
   if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
 
   override def close() = ()
@@ -87,6 +88,7 @@ class LocalSchemaRegistry(config: Config) extends AvroSerde with AvroSchemaRegis
   }
 
   private def hypersynchronized[X](func: => X) = synchronized {
+
     val file = dataPath.resolve(".lock").toFile
 
     def getLock(countDown: Int = 30): Unit = {
