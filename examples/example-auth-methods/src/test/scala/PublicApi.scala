@@ -81,8 +81,8 @@ trait PublicApi extends GatewayHttp {
             }
         }
       } catch {
-        case e: IllegalAccessError => response.success(Encoder.json(Unauthorized, "Unauthorized"))
-        case e: Throwable => response.success(handleException(e))
+        case _: IllegalAccessError => response.success(Encoder.json(Unauthorized, "Unauthorized"))
+        case e: Throwable => response.success(handleException(headers = List())(e))
       }
     }
   }
