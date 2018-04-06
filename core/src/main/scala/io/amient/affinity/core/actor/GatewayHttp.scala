@@ -94,8 +94,6 @@ trait GatewayHttp extends Gateway {
 
   import context.{dispatcher, system}
 
-//  private implicit val scheduler = context.system.scheduler
-
   private var isSuspended = true
 
   val sslContext = if (!conf.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
@@ -227,16 +225,25 @@ trait GatewayHttp extends Gateway {
   }
 
 
-  def handleWith(promise: Promise[HttpResponse])(f: => Future[HttpResponse])(implicit ctx: ExecutionContext): Unit = {
-    promise.completeWith(f recover handleException)
+  def handleWith(promise: Promise[HttpResponse], headers: List[HttpHeader] = List())(f: => Future[HttpResponse])(implicit ctx: ExecutionContext): Unit = {
+    promise.completeWith(try {
+      f recover handleException(headers)
+    } catch {
+      case t: Throwable => Future.successful(handleException(headers)(t))
+    })
   }
 
 
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 
   def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
-    case e@RequestException(status) => errorResponse(e, StatusCodes.custom(status.intValue().toString.take(3).toInt, status.reason, status.defaultMessage), headers)
-    case e: ExecutionException => handleException(e.getCause)
+    case e@RequestException(serverMessage, status) =>
+      log.error(s"${status.intValue} - ${status.reason} - $serverMessage")
+      val validHttpStatusCode = status.intValue().toString.take(3).toInt
+      val validHttpStatus = StatusCode.int2StatusCode(validHttpStatusCode)
+      val message = status.intValue.toString + " " + status.reason
+      HttpResponse(validHttpStatus, entity = message, headers = headers)
+    case e: ExecutionException => handleException(headers)(e.getCause)
     case e: NoSuchElementException => errorResponse(e, NotFound, headers)
     case e: IllegalArgumentException => errorResponse(e, BadRequest, headers)
     case e: IllegalStateException => errorResponse(e, Conflict, headers)
@@ -271,8 +278,6 @@ trait WebSocketSupport extends GatewayHttp {
       log.warning("Could not load /affinity.js - it probably wasn't compiled from the affinity_node.js source, see README file for instructions: " + e.getMessage)
       None
   }
-
-//  private val serializers = SerializationExtension(context.system).serializerByIdentity
 
   private val avroSerde = AvroSerde.create(config)
 
@@ -484,7 +489,7 @@ trait WebSocketSupport extends GatewayHttp {
           case NonFatal(e) =>
             var logged = false
             val errorHandler: PartialFunction[Throwable, Unit] = receiveHandleError(upstream) orElse {
-              case RequestException(status: StatusCode) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.defaultMessage)
+              case RequestException(_, status: StatusCode) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.reason)
               case e: ExecutionException => receiveHandleError(upstream)(e.getCause)
               case e: NoSuchElementException => upstream ! Map("type" -> "error", "code" -> 404, "message" -> e.getMessage())
               case e: IllegalArgumentException => upstream ! Map("type" -> "error", "code" -> 400, "message" -> e.getMessage())
