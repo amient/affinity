@@ -38,6 +38,7 @@ object LocalSchemaRegistry {
   object LocalAvroConf extends LocalAvroConf {
     override def apply(config: Config) = new LocalAvroConf().apply(config)
   }
+
   class LocalAvroConf extends CfgStruct[LocalAvroConf](classOf[AvroConf]) {
     val DataPath = filepath("schema.registry.path", true)
   }
@@ -49,8 +50,10 @@ class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegis
 
   def this(config: Config) = this(LocalAvroConf(config).DataPath())
 
-  require(dataPath != null)
-  if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
+  def checkDataPath(): Unit = {
+    require(dataPath != null)
+    if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
+  }
 
   override def close() = ()
 
@@ -59,6 +62,7 @@ class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegis
     * @return schema
     */
   override protected def loadSchema(id: Int): Schema = {
+    checkDataPath()
     new Schema.Parser().parse(dataPath.resolve(s"$id.avsc").toFile)
   }
 
@@ -69,6 +73,7 @@ class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegis
     * @return
     */
   override protected def registerSchema(subject: String, schema: Schema): Int = hypersynchronized {
+    checkDataPath()
     val s = dataPath.resolve(s"$subject.dat")
     val versions: Map[Schema, Int] = if (Files.exists(s)) {
       Source.fromFile(s.toFile).mkString.split(",").toList.map(_.toInt).map {
@@ -83,12 +88,15 @@ class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegis
       val schemaPath = dataPath.resolve(s"$id.avsc")
       Files.createFile(schemaPath)
       Files.write(schemaPath, schema.toString(true).getBytes("UTF-8"))
+      val updatedVersions = versions + (schema -> id)
+      Files.write(s, updatedVersions.values.mkString(",").getBytes("UTF-8"))
       id
     }
   }
 
   private def hypersynchronized[X](func: => X) = synchronized {
 
+    checkDataPath()
     val file = dataPath.resolve(".lock").toFile
 
     def getLock(countDown: Int = 30): Unit = {
