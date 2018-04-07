@@ -19,8 +19,6 @@
 
 package io.amient.affinity.core.http
 
-import java.net.InetAddress
-
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._

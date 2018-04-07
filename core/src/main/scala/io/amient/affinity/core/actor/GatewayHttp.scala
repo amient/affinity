@@ -237,7 +237,7 @@ trait GatewayHttp extends Gateway {
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 
   def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
-    case e@RequestException(serverMessage, status) =>
+    case e@RequestException(status, serverMessage) =>
       log.error(s"${status.intValue} - ${status.reason} - $serverMessage")
       val validHttpStatusCode = status.intValue().toString.take(3).toInt
       val validHttpStatus = StatusCode.int2StatusCode(validHttpStatusCode)
@@ -489,7 +489,7 @@ trait WebSocketSupport extends GatewayHttp {
           case NonFatal(e) =>
             var logged = false
             val errorHandler: PartialFunction[Throwable, Unit] = receiveHandleError(upstream) orElse {
-              case RequestException(_, status: StatusCode) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.reason)
+              case RequestException(status, _) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.reason)
               case e: ExecutionException => receiveHandleError(upstream)(e.getCause)
               case e: NoSuchElementException => upstream ! Map("type" -> "error", "code" -> 404, "message" -> e.getMessage())
               case e: IllegalArgumentException => upstream ! Map("type" -> "error", "code" -> 400, "message" -> e.getMessage())
