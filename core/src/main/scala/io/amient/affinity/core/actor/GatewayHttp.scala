@@ -237,8 +237,8 @@ trait GatewayHttp extends Gateway {
   def handleException: PartialFunction[Throwable, HttpResponse] = handleException(List())
 
   def handleException(headers: List[HttpHeader]): PartialFunction[Throwable, HttpResponse] = {
-    case e@RequestException(status, serverMessage) =>
-      log.error(s"${status.intValue} - ${status.reason} - $serverMessage")
+    case RequestException(status, serverMessage) =>
+      log.error(s"${status.intValue} ${status.reason} - $serverMessage")
       val validHttpStatusCode = status.intValue().toString.take(3).toInt
       val validHttpStatus = StatusCode.int2StatusCode(validHttpStatusCode)
       val message = status.intValue.toString + " " + status.reason
