@@ -19,6 +19,8 @@
 
 package io.amient.affinity.core.http
 
+import java.net.InetAddress
+
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import akka.http.scaladsl.model._
@@ -53,6 +55,20 @@ object RequestMatchers {
     } catch {
       case e: ExceptionWithErrorInfo => logger.warn(e.getMessage); None
       case NonFatal(e) => logger.warn("Error while matching HTTP request", e); None
+    }
+  }
+
+  object CLIENTIP {
+    def unapply(request: HttpRequest): Option[RemoteAddress.IP] = {
+      for (
+        remoteAddress <- request.header[headers.`X-Forwarded-For`].flatMap(_.addresses.headOption)
+          .orElse(request.header[headers.`Remote-Address`].map(_.address))
+          .orElse(request.header[headers.`X-Real-Ip`].map(_.address));
+        if (!remoteAddress.isUnknown);
+        ip <- remoteAddress.toIP
+      ) yield {
+        ip
+      }
     }
   }
 
