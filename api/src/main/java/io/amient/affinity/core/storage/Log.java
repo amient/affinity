@@ -155,11 +155,11 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     public <K> void tail(final MemStore kvstore, Optional<ObservableState<K>> observableState) {
         switch(fsm) {
             case INIT: throw new IllegalStateException("Cannot transition from init to tail - bootstrap is required first");
-            case WRITE: throw new IllegalStateException("Cannot transition from write mode directly from write to boot mode");
+            case WRITE: throw new IllegalStateException("Cannot transition from write to tail - bootstrap is required first");
             case BOOT: case TAIL: break;
         }
-        fsm = FSM.TAIL;
-        logsync.compareAndSet(null, new LogSync() {
+
+        boolean success = logsync.compareAndSet(null, new LogSync() {
             @Override
             public void run() {
                 try {
@@ -190,6 +190,11 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 }
             }
         });
+        if (success) {
+            fsm = FSM.TAIL;
+        } else {
+            throw new IllegalStateException("Another LogSync thread is already running");
+        }
         logsync.get().start();
     }
 

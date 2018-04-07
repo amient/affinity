@@ -66,8 +66,6 @@ trait Gateway extends ActorHandler {
 
   private val conf = Conf(context.system.settings.config).Affi
 
-//  private implicit val scheduler = context.system.scheduler
-
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
 
   implicit def unitToVoidFuture(f: Future[Unit]): Future[Void] = f.map(null)(ExecutionContext.Implicits.global)
@@ -152,7 +150,7 @@ trait Gateway extends ActorHandler {
     // finally - set up a watch for each referenced keyspace coordinator
     // coordinator will be sending 2 types of messages for each individual keyspace reference:
     // 1. MasterUpdates(..) sent whenever a master actor is added or removed to/from the routing tables
-    // 1. KeyspaceStatus(..)
+    // 2. KeyspaceStatus(..)
     keyspaces.values.foreach {
       case (coordinator, _, _) => coordinator.watch(self, clusterWide = true)
     }

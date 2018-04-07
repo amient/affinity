@@ -83,7 +83,7 @@ trait Partition extends ActorHandler {
     started = true
     log.debug(s"Starting keyspace: $keyspace, partition: $partition")
     //active state will block until all state stores have caught-up
-    activeState()
+    become(standby = false)
     //only after states have caught up we make the partition online and available to cooridnators
     context.parent ! PartitionOnline(self)
     super.preStart()
@@ -114,13 +114,13 @@ trait Partition extends ActorHandler {
 
     case msg@BecomeMaster() =>
       sender.reply(msg) {} //acking the receipt of the instruction immediately
-      activeState() //then blocking the inbox until state stores have caught-up with storage
+      become(standby = false) //then blocking the inbox until state stores have caught-up with storage
       log.debug(s"Became master for partition $keyspace/$partition")
       onBecomeMaster //then invoke custom handler
 
     case msg@BecomeStandby() =>
       sender.reply(msg) {} //acking the receipt of the instruction immediately
-      passiveState()  //then switch state stores to passive mode, i.e. tailing the storage in the background
+      become(standby = true)  //then switch state stores to standby mode, i.e. tailing the storage in the background
       log.debug(s"Became standby for partition $keyspace/$partition")
       onBecomeStandby
 
@@ -138,15 +138,11 @@ trait Partition extends ActorHandler {
     stateStores(stateStoreName)
   }
 
-  private[core] def activeState(): Unit = {
+  private[core] def become(standby: Boolean): Unit = {
     stateStores.values.foreach { state =>
       state.boot
-      if (state.external) state.tail
+      if (state.external || standby) state.tail
     }
-  }
-
-  private[core] def passiveState(): Unit = {
-    stateStores.values.foreach(_.tail)
   }
 
   private[core] def closeStateStores(): Unit = stateStores.foreach {
