@@ -25,6 +25,7 @@ import akka.AkkaException
 import akka.actor.{ActorRef, Scheduler, Status}
 import akka.pattern.{after, ask}
 import akka.util.Timeout
+import io.amient.affinity.core.http.RequestException
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.{Duration, _}
@@ -104,6 +105,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
         case i => promise.failure(new RuntimeException(s"expecting $tag, got: ${i.getClass} for $message sent to $target"))
       } recover {
         case cause: AkkaException => promise.failure(cause)
+        case cause: RequestException => promise.failure(cause)
         case cause: NoSuchElementException => promise.failure(cause)
         case cause: IllegalArgumentException => promise.failure(cause)
         case cause: AssertionError => promise.failure(cause)
