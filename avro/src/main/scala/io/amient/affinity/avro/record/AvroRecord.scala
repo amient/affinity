@@ -31,6 +31,7 @@ import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
+import org.codehaus.jackson.annotate.JsonIgnore
 
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
@@ -44,9 +45,9 @@ final class Fixed(len: Int = -1) extends StaticAnnotation
 
 abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
-  @transient val schema: Schema = AvroRecord.inferSchema(getClass)
+  lazy val schema: Schema = AvroRecord.inferSchema(getClass)
 
-  @transient private val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
+  private lazy val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
 
   override def getSchema: Schema = schema
 
