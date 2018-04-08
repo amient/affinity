@@ -19,6 +19,8 @@
 
 package io.amient.affinity.avro
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
@@ -202,6 +204,26 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     assert(ByteUtils.startsWith(bytes, prefix))
     newSerde.fromBytes(bytes) should be(key)
 
+  }
+
+  "AvroRecord" should "be serializable by java serializer" in {
+    val record = SimpleRecord()
+    val bos = new ByteArrayOutputStream()
+    val bytes = try {
+      val out = new ObjectOutputStream(bos)
+      out.writeObject(record)
+      out.flush()
+      bos.toByteArray()
+    } finally {
+      bos.close()
+    }
+    val bis = new ByteArrayInputStream(bytes)
+    val in = new ObjectInputStream(bis)
+    try {
+      in.readObject() should be (record)
+    } finally {
+      in.close()
+    }
   }
 
 }
