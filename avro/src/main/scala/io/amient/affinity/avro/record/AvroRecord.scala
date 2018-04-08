@@ -31,7 +31,6 @@ import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
-import org.codehaus.jackson.annotate.JsonIgnore
 
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
