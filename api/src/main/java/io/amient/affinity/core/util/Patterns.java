@@ -4,7 +4,9 @@ import java.util.regex.Pattern;
 
 public class Patterns {
 
-    public static Pattern literal = Pattern.compile("[\\p{L},\\p{N},\\n,\\r,\\.,:,;,%,\\p{Sc},\\?,\\!,\\-,\\+,\\*,\\/,\\(,\\),\\[,\\],\\=,\\w]+");
+    public static Pattern textual = Pattern.compile("[\\s\\p{L}\\p{N}\\n\\r\\.\\,:;%^&*@=\\p{Sc}\\?\\!\\-\\+\\*\\/\\(\\)\\[\\]\\=\\w]+");
+
+    public static Pattern literal = Pattern.compile("[\\p{L}\\p{N}\\.\\,:;%^&*@=\\p{Sc}\\?\\!\\-\\+\\*\\/\\(\\)\\[\\]\\=\\w]+");
 
     public static Pattern nominal = Pattern.compile("[\\p{L}]+");
 
@@ -12,7 +14,7 @@ public class Patterns {
 
     public static Pattern decimal = Pattern.compile("[0-9]+");
 
-    public static Pattern alphanum = Pattern.compile("[\\p{L},\\p{N},\\-,_]+");
+    public static Pattern alphanum = Pattern.compile("[\\p{L}\\p{N}\\-_]+");
 
     public static boolean is(Pattern pattern, String input) {
         return pattern.matcher(input).matches();

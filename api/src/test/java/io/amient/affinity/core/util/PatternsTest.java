@@ -4,8 +4,25 @@ import org.junit.Test;
 
 public class PatternsTest {
     @Test
-    public void literalPatternMatchesUnicodeText() {
-        assert(Patterns.is(Patterns.literal, ".,-+/*()[]_:;!?%¢$£1234567890١٢٣٤٥٦٧٨٩a\nAľľščťžýáíé\rτσιαιγολοχβςαν\n\rنيرحبال\r\nтераб"));
+    public void textualPatternMatchesUnicodeText() {
+        assert(Patterns.is(Patterns.textual, " .,-+/*()[]_:;!?^&@%¢$£1234567890١٢٣٤٥٦٧٨٩a\nAľľščťžýáíé\rτσιαιγολοχβςαν\n\rنيرحبال\r\nтераб"));
+        assert(!Patterns.is(Patterns.textual,"#"));
+        assert(!Patterns.is(Patterns.textual,"<"));
+        assert(!Patterns.is(Patterns.textual,">"));
+        assert(!Patterns.is(Patterns.textual,"~"));
+        assert(!Patterns.is(Patterns.textual,"\""));
+        assert(!Patterns.is(Patterns.textual,"|"));
+        assert(!Patterns.is(Patterns.textual,"\\"));
+        assert(!Patterns.is(Patterns.textual,"{"));
+        assert(!Patterns.is(Patterns.textual,"}"));
+    }
+
+    @Test
+    public void literalPatternMatchesUnicodeTextWithoutWhiteSpace() {
+        assert( Patterns.is(Patterns.literal, ".,-+/*()[]_:;!?^&@%=¢$£1234567890١٢٣٤٥٦٧٨٩aAľľščťžýáíéτσιαιγολοχβςανنيرحبالтераб"));
+        assert(!Patterns.is(Patterns.literal,"\r"));
+        assert(!Patterns.is(Patterns.literal,"\n"));
+        assert(!Patterns.is(Patterns.literal," "));
         assert(!Patterns.is(Patterns.literal,"#"));
         assert(!Patterns.is(Patterns.literal,"<"));
         assert(!Patterns.is(Patterns.literal,">"));
@@ -44,6 +61,7 @@ public class PatternsTest {
         assert(!Patterns.is(Patterns.nominal,"$"));
         assert(!Patterns.is(Patterns.nominal,"£"));
         assert(!Patterns.is(Patterns.nominal,"."));
+        assert(!Patterns.is(Patterns.nominal,","));
         assert(!Patterns.is(Patterns.nominal,"+"));
         assert(!Patterns.is(Patterns.nominal,"/"));
         assert(!Patterns.is(Patterns.nominal,"*"));
@@ -71,6 +89,7 @@ public class PatternsTest {
         assert(!Patterns.is(Patterns.numeral,"$"));
         assert(!Patterns.is(Patterns.numeral,"£"));
         assert(!Patterns.is(Patterns.numeral,"."));
+        assert(!Patterns.is(Patterns.numeral,","));
         assert(!Patterns.is(Patterns.numeral,"+"));
         assert(!Patterns.is(Patterns.numeral,"-"));
         assert(!Patterns.is(Patterns.numeral,"/"));
@@ -89,10 +108,11 @@ public class PatternsTest {
 
     @Test
     public void alphaNumPatternMatchesUnicodeLettersAndNumbersOnly() {
-        assert(Patterns.is(Patterns.alphanum,",_-1234567890aAľľščťžýáíéτσιαιγολοχβςανтераб"));
+        assert(Patterns.is(Patterns.alphanum,"_-1234567890aAľľščťžýáíéτσιαιγολοχβςανтераб"));
         assert(!Patterns.is(Patterns.alphanum,"$"));
         assert(!Patterns.is(Patterns.alphanum,"£"));
         assert(!Patterns.is(Patterns.alphanum,"."));
+        assert(!Patterns.is(Patterns.alphanum,","));
         assert(!Patterns.is(Patterns.alphanum,"+"));
         assert(!Patterns.is(Patterns.alphanum,"/"));
         assert(!Patterns.is(Patterns.alphanum,"*"));
