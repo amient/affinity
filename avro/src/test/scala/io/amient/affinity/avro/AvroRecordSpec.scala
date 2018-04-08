@@ -208,6 +208,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "AvroRecord" should "be serializable by java serializer" in {
     val record = SimpleRecord()
+    AvroRecord.write(record, record.schema)  //trigger initialization of lazy vals
     val bos = new ByteArrayOutputStream()
     val bytes = try {
       val out = new ObjectOutputStream(bos)

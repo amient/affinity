@@ -30,11 +30,9 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.IntegrationTestBase
+import io.amient.affinity.core.{IntegrationTestBase, ack}
 import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor._
+import io.amient.affinity.core.actor.{RegisterMediatorSubscriber, _}
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
 import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, JsonMessageHandler, TextMessageHandler}

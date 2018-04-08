@@ -27,7 +27,6 @@ import akka.event.Logging
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
-import io.amient.affinity.core.actor.Partition.RegisterMediatorSubscriber
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
@@ -36,20 +35,15 @@ import scala.language.postfixOps
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-object Partition {
-  //FIXME #122 make special serializer for mediation messages - currently this is java and the footprint is huge
-  case class CreateKeyValueMediator(stateStore: String, key: Any) extends Routed
-  case class KeyValueMediatorCreated(mediator: ActorRef)
-  case class RegisterMediatorSubscriber(subscriber: ActorRef)
+//FIXME #122 make special serializer for mediation messages - currently this is java and the footprint is huge
+case class CreateKeyValueMediator(stateStore: String, key: Any) extends Routed
+case class KeyValueMediatorCreated(mediator: ActorRef)
+case class RegisterMediatorSubscriber(subscriber: ActorRef)
 
-  case class BecomeStandby() extends Reply[Unit]
-
-  case class BecomeMaster() extends Reply[Unit]
-}
+case class BecomeStandby() extends Reply[Unit]
+case class BecomeMaster() extends Reply[Unit]
 
 trait Partition extends ActorHandler {
-
-  import Partition._
 
   private val log = Logging.getLogger(context.system, this)
 

@@ -44,9 +44,9 @@ final class Fixed(len: Int = -1) extends StaticAnnotation
 
 abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
-  lazy val schema: Schema = AvroRecord.inferSchema(getClass)
+  @transient lazy val schema: Schema = AvroRecord.inferSchema(getClass)
 
-  private lazy val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
+  @transient private lazy val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(getClass, schema)
 
   override def getSchema: Schema = schema
 
