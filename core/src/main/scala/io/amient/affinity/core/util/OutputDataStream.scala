@@ -35,6 +35,11 @@ class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: Abstract
     Future(jf.get)(ExecutionContext.Implicits.global)
   }
 
+  def delete(key: K): Future[_ <: Comparable[_]] = {
+    val jf = storage.delete(keySerde.toBytes(key))
+    Future(jf.get)(ExecutionContext.Implicits.global)
+  }
+
   def flush(): Unit = storage.flush()
 
   def close(): Unit = {
