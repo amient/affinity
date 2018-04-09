@@ -262,10 +262,9 @@ class State[K, V](val identifier: String,
     * which is more costly.
     *
     * @param key   to remove
-    * @param event is the message that will be pushed to key-value observers
     * @return Future Optional of the value previously held at the key position
     */
-  def remove(key: K, event: Any): Future[Option[V]] = getAndUpdate(key, x => None)
+  def remove(key: K): Future[Option[V]] = getAndUpdate(key, _ => None)
 
   /**
     * insert is a syntactic sugar for update which is only executed if the key doesn't exist yet

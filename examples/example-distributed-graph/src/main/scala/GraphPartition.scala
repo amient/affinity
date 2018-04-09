@@ -50,7 +50,7 @@ class GraphPartition extends Partition {
     }
 
     case command@DeleteComponent(cid) => sender.replyWith(command) {
-      components.remove(cid, command)
+      components.remove(cid)
     }
 
     /**

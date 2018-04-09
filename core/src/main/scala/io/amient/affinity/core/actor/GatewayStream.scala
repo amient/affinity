@@ -44,7 +44,7 @@ trait GatewayStream extends Gateway {
 
   private val lock = new Object
 
-  private val log = Logging.getLogger(context.system, this)
+  private val logger = Logging.getLogger(context.system, this)
 
   private val config = context.system.settings.config
 
@@ -57,12 +57,17 @@ trait GatewayStream extends Gateway {
   lazy val outpuStreams: ParSeq[OutputDataStream[_, _]] = declardOutputStreams.result().par
 
   def output[K: ClassTag, V: ClassTag](streamIdentifier: String): OutputDataStream[K, V] = {
-    val streamConfig = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
-    val keySerde: AbstractSerde[K] = Serde.of[K](config)
-    val valSerde: AbstractSerde[V] = Serde.of[V](config)
-    val outpuDataStream = new OutputDataStream(keySerde, valSerde, streamConfig)
-    declardOutputStreams += outpuDataStream
-    outpuDataStream
+    val streamConf = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
+    if (!streamConf.Class.isDefined) {
+      logger.warning(s"Output stream is not enabled in the current configuration: $streamIdentifier")
+      null
+    } else {
+      val keySerde: AbstractSerde[K] = Serde.of[K](config)
+      val valSerde: AbstractSerde[V] = Serde.of[V](config)
+      val outpuDataStream = new OutputDataStream(keySerde, valSerde, streamConf)
+      declardOutputStreams += outpuDataStream
+      outpuDataStream
+    }
   }
 
   /**
@@ -74,10 +79,14 @@ trait GatewayStream extends Gateway {
     * @tparam V
     */
   def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: InputStreamProcessor[K, V]): Unit = {
-    val streamConfig = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
-    val keySerde: AbstractSerde[K] = Serde.of[K](config)
-    val valSerde: AbstractSerde[V] = Serde.of[V](config)
-    declaredInputStreamProcessors += new RunnableInputStream[K, V](streamIdentifier, keySerde, valSerde, streamConfig, processor)
+    val streamConf = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
+    if (!streamConf.Class.isDefined) {
+      logger.warning(s"Input stream is not enabled in the current configuration: $streamIdentifier")
+    } else {
+      val keySerde: AbstractSerde[K] = Serde.of[K](config)
+      val valSerde: AbstractSerde[V] = Serde.of[V](config)
+      declaredInputStreamProcessors += new RunnableInputStream[K, V](streamIdentifier, keySerde, valSerde, streamConf, processor)
+    }
   }
 
   val inputStreamManager = new Thread {
@@ -149,17 +158,17 @@ trait GatewayStream extends Gateway {
 
       try {
         consumer.reset(TimeRange.since(minTimestamp))
-        log.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
+        logger.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommitTimestamp = System.currentTimeMillis()
         var finalized = false
         while ((!closed && !finalized) || !lastCommit.isDone) {
           //clusterSuspended is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
           //should be suspended anyway and hang so no need to do it for every record
           if (clusterSuspended) {
-            log.info(s"Pausing input stream processor: $identifier")
+            logger.info(s"Pausing input stream processor: $identifier")
             lock.synchronized(lock.wait())
             if (closed) return
-            log.info(s"Resuming input stream processor: $identifier")
+            logger.info(s"Resuming input stream processor: $identifier")
           }
           val entries = consumer.fetch(true)
           if (entries != null) for (entry <- entries) {
@@ -190,9 +199,9 @@ trait GatewayStream extends Gateway {
 
       } catch {
         case _: InterruptedException =>
-        case e: Throwable => log.error(e, s"Input stream processor: $identifier")
+        case e: Throwable => logger.error(e, s"Input stream processor: $identifier")
       } finally {
-        log.info(s"Finished input stream processor: $identifier (closed = $closed)")
+        logger.info(s"Finished input stream processor: $identifier (closed = $closed)")
         consumer.close()
         keySerde.close()
         valSerde.close()
