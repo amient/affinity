@@ -3,6 +3,7 @@ package io.amient.affinity.core.util;
 import org.junit.Test;
 
 public class TextTest {
+
     @Test
     public void textFilter() {
         String input = "(Hello1١),\t[World'2٢], {\"ľšť\"},!£@$%5\n<some hack/>" + (char)0;
@@ -16,6 +17,15 @@ public class TextTest {
         assert(Text.apply(Text.controlFilter, input).equals("\t\n" + (char)0));
     }
 
+    @Test(expected = RuntimeException.class)
+    public void applyingMatchPatternShouldThrowException() {
+        Text.apply(Text.plaintext, "abcd 123");
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void requiringFilterPatternShouldThrowException() {
+        Text.require("x", Text.plaintextFilter, "abcd 123");
+    }
     @Test
     public void fulltextPatternMatchesUnicodeText() {
         assert(Text.is(Text.fulltext, " <>~.,|\\/-+/*#()[]{}_\"\r\n\t:;!?^&@%¢$£1234567890١٢٣٤٥٦٧٨٩a\nAľľščťžýáíé\rτσιαιγολοχβςαν\n\rنيرحبال\r\nтераб"));

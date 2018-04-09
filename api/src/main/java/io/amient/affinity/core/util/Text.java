@@ -36,16 +36,34 @@ public class Text {
     final public static Pattern control = Pattern.compile("^["+ controlSet +"]+$");
     final public static Pattern controlFilter = Pattern.compile("[^"+ controlSet +"]");
 
+    /**
+     * remove all characters that don't match the given pattern
+     * @param pattern
+     * @param input
+     * @return
+     */
     public static String apply(Pattern pattern, String input) {
-        assert(!pattern.pattern().startsWith("^"));
+        if (pattern.pattern().startsWith("^")) throw new RuntimeException("Cannot use anchored regex for filtering");
         return pattern.matcher(input).replaceAll("");
     }
 
+    /**
+     *
+     * @param pattern
+     * @param input
+     * @return
+     */
     public static boolean is(Pattern pattern, String input) {
-        assert(pattern.pattern().startsWith("^"));
+        if (!pattern.pattern().startsWith("^")) throw new RuntimeException("Must use anchored regex for matching");
         return pattern.matcher(input).matches();
     }
 
+    /**
+     * @param field field name for the error message
+     * @param pattern pattern to match on
+     * @param input input to verify
+     * @throws IllegalArgumentException if the input doesn't passs the pattern filter
+     */
     public static void require(String field, Pattern pattern, String input) {
         if (!is(pattern, input)) {
             String error;
