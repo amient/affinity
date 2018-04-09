@@ -33,7 +33,7 @@ import io.amient.affinity.core.actor.Keyspace.{CheckKeyspaceStatus, KeyspaceStat
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
-import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.storage.{LogStorageConf, State}
 
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -48,12 +48,10 @@ object Gateway {
     val Class = cls("class", classOf[Gateway], false)
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
     val Http = struct("http", new GatewayHttp.HttpConf)
-    val Streams = group("stream", classOf[InputStreamConf], false)
+    val Stream = group("stream", classOf[LogStorageConf], false)
   }
 
   final case class GatewayClusterStatus(suspended: Boolean)
-
-  class InputStreamConf extends CfgStruct[InputStreamConf](Cfg.Options.IGNORE_UNKNOWN)
 
 }
 

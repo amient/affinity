@@ -23,6 +23,7 @@ import java.io.Closeable
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
+import io.amient.affinity.Conf
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 import io.amient.affinity.core.util.{CompletedJavaFuture, EventTime, OutputDataStream, TimeRange}
@@ -56,7 +57,7 @@ trait GatewayStream extends Gateway {
   lazy val outpuStreams: ParSeq[OutputDataStream[_, _]] = declardOutputStreams.result().par
 
   def output[K: ClassTag, V: ClassTag](streamIdentifier: String): OutputDataStream[K, V] = {
-    val streamConfig = LogStorage.StorageConf(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
+    val streamConfig = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
     val outpuDataStream = new OutputDataStream(keySerde, valSerde, streamConfig)
@@ -73,7 +74,7 @@ trait GatewayStream extends Gateway {
     * @tparam V
     */
   def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: InputStreamProcessor[K, V]): Unit = {
-    val streamConfig = LogStorage.StorageConf(config.getConfig(s"affinity.node.gateway.stream.$streamIdentifier"))
+    val streamConfig = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
     val keySerde: AbstractSerde[K] = Serde.of[K](config)
     val valSerde: AbstractSerde[V] = Serde.of[V](config)
     declaredInputStreamProcessors += new RunnableInputStream[K, V](streamIdentifier, keySerde, valSerde, streamConfig, processor)
