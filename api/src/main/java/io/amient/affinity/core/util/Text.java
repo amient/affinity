@@ -38,9 +38,9 @@ public class Text {
 
     /**
      * remove all characters that don't match the given pattern
-     * @param pattern
-     * @param input
-     * @return
+     * @param pattern regex to match against
+     * @param input string to filter
+     * @return filtered input string
      */
     public static String apply(Pattern pattern, String input) {
         if (pattern.pattern().startsWith("^")) throw new RuntimeException("Cannot use anchored regex for filtering");
@@ -48,10 +48,10 @@ public class Text {
     }
 
     /**
-     *
-     * @param pattern
-     * @param input
-     * @return
+     * Check if a given input matches the regex pattern
+     * @param pattern regex to match against
+     * @param input string to check
+     * @return true if the entire input matches the pattern
      */
     public static boolean is(Pattern pattern, String input) {
         if (!pattern.pattern().startsWith("^")) throw new RuntimeException("Must use anchored regex for matching");
