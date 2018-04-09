@@ -21,6 +21,7 @@ In order to use this formatter you need to build the following jar and place it 
      [--property schema.registry.zookeeper.root=<ZOOKEEPER-SCHEMA-REGISTRY-ROOT> \]
      [--property pretty ]
      [--property print.partition]
+     [--property print.type]
      [--property print.offset]
      [--property print.key] 
      [--property print.timestamp]

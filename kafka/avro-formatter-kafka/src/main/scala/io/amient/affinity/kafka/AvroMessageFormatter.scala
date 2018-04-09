@@ -29,6 +29,7 @@ import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
 import io.amient.affinity.avro.{ConfluentSchemaRegistry, ZookeeperSchemaRegistry}
 import io.amient.affinity.core.util.EventTime
 import kafka.common.MessageFormatter
+import org.apache.avro.generic.GenericContainer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
@@ -48,6 +49,7 @@ class AvroMessageFormatter extends MessageFormatter {
   private var printOffset = false
   private var printPartition = false
   private var printTimestamps = false
+  private var printType = false
 
   override def init(props: Properties): Unit = {
     if (props.containsKey("pretty")) pretty = true
@@ -55,6 +57,7 @@ class AvroMessageFormatter extends MessageFormatter {
     if (props.containsKey("print.offset")) printOffset = true
     if (props.containsKey("print.timestamp")) printTimestamps = true
     if (props.containsKey("print.partition")) printPartition = true
+    if (props.containsKey("print.type")) printType = true
     if (props.containsKey("no.value")) printValue = false
     if (props.containsKey("schema.registry.url")) {
       serde = new ConfluentSchemaRegistry(ConfigFactory.empty
@@ -107,6 +110,13 @@ class AvroMessageFormatter extends MessageFormatter {
 
     if (printValue) {
       val value: Any = serde.fromBytes(consumerRecord.value)
+      if (printType) {
+        value match {
+          case container: GenericContainer => output.print(container.getSchema.getName)
+          case other: Any => output.print(other.getClass.getSimpleName)
+        }
+        output.print(": ")
+      }
       val simpleJson: String = AvroJsonConverter.toJson(value)
       if (pretty) {
         val json: JsonNode = mapper.readTree(simpleJson)
