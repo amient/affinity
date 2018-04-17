@@ -91,7 +91,11 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     private void fsmEnterWriteState() {
         switch(fsm) {
             case INIT: throw new IllegalStateException("Bootstrap is required before writing");
-            case TAIL: stopLogSync(FSM.WRITE); break;
+            case TAIL: synchronized(this) {
+                if (fsm == FSM.TAIL) stopLogSync();
+                this.fsm = FSM.WRITE;
+            }
+            break;
             case BOOT: case WRITE: this.fsm = FSM.WRITE; break;
         }
     }
@@ -123,10 +127,11 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
 
     public <K> long bootstrap(String identifier, final MemStore kvstore, int partition, Optional<ObservableState<K>> observableState) {
         switch(fsm) {
-            case TAIL: stopLogSync(FSM.BOOT); break;
-            case WRITE: flushWrites(); fsm = FSM.BOOT; break;
-            case INIT: case BOOT: fsm = FSM.BOOT; break;
+            case TAIL: stopLogSync(); break;
+            case WRITE: flushWrites();  break;
+            case INIT: case BOOT: break;
         }
+        fsm = FSM.BOOT;
 
         POS checkpoint = getCheckpoint();
         log.debug("Bootstrap " + identifier + " from checkpoint " + checkpoint + ":end-offset");
@@ -198,7 +203,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     public void close() throws IOException {
         try {
             try {
-                if (fsm == FSM.TAIL) stopLogSync(FSM.INIT);
+                if (fsm == FSM.TAIL) stopLogSync();
             } finally {
                 fsm = FSM.INIT;
                 checkpointWriter.accept(0L);
@@ -237,7 +242,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         storage.flush();
     }
 
-    synchronized private void stopLogSync(FSM transitionTo)  {
+    private void stopLogSync()  {
         LogSync sync = logsync.get();
         if (sync == null) {
             throw new IllegalStateException("Tail mode requires a running logsync thread");
@@ -249,7 +254,6 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 log.warn("could not close LogSync thread", e);
             }
         }
-        this.fsm = transitionTo;
     }
 
     private POS updateCheckpoint(POS position) {
