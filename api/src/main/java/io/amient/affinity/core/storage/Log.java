@@ -91,10 +91,9 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     private void fsmEnterWriteState() {
         switch(fsm) {
             case INIT: throw new IllegalStateException("Bootstrap is required before writing");
-            case TAIL: stopLogSync(); break;
-            case BOOT: case WRITE: break;
+            case TAIL: stopLogSync(FSM.WRITE); break;
+            case BOOT: case WRITE: this.fsm = FSM.WRITE; break;
         }
-        this.fsm = FSM.WRITE;
     }
 
     public Future<POS> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) {
@@ -124,11 +123,10 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
 
     public <K> long bootstrap(String identifier, final MemStore kvstore, int partition, Optional<ObservableState<K>> observableState) {
         switch(fsm) {
-            case TAIL: stopLogSync(); break;
-            case WRITE: flushWrites(); break;
-            case INIT: case BOOT: break;
+            case TAIL: stopLogSync(FSM.BOOT); break;
+            case WRITE: flushWrites(); fsm = FSM.BOOT; break;
+            case INIT: case BOOT: fsm = FSM.BOOT; break;
         }
-        fsm = FSM.BOOT;
 
         POS checkpoint = getCheckpoint();
         log.debug("Bootstrap " + identifier + " from checkpoint " + checkpoint + ":end-offset");
@@ -158,6 +156,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             case WRITE: throw new IllegalStateException("Cannot transition from write to tail - bootstrap is required first");
             case BOOT: case TAIL: break;
         }
+        fsm = FSM.TAIL;
 
         boolean success = logsync.compareAndSet(null, new LogSync() {
             @Override
@@ -190,9 +189,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 }
             }
         });
-        if (success) {
-            fsm = FSM.TAIL;
-        } else {
+        if (!success) {
             throw new IllegalStateException("Another LogSync thread is already running");
         }
         logsync.get().start();
@@ -201,7 +198,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     public void close() throws IOException {
         try {
             try {
-                if (fsm == FSM.TAIL) stopLogSync();
+                if (fsm == FSM.TAIL) stopLogSync(FSM.INIT);
             } finally {
                 fsm = FSM.INIT;
                 checkpointWriter.accept(0L);
@@ -240,7 +237,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         storage.flush();
     }
 
-    private void stopLogSync() {
+    synchronized private void stopLogSync(FSM transitionTo)  {
         LogSync sync = logsync.get();
         if (sync == null) {
             throw new IllegalStateException("Tail mode requires a running logsync thread");
@@ -252,6 +249,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 log.warn("could not close LogSync thread", e);
             }
         }
+        this.fsm = transitionTo;
     }
 
     private POS updateCheckpoint(POS position) {
