@@ -74,7 +74,7 @@ public class MemoryLogStorage implements LogStorage<Long> {
                 fetchStopOffset.decrementAndGet();
             }
         }
-        System.out.println("Reset time range: " + range + ", offsets: " + position + " .. " + fetchStopOffset);
+        //logger.info("Reset time range: " + range + ", offsets: " + position + " .. " + fetchStopOffset);
     }
 
     @Override
