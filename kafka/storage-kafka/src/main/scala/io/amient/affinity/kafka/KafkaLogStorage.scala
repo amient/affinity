@@ -123,16 +123,14 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     kafkaConsumer.partitionsFor(topic).size()
   }
 
-  override def reset(range: TimeRange): Unit = {
-    this.range = range
-    kafkaConsumer.subscribe(List(topic), this)
-  }
-
   override def reset(partition: Int, range: TimeRange): Unit = {
     val tp = new TopicPartition(topic, partition)
     this.range = range
     kafkaConsumer.assign(List(tp))
-    onPartitionsAssigned(List(tp))
+    val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp))(tp)
+    val startOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp)).map(_.offset).getOrElse(beginOffset)
+    log.debug(s"Reset partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}")
+    reset(tp.partition, startOffset)
   }
 
   override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
@@ -156,6 +154,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
   }
 
+  override def resume(range: TimeRange): Unit = {
+    this.range = range
+    kafkaConsumer.subscribe(List(topic), this)
+  }
+
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
     partitions.foreach(tp => stopOffsets.remove(tp.partition))
   }
@@ -164,11 +167,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     partitions.foreach {
       tp =>
         val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp))(tp)
+        val rangeStartOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp)).map(_.offset).getOrElse(beginOffset)
+        val minOffset: Long = math.max(beginOffset, rangeStartOffset)
         val nextOffset: Long = Option(kafkaConsumer.committed(tp)).map(_.offset() + 1).getOrElse(0)
-        val minOffset: Long = math.max(nextOffset, beginOffset)
-        val startOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp)).map(_.offset).getOrElse(minOffset)
-        log.debug(s"Reset partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}")
-        reset(tp.partition, startOffset)
+        val resumeOffset: Long = math.max(minOffset, nextOffset)
+        log.debug(s"Reset partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}, resuming from offset: ${resumeOffset}")
+        reset(tp.partition, resumeOffset)
     }
   }
 

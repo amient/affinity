@@ -78,12 +78,12 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
     int getNumPartitions();
 
     /**
-     * reset all of the assigned partitions to the given time range.
+     * resume all partitions and continue from last checkpoint if within the given time range.
      * the lower bound position of each partition will be the first position which appears on the time range.start or later.
-     * the upper bound position of each partition will be the last position before the time range.end OR maximum available position
+     * the upper bound position of each partition will be the last position before the time range.end OR unbounded
      * @param range time range
      */
-    void reset(TimeRange range);
+    void resume(TimeRange range);
 
     /**
      * reset one of the assigned partitions to the given time range.

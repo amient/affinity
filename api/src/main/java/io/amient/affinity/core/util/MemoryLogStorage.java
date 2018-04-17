@@ -52,7 +52,12 @@ public class MemoryLogStorage implements LogStorage<Long> {
     }
 
     @Override
-    public void reset(TimeRange range) {
+    public void resume(TimeRange range) {
+        //N/A
+    }
+
+    @Override
+    public void reset(int partition, TimeRange range) {
         position = 0L;
         LogEntry<Long> b;
         while(true) {
@@ -70,11 +75,6 @@ public class MemoryLogStorage implements LogStorage<Long> {
             }
         }
         System.out.println("Reset time range: " + range + ", offsets: " + position + " .. " + fetchStopOffset);
-    }
-
-    @Override
-    public void reset(int partition, TimeRange range) {
-        reset(range);
     }
 
     @Override

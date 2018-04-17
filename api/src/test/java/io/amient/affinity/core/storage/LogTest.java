@@ -88,7 +88,7 @@ public class LogTest {
         }
 
         //test a bounded range scan
-        storage.reset(new TimeRange(11L, 13L)); //start time is inclusive, end time is exclusive
+        storage.reset(0, new TimeRange(11L, 13L)); //start time is inclusive, end time is exclusive
         Iterator<LogEntry<Long>> rangeScan = storage.boundedIterator();
         assert (rangeScan.hasNext());
         assert (new String(rangeScan.next().value).equals("value3"));
