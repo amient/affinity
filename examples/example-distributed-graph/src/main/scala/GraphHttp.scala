@@ -44,7 +44,7 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * WebSocket GET /vertex?id=<vid>
       */
-    case HTTP(GET, PATH("vertex"), _, response) => response.success(Encoder.html(OK, html))
+    case HTTP(GET, PATH("vertex"), _, response) => response.success(Encoder.html(OK, html, gzip = true))
     case WEBSOCK(PATH("vertex"), QUERY(("id", INT(vertex))), socket) =>
       connectKeyValueMediator(graphService, "graph", vertex) map {
         keyValueMediator => avroWebSocket(socket, keyValueMediator)
@@ -63,7 +63,7 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * WebSocket GET /component?id=<vid>
       */
-    case HTTP(GET, PATH("component"), _, response) => response.success(Encoder.html(OK, html))
+    case HTTP(GET, PATH("component"), _, response) => response.success(Encoder.html(OK, html, gzip = true))
     case WEBSOCK(PATH("component"), QUERY(("id", INT(cid))), socket) =>
       connectKeyValueMediator(graphService, "components", cid) map {
         case keyValueMediator => avroWebSocket(socket, keyValueMediator)

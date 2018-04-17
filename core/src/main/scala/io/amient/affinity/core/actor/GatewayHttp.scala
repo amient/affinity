@@ -191,12 +191,28 @@ trait GatewayHttp extends Gateway {
     case e: Throwable => response.success(handleException(headers)(e))
   }
 
-  def handleAsText(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = {
-    handleAs(response, dataGenerator, headers)(data => Encoder.text(OK, data))
+  def handleAsText(response: Promise[HttpResponse], dataGenerator: => Any): Unit = {
+    handleAsText(response, dataGenerator, gzip = true, headers = List())
   }
 
-  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = {
-    handleAs(response, dataGenerator, headers)(data => Encoder.json(OK, data))
+  def handleAsText(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader]): Unit = {
+    handleAsText(response, dataGenerator, gzip = true, headers)
+  }
+
+  def handleAsText(response: Promise[HttpResponse], dataGenerator: => Any, gzip: Boolean, headers: List[HttpHeader]): Unit = {
+    handleAs(response, dataGenerator, headers)(data => Encoder.text(OK, data, gzip))
+  }
+
+  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any): Unit = {
+    handleAsJson(response, dataGenerator, gzip = true, headers = List())
+  }
+
+  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader]): Unit = {
+    handleAsJson(response, dataGenerator, gzip = true, headers)
+  }
+
+  def handleAsJson(response: Promise[HttpResponse], dataGenerator: => Any, gzip: Boolean, headers: List[HttpHeader]): Unit = {
+    handleAs(response, dataGenerator, headers)(data => Encoder.json(OK, data, gzip))
   }
 
   def handleAs(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List())(f: (Any) => HttpResponse): Unit = try {
@@ -283,7 +299,7 @@ trait WebSocketSupport extends GatewayHttp {
   private implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
 
   abstract override def handle: Receive = super.handle orElse {
-    case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get))
+    case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get, gzip = true))
   }
 
   /**

@@ -46,7 +46,13 @@ object Encoder {
     result
   }
 
-  def json(status: StatusCode, value: Any, gzip: Boolean = true, headers: List[HttpHeader] = List()): HttpResponse = {
+  def json(status: StatusCode, value: Any): HttpResponse = json(status, value, gzip = true)
+
+  def json(status: StatusCode, value: Any, gzip: Boolean): HttpResponse = json(status, value, gzip, headers = List())
+
+  def json(status: StatusCode, value: Any, headers: List[HttpHeader]): HttpResponse = json(status, value, true, headers)
+
+  def json(status: StatusCode, value: Any, gzip: Boolean, headers: List[HttpHeader]): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
     h ++= headers
     h += Date(DateTime.now)
@@ -117,8 +123,15 @@ object Encoder {
     }
   }
 
-  def html(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+  def html(status: StatusCode, value: Any): HttpResponse = html(status, value, gzip = true)
+
+  def html(status: StatusCode, value: Any, gzip: Boolean): HttpResponse = html(status, value, gzip, headers = List())
+
+  def html(status: StatusCode, value: Any, headers: List[HttpHeader]): HttpResponse = html(status, value, true, headers)
+
+  def html(status: StatusCode, value: Any, gzip: Boolean, headers: List[HttpHeader]): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
+    h ++= headers
     h += Date(DateTime.now)
     h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
     HttpResponse(status, entity = html(value, gzip), headers = h.toList)
@@ -131,7 +144,13 @@ object Encoder {
     }
   }
 
-  def text(status: StatusCode, value: Any, gzip: Boolean = true): HttpResponse = {
+  def text(status: StatusCode, value: Any): HttpResponse = text(status, value, gzip = true)
+
+  def text(status: StatusCode, value: Any, gzip: Boolean): HttpResponse = text(status, value, gzip, headers = List())
+
+  def text(status: StatusCode, value: Any, headers: List[HttpHeader]): HttpResponse = text(status, value, true, headers)
+
+  def text(status: StatusCode, value: Any, gzip: Boolean, headers: List[HttpHeader]): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
     h += Date(DateTime.now)
     h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
