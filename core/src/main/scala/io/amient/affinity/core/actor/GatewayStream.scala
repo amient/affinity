@@ -20,6 +20,7 @@
 package io.amient.affinity.core.actor
 
 import java.io.Closeable
+import java.lang
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
@@ -147,8 +148,8 @@ trait GatewayStream extends Gateway {
     val consumer = LogStorage.newInstance(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
     val work = new ListBuffer[Future[Any]]
-    //TODO make hardcoded commit interval configurable
-    val commitInterval = 10 seconds
+    val commitInterval: Long = streamConfig.CommitIntervalMs()
+    val commitTimeout: Long = streamConfig.CommitTimeoutMs()
 
     override def close(): Unit = consumer.cancel()
 
@@ -157,7 +158,7 @@ trait GatewayStream extends Gateway {
       var lastCommit: java.util.concurrent.Future[java.lang.Long] = new CompletedJavaFuture(0L)
 
       try {
-        consumer.reset(TimeRange.since(minTimestamp))
+        consumer.resume(TimeRange.since(minTimestamp))
         logger.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommitTimestamp = System.currentTimeMillis()
         var finalized = false
@@ -182,11 +183,11 @@ trait GatewayStream extends Gateway {
            *  Every <commitInterval> all outputs and work is flushed and then consumer is commited()
            */
           val now = System.currentTimeMillis()
-          if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval.toMillis) {
+          if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval) {
             //flush all outputs in parallel - these are all outputs declared in this gateway
             outpuStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
-            Await.result(Future.sequence(work.result), commitInterval)
+            Await.result(Future.sequence(work.result), commitTimeout millis)
             //commit the records processed by this processor only since the last commit
             lastCommit = consumer.commit() //trigger new commit
             //TODO here the underlying commit future would distribute on completion the partial watermark to registered accumulator actors

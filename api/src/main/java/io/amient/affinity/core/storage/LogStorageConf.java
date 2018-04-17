@@ -30,6 +30,8 @@ import java.util.Set;
 public class LogStorageConf extends CfgStruct<LogStorageConf> {
     public CfgCls<LogStorage> Class = cls("class", LogStorage.class, false);
     public CfgLong MinTimestamp = longint("min.timestamp.ms", 0L);
+    public CfgLong CommitIntervalMs = longint( "commit.interval.ms", 5000L);
+    public CfgLong CommitTimeoutMs = longint( "commit.timeout.ms", 30000L);
 
     @Override
     protected Set<String> specializations() {
