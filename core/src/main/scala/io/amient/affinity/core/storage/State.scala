@@ -32,7 +32,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
+import io.amient.affinity.core.util.{ByteUtils, CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
@@ -145,12 +145,14 @@ class State[K, V](val identifier: String,
 
   /**
     * get an iterator for all records that are strictly not expired
+    *
     * @return a weak iterator that doesn't block read and write operations
     */
-  def iterator:  CloseableIterator[Record[K, V]] = iterator(TimeRange.UNBOUNDED)
+  def iterator: CloseableIterator[Record[K, V]] = iterator(TimeRange.UNBOUNDED)
 
   /**
     * get iterator for all records that are within a given time range and an optional prefix sequence
+    *
     * @param range  time range to filter the records by
     * @param prefix vararg sequence for the compound key to match; can be empty
     * @return a weak iterator that doesn't block read and write operations
@@ -197,7 +199,8 @@ class State[K, V](val identifier: String,
 
   /**
     * Get all records that match the given time range and optional prefix sequence
-    * @param range  time range to filter the records by
+    *
+    * @param range   time range to filter the records by
     * @param prefix1 mandatory root prefix
     * @param prefixN optional secondary prefix sequence
     * @return Map[K,V] as a transformation of Record.key -> Record.value
@@ -261,7 +264,7 @@ class State[K, V](val identifier: String,
     * it is different from delete in that it returns the removed value
     * which is more costly.
     *
-    * @param key   to remove
+    * @param key to remove
     * @return Future Optional of the value previously held at the key position
     */
   def remove(key: K): Future[Option[V]] = getAndUpdate(key, _ => None)
@@ -440,7 +443,7 @@ class State[K, V](val identifier: String,
           Future.successful(Some(value))
         case Some(log) =>
           log.append(kvstore, key, valueBytes, recordTimestamp) map {
-            pos =>Some(value)
+            pos => Some(value)
           }
       }
     }

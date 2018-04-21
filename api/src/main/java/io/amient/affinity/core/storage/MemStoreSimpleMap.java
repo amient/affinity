@@ -19,17 +19,20 @@
 
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.AbstractMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MemStoreSimpleMap extends MemStore {
 
-    final private ConcurrentHashMap<ByteBuffer, ByteBuffer> internal = new ConcurrentHashMap<>();
+    final private ConcurrentHashMap<ByteBuffer, byte[]> internal = new ConcurrentHashMap<>();
 
     public MemStoreSimpleMap(StateConf conf) throws IOException {
         super(conf);
@@ -43,12 +46,29 @@ public class MemStoreSimpleMap extends MemStore {
     @Override
     public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer prefix) {
         if (prefix != null) throw new UnsupportedOperationException("MemStoreSimpleMap doesn't support prefixes, use MemStoreSortedMap instead");
-        return CloseableIterator.apply(internal.entrySet().iterator());
+        return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
+            Iterator<Map.Entry<ByteBuffer, byte[]>> underlying = internal.entrySet().iterator();
+            @Override
+            public boolean hasNext() {
+                return underlying.hasNext();
+            }
+
+            @Override
+            public Map.Entry<ByteBuffer, ByteBuffer> next() {
+                Map.Entry<ByteBuffer, byte[]> entry = underlying.next();
+                return new AbstractMap.SimpleEntry(entry.getKey(), ByteBuffer.wrap(entry.getValue()));
+            }
+
+            @Override
+            public void close() throws IOException {
+                MemStoreSimpleMap.this.close();
+            }
+        };
     }
 
     @Override
     public Optional<ByteBuffer> apply(ByteBuffer key) {
-        return Optional.ofNullable(internal.get(key));
+        return Optional.ofNullable(internal.get(key)).map(ByteBuffer::wrap);
     }
 
     @Override
@@ -58,7 +78,7 @@ public class MemStoreSimpleMap extends MemStore {
 
     @Override
     public void put(ByteBuffer key, ByteBuffer value)  {
-        internal.put(key, value);
+        internal.put(key, ByteUtils.bufToArray(value));
     }
 
     @Override
