@@ -33,6 +33,8 @@ abstract public class Cfg<T> implements Serializable {
 
     private String path = "";
 
+    private String description = "";
+
     protected String relPath;
 
     private JavaOption<T> value = JavaOption.empty();
@@ -61,6 +63,16 @@ abstract public class Cfg<T> implements Serializable {
 
     final public String path(String relativePathToRsolve) {
         return (path.isEmpty() ? "" : path + ".") + relativePathToRsolve;
+    }
+
+
+    final public Cfg<T> doc(String description) {
+        this.description = description;
+        return this;
+    }
+
+    final public String description() {
+        return this.description;
     }
 
     final public boolean isDefined() {

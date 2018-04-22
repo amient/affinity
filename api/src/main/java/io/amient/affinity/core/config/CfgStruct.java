@@ -248,4 +248,10 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return result.toString();
     }
 
+    public Map<String, Cfg<?>> map() {
+        TreeMap<String, Cfg<?>> result = new TreeMap<>();
+        properties.forEach(prop -> result. put(prop.getKey(), prop.getValue()));
+        return result;
+    }
+
 }
