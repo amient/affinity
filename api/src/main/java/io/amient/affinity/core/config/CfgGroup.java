@@ -34,6 +34,10 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
         this.cls = cls;
     }
 
+    public Class<G> getGroupClass() {
+        return cls;
+    }
+
     @Override
     public CfgGroup<G> apply(Config config) throws IllegalArgumentException {
         ConfigObject o = listPos > -1 ? config.getObjectList(relPath).get(listPos) : config.getObject(relPath);

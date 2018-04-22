@@ -67,7 +67,7 @@ object GatewayHttp {
 
   class HttpConf extends CfgStruct[HttpConf] {
 
-    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100)
+    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
     val Host = string("host", true)
     val Port = integer("port", true)
     val Tls = struct("tls", new TlsConf)

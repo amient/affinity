@@ -8,7 +8,7 @@ import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
-object RebalancerTool extends Tool {
+object RebalanceTool extends Tool {
 
   class RebalancerConf extends CfgStruct[RebalancerConf] {
     val BootstrapServer = string("bootstrap.server", true).doc("kafka bootstrap server")
@@ -26,7 +26,7 @@ object RebalancerTool extends Tool {
     sys.exit(1)
   }
 
-  def apply(args: List[String], config: Config = ConfigFactory.empty): Unit = args match {
+  def apply(args: List[String], config: Config): Unit = args match {
     case "--bootstarp-server" :: bootstrapServer :: tail => apply(tail, config.withValue("bootstrap.server", ConfigValueFactory.fromAnyRef(bootstrapServer)))
     case "--config-file" :: configFile :: tail => apply(tail, config.withValue("config.file", ConfigValueFactory.fromAnyRef(configFile)))
     case Nil => try apply(new RebalancerConf().apply(config)) catch {
