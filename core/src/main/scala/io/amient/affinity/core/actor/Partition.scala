@@ -25,13 +25,11 @@ import java.util.{Observable, Observer}
 import akka.actor.{Actor, ActorRef, Status}
 import akka.event.Logging
 import io.amient.affinity.Conf
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
 import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
-import scala.language.postfixOps
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -107,13 +105,13 @@ trait Partition extends ActorHandler {
   abstract override def manage: Receive = super.manage orElse {
 
     case msg@BecomeMaster() =>
-      sender.reply(msg) {} //acking the receipt of the instruction immediately
+      msg(sender) ! {} //acking the receipt of the instruction immediately
       become(standby = false) //then blocking the inbox until state stores have caught-up with storage
       log.debug(s"Became master for partition $keyspace/$partition")
       onBecomeMaster //then invoke custom handler
 
     case msg@BecomeStandby() =>
-      sender.reply(msg) {} //acking the receipt of the instruction immediately
+      msg(sender) ! {} //acking the receipt of the instruction immediately
       become(standby = true)  //then switch state stores to standby mode, i.e. tailing the storage in the background
       log.debug(s"Became standby for partition $keyspace/$partition")
       onBecomeStandby

@@ -21,10 +21,9 @@ package io.amient.affinity.kafka
 
 import java.io.File
 import java.net.InetSocketAddress
-import java.nio.file.Files
 
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest.Suite
 import org.slf4j.LoggerFactory
 
 trait EmbeddedZooKeeper extends EmbeddedService {

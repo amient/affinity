@@ -152,6 +152,7 @@ object Encoder {
 
   def text(status: StatusCode, value: Any, gzip: Boolean, headers: List[HttpHeader]): HttpResponse = {
     val h = mutable.ListBuffer[HttpHeader]()
+    h ++= headers
     h += Date(DateTime.now)
     h += `Content-Encoding`(if (gzip) HttpEncodings.gzip else HttpEncodings.identity)
     HttpResponse(status, entity = text(value, gzip), headers = h.toList)

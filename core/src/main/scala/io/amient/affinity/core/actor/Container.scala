@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, ActorPath, ActorRef}
+import akka.actor.{Actor, ActorPath, ActorRef, Terminated}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.Conf
@@ -98,15 +98,13 @@ class Container(group: String) extends Actor {
       coordinator.unregister(partitions(ref))
       partitions -= ref
 
-    case request @ MasterUpdates(_, add, remove) => sender.reply(request) {
+    case request @ MasterUpdates(_, add, remove) => request(sender) ! {
       implicit val timeout = Timeout(startupTimeout)
-      remove.toList.map(ref => ref ack BecomeStandby())
-      add.toList.map(ref => ref ack BecomeMaster())
+      remove.toList.foreach(ref => ref ack BecomeStandby())
+      add.toList.foreach(ref => ref ack BecomeMaster())
     }
 
-    case request@GracefulShutdown() => sender.reply(request) {
-      context.stop(self)
-    }
+    case request@GracefulShutdown() => request(sender) ! context.stop(self)
 
   }
 }

@@ -37,7 +37,7 @@ import org.apache.kafka.common.errors.{TopicExistsException, WakeupException}
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.language.reflectiveCalls
 
@@ -87,7 +87,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
       if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom key.serializer")
       if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom value.serializer")
-      producerConfig.entrySet().foreach { case (entry) =>
+      producerConfig.entrySet.asScala.foreach { case (entry) =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
@@ -104,7 +104,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
       if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
-      consumerConfig.entrySet().foreach { case (entry) =>
+      consumerConfig.entrySet.asScala.foreach { case (entry) =>
         put(entry.getKey, entry.getValue.unwrapped())
       }
     }
@@ -126,21 +126,21 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   override def reset(partition: Int, range: TimeRange): Unit = {
     val tp = new TopicPartition(topic, partition)
     this.range = range
-    kafkaConsumer.assign(List(tp))
-    val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp))(tp)
-    val startOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp)).map(_.offset).getOrElse(beginOffset)
+    kafkaConsumer.assign(List(tp).asJava)
+    val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp)
+    val startOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start)).asJava).get(tp)).map(_.offset).getOrElse(beginOffset)
     log.debug(s"Reset partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}")
     reset(tp.partition, startOffset)
   }
 
   override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
     val tp = new TopicPartition(topic, partition)
-    val startOffset = if (startPosition == null || startPosition < 0) kafkaConsumer.beginningOffsets(List(tp))(tp) else startPosition
+    val startOffset = if (startPosition == null || startPosition < 0) kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp) else startPosition
     if (startOffset < 0) {
       return null
     } else {
       kafkaConsumer.seek(tp, startOffset)
-      val maxOffset: Long = kafkaConsumer.endOffsets(List(tp))(tp) - 1
+      val maxOffset: Long = kafkaConsumer.endOffsets(List(tp).asJava).get(tp) - 1
       val stopOffset = maxOffset
       /* kafka at the moment supports only offsets-after(t), so if one day there is offsets-before(t) we can optimize more:
       val stopOffset: Long = Option(kafkaConsumer.offsetsBefore(Map(tp -> new java.lang.Long(range.end))).get(tp)).map(_.offset).getOrElse(maxOffset)
@@ -156,18 +156,18 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def resume(range: TimeRange): Unit = {
     this.range = range
-    kafkaConsumer.subscribe(List(topic), this)
+    kafkaConsumer.subscribe(List(topic).asJava, this)
   }
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
-    partitions.foreach(tp => stopOffsets.remove(tp.partition))
+    partitions.asScala.foreach(tp => stopOffsets.remove(tp.partition))
   }
 
   override def onPartitionsAssigned(partitions: util.Collection[TopicPartition]) = {
-    partitions.foreach {
+    partitions.asScala.foreach {
       tp =>
-        val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp))(tp)
-        val rangeStartOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start))).get(tp)).map(_.offset).getOrElse(beginOffset)
+        val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp)
+        val rangeStartOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start)).asJava).get(tp)).map(_.offset).getOrElse(beginOffset)
         val minOffset: Long = math.max(beginOffset, rangeStartOffset)
         val nextOffset: Long = Option(kafkaConsumer.committed(tp)).map(_.offset() + 1).getOrElse(0)
         val resumeOffset: Long = math.max(minOffset, nextOffset)
@@ -191,7 +191,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       case _: WakeupException => return null
     }
 
-    kafkaRecords.iterator.filter { record =>
+    kafkaRecords.iterator.asScala.filter { record =>
       if (unbounded) {
         record.timestamp >= range.start && record.timestamp <= range.end
       } else if (!stopOffsets.contains(record.partition)) {
@@ -203,7 +203,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }.map {
       case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)
     }
-  }
+  }.asJava
 
   def cancel(): Unit = kafkaConsumer.wakeup()
 
@@ -254,7 +254,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
       if (kafkaStorageConf.Consumer.isDefined) {
         val consumerConfig = kafkaStorageConf.Consumer.config()
-        consumerConfig.entrySet().foreach { case (entry) =>
+        consumerConfig.entrySet.asScala.foreach { case (entry) =>
           put(entry.getKey, entry.getValue.unwrapped())
         }
       }
@@ -278,9 +278,9 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
           exists = Some(true)
         } else {
           val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
-          schemaTopicRequest.configs(topicConfigs)
+          schemaTopicRequest.configs(topicConfigs.asJava)
           try {
-            admin.createTopics(List(schemaTopicRequest)).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+            admin.createTopics(List(schemaTopicRequest).asJava).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
             log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor, configs: $topicConfigs")
             exists = Some(false)
           } catch {
@@ -291,7 +291,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
       if (exists.get) {
         log.debug(s"Checking that topic $topic has correct number of partitions: ${numPartitions}")
-        val description = admin.describeTopics(List(topic)).values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        val description = admin.describeTopics(List(topic).asJava).values.asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
         if (description.partitions().size() != numPartitions) {
           throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()} partitions, expecting: $numPartitions")
         }
@@ -302,14 +302,14 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         }
         log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
         val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
-        val actualConfig = admin.describeConfigs(List(topicConfigResource))
-          .values().head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        val actualConfig = admin.describeConfigs(List(topicConfigResource).asJava)
+          .values().asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
         val configOutOfSync = topicConfigs.exists { case (k, v) => actualConfig.get(k).value() != v }
         if (readonly) {
           if (configOutOfSync) log.warn(s"External State configuration doesn't match the state configuration: $topicConfigs")
         } else if (configOutOfSync) {
-          val entries: util.Collection[ConfigEntry] = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }
-          admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)))
+          val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }.asJavaCollection
+          admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)).asJava)
             .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
           log.info(s"Topic $topic configuration altered successfully")
         } else {

@@ -31,7 +31,6 @@ import org.apache.avro.util.Utf8
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
 
-import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.util.Try
 
@@ -67,11 +66,11 @@ object AvroJsonConverter {
         case Schema.Type.STRING if json == null => new Utf8()
         case Schema.Type.STRING if json.isTextual => new Utf8(json.getTextValue)
         case Schema.Type.UNION if schema.getTypes.size == 2 && schema.getTypes.get(0).getType == Schema.Type.NULL =>
-          schema.getTypes.map(s => Try(to(json, s))).find(_.isSuccess).map(_.get).get
-        case Schema.Type.ARRAY if json.isArray => json.getElements.map(x => to(x, schema.getElementType)).toList.asJava
+          schema.getTypes.asScala.map(s => Try(to(json, s))).find(_.isSuccess).map(_.get).get
+        case Schema.Type.ARRAY if json.isArray => json.getElements.asScala.map(x => to(x, schema.getElementType)).toList.asJava
         case Schema.Type.MAP if json.isObject =>
           val builder = Map.newBuilder[String, Any]
-          schema.getFields foreach { field =>
+          schema.getFields.asScala foreach { field =>
             builder += field.name -> to(json.get(field.name), field.schema)
           }
           builder.result.asJava
@@ -80,7 +79,7 @@ object AvroJsonConverter {
         case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getTextValue.getBytes(StandardCharsets.UTF_8))
         case Schema.Type.RECORD if json.isObject =>
           val builder = new GenericRecordBuilder(schema)
-          schema.getFields foreach { field =>
+          schema.getFields.asScala foreach { field =>
             val d = json.get(field.name)
             builder.set(field, to(d, field.schema()))
           }

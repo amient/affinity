@@ -20,7 +20,6 @@
 package io.amient.affinity.core.http
 
 import java.net.InetSocketAddress
-import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 
 import akka.actor.{ActorRef, ActorSystem}

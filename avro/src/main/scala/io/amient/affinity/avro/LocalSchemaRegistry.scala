@@ -22,7 +22,6 @@ package io.amient.affinity.avro
 import java.nio.file.{Files, Path}
 
 import com.typesafe.config.Config
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf

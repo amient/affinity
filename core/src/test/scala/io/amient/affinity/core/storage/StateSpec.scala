@@ -26,7 +26,7 @@ import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import scala.language.postfixOps
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -43,7 +43,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
       Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
       Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
       Conf.Affi.Node.Gateway.Http.Port.path -> "0"
-    )))
+    ).asJava))
 
   override def afterAll: Unit = {
     Await.ready(system.terminate(), 15 seconds)
@@ -57,7 +57,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
       State.StateConf.External.path -> "true"
-    )))
+    ).asJava))
     val state = State.create[Long, ExpirableValue]("read-only-store", 0, stateConf, 1, system)
     an[IllegalStateException] should be thrownBy (Await.result(state.insert(1L, ExpirableValue("one", 1)), specTimeout))
     an[IllegalStateException] should be thrownBy (Await.result(state.delete(1L), specTimeout))
@@ -67,7 +67,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
 
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName
-    )))
+    ).asJava))
     val state = State.create[Long, ExpirableValue]("no-ttl-store", 0, stateConf, 1, system)
 
     val nowMs = System.currentTimeMillis()
@@ -86,7 +86,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
       State.StateConf.TtlSeconds.path -> 5
-    )))
+    ).asJava))
 
     val state = State.create[Long, ExpirableValue]("ttl-store", 0, stateConf, 1, system)
 
@@ -106,7 +106,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
   it should "manage 1-N mappings when compound key prefix is used" in {
     val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
       State.StateConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
-    )))
+    ).asJava))
     val state = State.create[ExampleCompoundKey, String]("prefix-key-store", 0, stateConf, 1, system)
 
     state.insert(ExampleCompoundKey(1000L, "x", 1), "value11")

@@ -20,7 +20,6 @@
 package io.amient.affinity.core.actor
 
 import java.io.Closeable
-import java.lang
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
@@ -29,7 +28,7 @@ import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 import io.amient.affinity.core.util.{CompletedJavaFuture, EventTime, OutputDataStream, TimeRange}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.parallel.immutable.ParSeq
@@ -172,7 +171,7 @@ trait GatewayStream extends Gateway {
             logger.info(s"Resuming input stream processor: $identifier")
           }
           val entries = consumer.fetch(true)
-          if (entries != null) for (entry <- entries) {
+          if (entries != null) for (entry <- entries.asScala) {
             //TODO we need entry.partition and use it with entry.position to provide watermark and gather it for distribution during the commit
             val key: K = keySerde.fromBytes(entry.key)
             val value: V = valSerde.fromBytes(entry.value)

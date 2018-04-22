@@ -24,8 +24,6 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.serde.{Serde, Serdes}
 
-import scala.util.Try
-
 final class AvroSerdeProxy(tools: Serdes) extends Serde[Any] {
 
   def this(config: Config) = this(Serde.tools(config))

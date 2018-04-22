@@ -18,7 +18,6 @@
  */
 
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{Partition, Routed}
 import io.amient.affinity.core.util.Reply
 
@@ -33,13 +32,8 @@ class ExamplePartition extends Partition {
   import context.dispatcher
 
   override def handle: Receive = {
-    case request @ GetValue(key: String) => sender.reply(request) {
-      cache(key)
-    }
-
-    case request @ PutValue(key: String, value: String) => sender.replyWith(request) {
-      cache.update(key, value)
-    }
+    case request @ GetValue(key: String) => request(sender) ! cache(key)
+    case request @ PutValue(key: String, value: String) => request(sender) ! cache.update(key, value)
   }
 
 }

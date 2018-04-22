@@ -34,7 +34,7 @@ import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 import io.amient.affinity.{AffinityActorSystem, Conf}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
@@ -125,9 +125,9 @@ class Node(config: Config) {
 
   def startContainers(): Unit = {
     if (conf.Affi.Node.Containers.isDefined) {
-      conf.Affi.Node.Containers().foreach {
+      conf.Affi.Node.Containers().asScala.foreach {
         case (group: String, value: CfgIntList) =>
-          val partitions = value().map(_.toInt).toList
+          val partitions = value().asScala.map(_.toInt).toList
           startContainer(group, partitions)
       }
     }
@@ -163,8 +163,8 @@ class Node(config: Config) {
   }
 
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {
-    eventual onFailure {
-      case NonFatal(e) =>
+    eventual.failed.foreach {
+      case e: Throwable =>
         log.error(e, "Could not execute startup command")
         shutdown()
     }

@@ -86,7 +86,7 @@ class Controller extends Actor {
 
   override def receive: Receive = {
 
-    case request@CreateContainer(group, partitions, partitionProps) => sender.replyWith(request) {
+    case request@CreateContainer(group, partitions, partitionProps) => request(sender) ! {
       try {
         log.debug(s"Creating Container for $group with partitions $partitions")
         context.actorOf(Props(new Container(group) {
@@ -117,15 +117,10 @@ class Controller extends Actor {
       val gatewayRef = context.actorOf(gatewayProps, name = "gateway")
       context.watch(gatewayRef)
       gatewayPromise = Promise[Int]()
-      sender.replyWith(request) {
-        gatewayPromise.future
-      }
+      request(sender) ! gatewayPromise.future
       gatewayRef ! CreateGateway
     } catch {
-      case _: InvalidActorNameException =>
-        sender.replyWith(request) {
-          gatewayPromise.future
-        }
+      case _: InvalidActorNameException => request(sender) ! gatewayPromise.future
     }
 
     case Terminated(child) if (child.path.name == "gateway") =>
@@ -136,17 +131,20 @@ class Controller extends Actor {
       gatewayPromise.success(httpPort)
     }
 
-    case request@GracefulShutdown() => sender.replyWith(request) {
+    case request@GracefulShutdown() =>
       implicit val timeout = Timeout(shutdownTimeout)
-      Future.sequence(context.children map { child =>
-        log.debug("Requesting GracefulShutdown from " + child)
-        child ? GracefulShutdown() recover {
-          case any =>
-            log.warning(s"$child failed while executing GracefulShutdown request: ", any.getMessage)
-            context.stop(child)
-        }
-      }) map (_ => system.terminate())
-    }
+      request(sender) ! {
+        Future.sequence {
+          context.children.map { child =>
+            log.debug("Requesting GracefulShutdown from " + child)
+            child ? GracefulShutdown() recover {
+              case any =>
+                log.warning(s"$child failed while executing GracefulShutdown request: ", any.getMessage)
+                context.stop(child)
+            }
+          }
+        } flatMap (_ => system.terminate()) map (_ => ())
+      }
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
   }

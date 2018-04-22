@@ -28,7 +28,7 @@ import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.CfgStruct
 import org.apache.avro.{Schema, SchemaValidator}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 object MemorySchemaRegistry {
 
@@ -43,15 +43,15 @@ object MemorySchemaRegistry {
 
   def createUniverse(reuse: Option[Int] = None): Universe = synchronized {
     reuse match {
-      case Some(id) if multiverse.containsKey(id) => multiverse(id)
+      case Some(id) if multiverse.containsKey(id) => multiverse.get(id)
       case Some(id) =>
         val universe = new Universe(id)
-        multiverse += id -> universe
+        multiverse.asScala += id -> universe
         universe
       case None =>
-        val id = (if (multiverse.isEmpty) 1 else multiverse.keys.max + 1)
+        val id = (if (multiverse.isEmpty) 1 else multiverse.asScala.keys.max + 1)
         val universe = new Universe(id)
-        multiverse += id -> universe
+        multiverse.asScala += id -> universe
         universe
     }
   }
@@ -61,7 +61,7 @@ object MemorySchemaRegistry {
     val subjects = new ConcurrentHashMap[String, List[Int]]()
 
     def getOrRegister(schema: Schema): Int = synchronized {
-      schemas.find(_._2 == schema) match {
+      schemas.asScala.find(_._2 == schema) match {
         case None =>
           val newId = schemas.size
           schemas.put(newId, schema)
@@ -72,7 +72,7 @@ object MemorySchemaRegistry {
 
     def updateSubject(subject: String, schemaId: Int, validator: SchemaValidator): Unit = synchronized {
       val existing = Option(subjects.get(subject)).getOrElse(List())
-      validator.validate(schemas(schemaId), existing.map(id => schemas(id)))
+      validator.validate(schemas.get(schemaId), existing.map(id => schemas.get(id)).asJava)
       if (!existing.contains(schemaId)) {
         subjects.put(subject, (existing :+ schemaId))
       }

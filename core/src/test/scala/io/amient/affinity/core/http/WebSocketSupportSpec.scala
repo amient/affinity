@@ -57,7 +57,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     val data = state[Int, Envelope]("test")
 
     override def handle: Receive = {
-      case query@Envelope(id, side, seq) => sender.replyWith(query)(data.replace(id.id, query))
+      case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
       case ID(s) => data.push(s, ID(s+1))
     }
   }))
@@ -108,7 +108,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
           }, new UpstreamActor {
             override def handle: Receive = {
               case None => push("{}")
-              case Some(base@Envelope(id, side, _)) => push(Encoder.json(base))
+              case Some(base: Envelope) => push(Encoder.json(base))
               case id:ID => push(Encoder.json(id))
             }
           })
@@ -146,7 +146,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
           ws.close()
         }
       } catch {
-        case e: IOException => true
+        case _: IOException => true
       }) should be(true)
     }
 

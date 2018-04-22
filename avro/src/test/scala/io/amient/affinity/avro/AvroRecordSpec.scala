@@ -25,7 +25,6 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
-import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Seq
 

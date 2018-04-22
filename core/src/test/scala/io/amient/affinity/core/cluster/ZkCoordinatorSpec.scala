@@ -27,7 +27,7 @@ import io.amient.affinity.core.util.{AffinityTestBase, Reply}
 import io.amient.affinity.kafka.EmbeddedZooKeeper
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 case class ZkTestKey(val id: Int) extends AvroRecord with Routed with Reply[Option[ZkTestValue]] {
   override def key = this
@@ -64,7 +64,7 @@ class ZkCoordinatorSpec extends FlatSpec with AffinityTestBase with EmbeddedZooK
   })
 
   val node2 = new Node(config.withValue("affinity.node.container.region",
-    ConfigValueFactory.fromIterable(List(0, 1, 2, 3))))
+    ConfigValueFactory.fromIterable(List(0, 1, 2, 3).asJava)))
 
   //  val region2 = new Node(config.withValue("affinity.node.container.region",
   //    ConfigValueFactory.fromIterable(List(1,3,5,7))))

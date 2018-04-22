@@ -38,7 +38,7 @@ class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPat
     }
     override def handle: Receive = {
       case e: IllegalStateException => throw e
-      case any =>
+      case _ =>
     }
   })
 
@@ -59,15 +59,14 @@ class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPat
 
         //first stop Partition explicitly - it shouldn't be restarted
         import system.dispatcher
-        println(coordinator.services)
-        system.actorSelection(ActorPath.fromString(coordinator.services.head._1)).resolveOne() onSuccess {
+        system.actorSelection(ActorPath.fromString(coordinator.services.head._1)).resolveOne.foreach {
           case actorRef => system.stop(actorRef)
         }
         eventually { coordinator.services.size should be(3) }
 
         //now simulate error in one of the partitions
         val partitionToFail = coordinator.services.head._1
-        system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne() onSuccess {
+        system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne.foreach {
           case actorRef => actorRef ! new IllegalStateException("Exception expected by the Test")
         }
         eventually  { coordinator.services.size should be(2) }

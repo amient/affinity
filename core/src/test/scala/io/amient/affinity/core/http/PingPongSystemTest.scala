@@ -21,9 +21,9 @@ package io.amient.affinity.core.http
 
 import akka.http.javadsl.model.ContentTypes
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import io.amient.affinity.core.ack
@@ -58,13 +58,13 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
 
     object ERROR {
       def unapply(http: HttpExchange): Option[HttpExchange] = {
-        throw new IllegalArgumentException("Simulated resumable exception")
+        throw new IllegalArgumentException(s"Simulated resumable exception ${http.request.method}")
       }
     }
 
     override def handle: Receive = {
       case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
-      case http@HTTP(GET, PATH("timeout"), _, response) if http.timeout(200 millis) =>
+      case http@HTTP(GET, PATH("timeout"), _, _) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) => handleWith(response) {
         implicit val timeout = Timeout(1 second)
         ks gather ClusterPing() map {
@@ -85,7 +85,7 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
   override protected def beforeAll(): Unit = try {
     node2.startContainer("region", List(0, 1), new Partition {
       override def handle: Receive = {
-        case req@ClusterPing() => sender.reply(req)("pong")
+        case req@ClusterPing() => req(sender) ! "pong"
       }
     })
     node1.awaitClusterReady()

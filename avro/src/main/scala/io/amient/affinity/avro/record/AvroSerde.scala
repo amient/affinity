@@ -33,7 +33,7 @@ import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferInputStream
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
 object AvroSerde {
@@ -56,7 +56,7 @@ object AvroSerde {
     val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], true)
 
     override protected def specializations(): util.Set[String] = {
-      Set("schema.registry")
+      Set("schema.registry").asJava
     }
   }
 
@@ -81,7 +81,7 @@ object AvroSerde {
     */
   def binaryPrefixLength(recordClass: Class[_ <: AvroRecord]): Option[Int] = {
     val schema = AvroRecord.inferSchema(recordClass)
-    val fixedLen = schema.getFields.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
+    val fixedLen = schema.getFields.asScala.map(_.schema).takeWhile(_.getType == Schema.Type.FIXED).map(_.getFixedSize).sum
     if (fixedLen > 0) Some(5 + fixedLen) else None
   }
 
@@ -143,7 +143,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     *         null if bytes are null
     */
   def read(buf: ByteBuffer): Any = {
-    if (buf == null) null else read(new ByteBufferInputStream(List(buf)))
+    if (buf == null) null else read(new ByteBufferInputStream(List(buf).asJava))
   }
 
   /**
@@ -202,7 +202,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     output.write(0) //magic byte
     ByteUtils.writeIntValue(schemaId, output) //schema id
     //all used prefix keys
-    prefix.zip(schema.getFields.take(prefix.length).map(_.schema.getFixedSize)).foreach {
+    prefix.zip(schema.getFields.asScala.take(prefix.length).map(_.schema.getFixedSize)).foreach {
       case (value: String, fixedLen: Int) => output.write(AvroRecord.stringToFixed(value, fixedLen))
       case (value: Integer, 4) => ByteUtils.writeIntValue(value, output)
       case (value: java.lang.Long, 8) => ByteUtils.writeLongValue(value, output)

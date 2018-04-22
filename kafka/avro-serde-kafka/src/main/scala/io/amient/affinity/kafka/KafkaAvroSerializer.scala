@@ -22,7 +22,7 @@ package io.amient.affinity.kafka
 import java.util
 
 import com.typesafe.config.ConfigFactory
-import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.record.AvroSerde
 import org.apache.kafka.common.serialization.Serializer
 
 class KafkaAvroSerializer extends Serializer[Any] {

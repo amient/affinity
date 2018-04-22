@@ -27,12 +27,11 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.Conf
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.actor.Keyspace.{CheckKeyspaceStatus, KeyspaceStatus}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.{LogStorageConf, State}
 
 import scala.collection.mutable
@@ -175,7 +174,7 @@ trait Gateway extends ActorHandler {
 
   abstract override def manage = super.manage orElse {
 
-    case request@GracefulShutdown() => sender.reply(request) {
+    case request@GracefulShutdown() => request(sender) ! {
       shutdown()
       log.info("Gateway shutdown completed")
       context.stop(self)
@@ -188,7 +187,7 @@ trait Gateway extends ActorHandler {
           s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
       }
 
-    case msg@MasterUpdates(group, add, remove) => sender.reply(msg) {
+    case request@MasterUpdates(group, add, remove) => request(sender) ! {
       val service: ActorRef = keyspaces(group)._2
       remove.foreach(ref => service ! RemoveRoutee(ActorRefRoutee(ref)))
       add.foreach(ref => service ! AddRoutee(ActorRefRoutee(ref)))

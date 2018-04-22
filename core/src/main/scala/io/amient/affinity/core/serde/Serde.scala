@@ -58,7 +58,7 @@ object Serde {
 
   def by[S](identity: Int, config: Config): Serde[S] = tools(config).by(identity).asInstanceOf[Serde[S]]
 
-  def of[S: ClassTag](config: Config): AbstractSerde[S] = tools(config).of[S](config)
+  def of[S: ClassTag](config: Config): AbstractSerde[S] = tools(config).of[S]
 
   def find(o: AnyRef, config: Config) = tools(config).find(o)
 
@@ -179,7 +179,7 @@ class Serdes(val config: Config) {
 
   private val serializerMap = new ConcurrentHashMap[Class[_], Serde[_]]()
 
-  def of[S: ClassTag](config: Config): Serde[S] = {
+  def of[S: ClassTag]: Serde[S] = {
     val runtimeClass = implicitly[ClassTag[S]].runtimeClass
     val ser = if (runtimeClass == classOf[Array[Byte]]) {
       new ByteArraySerde

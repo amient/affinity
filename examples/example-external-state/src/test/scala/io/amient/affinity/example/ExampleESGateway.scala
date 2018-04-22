@@ -69,8 +69,8 @@ class ExampleESPartition extends Partition {
   }
 
   override def handle: Receive = {
-    case request@GetLatest() => sender.reply(request) {
-      latest.iterator.asScala.map(_.productIterator.mkString(("\t"))).toList
-    }
+    case request@GetLatest() =>
+      request(sender) ! latest.iterator.asScala.map(_.productIterator.mkString(("\t"))).toList
+
   }
 }

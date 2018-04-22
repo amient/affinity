@@ -153,7 +153,7 @@ trait GatewayHttp extends Gateway {
   }
 
   abstract override def manage: Receive = super.manage orElse {
-    case msg@CreateGateway => context.parent ! Controller.GatewayCreated(listener.getPort)
+    case CreateGateway => context.parent ! Controller.GatewayCreated(listener.getPort)
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)
@@ -163,9 +163,8 @@ trait GatewayHttp extends Gateway {
         new RuntimeException("Suspension queue overflow")
       }
 
-    case request@GracefulShutdown() => sender.reply(request) {
-      context.stop(self)
-    }
+    case request@GracefulShutdown() => request(sender) ! context.stop(self)
+
   }
 
   override def unhandled: Receive = {
@@ -299,7 +298,7 @@ trait WebSocketSupport extends GatewayHttp {
   private implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
 
   abstract override def handle: Receive = super.handle orElse {
-    case http@HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get, gzip = true))
+    case HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get, gzip = true))
   }
 
   /**

@@ -23,7 +23,7 @@ import java.util.concurrent.TimeoutException
 
 import akka.AkkaException
 import akka.actor.{ActorRef, Scheduler, Status}
-import akka.pattern.{after, ask}
+import akka.pattern.{after, ask, pipe}
 import akka.util.Timeout
 import io.amient.affinity.core.http.RequestException
 import org.slf4j.LoggerFactory
@@ -59,7 +59,25 @@ trait AckSupport {
 
 }
 
-trait Reply[+T]
+trait Reply[+T] {
+
+  def apply[TT >: T](sender: ActorRef): ReplyTo[TT] = new ReplyTo[TT](sender)
+
+}
+
+class ReplyTo[T](sender: ActorRef) {
+  def !(response: => T): Unit = {
+    sender ! (try response catch {
+      case NonFatal(e) => Status.Failure(e)
+    })
+  }
+
+  def !(response: => Future[T])(implicit context: ExecutionContext) = {
+    (try response catch {
+      case NonFatal(e) => Future.failed(e)
+    }) pipeTo sender
+  }
+}
 
 trait Scatter[T] extends Reply[T] {
   def gather(r1: T, r2: T): T
@@ -97,6 +115,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     */
   def ack[T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext, tag: ClassTag[T]): Future[T] = {
     val promise = Promise[T]()
+
     def attempt(retry: Int, delay: Duration = 0 seconds): Unit = {
       val f = if (delay.toMillis == 0) target ? message else after(timeout.duration, scheduler)(target ? message)
       f map {
@@ -124,17 +143,20 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
           attempt(retry - 1, timeout.duration)
       }
     }
+
     attempt(2)
     promise.future
   }
 
   /**
     * Intermediate reply with future. An ack is sent to the `target` actor when the future completes.
+    *
     * @param request message which is being replied to
     * @param closure which must return future on which the acknowledgement depends
     * @tparam T
     */
 
+  @deprecated("use request(sender) ! ...", "2.6.5")
   def replyWith[T](request: Reply[T])(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
     try {
       val f: Future[T] = closure
@@ -154,6 +176,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     * @param request message which is being replied to
     * @param closure of which result will be send as the acknowledgement value
     */
+  @deprecated("use request(sender) ! ...", "2.6.5")
   def reply[T](request: Reply[T])(closure: => T): Unit = {
     try {
       val result: T = closure

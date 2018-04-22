@@ -32,11 +32,11 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.{ByteUtils, CloseableIterator, EventTime, TimeRange}
+import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.language.{existentials, implicitConversions, postfixOps}
+import scala.language.{existentials, implicitConversions}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -163,7 +163,7 @@ class State[K, V](val identifier: String,
       ByteBuffer.wrap(keySerde.prefix(keyClass, javaPrefix: _*))
     }
     val underlying = kvstore.iterator(bytePrefix)
-    val mapped = underlying.flatMap { entry =>
+    val mapped = underlying.asScala.flatMap { entry =>
       option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs))
         .filter(byteRecord => range.contains(byteRecord.timestamp))
         .map { byteRecord =>
@@ -209,7 +209,7 @@ class State[K, V](val identifier: String,
     val builder = Map.newBuilder[K, V]
     val it = iterator(range, (prefix1 +: prefixN): _*)
     try {
-      it.foreach(record => builder += record.key -> record.value)
+      it.asScala.foreach(record => builder += record.key -> record.value)
       builder.result()
     } finally {
       it.close()

@@ -50,12 +50,8 @@ class ExampleApiGateway extends Gateway {
   def putData(key: String, value: String): Future[Option[String]] = simpleService ack PutValue(key, value)
 
   override def handle: Receive = super.handle orElse {
-    case request@GetData(key) => sender.replyWith(request) {
-      getData(key)
-    }
-    case cmd@PutData(key, value) => sender.replyWith(cmd) {
-      putData(key, value)
-    }
+    case request@GetData(key) => request(sender) ! getData(key)
+    case request@PutData(key, value) => request(sender) ! putData(key, value)
   }
 
 }

@@ -25,8 +25,6 @@ import io.amient.affinity.core.ack
 class ZkCoordinatorTestService extends Partition {
 
   override def handle: Receive = {
-    case request@ZkTestKey(id) => sender.reply(request){
-      Some(ZkTestValue(List(id)))
-    }
+    case request@ZkTestKey(id) => request(sender) ! Some(ZkTestValue(List(id)))
   }
 }

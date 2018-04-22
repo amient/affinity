@@ -81,7 +81,7 @@ class Keyspace(config: Config) extends Actor {
       case NonFatal(e) => sender ! Failure(new RuntimeException(s"Could not route $message", e))
     }
 
-    case req@ScatterGather(message: Reply[Any], t) => sender.replyWith(req) {
+    case req@ScatterGather(message: Reply[Any], t) => req(sender) ! {
       val recipients = routes.values
       implicit val timeout = t
       implicit val scheduler = context.system.scheduler
@@ -103,9 +103,8 @@ class Keyspace(config: Config) extends Actor {
         if (removed != routee) routes.put(partition, removed)
       }
 
-    case req@CheckKeyspaceStatus(_keyspace) => sender.reply(req) {
-      KeyspaceStatus(_keyspace, suspended = (routes.size != numPartitions))
-    }
+    case req@CheckKeyspaceStatus(_keyspace) =>
+      req(sender) ! KeyspaceStatus(_keyspace, suspended = (routes.size != numPartitions))
 
     case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
 

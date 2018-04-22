@@ -64,7 +64,7 @@ object LogRDDSpecUniverse {
 
   def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.UNBOUNDED)
                                               (implicit sc: SparkContext): RDD[(K, V)] = {
-    LogRDD(LogStorage.newInstance(storageConf), range).compact.present[K,V](AvroSerde.create(avroConf))
+      LogRDD(LogStorage.newInstance(storageConf), range).compact.present[K,V](AvroSerde.create(avroConf))
   }
 
 }

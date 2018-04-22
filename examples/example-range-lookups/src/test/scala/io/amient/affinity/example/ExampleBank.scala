@@ -27,7 +27,7 @@ import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Rou
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util.{EventTime, Reply, Scatter, TimeRange}
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -63,7 +63,7 @@ class ExampleBank extends GatewayStream with GatewayHttp {
 }
 
 
-case class StoreTransaction(key: Account, t: Transaction) extends AvroRecord with Routed with Reply[Unit]
+case class StoreTransaction(key: Account, t: Transaction) extends AvroRecord with Routed with Reply[Option[Transaction]]
 case class StorageKey(@Fixed(8) sortcode: String, @Fixed account: Int, txn: Long) extends AvroRecord
 case class GetAccountTransactions(key: Account) extends AvroRecord with Routed with Reply[Seq[Transaction]]
 case class GetBranchTransactions(sortcode: String, beforeUnixTs: Long = Long.MaxValue) extends AvroRecord with Scatter[Seq[Transaction]] {
@@ -76,15 +76,14 @@ class DefaultPartition extends Partition {
 
   override def handle: Receive = {
 
-    case request@StoreTransaction(account@Account(sortcode, number), transaction) => sender.reply(request) {
+    case request@StoreTransaction(Account(sortcode, number), transaction) => request(sender) ! {
       transactions.replace(StorageKey(sortcode, number, transaction.id), transaction)
     }
 
-    case request@GetBranchTransactions(sortcode, before) => sender.reply(request) {
-      transactions.range(TimeRange.until(before), sortcode).values.toList
-    }
+    case request@GetBranchTransactions(sortcode, before) =>
+      request(sender) ! transactions.range(TimeRange.until(before), sortcode).values.toList
 
-    case request@GetAccountTransactions(account) => sender.reply(request) {
+    case request@GetAccountTransactions(account) => request(sender) ! {
       transactions.range(TimeRange.UNBOUNDED, account.sortcode, account.number).values.toList
     }
   }

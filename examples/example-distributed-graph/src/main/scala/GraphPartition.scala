@@ -37,30 +37,22 @@ class GraphPartition extends Partition {
     /**
       * getting Component object by the Component ID
       */
-    case request@GetComponent(cid) => sender.reply(request) {
-      components(cid)
-    }
+    case request@GetComponent(cid) => request(sender) ! components(cid)
 
     /**
       * Updated component of the vertex.
       * Responds with the Component data previously associated with the vertex
       */
-    case command@UpdateComponent(cid, updated) => sender.replyWith(command) {
-      components.update(cid, updated)
-    }
+    case request@UpdateComponent(cid, updated) => request(sender) ! components.update(cid, updated)
 
-    case command@DeleteComponent(cid) => sender.replyWith(command) {
-      components.remove(cid)
-    }
+    case request@DeleteComponent(cid) => request(sender) ! components.remove(cid)
 
     /**
       * getting VertexProps object by Vertex ID
       */
-    case request@GetVertexProps(vid) => sender.reply(request) {
-      graph(vid)
-    }
+    case request@GetVertexProps(vid) => request(sender) ! graph(vid)
 
-    case command@UpdateVertexComponent(vid, cid) => sender.replyWith(command) {
+    case request@UpdateVertexComponent(vid, cid) => request(sender) ! {
       graph.getAndUpdate(vid, {
         case None => throw new NoSuchElementException
         case Some(props: VertexProps) if (props.component == cid) => Some(props)
@@ -76,7 +68,7 @@ class GraphPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
-    case command@ModifyGraph(vertex, edge, GOP.ADD) => sender.replyWith(command) {
+    case request@ModifyGraph(vertex, edge, GOP.ADD) => request(sender) ! {
       graph.updateAndGet(vertex, {
         case Some(existing) if (existing.edges.exists(_.target == edge.target)) => Some(existing)
         case None => Some(VertexProps(System.currentTimeMillis, vertex, Set(edge)))
@@ -91,7 +83,7 @@ class GraphPartition extends Partition {
       * data shard owned by this partition.
       * Responds Status.Failure if the operation fails, or with Success(VertexProps) holding the updated state
       */
-    case command@ModifyGraph(vertex, edge, GOP.REMOVE) => sender.replyWith(command) {
+    case request@ModifyGraph(vertex, edge, GOP.REMOVE) => request(sender) ! {
       graph.updateAndGet(vertex ,{
         case None => throw new NoSuchElementException
         case Some(existing) if !existing.edges.exists(_.target == edge.target) => throw new IllegalArgumentException("not connected")

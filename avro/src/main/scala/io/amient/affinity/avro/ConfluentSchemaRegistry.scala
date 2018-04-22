@@ -31,7 +31,7 @@ import org.apache.avro.Schema
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 object ConfluentSchemaRegistry {
 
@@ -70,7 +70,7 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
   def getSubjects: Iterator[String] = {
     val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.getElements().map(_.getTextValue)
+      j.getElements().asScala.map(_.getTextValue)
     } else {
       if (j.get("error_code").getIntValue == 40401) {
         Iterator.empty
@@ -83,7 +83,7 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
   def getVersions(subject: String): Iterator[Int] = {
     val j = mapper.readValue(get(s"/subjects/$subject/versions"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.getElements().map(_.getIntValue)
+      j.getElements().asScala.map(_.getIntValue)
     } else {
       if (j.get("error_code").getIntValue == 40401) {
         Iterator.empty

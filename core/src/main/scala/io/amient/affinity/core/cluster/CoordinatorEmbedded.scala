@@ -56,7 +56,7 @@ object CoordinatorEmbedded extends Observable {
     g -= handle
   }
 
-  def put(space: String, handle: String, handle1: String) = update(space) { g =>
+  def put(space: String, handle: String) = update(space) { g =>
     g += handle -> handle
     setChanged()
     notifyObservers((space, services(space).toMap))
@@ -88,7 +88,7 @@ class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) ex
 
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
-    CoordinatorEmbedded.put(space, handle, handle)
+    CoordinatorEmbedded.put(space, handle)
     handle
   }
 
