@@ -98,7 +98,8 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     super.afterAll()
   }
 
-  "Master Transition" should "not lead to inconsistent state" in {
+  //FIXME #177
+  "Master Transition" should "not lead to inconsistent state" ignore {
     val requestCount = new AtomicInteger(0)
     val expected = new ConcurrentHashMap[String, String]()
     import scala.concurrent.ExecutionContext.Implicits.global
