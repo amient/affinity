@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
-object TimeLogUtil {
+object TimeLogTool {
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
