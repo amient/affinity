@@ -95,7 +95,6 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
 
   behavior of "KafkaStorage"
 
-  //FIXME #155
   it should "survive failing writes" in {
     config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
     system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
