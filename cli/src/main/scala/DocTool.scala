@@ -14,7 +14,7 @@ object DocTool extends Tool {
     override def apply(config: Config) = new DocToolConf().apply(config)
   }
 
-  override def apply(args: List[String], config: Config): Unit = apply(affinity.Conf)
+  def apply(config: Config): Unit = apply(affinity.Conf)
 
   def apply(cfg: Cfg[_], extraPath: String = ""): Unit = {
     //TODO extenesions

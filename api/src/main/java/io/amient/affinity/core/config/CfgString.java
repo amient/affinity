@@ -27,4 +27,9 @@ public class CfgString extends Cfg<String> {
     public Cfg<String> apply(Config config) throws IllegalArgumentException {
         return setValue(listPos > -1 ? config.getStringList(relPath).get(listPos) : config.getString(relPath));
     }
+
+    @Override
+    public String parameter() {
+        return "string";
+    }
 }

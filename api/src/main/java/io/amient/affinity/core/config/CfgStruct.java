@@ -124,6 +124,11 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return (T) this;
     }
 
+    @Override
+    public String parameter() {
+        return "?";
+    }
+
     public Config config() {
         return config;
     }

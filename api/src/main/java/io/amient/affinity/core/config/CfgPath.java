@@ -32,4 +32,9 @@ public class CfgPath extends Cfg<Path> {
         return setValue(Paths.get(urlString).toAbsolutePath());
     }
 
+    @Override
+    public String parameter() {
+        return "file-path";
+    }
+
 }

@@ -27,4 +27,10 @@ public class CfgBool extends Cfg<Boolean> {
     public CfgBool apply(Config config) throws IllegalArgumentException {
         return setValue(listPos > -1 ? config.getBooleanList(relPath).get(listPos) : config.getBoolean(relPath));
     }
+
+    @Override
+    public String parameter() {
+        return "true|false";
+    }
+
 }

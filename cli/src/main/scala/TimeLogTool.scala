@@ -35,7 +35,9 @@ object TimeLogTool extends Tool {
   private var numRecords = 0
   private val blocks = ListBuffer[(TimeRange, Long, Long)]()
 
-  def apply(args: List[String], config: Config): Unit = args match {
+  override def apply(config: Config): Unit = ???
+
+  override def apply(args: List[String], config: Config): Unit = args match {
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: toOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toLong, new TimeRange(from, until), fromOffset.toLong -> toOffset.toLong)
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toLong, new TimeRange(from, until), fromOffset.toLong -> Long.MaxValue)
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: Nil if (from.contains("T")) => apply(bootstrap, topic, partition.toInt, fuzz.toLong, new TimeRange(from, until))

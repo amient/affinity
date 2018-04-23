@@ -75,6 +75,10 @@ abstract public class Cfg<T> implements Serializable {
         return this.description;
     }
 
+    abstract public String parameter();
+
+    final public boolean isRequired() { return this.required; }
+
     final public boolean isDefined() {
         return value.isPresent() || defaultValue.isPresent();
     }

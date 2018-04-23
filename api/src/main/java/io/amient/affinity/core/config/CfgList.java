@@ -57,6 +57,11 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
         return setValue(list);
     }
 
+    @Override
+    public String parameter() {
+        return "[]";
+    }
+
     public L apply(Integer entry) {
         return apply().get(entry);
     }

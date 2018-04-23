@@ -41,4 +41,9 @@ public class CfgCls<B> extends Cfg<Class<? extends B>> {
         }
     }
 
+    @Override
+    public String parameter() {
+        return "fqn ~ " + cls.getName();
+    }
+
 }
