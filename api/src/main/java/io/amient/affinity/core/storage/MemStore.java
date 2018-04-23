@@ -49,7 +49,7 @@ public abstract class MemStore implements Closeable {
         //TODO public CfgInt MemReadTimeoutMs = integer("memstore.read.timeout.ms", 1000);
         @Override
         protected Set<String> specializations() {
-            return new HashSet(Arrays.asList("mapdb", "rocksdb"));
+            return new HashSet(Arrays.asList("rocksdb"));
         }
     }
 
