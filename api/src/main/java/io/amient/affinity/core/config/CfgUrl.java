@@ -30,7 +30,8 @@ public class CfgUrl extends Cfg<URL> {
     public CfgUrl apply(Config config) {
         String urlString = listPos > -1 ? config.getStringList(relPath).get(listPos) : config.getString(relPath);
         try {
-            return setValue(new URL(urlString));
+            setValue(new URL(urlString));
+            return this;
         } catch (MalformedURLException e) {
             throw new IllegalArgumentException(e);
         }

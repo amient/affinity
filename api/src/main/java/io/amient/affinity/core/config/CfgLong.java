@@ -25,7 +25,8 @@ public class CfgLong extends Cfg<Long> {
 
     @Override
     public Cfg<Long> apply(Config config) throws IllegalArgumentException {
-        return setValue(listPos > -1 ? config.getLongList(relPath).get(listPos) : config.getLong(relPath));
+        setValue(listPos > -1 ? config.getLongList(relPath).get(listPos) : config.getLong(relPath));
+        return this;
     }
 
     @Override

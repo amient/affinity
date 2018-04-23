@@ -56,7 +56,8 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
             }
 
         });
-        return setValue(map);
+       setValue(map);
+       return this;
     }
 
     @Override

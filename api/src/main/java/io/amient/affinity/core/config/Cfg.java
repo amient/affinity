@@ -45,10 +45,9 @@ abstract public class Cfg<T> implements Serializable {
 
     abstract public Cfg<T> apply(Config config) throws IllegalArgumentException;
 
-    final public <C extends Cfg<T>> C setValue(T value) {
+    final public void setValue(T value) {
         //TODO #107 using setValue should modify the underlying config object
         this.value = JavaOption.of(value);
-        return (C) this;
     }
 
     final public T apply() {

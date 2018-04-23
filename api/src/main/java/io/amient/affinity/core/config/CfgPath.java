@@ -29,7 +29,8 @@ public class CfgPath extends Cfg<Path> {
     @Override
     public CfgPath apply(Config config) {
         String urlString = listPos > -1 ? config.getStringList(relPath).get(listPos) : config.getString(relPath);
-        return setValue(Paths.get(urlString).toAbsolutePath());
+        setValue(Paths.get(urlString).toAbsolutePath());
+        return this;
     }
 
     @Override

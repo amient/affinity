@@ -61,8 +61,8 @@ try {
   } catch {
     case e: IllegalArgumentException =>
       println(e.getMessage)
-      println("Usage: affinity-cli <command> [arguments]\n")
-      println("Available commands:")
+      println("\nUsage: affinity-cli <command> [arguments]")
+      println("\nAvailable commands:")
       tools.foreach {
         case (command, tool) => println(s"\t\t${command.padTo(15, ' ')}\t${tool.Conf.description} [${tool.cliOptions}]")
       }

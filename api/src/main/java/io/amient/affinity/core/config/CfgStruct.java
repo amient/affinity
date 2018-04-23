@@ -119,7 +119,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             if (!errorMessage.isEmpty()) {
                 throw new IllegalArgumentException(errorMessage);
             }
-            return (T) setValue((T) this);
+            setValue((T) this);
+            return (T) this;
         }
         return (T) this;
     }
