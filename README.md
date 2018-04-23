@@ -313,7 +313,6 @@ of the akka core:
  - `kafka/avro-serde-kafka` kafka produer serializer and consumer deserializer for the `avro` module (Scala)
  - `kafka/storage-kafka` module with kafka storage and binary stream implementations
  - `kafka/test-util-kafka` provides EmbeddedZooKeeper, EmbeddedKafka and EmbeddedCfRegistry for testing
- - `mapdb` module with MapDb implementation of the MemStore (Java)
  - `rocksdb` module with RocksDb implementation of the MemStore (Java)
  - `spark` uses the underlying stream storage as CompactRDD with all the serde magic
  - `ws-client` custom web socket with avro support (Java)

@@ -2,7 +2,7 @@ include ':api',
         ':cli',
         ':avro',
         ':core',
-        ':rocksdb', ':mapdb',
+        ':rocksdb',
         ':ws-client',
         ':spark',
 
