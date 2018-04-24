@@ -40,8 +40,15 @@ package object affinity {
   }
 
   class AkkaConf extends CfgStruct[AkkaConf](Cfg.Options.IGNORE_UNKNOWN) {
+    //TODO if Remote Hostname and Port are configured then other remote settings should be auto-configured, e.g. actor provider, enabled-transports
     val Hostname: CfgString = string("remote.netty.tcp.hostname", false)
     val Port: CfgInt = integer("remote.netty.tcp.port", false)
+    //TODO the following ones should be set on the application config objects if not present
+    val HttpServerIdleTimeout = string("http.server.idle-timeout", "infinite")
+    val HttpServerRequestTimeout = string("http.server.request-timeout", "30s")
+    val HttpServerMaxConnections = integer("http.server.max-connections", 1000)
+    val HttpServerRemoteAddressHeader = string("http.server.remote-address-header", "on")
+    val HttpServerHeaderDiscolsure = string("http.server.server-header", "-")
   }
 
   class AffinityConf extends CfgStruct[AffinityConf] {

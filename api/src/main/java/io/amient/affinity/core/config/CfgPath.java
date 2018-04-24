@@ -34,7 +34,7 @@ public class CfgPath extends Cfg<Path> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "file-path";
     }
 

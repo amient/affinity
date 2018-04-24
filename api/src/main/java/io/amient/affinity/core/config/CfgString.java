@@ -30,7 +30,7 @@ public class CfgString extends Cfg<String> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "string";
     }
 }

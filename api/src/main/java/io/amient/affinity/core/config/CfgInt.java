@@ -30,7 +30,7 @@ public class CfgInt extends Cfg<Integer> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "int";
     }
 }

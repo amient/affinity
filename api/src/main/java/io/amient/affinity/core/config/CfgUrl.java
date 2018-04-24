@@ -38,7 +38,7 @@ public class CfgUrl extends Cfg<URL> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "url";
     }
 

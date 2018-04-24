@@ -122,7 +122,7 @@ public abstract class MemStore implements Closeable {
 
     /**
      * Unwraps stored cell into metadata and value bytes, returning the underlying value only if it hasn't expired
-     * with respect to the provided ttl ms parameter and system time
+     * with respect to the provided ttl ms parameterInfo and system time
      *
      * @param key              record key
      * @param valueAndMetadata wrapped value and event time metadata

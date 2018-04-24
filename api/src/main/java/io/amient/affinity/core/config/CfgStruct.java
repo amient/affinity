@@ -63,7 +63,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     @Override
-    void setPath(String path) {
+    public void setPath(String path) {
         super.setPath(path);
         properties.forEach(entry -> entry.getValue().setPath(path(entry.getKey())));
     }
@@ -126,7 +126,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "?";
     }
 

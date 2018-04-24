@@ -30,7 +30,7 @@ public class CfgBool extends Cfg<Boolean> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "true|false";
     }
 

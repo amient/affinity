@@ -419,7 +419,7 @@ object AvroRecord extends AvroExtractors {
                   case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
                   case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
                   case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).size(size)
-                  case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameter for @Fixed(<int>) $fieldName: $fieldType)")
+                  case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
                   case Some(size) => throw new IllegalArgumentException(s"Only fixed string fields can have custom fixed size: @Fixed $fieldName: $fieldType")
                   case None => throw new IllegalArgumentException(s"Only int, long and string can be used as fixed fields")
                 }

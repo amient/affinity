@@ -59,7 +59,7 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "[]";
     }
 

@@ -50,12 +50,12 @@ try {
         println("\nRequired arguments: ")
         tool.Conf.map.asScala.filter(_._2.isRequired).foreach {
           case (name, cfg) =>
-            println(s"\t\t${(tool.cliArg(name) + " <"+cfg.parameter+">").padTo(40, ' ')}\t${cfg.description}")
+            println(s"\t\t${(tool.cliArg(name) + " <"+cfg.parameterInfo+">").padTo(40, ' ')}\t${cfg.description}")
         }
         println("\nOptional arguments: ")
         tool.Conf.map.asScala.filter(!_._2.isRequired).foreach {
           case (name, cfg) =>
-            println(s"\t\t${(tool.cliArg(name) + " <"+cfg.parameter+">").padTo(40, ' ')}\t${cfg.description}")
+            println(s"\t\t${(tool.cliArg(name) + " <"+cfg.parameterInfo+">").padTo(40, ' ')}\t${cfg.description}")
         }
     }
   } catch {

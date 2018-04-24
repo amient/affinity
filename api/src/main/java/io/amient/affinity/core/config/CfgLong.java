@@ -30,7 +30,7 @@ public class CfgLong extends Cfg<Long> {
     }
 
     @Override
-    public String parameter() {
+    public String parameterInfo() {
         return "long";
     }
 }

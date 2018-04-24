@@ -61,8 +61,8 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
     }
 
     @Override
-    public String parameter() {
-        return "identifier";
+    public String parameterInfo() {
+        return "<ID>";
     }
 
     public G apply(String entry) {
