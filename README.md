@@ -328,48 +328,39 @@ It doesn't provide any binding for compile configuration, that is left to applic
 In all examples and for all tests, logback binding is used.
 
 
-##Avro
-------------------------------------------------------------------------------------------------------
+## Avro
 	affinity.avro.schema.registry.class [FQN] (!)                                   	one of ConfluentSchemaRegistry, ZookeeperSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
 
-###Avro (io.amient.affinity.avro.ConfluentSchemaRegistry)
-------------------------------------------------------------------------------------------------------
+### Avro (io.amient.affinity.avro.ConfluentSchemaRegistry)
 	affinity.avro.schema.registry.url [URL] (http://localhost:8081)                 	Confluent Schema Registry connection base URL
 
-###Avro (io.amient.affinity.avro.ZookeeperSchemaRegistry)
-------------------------------------------------------------------------------------------------------
+### Avro (io.amient.affinity.avro.ZookeeperSchemaRegistry)
 	affinity.avro.schema.registry.zookeeper.connect [STRING] (!)                    	Coma-separated list of host:port zookeeper servers
 	affinity.avro.schema.registry.zookeeper.timeout.connect.ms [INT] (6000)         	Time-out for establishing connection to zookeeper cluster
 	affinity.avro.schema.registry.zookeeper.timeout.session.ms [INT] (10000)        	Time-out after which any ephemeral nodes will be removed for a lost connection
 	affinity.avro.schema.registry.zookeeper.root [STRING] (/affinity-schema-registry)	znode under which schemas will be stored
 
-###Avro (io.amient.affinity.avro.LocalSchemaRegistry)
-------------------------------------------------------------------------------------------------------
+### Avro (io.amient.affinity.avro.LocalSchemaRegistry)
 	affinity.avro.schema.registry.path [FILE-PATH] (!)                              	local file path under which schemas will be stored
 
-##Avro (io.amient.affinity.avro.MemorySchemaRegistry)
-------------------------------------------------------------------------------------------------------
+### Avro (io.amient.affinity.avro.MemorySchemaRegistry)
 	affinity.avro.schema.registry.id [INT] (-)                                      	multiple instances with the same id will share the schemas registered by any of them
 
 
-##Coordinator
-------------------------------------------------------------------------------------------------------
+## Coordinator
 	affinity.coordinator.class [FQN] (io.amient.affinity.core.cluster.CoordinatorZk)	implementation of coordinator must extend cluster.Coordinator
 
-###Coordinator (io.amient.affinity.core.cluster.CoordinatorZk)
-------------------------------------------------------------------------------------------------------
+### Coordinator (io.amient.affinity.core.cluster.CoordinatorZk)
 	affinity.coordinator.zookeeper.connect [STRING] (!)                             	Coma-separated list of host:port zookeeper servers
 	affinity.coordinator.zookeeper.timeout.connect.ms [INT] (6000)                  	Time-out for establishing connection to zookeeper cluster
 	affinity.coordinator.zookeeper.timeout.session.ms [INT] (10000)                 	Time-out after which any ephemeral nodes will be removed for a lost connection
 	affinity.coordinator.zookeeper.root [STRING] (/affinity)                        	znode under which coordination data between affinity nodes will be registered
 
-###Coordinator (io.amient.affinity.core.cluster.CoordinatorEmbedded)
-------------------------------------------------------------------------------------------------------
+### Coordinator (io.amient.affinity.core.cluster.CoordinatorEmbedded)
 	affinity.coordinator.embedded.id [INT] (!)                                      	embedded coordinator instances must have the same id to work together
 
 
-##Global State
-------------------------------------------------------------------------------------------------------
+## Global State
 	affinity.global [<ID>] (-)                                                      	
 	affinity.global.<ID>.external [TRUE|FALSE] (false)                              	
 	affinity.global.<ID>.lock.timeout.ms [INT] (10000)                              	
@@ -383,8 +374,7 @@ In all examples and for all tests, logback binding is used.
 	affinity.global.<ID>.storage.min.timestamp.ms [LONG] (0)                        	
 	affinity.global.<ID>.ttl.sec [INT] (-1)                                         	
 
-###Global State Storage(io.amient.affinity.kafka.KafkaLogStorage)
-------------------------------------------------------------------------------------------------------
+### Global State Storage(io.amient.affinity.kafka.KafkaLogStorage)
 	affinity.global.<ID>.storage.kafka.bootstrap.servers [STRING] (!)               	
 	affinity.global.<ID>.storage.kafka.consumer.group.id [STRING] (-)               	
 	affinity.global.<ID>.storage.kafka.consumer.*
@@ -392,12 +382,10 @@ In all examples and for all tests, logback binding is used.
 	affinity.global.<ID>.storage.kafka.replication.factor [INT] (1)                 	
 	affinity.global.<ID>.storage.kafka.topic [STRING] (!)                           	
 
-###Global State Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
-------------------------------------------------------------------------------------------------------
+### Global State Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
 
 
-##Keyspaces
-------------------------------------------------------------------------------------------------------
+## Keyspaces
 	affinity.keyspace [<ID>] (-)                                                    	
 	affinity.keyspace.<ID>.class [FQN] (!)                                          	
 	affinity.keyspace.<ID>.num.partitions [INT] (!)                                 	
@@ -414,8 +402,7 @@ In all examples and for all tests, logback binding is used.
 	affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms [LONG] (0)           	
 	affinity.keyspace.<ID>.state.<ID>.ttl.sec [INT] (-1)                            	
 
-###Keyspaces Storage(io.amient.affinity.kafka.KafkaLogStorage)
-------------------------------------------------------------------------------------------------------
+### Keyspaces Storage(io.amient.affinity.kafka.KafkaLogStorage)
 	affinity.keyspace.<ID>.state.<ID>.storage.kafka.bootstrap.servers [STRING] (!)  	
 	affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.group.id [STRING] (-)  	
 	affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.*
@@ -423,12 +410,10 @@ In all examples and for all tests, logback binding is used.
 	affinity.keyspace.<ID>.state.<ID>.storage.kafka.replication.factor [INT] (1)    	
 	affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)              	
 
-###Keyspaces Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
-------------------------------------------------------------------------------------------------------
+### Keyspaces Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
 
 
-##Node Context
-------------------------------------------------------------------------------------------------------
+## Node Context
 	affinity.node.container [<ID>] (-)                                              	
 	affinity.node.container.<ID> [[]] (!)                                           	
 	affinity.node.data.dir [FILE-PATH] (./.data)                                    	
@@ -450,8 +435,7 @@ In all examples and for all tests, logback binding is used.
 	affinity.node.shutdown.timeout.ms [INT] (30000)                                 	
 	affinity.node.startup.timeout.ms [INT] (2147483647)                             	
 
-###Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
-------------------------------------------------------------------------------------------------------
+### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
 	affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)          	
 	affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)          	
 	affinity.node.gateway.stream.<ID>.kafka.consumer.*
@@ -460,8 +444,7 @@ In all examples and for all tests, logback binding is used.
 	affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                      	
 
 
-##Important Akka Configuration Options
-------------------------------------------------------------------------------------------------------
+## Important Akka Configuration Options
 	akka.http.server.idle-timeout [STRING] (infinite)                               	
 	akka.http.server.max-connections [INT] (1000)                                   	
 	akka.http.server.remote-address-header [STRING] (on)                            	
