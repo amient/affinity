@@ -47,8 +47,8 @@ object Node {
     val Containers: CfgGroup[CfgIntList] = group("container", classOf[CfgIntList], false)
       .doc("Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3] ")
     val Gateway: GatewayConf = struct("gateway", new GatewayConf)
-    val StartupTimeoutMs = integer("startup.timeout.ms", Integer.MAX_VALUE).doc("Maximum time a node can take to startup - this number must account for any potential state bootstrap")
-    val ShutdownTimeoutMs = integer("shutdown.timeout.ms", 30000).doc("Maximum time a node can take to shutdown gracefully")
+    val StartupTimeoutMs = longint("startup.timeout.ms", Integer.MAX_VALUE).doc("Maximum time a node can take to startup - this number must account for any potential state bootstrap")
+    val ShutdownTimeoutMs = longint("shutdown.timeout.ms", 30000).doc("Maximum time a node can take to shutdown gracefully")
     //TODO #107 is this a reasonable default
     val DataDir = filepath("data.dir", Paths.get("./.data")).doc("Location under which any local state or registers will be kept")
     val SystemName = string("name", "AffinityNode").doc("ActorSystem name under which the Node presents itself in the Akka Cluster")

@@ -48,6 +48,8 @@ trait GatewayStream extends Gateway {
 
   private val config = context.system.settings.config
 
+  private val nodeConf = Conf(config).Affi.Node
+
   type InputStreamProcessor[K, V] = Record[K, V] => Future[Any]
 
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
@@ -57,7 +59,7 @@ trait GatewayStream extends Gateway {
   lazy val outpuStreams: ParSeq[OutputDataStream[_, _]] = declardOutputStreams.result().par
 
   def output[K: ClassTag, V: ClassTag](streamIdentifier: String): OutputDataStream[K, V] = {
-    val streamConf = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
+    val streamConf = nodeConf.Gateway.Stream(streamIdentifier)
     if (!streamConf.Class.isDefined) {
       logger.warning(s"Output stream is not enabled in the current configuration: $streamIdentifier")
       null
@@ -79,7 +81,7 @@ trait GatewayStream extends Gateway {
     * @tparam V
     */
   def input[K: ClassTag, V: ClassTag](streamIdentifier: String)(processor: InputStreamProcessor[K, V]): Unit = {
-    val streamConf = Conf(config).Affi.Node.Gateway.Stream(streamIdentifier)
+    val streamConf = nodeConf.Gateway.Stream(streamIdentifier)
     if (!streamConf.Class.isDefined) {
       logger.warning(s"Input stream is not enabled in the current configuration: $streamIdentifier")
     } else {
@@ -101,7 +103,7 @@ trait GatewayStream extends Gateway {
         }
         inputStreamExecutor.shutdown()
         inputStreamProcessors.foreach(_.close)
-        inputStreamExecutor.awaitTermination(10, TimeUnit.SECONDS) //TODO use shutdown timeout
+        inputStreamExecutor.awaitTermination(nodeConf.ShutdownTimeoutMs(), TimeUnit.MILLISECONDS)
       } finally {
         inputStreamExecutor.shutdownNow()
       }
