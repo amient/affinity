@@ -37,6 +37,7 @@ trait EmbeddedConfluentRegistry extends EmbeddedKafka with BeforeAndAfterAll {
     put("listeners", s"http://127.0.0.1:0")
     put("kafkastore.connection.url", zkConnect)
     put("avro.compatibility.level", "full")
+    put("kafkastore.init.timeout.ms", "5000")
     put("kafkastore.topic", "_schemas")
     put("debug", "true")
   })

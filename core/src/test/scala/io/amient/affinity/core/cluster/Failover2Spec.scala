@@ -57,7 +57,7 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   val node1 = new Node(config)
   node1.startGateway(new GatewayHttp {
 
-    import context.dispatcher
+    implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
     implicit val scheduler = context.system.scheduler
 
@@ -99,7 +99,7 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   }
 
   //FIXME #177
-  "Master Transition" should "not lead to inconsistent state" ignore {
+  "Master Transition" should "not lead to inconsistent state" in {
     val requestCount = new AtomicInteger(0)
     val expected = new ConcurrentHashMap[String, String]()
     import scala.concurrent.ExecutionContext.Implicits.global
