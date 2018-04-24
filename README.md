@@ -299,165 +299,147 @@ enforcement of requirements and messaging around invalid settings.
 
 
 Avro
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.avro.schema.registry.class | FQN | ! | one of ConfluentSchemaRegistry, ZookeeperSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
+------------------------------------------------------------------------------------------------------
+	affinity.avro.schema.registry.class [FQN] (!)                                   	one of ConfluentSchemaRegistry, ZookeeperSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
 
 Avro (io.amient.affinity.avro.ConfluentSchemaRegistry)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.avro.schema.registry.url | URL | http://localhost:8081 | Confluent Schema Registry connection base URL
+------------------------------------------------------------------------------------------------------
+	affinity.avro.schema.registry.url [URL] (http://localhost:8081)                 	Confluent Schema Registry connection base URL
 
 Avro (io.amient.affinity.avro.ZookeeperSchemaRegistry)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.avro.schema.registry.zookeeper.connect | STRING | ! | Coma-separated list of host:port zookeeper servers
-affinity.avro.schema.registry.zookeeper.timeout.connect.ms | INT | 6000 | Time-out for establishing connection to zookeeper cluster
-affinity.avro.schema.registry.zookeeper.timeout.session.ms | INT | 10000 | Time-out after which any ephemeral nodes will be removed for a lost connection
-affinity.avro.schema.registry.zookeeper.root | STRING | /affinity-schema-registry | znode under which schemas will be stored
+------------------------------------------------------------------------------------------------------
+	affinity.avro.schema.registry.zookeeper.connect [STRING] (!)                    	Coma-separated list of host:port zookeeper servers
+	affinity.avro.schema.registry.zookeeper.timeout.connect.ms [INT] (6000)         	Time-out for establishing connection to zookeeper cluster
+	affinity.avro.schema.registry.zookeeper.timeout.session.ms [INT] (10000)        	Time-out after which any ephemeral nodes will be removed for a lost connection
+	affinity.avro.schema.registry.zookeeper.root [STRING] (/affinity-schema-registry)	znode under which schemas will be stored
 
 Avro (io.amient.affinity.avro.LocalSchemaRegistry)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.avro.schema.registry.path | FILE-PATH | ! | local file path under which schemas will be stored
+------------------------------------------------------------------------------------------------------
+	affinity.avro.schema.registry.path [FILE-PATH] (!)                              	local file path under which schemas will be stored
 
 Avro (io.amient.affinity.avro.MemorySchemaRegistry)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.avro.schema.registry.id | INT | - | multiple instances with the same id will share the schemas registered by any of them
+------------------------------------------------------------------------------------------------------
+	affinity.avro.schema.registry.id [INT] (-)                                      	multiple instances with the same id will share the schemas registered by any of them
 
 
 Coordinator
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.coordinator.class | FQN | io.amient.affinity.core.cluster.CoordinatorZk | implementation of coordinator must extend cluster.Coordinator
+------------------------------------------------------------------------------------------------------
+	affinity.coordinator.class [FQN] (io.amient.affinity.core.cluster.CoordinatorZk)	implementation of coordinator must extend cluster.Coordinator
 
 Coordinator (io.amient.affinity.core.cluster.CoordinatorZk)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.coordinator.zookeeper.connect | STRING | ! | Coma-separated list of host:port zookeeper servers
-affinity.coordinator.zookeeper.timeout.connect.ms | INT | 6000 | Time-out for establishing connection to zookeeper cluster
-affinity.coordinator.zookeeper.timeout.session.ms | INT | 10000 | Time-out after which any ephemeral nodes will be removed for a lost connection
-affinity.coordinator.zookeeper.root | STRING | /affinity | znode under which coordination data between affinity nodes will be registered
+------------------------------------------------------------------------------------------------------
+	affinity.coordinator.zookeeper.connect [STRING] (!)                             	Coma-separated list of host:port zookeeper servers
+	affinity.coordinator.zookeeper.timeout.connect.ms [INT] (6000)                  	Time-out for establishing connection to zookeeper cluster
+	affinity.coordinator.zookeeper.timeout.session.ms [INT] (10000)                 	Time-out after which any ephemeral nodes will be removed for a lost connection
+	affinity.coordinator.zookeeper.root [STRING] (/affinity)                        	znode under which coordination data between affinity nodes will be registered
 
 Coordinator (io.amient.affinity.core.cluster.CoordinatorEmbedded)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.coordinator.embedded.id | INT | ! | embedded coordinator instances must have the same id to work together
+------------------------------------------------------------------------------------------------------
+	affinity.coordinator.embedded.id [INT] (!)                                      	embedded coordinator instances must have the same id to work together
 
 
 Global Key-Value Stores
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.global | <ID> | - | 
-affinity.global.<ID>.external | TRUE|FALSE | false | 
-affinity.global.<ID>.lock.timeout.ms | INT | 10000 | 
-affinity.global.<ID>.memstore.class | FQN | ! | 
-affinity.global.<ID>.memstore.data.dir | FILE-PATH | - | 
-affinity.global.<ID>.memstore.key.prefix.size | INT | - | 
-affinity.global.<ID>.min.timestamp.ms | LONG | 0 | 
-affinity.global.<ID>.storage.class | FQN | - | 
-affinity.global.<ID>.storage.commit.interval.ms | LONG | 5000 | 
-affinity.global.<ID>.storage.commit.timeout.ms | LONG | 30000 | 
-affinity.global.<ID>.storage.min.timestamp.ms | LONG | 0 | 
-affinity.global.<ID>.ttl.sec | INT | -1 | 
+------------------------------------------------------------------------------------------------------
+	affinity.global [<ID>] (-)                                                      	
+	affinity.global.<ID>.external [TRUE|FALSE] (false)                              	
+	affinity.global.<ID>.lock.timeout.ms [INT] (10000)                              	
+	affinity.global.<ID>.memstore.class [FQN] (!)                                   	
+	affinity.global.<ID>.memstore.data.dir [FILE-PATH] (-)                          	
+	affinity.global.<ID>.memstore.key.prefix.size [INT] (-)                         	
+	affinity.global.<ID>.min.timestamp.ms [LONG] (0)                                	
+	affinity.global.<ID>.storage.class [FQN] (-)                                    	
+	affinity.global.<ID>.storage.commit.interval.ms [LONG] (5000)                   	
+	affinity.global.<ID>.storage.commit.timeout.ms [LONG] (30000)                   	
+	affinity.global.<ID>.storage.min.timestamp.ms [LONG] (0)                        	
+	affinity.global.<ID>.ttl.sec [INT] (-1)                                         	
 
 Global Key-Value Stores Storage(io.amient.affinity.kafka.KafkaLogStorage)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.global.<ID>.storage.kafka.bootstrap.servers | STRING | ! | 
-affinity.global.<ID>.storage.kafka.consumer.group.id | STRING | - | 
-affinity.global.<ID>.storage.kafka.consumer.* | | | 
-affinity.global.<ID>.storage.kafka.producer.* | | | 
-affinity.global.<ID>.storage.kafka.replication.factor | INT | 1 | 
-affinity.global.<ID>.storage.kafka.topic | STRING | ! | 
+------------------------------------------------------------------------------------------------------
+	affinity.global.<ID>.storage.kafka.bootstrap.servers [STRING] (!)               	
+	affinity.global.<ID>.storage.kafka.consumer.group.id [STRING] (-)               	
+	affinity.global.<ID>.storage.kafka.consumer.*
+	affinity.global.<ID>.storage.kafka.producer.*
+	affinity.global.<ID>.storage.kafka.replication.factor [INT] (1)                 	
+	affinity.global.<ID>.storage.kafka.topic [STRING] (!)                           	
 
 Global Key-Value Stores Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
+------------------------------------------------------------------------------------------------------
 
 
 Key-Space Definitions
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.keyspace | <ID> | - | 
-affinity.keyspace.<ID>.class | FQN | ! | 
-affinity.keyspace.<ID>.num.partitions | INT | ! | 
-affinity.keyspace.<ID>.state | <ID> | - | 
-affinity.keyspace.<ID>.state.<ID>.external | TRUE|FALSE | false | 
-affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms | INT | 10000 | 
-affinity.keyspace.<ID>.state.<ID>.memstore.class | FQN | ! | 
-affinity.keyspace.<ID>.state.<ID>.memstore.data.dir | FILE-PATH | - | 
-affinity.keyspace.<ID>.state.<ID>.memstore.key.prefix.size | INT | - | 
-affinity.keyspace.<ID>.state.<ID>.min.timestamp.ms | LONG | 0 | 
-affinity.keyspace.<ID>.state.<ID>.storage.class | FQN | - | 
-affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms | LONG | 5000 | 
-affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms | LONG | 30000 | 
-affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms | LONG | 0 | 
-affinity.keyspace.<ID>.state.<ID>.ttl.sec | INT | -1 | 
+------------------------------------------------------------------------------------------------------
+	affinity.keyspace [<ID>] (-)                                                    	
+	affinity.keyspace.<ID>.class [FQN] (!)                                          	
+	affinity.keyspace.<ID>.num.partitions [INT] (!)                                 	
+	affinity.keyspace.<ID>.state [<ID>] (-)                                         	
+	affinity.keyspace.<ID>.state.<ID>.external [TRUE|FALSE] (false)                 	
+	affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms [INT] (10000)                 	
+	affinity.keyspace.<ID>.state.<ID>.memstore.class [FQN] (!)                      	
+	affinity.keyspace.<ID>.state.<ID>.memstore.data.dir [FILE-PATH] (-)             	
+	affinity.keyspace.<ID>.state.<ID>.memstore.key.prefix.size [INT] (-)            	
+	affinity.keyspace.<ID>.state.<ID>.min.timestamp.ms [LONG] (0)                   	
+	affinity.keyspace.<ID>.state.<ID>.storage.class [FQN] (-)                       	
+	affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms [LONG] (5000)      	
+	affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms [LONG] (30000)      	
+	affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms [LONG] (0)           	
+	affinity.keyspace.<ID>.state.<ID>.ttl.sec [INT] (-1)                            	
 
 Key-Space Definitions Storage(io.amient.affinity.kafka.KafkaLogStorage)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.keyspace.<ID>.storage.kafka.bootstrap.servers | STRING | ! | 
-affinity.keyspace.<ID>.storage.kafka.consumer.group.id | STRING | - | 
-affinity.keyspace.<ID>.storage.kafka.consumer.* | | | 
-affinity.keyspace.<ID>.storage.kafka.producer.* | | | 
-affinity.keyspace.<ID>.storage.kafka.replication.factor | INT | 1 | 
-affinity.keyspace.<ID>.storage.kafka.topic | STRING | ! | 
+------------------------------------------------------------------------------------------------------
+	affinity.keyspace.<ID>.storage.kafka.bootstrap.servers [STRING] (!)             	
+	affinity.keyspace.<ID>.storage.kafka.consumer.group.id [STRING] (-)             	
+	affinity.keyspace.<ID>.storage.kafka.consumer.*
+	affinity.keyspace.<ID>.storage.kafka.producer.*
+	affinity.keyspace.<ID>.storage.kafka.replication.factor [INT] (1)               	
+	affinity.keyspace.<ID>.storage.kafka.topic [STRING] (!)                         	
 
 Key-Space Definitions Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
+------------------------------------------------------------------------------------------------------
 
 
 Node Deployment
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.node.container | <ID> | - | 
-affinity.node.container.<ID> | [] | ! | 
-affinity.node.data.dir | FILE-PATH | ./.data | 
-affinity.node.gateway.class | FQN | - | 
-affinity.node.gateway.http.host | STRING | ! | 
-affinity.node.gateway.http.max.websocket.queue.size | INT | 100 | number of messages that can be queued for delivery before blocking
-affinity.node.gateway.http.port | INT | ! | 
-affinity.node.gateway.http.tls.keystore.file | STRING | - | 
-affinity.node.gateway.http.tls.keystore.password | STRING | ! | 
-affinity.node.gateway.http.tls.keystore.resource | STRING | - | 
-affinity.node.gateway.http.tls.keystore.standard | STRING | PKCS12 | 
-affinity.node.gateway.stream | <ID> | - | 
-affinity.node.gateway.stream.<ID>.class | FQN | - | 
-affinity.node.gateway.stream.<ID>.commit.interval.ms | LONG | 5000 | 
-affinity.node.gateway.stream.<ID>.commit.timeout.ms | LONG | 30000 | 
-affinity.node.gateway.stream.<ID>.min.timestamp.ms | LONG | 0 | 
-affinity.node.gateway.suspend.queue.max.size | INT | 1000 | 
-affinity.node.name | STRING | AffinityNode | 
-affinity.node.shutdown.timeout.ms | INT | 30000 | 
-affinity.node.startup.timeout.ms | INT | 2147483647 | 
+------------------------------------------------------------------------------------------------------
+	affinity.node.container [<ID>] (-)                                              	
+	affinity.node.container.<ID> [[]] (!)                                           	
+	affinity.node.data.dir [FILE-PATH] (./.data)                                    	
+	affinity.node.gateway.class [FQN] (-)                                           	
+	affinity.node.gateway.http.host [STRING] (!)                                    	
+	affinity.node.gateway.http.max.websocket.queue.size [INT] (100)                 	number of messages that can be queued for delivery before blocking
+	affinity.node.gateway.http.port [INT] (!)                                       	
+	affinity.node.gateway.http.tls.keystore.file [STRING] (-)                       	
+	affinity.node.gateway.http.tls.keystore.password [STRING] (!)                   	
+	affinity.node.gateway.http.tls.keystore.resource [STRING] (-)                   	
+	affinity.node.gateway.http.tls.keystore.standard [STRING] (PKCS12)              	
+	affinity.node.gateway.stream [<ID>] (-)                                         	
+	affinity.node.gateway.stream.<ID>.class [FQN] (-)                               	
+	affinity.node.gateway.stream.<ID>.commit.interval.ms [LONG] (5000)              	
+	affinity.node.gateway.stream.<ID>.commit.timeout.ms [LONG] (30000)              	
+	affinity.node.gateway.stream.<ID>.min.timestamp.ms [LONG] (0)                   	
+	affinity.node.gateway.suspend.queue.max.size [INT] (1000)                       	
+	affinity.node.name [STRING] (AffinityNode)                                      	
+	affinity.node.shutdown.timeout.ms [INT] (30000)                                 	
+	affinity.node.startup.timeout.ms [INT] (2147483647)                             	
 
 Node Deployment Stream(io.amient.affinity.kafka.KafkaLogStorage)
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers | STRING | ! | 
-affinity.node.gateway.stream.<ID>.kafka.consumer.group.id | STRING | - | 
-affinity.node.gateway.stream.<ID>.kafka.consumer.* | | | 
-affinity.node.gateway.stream.<ID>.kafka.producer.* | | | 
-affinity.node.gateway.stream.<ID>.kafka.replication.factor | INT | 1 | 
-affinity.node.gateway.stream.<ID>.kafka.topic | STRING | ! | 
+------------------------------------------------------------------------------------------------------
+	affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)          	
+	affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)          	
+	affinity.node.gateway.stream.<ID>.kafka.consumer.*
+	affinity.node.gateway.stream.<ID>.kafka.producer.*
+	affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)            	
+	affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                      	
 
 
 Important Akka Configuration Options
-HOCON Path | Type | Default Value | Description
---- | --- | --- | ---
-akka.http.server.idle-timeout | STRING | infinite | 
-akka.http.server.max-connections | INT | 1000 | 
-akka.http.server.remote-address-header | STRING | on | 
-akka.http.server.request-timeout | STRING | 30s | 
-akka.http.server.server-header | STRING | - | 
-akka.remote.netty.tcp.hostname | STRING | - | 
-akka.remote.netty.tcp.port | INT | - | 
-akka.* | | | 
-
+------------------------------------------------------------------------------------------------------
+	akka.http.server.idle-timeout [STRING] (infinite)                               	
+	akka.http.server.max-connections [INT] (1000)                                   	
+	akka.http.server.remote-address-header [STRING] (on)                            	
+	akka.http.server.request-timeout [STRING] (30s)                                 	
+	akka.http.server.server-header [STRING] (-)                                     	
+	akka.remote.netty.tcp.hostname [STRING] (-)                                     	
+	akka.remote.netty.tcp.port [INT] (-)                                            	
+	akka.*
 
 
 # Development 
