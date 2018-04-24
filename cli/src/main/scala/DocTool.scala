@@ -23,7 +23,7 @@ object DocTool extends Tool {
 
   def apply(config: Config): Unit = {
     println("\n\nAvro")
-    println("======================================================================================================")
+    println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Affi.Avro)
 
     println(s"\nAvro (${classOf[ConfluentSchemaRegistry].getName})")
@@ -39,7 +39,7 @@ object DocTool extends Tool {
     apply(MemAvroConf(affinity.Conf.Affi.Avro))
 
     println("\n\nCoordinator")
-    println("======================================================================================================")
+    println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Affi.Coordinator)
 
     println(s"\nCoordinator (${classOf[CoordinatorZk].getName})")
@@ -51,27 +51,26 @@ object DocTool extends Tool {
     apply(EmbedConf(affinity.Conf.Affi.Coordinator))
 
     println("\n\nGlobal Key-Value Store Defintions")
-    println("======================================================================================================")
+    println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Affi.Global)
     //TODO storage extenesions
 
     println("\n\nKey-Space Defintitions")
-    println("======================================================================================================")
+    println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Affi.Keyspace)
     //TODO storage extenesions
     //TODO memstore extensions
 
     println("\n\nNode Deployment")
-    println("======================================================================================================")
+    println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Affi.Node)
     println()
     //TODO stream storage extenesions
 
     println("\n\nImportant Akka Configuration Options:")
-    println("======================================================================================================")
+    println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Akka)
     println(".. all other akka settings may be applied")
-    println("------------------------------------------------------------------------------------------------------")
 
   }
 
