@@ -67,17 +67,17 @@ object GatewayHttp {
 
   class HttpConf extends CfgStruct[HttpConf] {
 
-    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100)
-    val Host = string("host", true)
-    val Port = integer("port", true)
+    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
+    val Host = string("host", true).doc("host to which the http interface binds to")
+    val Port = integer("port", true).doc("port to which the http interface binds to")
     val Tls = struct("tls", new TlsConf)
   }
 
   class TlsConf extends CfgStruct[TlsConf] {
-    val KeyStoreStandard = string("keystore.standard", "PKCS12")
-    val KeyStorePassword = string("keystore.password", true)
-    val KeyStoreResource = string("keystore.resource", false)
-    val KeyStoreFile = string("keystore.file", false)
+    val KeyStoreStandard = string("keystore.standard", "PKCS12").doc("format of the keystore")
+    val KeyStorePassword = string("keystore.password", true).doc("password to the keystore file")
+    val KeyStoreResource = string("keystore.resource", false).doc("resource which holds the keystore, if file not used")
+    val KeyStoreFile = string("keystore.file", false).doc("file which contains the keystore contents, if resource not used")
   }
 
 }

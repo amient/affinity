@@ -40,15 +40,24 @@ package object affinity {
   }
 
   class AkkaConf extends CfgStruct[AkkaConf](Cfg.Options.IGNORE_UNKNOWN) {
+    //TODO if Remote Hostname and Port are configured then other remote settings should be auto-configured, e.g. actor provider, enabled-transports
     val Hostname: CfgString = string("remote.netty.tcp.hostname", false)
     val Port: CfgInt = integer("remote.netty.tcp.port", false)
+    val RemoteTransports = stringlist("remote.enabled-transports", false).doc("Set this to [\"akka.remote.netty.tcp\"] when running in a cluster")
+    val ActorProvider = string("actor.provider", false).doc("Set this to \"akka.remote.RemoteActorRefProvider\" when running in a cluster")
+    //TODO the following ones should be set on the application config objects if not present
+    val HttpServerIdleTimeout = string("http.server.idle-timeout", "infinite")
+    val HttpServerRequestTimeout = string("http.server.request-timeout", "30s")
+    val HttpServerMaxConnections = integer("http.server.max-connections", 1000)
+    val HttpServerRemoteAddressHeader = string("http.server.remote-address-header", "on")
+    val HttpServerHeaderDiscolsure = string("http.server.server-header", "-")
   }
 
   class AffinityConf extends CfgStruct[AffinityConf] {
     val Avro: AvroConf = struct("avro", new AvroConf())
     val Coordinator: CoorinatorConf = struct("coordinator", new CoorinatorConf)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
-    val Global: CfgGroup[StateConf] = group("global", classOf[StateConf], false)
+    val Global = group("global", classOf[StateConf], false).doc("each global state has an ID and needs to be further configured")
     val Node = struct("node", new NodeConf)
   }
 

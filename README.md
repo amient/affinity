@@ -1,5 +1,29 @@
 ### Build Status ![CircleCI](https://circleci.com/gh/amient/affinity/tree/master.png?circle-token=:circle-token)
 
+- [Design Goals](#design-goals)
+- [Architecture](#architecture)
+  * [Basic principles](#basic-principles)
+  * [Http Layer](#http-layer)
+  * [Serialization](#serialization)
+  * [Distributed coordination](#distributed-coordination)
+    + [Failover](#failover)
+  * [State Management](#state-management)
+    + [Notes on consistency](#notes-on-consistency)
+- [Configuration](#configuration)
+  * [Logging](#logging)
+  * [Avro](#avro)
+  * [Coordinator](#coordinator)
+  * [Global State](#global-state)
+  * [Keyspaces](#key-space-definitions)
+  * [Node Context](#node-context)
+  * [Important Akka Configuration Options](#important-akka-configuration-options)
+- [Development](#development)
+  * [Cross-builds](#cross-builds)
+    + [Current master versions](#current-master-versions)
+    + [Scala 2.11](#scala-211)
+  * [JavaScript (affinity.js)](#javascript-affinityjs)
+
+
 # Design Goals
 
  - library for building stateful, scalable Data APIs on top of streaming foundation
@@ -92,7 +116,7 @@ There ws an experimintal piece of code around lightweight transactions that can 
 around orchestrated logic which use reversible Instructions to compensate failed operations
 but this was abandonned as for it to operate consistently distributed locks would have to be used.
 
-### The Http Layer
+## Http Layer
 
 In the Http Gateway, the HTTP Interface is completely async done with Akka Http.
 HTTP Handlers participate in handling the incoming HTTP Requests by chaining the
@@ -297,7 +321,139 @@ Internally Affinity has its own type-safe configuration abstraction that is init
 from the HOCON conf files. These type-safe configuration descriptors handle validation,
 enforcement of requirements and messaging around invalid settings.
 
-TODO ..
+## Logging
+
+Affinity uses SLF4j and it also redirects all Akka logging to SLF4J.
+It doesn't provide any binding for compile configuration, that is left to applications.
+In all examples and for all tests, logback binding is used.
+
+
+## Avro
+        affinity.avro.schema.registry.class [FQN] (!)                                           one of ConfluentSchemaRegistry, ZookeeperSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
+
+### Avro (io.amient.affinity.avro.ConfluentSchemaRegistry)
+        affinity.avro.schema.registry.url [URL] (http://localhost:8081)                         Confluent Schema Registry connection base URL
+
+### Avro (io.amient.affinity.avro.ZookeeperSchemaRegistry)
+        affinity.avro.schema.registry.zookeeper.connect [STRING] (!)                            Coma-separated list of host:port zookeeper servers
+        affinity.avro.schema.registry.zookeeper.timeout.connect.ms [INT] (6000)                 Time-out for establishing connection to zookeeper cluster
+        affinity.avro.schema.registry.zookeeper.timeout.session.ms [INT] (10000)                Time-out after which any ephemeral nodes will be removed for a lost connection
+        affinity.avro.schema.registry.zookeeper.root [STRING] (/affinity-schema-registry)       znode under which schemas will be stored
+
+### Avro (io.amient.affinity.avro.LocalSchemaRegistry)
+        affinity.avro.schema.registry.path [FILE-PATH] (!)                                      local file path under which schemas will be stored
+
+### Avro (io.amient.affinity.avro.MemorySchemaRegistry)
+        affinity.avro.schema.registry.id [INT] (-)                                              multiple instances with the same id will share the schemas registered by any of them
+
+
+## Coordinator
+        affinity.coordinator.class [FQN] (io.amient.affinity.core.cluster.CoordinatorZk)        implementation of coordinator must extend cluster.Coordinator
+
+### Coordinator (io.amient.affinity.core.cluster.CoordinatorZk)
+        affinity.coordinator.zookeeper.connect [STRING] (!)                                     Coma-separated list of host:port zookeeper servers
+        affinity.coordinator.zookeeper.timeout.connect.ms [INT] (6000)                          Time-out for establishing connection to zookeeper cluster
+        affinity.coordinator.zookeeper.timeout.session.ms [INT] (10000)                         Time-out after which any ephemeral nodes will be removed for a lost connection
+        affinity.coordinator.zookeeper.root [STRING] (/affinity)                                znode under which coordination data between affinity nodes will be registered
+
+### Coordinator (io.amient.affinity.core.cluster.CoordinatorEmbedded)
+        affinity.coordinator.embedded.id [INT] (!)                                              embedded coordinator instances must have the same id to work together
+
+
+## Global State
+        affinity.global [<ID>] (-)                                                              each global state has an ID and needs to be further configured
+        affinity.global.<ID>.external [TRUE|FALSE] (false)                                      If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly
+        affinity.global.<ID>.lock.timeout.ms [INT] (10000)                                      When per-row locking is used, this time-out specifies how long a lock can be held by a single thread
+        affinity.global.<ID>.memstore.class [FQN] (!)                                           Implementation of storage.MemStore that will be used for lookups
+        affinity.global.<ID>.memstore.data.dir [FILE-PATH] (-)                                  Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set
+        affinity.global.<ID>.memstore.key.prefix.size [INT] (-)                                 Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields
+        affinity.global.<ID>.min.timestamp.ms [LONG] (0)                                        Any records with timestamp lower than this value will be immediately dropped
+        affinity.global.<ID>.storage.class [FQN] (-)                                            Implementation of storage.LogStorage which will be used for persistence
+        affinity.global.<ID>.storage.commit.interval.ms [LONG] (5000)                           Frequency at which consumed records will be committed to the log storage backend
+        affinity.global.<ID>.storage.commit.timeout.ms [LONG] (30000)                           Number of milliseconds after which a commit is considered failed
+        affinity.global.<ID>.storage.min.timestamp.ms [LONG] (0)                                Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
+        affinity.global.<ID>.ttl.sec [INT] (-1)                                                 Per-record expiration which will based off event-time if the data class implements EventTime trait
+
+### Global State Storage(io.amient.affinity.kafka.KafkaLogStorage)
+        affinity.global.<ID>.storage.kafka.bootstrap.servers [STRING] (!)                       kafka connection string used for consumer and/or producer
+        affinity.global.<ID>.storage.kafka.consumer                                             any settings that the underlying version of kafka consumer client supports
+        affinity.global.<ID>.storage.kafka.consumer.group.id [STRING] (-)                       kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.global.<ID>.storage.kafka.producer                                             any settings that the underlying version of kafka producer client supports
+        affinity.global.<ID>.storage.kafka.replication.factor [INT] (1)                         replication factor of the kafka topic
+        affinity.global.<ID>.storage.kafka.topic [STRING] (!)                                   kafka topic name
+
+### Global State Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
+
+
+## Keyspaces
+        affinity.keyspace [<ID>] (-)                                                            
+        affinity.keyspace.<ID>.class [FQN] (!)                                                  Implementation of core.actor.Partition of whose instances is the Keyspace composed
+        affinity.keyspace.<ID>.num.partitions [INT] (!)                                         Total number of partitions in the Keyspace
+        affinity.keyspace.<ID>.state [<ID>] (-)                                                 Keyspace may have any number of States, each identified by its ID - each state within a Keyspace is co-partitioned identically
+        affinity.keyspace.<ID>.state.<ID>.external [TRUE|FALSE] (false)                         If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly
+        affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms [INT] (10000)                         When per-row locking is used, this time-out specifies how long a lock can be held by a single thread
+        affinity.keyspace.<ID>.state.<ID>.memstore.class [FQN] (!)                              Implementation of storage.MemStore that will be used for lookups
+        affinity.keyspace.<ID>.state.<ID>.memstore.data.dir [FILE-PATH] (-)                     Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set
+        affinity.keyspace.<ID>.state.<ID>.memstore.key.prefix.size [INT] (-)                    Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields
+        affinity.keyspace.<ID>.state.<ID>.min.timestamp.ms [LONG] (0)                           Any records with timestamp lower than this value will be immediately dropped
+        affinity.keyspace.<ID>.state.<ID>.storage.class [FQN] (-)                               Implementation of storage.LogStorage which will be used for persistence
+        affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms [LONG] (5000)              Frequency at which consumed records will be committed to the log storage backend
+        affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms [LONG] (30000)              Number of milliseconds after which a commit is considered failed
+        affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms [LONG] (0)                   Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
+        affinity.keyspace.<ID>.state.<ID>.ttl.sec [INT] (-1)                                    Per-record expiration which will based off event-time if the data class implements EventTime trait
+
+### Keyspaces Storage(io.amient.affinity.kafka.KafkaLogStorage)
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.bootstrap.servers [STRING] (!)          kafka connection string used for consumer and/or producer
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer                                any settings that the underlying version of kafka consumer client supports
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.group.id [STRING] (-)          kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.producer                                any settings that the underlying version of kafka producer client supports
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.replication.factor [INT] (1)            replication factor of the kafka topic
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)                      kafka topic name
+
+### Keyspaces Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
+
+
+## Node Context
+        affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3] 
+        affinity.node.container.<ID> [[]] (!)                                                   
+        affinity.node.data.dir [FILE-PATH] (./.data)                                            Location under which any local state or registers will be kept
+        affinity.node.gateway.class [FQN] (-)                                                   Entry point class for all external requests, both http and stream inputs
+        affinity.node.gateway.http.host [STRING] (!)                                            host to which the http interface binds to
+        affinity.node.gateway.http.max.websocket.queue.size [INT] (100)                         number of messages that can be queued for delivery before blocking
+        affinity.node.gateway.http.port [INT] (!)                                               port to which the http interface binds to
+        affinity.node.gateway.http.tls.keystore.file [STRING] (-)                               file which contains the keystore contents, if resource not used
+        affinity.node.gateway.http.tls.keystore.password [STRING] (!)                           password to the keystore file
+        affinity.node.gateway.http.tls.keystore.resource [STRING] (-)                           resource which holds the keystore, if file not used
+        affinity.node.gateway.http.tls.keystore.standard [STRING] (PKCS12)                      format of the keystore
+        affinity.node.gateway.stream [<ID>] (-)                                                 External input and output streams to which system is connected, if any
+        affinity.node.gateway.stream.<ID>.class [FQN] (-)                                       Implementation of storage.LogStorage which will be used for persistence
+        affinity.node.gateway.stream.<ID>.commit.interval.ms [LONG] (5000)                      Frequency at which consumed records will be committed to the log storage backend
+        affinity.node.gateway.stream.<ID>.commit.timeout.ms [LONG] (30000)                      Number of milliseconds after which a commit is considered failed
+        affinity.node.gateway.stream.<ID>.min.timestamp.ms [LONG] (0)                           Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
+        affinity.node.gateway.suspend.queue.max.size [INT] (1000)                               Size of the queue when the cluster enters suspended mode
+        affinity.node.name [STRING] (AffinityNode)                                              ActorSystem name under which the Node presents itself in the Akka Cluster
+        affinity.node.shutdown.timeout.ms [INT] (30000)                                         Maximum time a node can take to shutdown gracefully
+        affinity.node.startup.timeout.ms [INT] (2147483647)                                     Maximum time a node can take to startup - this number must account for any potential state bootstrap
+
+### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
+        affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)                  kafka connection string used for consumer and/or producer
+        affinity.node.gateway.stream.<ID>.kafka.consumer                                        any settings that the underlying version of kafka consumer client supports
+        affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)                  kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.node.gateway.stream.<ID>.kafka.producer                                        any settings that the underlying version of kafka producer client supports
+        affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)                    replication factor of the kafka topic
+        affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name
+
+
+## Important Akka Configuration Options
+        akka.actor.provider [STRING] (-)                                                        Set this to "akka.remote.RemoteActorRefProvider" when running in a cluster
+        akka.http.server.idle-timeout [STRING] (infinite)                                       
+        akka.http.server.max-connections [INT] (1000)                                           
+        akka.http.server.remote-address-header [STRING] (on)                                    
+        akka.http.server.request-timeout [STRING] (30s)                                         
+        akka.http.server.server-header [STRING] (-)                                             
+        akka.remote.enabled-transports [[]] (-)                                                 Set this to ["akka.remote.netty.tcp"] when running in a cluster
+        akka.remote.netty.tcp.hostname [STRING] (-)                                             
+        akka.remote.netty.tcp.port [INT] (-)                                                    
 
 
 # Development 
@@ -372,9 +528,4 @@ When doing a lot of work on the javascript watchify can be used
     npm install -g watchify
     watchify core/src/main/resources/affinity_node.js -v -o core/src/main/resources/affinity.js -d
 
-## Logging
-
-Affinity uses SLF4j and it also redirects all Akka logging to SLF4J.
-It doesn't provide any binding for compile configuration, that is left to applications.
-In all examples and for all tests, logback binding is used.
 

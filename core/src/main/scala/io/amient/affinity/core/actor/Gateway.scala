@@ -44,10 +44,10 @@ import scala.util.control.NonFatal
 object Gateway {
 
   class GatewayConf extends CfgStruct[GatewayConf] {
-    val Class = cls("class", classOf[Gateway], false)
-    val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000)
+    val Class = cls("class", classOf[Gateway], false).doc("Entry point class for all external requests, both http and stream inputs")
+    val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000).doc("Size of the queue when the cluster enters suspended mode")
     val Http = struct("http", new GatewayHttp.HttpConf)
-    val Stream = group("stream", classOf[LogStorageConf], false)
+    val Stream = group("stream", classOf[LogStorageConf], false).doc("External input and output streams to which system is connected, if any")
   }
 
   final case class GatewayClusterStatus(suspended: Boolean)

@@ -33,12 +33,23 @@ public class CfgCls<B> extends Cfg<Class<? extends B>> {
     public CfgCls<B> apply(Config config) {
         String fqn = listPos > -1 ? config.getStringList(relPath).get(listPos) : config.getString(relPath);
         try {
-            return setValue(Class.forName(fqn).asSubclass(cls));
+            setValue(Class.forName(fqn).asSubclass(cls));
+            return this;
         } catch (ClassCastException e) {
             throw new IllegalArgumentException(fqn + " is not an instance of " + cls);
         } catch (ClassNotFoundException e) {
             throw new IllegalArgumentException(e);
         }
+    }
+
+    @Override
+    public String parameterInfo() {
+        return "fqn";
+    }
+
+    @Override
+    public String defaultInfo() {
+        return isDefined() ? apply().getName().toString() : "-";
     }
 
 }

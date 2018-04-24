@@ -19,10 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
-import io.amient.affinity.core.config.CfgCls;
-import io.amient.affinity.core.config.CfgInt;
-import io.amient.affinity.core.config.CfgPath;
-import io.amient.affinity.core.config.CfgStruct;
+import io.amient.affinity.core.config.*;
 import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
 import org.slf4j.Logger;
@@ -43,9 +40,16 @@ import java.util.*;
 public abstract class MemStore implements Closeable {
 
     public static class MemStoreConf extends CfgStruct<MemStoreConf> {
-        public CfgCls<MemStore> Class = cls("class", MemStore.class, true);
-        public CfgPath DataDir = filepath("data.dir", false);
-        public CfgInt KeyPrefixSize = integer("key.prefix.size", false);
+
+        public Cfg<Class<? extends MemStore>> Class = cls("class", MemStore.class, true)
+                .doc("Implementation of storage.MemStore that will be used for lookups");
+
+        public Cfg<Path> DataDir = filepath("data.dir", false)
+                .doc("Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set");
+
+        public Cfg<Integer> KeyPrefixSize = integer("key.prefix.size", false)
+                .doc("Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields");
+
         //TODO public CfgInt MemReadTimeoutMs = integer("memstore.read.timeout.ms", 1000);
         @Override
         protected Set<String> specializations() {
@@ -122,7 +126,7 @@ public abstract class MemStore implements Closeable {
 
     /**
      * Unwraps stored cell into metadata and value bytes, returning the underlying value only if it hasn't expired
-     * with respect to the provided ttl ms parameter and system time
+     * with respect to the provided ttl ms parameterInfo and system time
      *
      * @param key              record key
      * @param valueAndMetadata wrapped value and event time metadata

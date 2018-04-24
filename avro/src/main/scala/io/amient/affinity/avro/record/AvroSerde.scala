@@ -53,7 +53,8 @@ object AvroSerde {
   }
 
   class AvroConf extends CfgStruct[AvroConf] {
-    val Class: CfgCls[AvroSerde] = cls("schema.registry.class", classOf[AvroSerde], true)
+    val Class = cls("schema.registry.class", classOf[AvroSerde], true)
+      .doc("one of ConfluentSchemaRegistry, ZookeeperSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package")
 
     override protected def specializations(): util.Set[String] = {
       Set("schema.registry").asJava

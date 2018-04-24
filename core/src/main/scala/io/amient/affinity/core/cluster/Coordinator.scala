@@ -47,6 +47,7 @@ object Coordinator {
 
   class CoorinatorConf extends CfgStruct[CoorinatorConf] {
     val Class = cls("class", classOf[Coordinator], classOf[CoordinatorZk])
+      .doc("implementation of coordinator must extend cluster.Coordinator")
 
     override protected def specializations(): util.Set[String] = Set("zookeeper", "embedded").asJava
   }

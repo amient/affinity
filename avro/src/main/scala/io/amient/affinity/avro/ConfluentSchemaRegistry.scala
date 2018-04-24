@@ -40,7 +40,8 @@ object ConfluentSchemaRegistry {
   }
 
   class CfAvroConf extends CfgStruct[CfAvroConf](classOf[AvroConf]) {
-    val ConfluentSchemaRegistryUrl= url("schema.registry.url", new URL("http://localhost:8081"))
+    val ConfluentSchemaRegistryUrl = url("schema.registry.url", new URL("http://localhost:8081"))
+      .doc("Confluent Schema Registry connection base URL")
   }
 
 }

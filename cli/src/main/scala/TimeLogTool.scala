@@ -1,7 +1,8 @@
 import com.indvd00m.ascii.render.api.{ICanvas, IContextBuilder, IRender}
 import com.indvd00m.ascii.render.elements.{Label, Line, Rectangle}
 import com.indvd00m.ascii.render.{Point, Render}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.{LogEntry, LogStorage, LogStorageConf}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.kafka.KafkaLogStorage
@@ -11,7 +12,16 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
-object TimeLogUtil {
+object TimeLogTool extends Tool {
+
+  class TimeLogConf extends CfgStruct[TimeLogConf] {
+    doc("Utility for analyzing log compaction")
+  }
+
+  object Conf extends TimeLogConf {
+    override def apply(config: Config) = new TimeLogConf().apply(config)
+  }
+
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -25,7 +35,9 @@ object TimeLogUtil {
   private var numRecords = 0
   private val blocks = ListBuffer[(TimeRange, Long, Long)]()
 
-  def apply(args: List[String]): Unit = args match {
+  override def apply(config: Config): Unit = ???
+
+  override def apply(args: List[String], config: Config): Unit = args match {
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: toOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toLong, new TimeRange(from, until), fromOffset.toLong -> toOffset.toLong)
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: fromOffset :: Nil => apply(bootstrap, topic, partition.toInt, fuzz.toLong, new TimeRange(from, until), fromOffset.toLong -> Long.MaxValue)
     case bootstrap :: topic :: partition :: fuzz :: from :: until :: Nil if (from.contains("T")) => apply(bootstrap, topic, partition.toInt, fuzz.toLong, new TimeRange(from, until))

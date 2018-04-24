@@ -40,7 +40,7 @@ object CoordinatorEmbedded extends Observable {
   }
 
   class EmbedConf extends CfgStruct[EmbedConf](classOf[CoorinatorConf]) {
-    val ID = integer("embedded.id", true)
+    val ID = integer("embedded.id", true).doc("embedded coordinator instances must have the same id to work together")
   }
 
   private val services = mutable.Map[String, mutable.Map[String, String]]()

@@ -56,17 +56,17 @@ object KafkaStorage {
   }
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[LogStorageConf]) {
-    val Topic = string("kafka.topic", true)
-    val ReplicationFactor = integer("kafka.replication.factor", 1)
-    val BootstrapServers = string("kafka.bootstrap.servers", true)
-    val Producer = struct("kafka.producer", new KafkaProducerConf)
-    val Consumer = struct("kafka.consumer", new KafkaConsumerConf)
+    val Topic = string("kafka.topic", true).doc("kafka topic name")
+    val ReplicationFactor = integer("kafka.replication.factor", 1).doc("replication factor of the kafka topic")
+    val BootstrapServers = string("kafka.bootstrap.servers", true).doc("kafka connection string used for consumer and/or producer")
+    val Producer = struct("kafka.producer", new KafkaProducerConf).doc("any settings that the underlying version of kafka producer client supports")
+    val Consumer = struct("kafka.consumer", new KafkaConsumerConf).doc("any settings that the underlying version of kafka consumer client supports")
   }
 
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)
 
   class KafkaConsumerConf extends CfgStruct[KafkaConsumerConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val GroupId = string("group.id", false)
+    val GroupId = string("group.id", false).doc("kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally")
   }
 
 }

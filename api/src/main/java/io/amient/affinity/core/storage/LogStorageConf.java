@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.config.Cfg;
 import io.amient.affinity.core.config.CfgCls;
 import io.amient.affinity.core.config.CfgLong;
 import io.amient.affinity.core.config.CfgStruct;
@@ -28,10 +29,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class LogStorageConf extends CfgStruct<LogStorageConf> {
-    public CfgCls<LogStorage> Class = cls("class", LogStorage.class, false);
-    public CfgLong MinTimestamp = longint("min.timestamp.ms", 0L);
-    public CfgLong CommitIntervalMs = longint( "commit.interval.ms", 5000L);
-    public CfgLong CommitTimeoutMs = longint( "commit.timeout.ms", 30000L);
+    public Cfg<Class<? extends LogStorage>> Class = cls("class", LogStorage.class, false)
+            .doc("Implementation of storage.LogStorage which will be used for persistence");
+
+    public Cfg<Long> MinTimestamp = longint("min.timestamp.ms", 0L)
+            .doc("Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.");
+
+    public Cfg<Long> CommitIntervalMs = longint( "commit.interval.ms", 5000L)
+            .doc("Frequency at which consumed records will be committed to the log storage backend");
+
+    public Cfg<Long> CommitTimeoutMs = longint( "commit.timeout.ms", 30000L)
+            .doc("Number of milliseconds after which a commit is considered failed");
 
     @Override
     protected Set<String> specializations() {

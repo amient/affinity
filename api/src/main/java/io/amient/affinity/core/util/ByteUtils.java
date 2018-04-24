@@ -289,7 +289,7 @@ public class ByteUtils {
      * @param value int number to convert
      * @param result destination array where to write the big endian
      * @param offset position in the destination array to start from
-     * @return the modified array passed in the result parameter
+     * @return the modified array passed in the result parameterInfo
      */
     public static byte[] putIntValue(int value, byte[] result, int offset) {
         result[offset + 0] = (byte) ((value >>> 24) & 0xFF);
@@ -345,7 +345,7 @@ public class ByteUtils {
      * @param value long number to convert
      * @param result destination array where to write the big endian
      * @param offset position in the destination array to start from
-     * @return the modified array passed in the result parameter
+     * @return the modified array passed in the result parameterInfo
      */
     public static byte[] putLongValue(long value, byte[] result, int offset) {
         result[offset + 0] = (byte) ((value >>> 56) & 0xFF);

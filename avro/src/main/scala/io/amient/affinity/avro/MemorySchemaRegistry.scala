@@ -37,6 +37,7 @@ object MemorySchemaRegistry {
   }
   class MemAvroConf extends CfgStruct[MemAvroConf](classOf[AvroConf]) {
     val ID = integer("schema.registry.id", false)
+      .doc("multiple instances with the same id will share the schemas registered by any of them")
   }
 
   val multiverse = new ConcurrentHashMap[Int, Universe]()

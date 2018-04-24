@@ -39,7 +39,7 @@ object LocalSchemaRegistry {
   }
 
   class LocalAvroConf extends CfgStruct[LocalAvroConf](classOf[AvroConf]) {
-    val DataPath = filepath("schema.registry.path", true)
+    val DataPath = filepath("schema.registry.path", true).doc("local file path under which schemas will be stored")
   }
 
 }

@@ -28,7 +28,7 @@ import java.util.*;
 
 public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested {
 
-    private final List<Options> options;
+    public final List<Options> options;
 
     private List<Map.Entry<String, Cfg<?>>> properties = new LinkedList<>();
 
@@ -40,6 +40,12 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     protected Set<String> specializations() {
         return Collections.emptySet();
+    }
+
+    @Override
+    public CfgStruct<T> doc(String description) {
+        super.doc(description);
+        return this;
     }
 
     public CfgStruct(Class<? extends CfgStruct<?>> inheritFrom, Options... options) {
@@ -63,7 +69,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     @Override
-    void setPath(String path) {
+    public void setPath(String path) {
         super.setPath(path);
         properties.forEach(entry -> entry.getValue().setPath(path(entry.getKey())));
     }
@@ -119,9 +125,15 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             if (!errorMessage.isEmpty()) {
                 throw new IllegalArgumentException(errorMessage);
             }
-            return (T) setValue((T) this);
+            setValue((T) this);
+            return (T) this;
         }
         return (T) this;
+    }
+
+    @Override
+    public String parameterInfo() {
+        return "";
     }
 
     public Config config() {
@@ -134,6 +146,14 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     public CfgString string(String path, String defaultValue) {
         return add(path, new CfgString(), true, Optional.of(defaultValue));
+    }
+
+    public CfgStringList stringlist(String path, List<String> defaultValue) {
+        return add(path, new CfgStringList(), true, Optional.of(defaultValue));
+    }
+
+    public CfgStringList stringlist(String path, boolean required) {
+        return add(path, new CfgStringList(), required, Optional.empty());
     }
 
     public CfgLong longint(String path, boolean required) {
@@ -159,6 +179,14 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     public CfgInt integer(String path, Integer defaultValue) {
         return add(path, new CfgInt(), true, Optional.of(defaultValue));
+    }
+
+    public CfgIntList intlist(String path, boolean required) {
+        return add(path, new CfgIntList(), required, Optional.empty());
+    }
+
+    public CfgIntList intlist(String path, List<Integer> defaultValue) {
+        return add(path, new CfgIntList(), true, Optional.of(defaultValue));
     }
 
     public CfgUrl url(String path, boolean required) {
@@ -246,6 +274,12 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         });
         result.append("}");
         return result.toString();
+    }
+
+    public Map<String, Cfg<?>> map() {
+        TreeMap<String, Cfg<?>> result = new TreeMap<>();
+        properties.forEach(prop -> result. put(prop.getKey(), prop.getValue()));
+        return result;
     }
 
 }

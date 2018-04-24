@@ -33,6 +33,8 @@ abstract public class Cfg<T> implements Serializable {
 
     private String path = "";
 
+    private String description = "";
+
     protected String relPath;
 
     private JavaOption<T> value = JavaOption.empty();
@@ -43,10 +45,9 @@ abstract public class Cfg<T> implements Serializable {
 
     abstract public Cfg<T> apply(Config config) throws IllegalArgumentException;
 
-    final public <C extends Cfg<T>> C setValue(T value) {
+    final public void setValue(T value) {
         //TODO #107 using setValue should modify the underlying config object
         this.value = JavaOption.of(value);
-        return (C) this;
     }
 
     final public T apply() {
@@ -59,9 +60,26 @@ abstract public class Cfg<T> implements Serializable {
         return path;
     }
 
-    final public String path(String relativePathToRsolve) {
-        return (path.isEmpty() ? "" : path + ".") + relativePathToRsolve;
+    final public String path(String relativePathToResolve) {
+        return (path.isEmpty() ? "" : path + ".") + relativePathToResolve;
     }
+
+    public Cfg<T> doc(String description) {
+        this.description = description;
+        return this;
+    }
+
+    final public String description() {
+        return this.description;
+    }
+
+    abstract public String parameterInfo();
+
+    public String defaultInfo() {
+        return isDefined() ? apply().toString() : "-";
+    }
+
+    final public boolean isRequired() { return this.required; }
 
     final public boolean isDefined() {
         return value.isPresent() || defaultValue.isPresent();
@@ -71,7 +89,7 @@ abstract public class Cfg<T> implements Serializable {
         this.required = false;
     }
 
-    void setPath(String path) {
+    public void setPath(String path) {
         this.path = path;
     }
 
@@ -79,7 +97,7 @@ abstract public class Cfg<T> implements Serializable {
         this.listPos = listPos;
     }
 
-    final void setRelPath(String relPath) {
+    final public void setRelPath(String relPath) {
         this.relPath = relPath;
     }
 

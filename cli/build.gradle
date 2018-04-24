@@ -17,6 +17,7 @@ repositories {
 dependencies {
     compile project(':core')
     compile project(':kafka:storage-kafka')
+    compile project(':rocksdb')
     compile group: 'com.indvd00m.ascii.render', name: 'ascii-render', version: '1.2.1'
     compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
     compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
