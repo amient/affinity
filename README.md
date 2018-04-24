@@ -386,12 +386,12 @@ Key-Space Definitions
 
 Key-Space Definitions Storage(io.amient.affinity.kafka.KafkaLogStorage)
 ------------------------------------------------------------------------------------------------------
-	affinity.keyspace.<ID>.storage.kafka.bootstrap.servers [STRING] (!)             	
-	affinity.keyspace.<ID>.storage.kafka.consumer.group.id [STRING] (-)             	
-	affinity.keyspace.<ID>.storage.kafka.consumer.*
-	affinity.keyspace.<ID>.storage.kafka.producer.*
-	affinity.keyspace.<ID>.storage.kafka.replication.factor [INT] (1)               	
-	affinity.keyspace.<ID>.storage.kafka.topic [STRING] (!)                         	
+	affinity.keyspace.<ID>.state.<ID>.storage.kafka.bootstrap.servers [STRING] (!)  	
+	affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.group.id [STRING] (-)  	
+	affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.*
+	affinity.keyspace.<ID>.state.<ID>.storage.kafka.producer.*
+	affinity.keyspace.<ID>.state.<ID>.storage.kafka.replication.factor [INT] (1)    	
+	affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)              	
 
 Key-Space Definitions Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
 ------------------------------------------------------------------------------------------------------
