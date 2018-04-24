@@ -39,6 +39,12 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
     }
 
     @Override
+    public CfgGroup<G> doc(String description) {
+        super.doc(description);
+        return this;
+    }
+
+    @Override
     public CfgGroup<G> apply(Config config) throws IllegalArgumentException {
         ConfigObject o = listPos > -1 ? config.getObjectList(relPath).get(listPos) : config.getObject(relPath);
         Map<String, G> map = new HashMap<>();

@@ -23,11 +23,21 @@ import io.amient.affinity.core.config.*;
 import io.amient.affinity.core.storage.MemStore.MemStoreConf;
 
 public class StateConf extends CfgStruct<StateConf> {
-    public CfgInt TtlSeconds = integer("ttl.sec", -1);
-    public CfgBool External = bool("external", true, false);
-    public CfgLong MinTimestampUnixMs = longint("min.timestamp.ms", 0L);
+
+    public Cfg<Integer> TtlSeconds = integer("ttl.sec", -1)
+            .doc("Per-record expiration which will based off event-time if the data class implements EventTime trait");
+
+    public Cfg<Boolean> External = bool("external", true, false)
+            .doc("If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly");
+
+    public Cfg<Long> MinTimestampUnixMs = longint("min.timestamp.ms", 0L)
+            .doc("Any records with timestamp lower than this value will be immediately dropped");
+
     public LogStorageConf Storage = struct("storage", new LogStorageConf());
+
     public MemStoreConf MemStore = struct("memstore", new MemStore.MemStoreConf());
-    public CfgInt LockTimeoutMs = integer("lock.timeout.ms", 10000);
+
+    public Cfg<Integer> LockTimeoutMs = integer("lock.timeout.ms", 10000)
+            .doc("When per-row locking is used, this time-out specifies how long a lock can be held by a single thread");
 }
 

@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.util;
 
+import io.amient.affinity.core.config.Cfg;
 import io.amient.affinity.core.config.CfgInt;
 import io.amient.affinity.core.config.CfgString;
 import io.amient.affinity.core.config.CfgStruct;
@@ -29,9 +30,14 @@ import java.util.Set;
 
 public class ZkConf extends CfgStruct<ZkConf> {
 
-    public final CfgString Connect = string("connect", true);
-    public final CfgInt ConnectTimeoutMs = integer("timeout.connect.ms", 6000);
-    public final CfgInt SessionTimeoutMs = integer("timeout.session.ms", 10000);
+    public final Cfg<String> Connect = string("connect", true)
+            .doc("Coma-separated list of host:port zookeeper servers");
+
+    public final Cfg<Integer> ConnectTimeoutMs = integer("timeout.connect.ms", 6000)
+            .doc("Time-out for establishing connection to zookeeper cluster");
+
+    public final Cfg<Integer> SessionTimeoutMs = integer("timeout.session.ms", 10000)
+            .doc("Time-out after which any ephemeral nodes will be removed for a lost connection");
 
     @Override
     protected Set<String> specializations() {

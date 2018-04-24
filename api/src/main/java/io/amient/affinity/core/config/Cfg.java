@@ -64,7 +64,7 @@ abstract public class Cfg<T> implements Serializable {
         return (path.isEmpty() ? "" : path + ".") + relativePathToResolve;
     }
 
-    final public Cfg<T> doc(String description) {
+    public Cfg<T> doc(String description) {
         this.description = description;
         return this;
     }
