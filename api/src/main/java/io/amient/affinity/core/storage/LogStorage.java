@@ -189,6 +189,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      * Flush all writes that were created by append() or delete().
      * This should block until all calls to append() or delete() have completed successfully or
      * throw exception otherwise.
+     *
      */
     void flush();
 

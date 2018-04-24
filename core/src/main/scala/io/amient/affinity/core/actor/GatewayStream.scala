@@ -166,8 +166,10 @@ trait GatewayStream extends Gateway {
           //should be suspended anyway and hang so no need to do it for every record
           if (clusterSuspended) {
             logger.info(s"Pausing input stream processor: $identifier")
-            lock.synchronized(lock.wait())
-            if (closed) return
+            while (clusterSuspended) {
+              lock.synchronized(lock.wait())
+              if (closed) return
+            }
             logger.info(s"Resuming input stream processor: $identifier")
           }
           val entries = consumer.fetch(true)

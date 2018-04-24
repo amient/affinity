@@ -240,6 +240,8 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def flush() = if (producerActive) {
     producer.flush()
+    //TODO #199 kafka producer flush doesn't throw exception so we need to use our own exception var
+    //and set it from any failed produce request and rethrow here
   }
 
   override def close(): Unit = if (!closed) {
