@@ -67,10 +67,10 @@ object DocTool extends Tool {
     println()
     //TODO stream storage extenesions
 
-    println("\n\nImportant Akka Configuration Options:")
+    println("\n\nImportant Akka Configuration Options")
     println("------------------------------------------------------------------------------------------------------")
     apply(affinity.Conf.Akka)
-    println(".. all other akka settings may be applied")
+    println("\t.. all other akka settings may be applied")
 
   }
 
@@ -80,7 +80,7 @@ object DocTool extends Tool {
       val requiredInfo = (if (cfg.isRequired) "*" else "").padTo(2, ' ')
       val defaultInfo = (if (cfg.isDefined) cfg.defaultInfo() + " " else "") + "- "
       val paramterInfo = cfg.parameterInfo.padTo(10, ' ')
-      println(s"${cfg.path.padTo(60, ' ')}\t$requiredInfo\t$paramterInfo\t$defaultInfo\t${cfg.description}")
+      println(s"\t${cfg.path.padTo(60, ' ')}\t$requiredInfo\t$paramterInfo\t$defaultInfo\t${cfg.description}")
     }
 
     cfg match {

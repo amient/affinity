@@ -300,124 +300,110 @@ enforcement of requirements and messaging around invalid settings.
 
 Avro
 ------------------------------------------------------------------------------------------------------
-affinity.avro.schema.registry.class                         	* 	fqn       	- 	
+	affinity.avro.schema.registry.class                         	* 	fqn       	- 	
 
 Avro (io.amient.affinity.avro.ConfluentSchemaRegistry)
 ------------------------------------------------------------------------------------------------------
-affinity.avro.schema.registry.url                           	* 	url       	http://localhost:8081 - 	
+	affinity.avro.schema.registry.url                           	* 	url       	http://localhost:8081 - 	
 
 Avro (io.amient.affinity.avro.ZookeeperSchemaRegistry)
 ------------------------------------------------------------------------------------------------------
-affinity.avro.schema.registry.zookeeper.connect             	* 	string    	- 	
-affinity.avro.schema.registry.zookeeper.timeout.connect.ms  	* 	int       	6000 - 	
-affinity.avro.schema.registry.zookeeper.timeout.session.ms  	* 	int       	10000 - 	
-affinity.avro.schema.registry.zookeeper.root                	* 	string    	/affinity-schema-registry - 	
+	affinity.avro.schema.registry.zookeeper.connect             	* 	string    	- 	
+	affinity.avro.schema.registry.zookeeper.timeout.connect.ms  	* 	int       	6000 - 	
+	affinity.avro.schema.registry.zookeeper.timeout.session.ms  	* 	int       	10000 - 	
+	affinity.avro.schema.registry.zookeeper.root                	* 	string    	/affinity-schema-registry - 	
 
 Avro (io.amient.affinity.avro.MemorySchemaRegistry)
 ------------------------------------------------------------------------------------------------------
-affinity.avro.schema.registry.id                            	  	int       	- 	
+	affinity.avro.schema.registry.id                            	  	int       	- 	
 
 
 Coordinator
 ------------------------------------------------------------------------------------------------------
-affinity.coordinator.class                                  	* 	fqn       	io.amient.affinity.core.cluster.CoordinatorZk - 	
+	affinity.coordinator.class                                  	* 	fqn       	io.amient.affinity.core.cluster.CoordinatorZk - 	
 
 Coordinator (io.amient.affinity.core.cluster.CoordinatorZk)
 ------------------------------------------------------------------------------------------------------
-affinity.coordinator.zookeeper.connect                      	* 	string    	- 	
-affinity.coordinator.zookeeper.timeout.connect.ms           	* 	int       	6000 - 	
-affinity.coordinator.zookeeper.timeout.session.ms           	* 	int       	10000 - 	
-affinity.coordinator.zookeeper.root                         	* 	string    	/affinity - 	
+	affinity.coordinator.zookeeper.connect                      	* 	string    	- 	
+	affinity.coordinator.zookeeper.timeout.connect.ms           	* 	int       	6000 - 	
+	affinity.coordinator.zookeeper.timeout.session.ms           	* 	int       	10000 - 	
+	affinity.coordinator.zookeeper.root                         	* 	string    	/affinity - 	
 
 Coordinator (io.amient.affinity.core.cluster.CoordinatorEmbedded)
 ------------------------------------------------------------------------------------------------------
-affinity.coordinator.embedded.id                            	* 	int       	- 	
+	affinity.coordinator.embedded.id                            	* 	int       	- 	
 
 
 Global Key-Value Store Defintions
 ------------------------------------------------------------------------------------------------------
-affinity.global                                             	  	<ID>      	- 	
-affinity.global.<ID>.external                               	* 	true|false	false - 	
-affinity.global.<ID>.lock.timeout.ms                        	* 	int       	10000 - 	
-affinity.global.<ID>.memstore.class                         	* 	fqn       	- 	
-affinity.global.<ID>.memstore.data.dir                      	  	file-path 	- 	
-affinity.global.<ID>.memstore.key.prefix.size               	  	int       	- 	
-affinity.global.<ID>.min.timestamp.ms                       	* 	long      	0 - 	
-affinity.global.<ID>.storage.class                          	  	fqn       	- 	
-affinity.global.<ID>.storage.commit.interval.ms             	* 	long      	5000 - 	
-affinity.global.<ID>.storage.commit.timeout.ms              	* 	long      	30000 - 	
-affinity.global.<ID>.storage.min.timestamp.ms               	* 	long      	0 - 	
-affinity.global.<ID>.ttl.sec                                	* 	int       	-1 - 	
+	affinity.global                                             	  	<ID>      	- 	
+	affinity.global.<ID>.external                               	* 	true|false	false - 	
+	affinity.global.<ID>.lock.timeout.ms                        	* 	int       	10000 - 	
+	affinity.global.<ID>.memstore.class                         	* 	fqn       	- 	
+	affinity.global.<ID>.memstore.data.dir                      	  	file-path 	- 	
+	affinity.global.<ID>.memstore.key.prefix.size               	  	int       	- 	
+	affinity.global.<ID>.min.timestamp.ms                       	* 	long      	0 - 	
+	affinity.global.<ID>.storage.class                          	  	fqn       	- 	
+	affinity.global.<ID>.storage.commit.interval.ms             	* 	long      	5000 - 	
+	affinity.global.<ID>.storage.commit.timeout.ms              	* 	long      	30000 - 	
+	affinity.global.<ID>.storage.min.timestamp.ms               	* 	long      	0 - 	
+	affinity.global.<ID>.ttl.sec                                	* 	int       	-1 - 	
 
 
 Key-Space Defintitions
 ------------------------------------------------------------------------------------------------------
-affinity.keyspace                                           	  	<ID>      	- 	
-affinity.keyspace.<ID>.class                                	* 	fqn       	- 	
-affinity.keyspace.<ID>.num.partitions                       	* 	int       	- 	
-affinity.keyspace.<ID>.state                                	  	<ID>      	- 	
-affinity.keyspace.<ID>.state.<ID>.external                  	* 	true|false	false - 	
-affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms           	* 	int       	10000 - 	
-affinity.keyspace.<ID>.state.<ID>.memstore.class            	* 	fqn       	- 	
-affinity.keyspace.<ID>.state.<ID>.memstore.data.dir         	  	file-path 	- 	
-affinity.keyspace.<ID>.state.<ID>.memstore.key.prefix.size  	  	int       	- 	
-affinity.keyspace.<ID>.state.<ID>.min.timestamp.ms          	* 	long      	0 - 	
-affinity.keyspace.<ID>.state.<ID>.storage.class             	  	fqn       	- 	
-affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms	* 	long      	5000 - 	
-affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms 	* 	long      	30000 - 	
-affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms  	* 	long      	0 - 	
-affinity.keyspace.<ID>.state.<ID>.ttl.sec                   	* 	int       	-1 - 	
+	affinity.keyspace                                           	  	<ID>      	- 	
+	affinity.keyspace.<ID>.class                                	* 	fqn       	- 	
+	affinity.keyspace.<ID>.num.partitions                       	* 	int       	- 	
+	affinity.keyspace.<ID>.state                                	  	<ID>      	- 	
+	affinity.keyspace.<ID>.state.<ID>.external                  	* 	true|false	false - 	
+	affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms           	* 	int       	10000 - 	
+	affinity.keyspace.<ID>.state.<ID>.memstore.class            	* 	fqn       	- 	
+	affinity.keyspace.<ID>.state.<ID>.memstore.data.dir         	  	file-path 	- 	
+	affinity.keyspace.<ID>.state.<ID>.memstore.key.prefix.size  	  	int       	- 	
+	affinity.keyspace.<ID>.state.<ID>.min.timestamp.ms          	* 	long      	0 - 	
+	affinity.keyspace.<ID>.state.<ID>.storage.class             	  	fqn       	- 	
+	affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms	* 	long      	5000 - 	
+	affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms 	* 	long      	30000 - 	
+	affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms  	* 	long      	0 - 	
+	affinity.keyspace.<ID>.state.<ID>.ttl.sec                   	* 	int       	-1 - 	
 
 
 Node Deployment
 ------------------------------------------------------------------------------------------------------
-affinity.node.container                                     	  	<ID>      	- 	
-affinity.node.container.<ID>                                	* 	[]        	- 	
-affinity.node.data.dir                                      	* 	file-path 	./.data - 	
-affinity.node.gateway.class                                 	  	fqn       	- 	
-affinity.node.gateway.http.host                             	* 	string    	- 	
-affinity.node.gateway.http.max.websocket.queue.size         	* 	int       	100 - 	number of messages that can be queued for delivery before blocking
-affinity.node.gateway.http.port                             	* 	int       	- 	
-affinity.node.gateway.http.tls.keystore.file                	  	string    	- 	
-affinity.node.gateway.http.tls.keystore.password            	* 	string    	- 	
-affinity.node.gateway.http.tls.keystore.resource            	  	string    	- 	
-affinity.node.gateway.http.tls.keystore.standard            	* 	string    	PKCS12 - 	
-affinity.node.gateway.stream                                	  	<ID>      	- 	
-affinity.node.gateway.stream.<ID>.class                     	  	fqn       	- 	
-affinity.node.gateway.stream.<ID>.commit.interval.ms        	* 	long      	5000 - 	
-affinity.node.gateway.stream.<ID>.commit.timeout.ms         	* 	long      	30000 - 	
-affinity.node.gateway.stream.<ID>.min.timestamp.ms          	* 	long      	0 - 	
-affinity.node.gateway.suspend.queue.max.size                	* 	int       	1000 - 	
-affinity.node.name                                          	* 	string    	AffinityNode - 	
-affinity.node.shutdown.timeout.ms                           	* 	int       	30000 - 	
-affinity.node.startup.timeout.ms                            	* 	int       	2147483647 - 	
+	affinity.node.container                                     	  	<ID>      	- 	
+	affinity.node.container.<ID>                                	* 	[]        	- 	
+	affinity.node.data.dir                                      	* 	file-path 	./.data - 	
+	affinity.node.gateway.class                                 	  	fqn       	- 	
+	affinity.node.gateway.http.host                             	* 	string    	- 	
+	affinity.node.gateway.http.max.websocket.queue.size         	* 	int       	100 - 	number of messages that can be queued for delivery before blocking
+	affinity.node.gateway.http.port                             	* 	int       	- 	
+	affinity.node.gateway.http.tls.keystore.file                	  	string    	- 	
+	affinity.node.gateway.http.tls.keystore.password            	* 	string    	- 	
+	affinity.node.gateway.http.tls.keystore.resource            	  	string    	- 	
+	affinity.node.gateway.http.tls.keystore.standard            	* 	string    	PKCS12 - 	
+	affinity.node.gateway.stream                                	  	<ID>      	- 	
+	affinity.node.gateway.stream.<ID>.class                     	  	fqn       	- 	
+	affinity.node.gateway.stream.<ID>.commit.interval.ms        	* 	long      	5000 - 	
+	affinity.node.gateway.stream.<ID>.commit.timeout.ms         	* 	long      	30000 - 	
+	affinity.node.gateway.stream.<ID>.min.timestamp.ms          	* 	long      	0 - 	
+	affinity.node.gateway.suspend.queue.max.size                	* 	int       	1000 - 	
+	affinity.node.name                                          	* 	string    	AffinityNode - 	
+	affinity.node.shutdown.timeout.ms                           	* 	int       	30000 - 	
+	affinity.node.startup.timeout.ms                            	* 	int       	2147483647 - 	
 
 
 
-Important Akka Configuration Options:
+Important Akka Configuration Options
 ------------------------------------------------------------------------------------------------------
-akka.http.server.idle-timeout                               	* 	string    	infinite - 	
-akka.http.server.max-connections                            	* 	int       	1000 - 	
-akka.http.server.remote-address-header                      	* 	string    	on - 	
-akka.http.server.request-timeout                            	* 	string    	30s - 	
-akka.http.server.server-header                              	* 	string    	- - 	
-akka.remote.netty.tcp.hostname                              	  	string    	- 	
-akka.remote.netty.tcp.port                                  	  	int       	- 	
-.. all other akka settings may be applied
-
-
-
-Important Akka Configuration Options:
-======================================================================================================
-akka.http.server.idle-timeout                               	* 	string    	infinite - 	
-akka.http.server.max-connections                            	* 	int       	1000 - 	
-akka.http.server.remote-address-header                      	* 	string    	on - 	
-akka.http.server.request-timeout                            	* 	string    	30s - 	
-akka.http.server.server-header                              	* 	string    	- - 	
-akka.remote.netty.tcp.hostname                              	  	string    	- 	
-akka.remote.netty.tcp.port                                  	  	int       	- 	
-.. all other akka settings may be applied
-------------------------------------------------------------------------------------------------------
+	akka.http.server.idle-timeout                               	* 	string    	infinite - 	
+	akka.http.server.max-connections                            	* 	int       	1000 - 	
+	akka.http.server.remote-address-header                      	* 	string    	on - 	
+	akka.http.server.request-timeout                            	* 	string    	30s - 	
+	akka.http.server.server-header                              	* 	string    	- - 	
+	akka.remote.netty.tcp.hostname                              	  	string    	- 	
+	akka.remote.netty.tcp.port                                  	  	int       	- 	
+    .. all other akka settings may be applied
 
 
 
