@@ -11,8 +11,4 @@ if [ $? -eq 0 ]; then
 
     $script $*
 
-    if [ $? -ne 0 ]; then
-        printUsage
-        exit $?
-    fi
 fi
