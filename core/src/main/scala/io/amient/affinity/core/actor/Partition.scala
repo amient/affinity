@@ -74,8 +74,8 @@ trait Partition extends ActorHandler {
   override def preStart(): Unit = {
     started = true
     log.debug(s"Starting keyspace: $keyspace, partition: $partition")
-    //active state will block until all state stores have caught-up
-    become(standby = false)
+    //on start-up every partition is a standby which also requires a blocking bootstrap first
+    become(standby = true)
     //only after states have caught up we make the partition online and available to cooridnators
     context.parent ! PartitionOnline(self)
     super.preStart()
@@ -107,13 +107,11 @@ trait Partition extends ActorHandler {
     case msg@BecomeMaster() =>
       msg(sender) ! {} //acking the receipt of the instruction immediately
       become(standby = false) //then blocking the inbox until state stores have caught-up with storage
-      log.debug(s"Became master for partition $keyspace/$partition")
       onBecomeMaster //then invoke custom handler
 
     case msg@BecomeStandby() =>
       msg(sender) ! {} //acking the receipt of the instruction immediately
       become(standby = true)  //then switch state stores to standby mode, i.e. tailing the storage in the background
-      log.debug(s"Became standby for partition $keyspace/$partition")
       onBecomeStandby
 
     case CreateKeyValueMediator(stateStoreName: String, key: Any) => try {
@@ -134,6 +132,11 @@ trait Partition extends ActorHandler {
     stateStores.values.foreach { state =>
       state.boot
       if (state.external || standby) state.tail
+    }
+    if (standby) {
+      log.debug(s"Became standby for partition $keyspace/$partition")
+    } else {
+      log.debug(s"Became master for partition $keyspace/$partition")
     }
   }
 

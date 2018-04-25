@@ -134,9 +134,9 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         fsm = FSM.BOOT;
 
         POS checkpoint = getCheckpoint();
-        log.debug("Bootstrap " + identifier + " from checkpoint " + checkpoint + ":end-offset");
         long t = EventTime.unix();
         POS endOffset = storage.reset(partition, checkpoint);
+        log.debug("Bootstrap " + identifier + " from checkpoint:" + checkpoint + " to end-offset: " + endOffset);
         long numRecordsProcessed = 0L;
         if (endOffset != null) {
             Iterator<LogEntry<POS>> i = storage.boundedIterator();

@@ -444,6 +444,7 @@ class State[K, V](val identifier: String,
         case Some(log) =>
           log.append(kvstore, key, valueBytes, recordTimestamp) map {
             pos => Some(value)
+            //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
           }
       }
     }
