@@ -72,7 +72,7 @@ class ReplyTo[T](sender: ActorRef) {
     })
   }
 
-  def !(response: => Future[T])(implicit context: ExecutionContext) = {
+  def !(response: => Future[T])(implicit context: ExecutionContext): Future[T] = {
     (try response catch {
       case NonFatal(e) => Future.failed(e)
     }) pipeTo sender

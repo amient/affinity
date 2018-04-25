@@ -176,7 +176,6 @@ trait GatewayStream extends Gateway {
           }
           val entries = consumer.fetch(true)
           if (entries != null) for (entry <- entries.asScala) {
-            //TODO we need entry.partition and use it with entry.position to provide watermark and gather it for distribution during the commit
             val key: K = keySerde.fromBytes(entry.key)
             val value: V = valSerde.fromBytes(entry.value)
             val unitOfWork = processor(new Record(key, value, entry.timestamp))
@@ -193,7 +192,6 @@ trait GatewayStream extends Gateway {
             Await.result(Future.sequence(work.result), commitTimeout millis)
             //commit the records processed by this processor only since the last commit
             lastCommit = consumer.commit() //trigger new commit
-            //TODO here the underlying commit future would distribute on completion the partial watermark to registered accumulator actors
             //clear the work accumulator for the next commit
             work.clear
             lastCommitTimestamp = now

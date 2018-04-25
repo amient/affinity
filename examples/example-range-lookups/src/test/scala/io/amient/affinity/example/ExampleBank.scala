@@ -78,6 +78,8 @@ class DefaultPartition extends Partition {
 
     case request@StoreTransaction(Account(sortcode, number), transaction) => request(sender) ! {
       transactions.replace(StorageKey(sortcode, number, transaction.id), transaction)
+    } map {
+      _ => context.system.eventStream.publish(request) //this is only to have determinist way of testing all data was processed
     }
 
     case request@GetBranchTransactions(sortcode, before) =>

@@ -19,8 +19,10 @@
 
 package io.amient.affinity.example
 
+import java.util.concurrent.{CountDownLatch, TimeUnit}
 import java.util.{Properties, UUID}
 
+import akka.actor.{Actor, Props}
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
@@ -56,7 +58,9 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
   val inputTopic = config.getString("affinity.node.gateway.stream.input-stream.kafka.topic")
 
   val producerProps = new Properties() {
+
     import ProducerConfig._
+
     put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap)
     put(ACKS_CONFIG, "1")
     put(KEY_SERIALIZER_CLASS_CONFIG, classOf[KafkaAvroSerializer].getName)
@@ -74,16 +78,16 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
   val txn6 = Transaction(1006, 99.9, timestamp = 1530172800000L) //08am 28 June 2018
 
 
-
   override def beforeAll(): Unit = {
     //produce test data for all tests
     val producer = new KafkaProducer[Account, Transaction](producerProps)
     try {
       val randomPartition = new Random()
 
-      def produceTestTransaction(account: Account, t: Transaction): Long = {
-        producer.send(new ProducerRecord(inputTopic, randomPartition.nextInt(numPartitions), t.timestamp, account, t)).get.offset
+      def produceTestTransaction(account: Account, t: Transaction): Unit = {
+        producer.send(new ProducerRecord(inputTopic, randomPartition.nextInt(numPartitions), t.timestamp, account, t))
       }
+
       produceTestTransaction(Account("11-10-30", 10233321), txn1)
       produceTestTransaction(Account("33-55-10", 49772300), txn2)
       produceTestTransaction(Account("11-10-30", 10233321), txn3)
@@ -96,10 +100,16 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     }
     node.start()
     node.awaitClusterReady()
-    //TODO expose something in the AffinityTestBase to have precise blocking point that the input data was processed
-    //e.g. awaitInputProcessed("input-stream") where watermark is the set of highest partition-offsets
-    //FIXME #177 this could be a solution to the general problem of syncing standbys
-    Thread.sleep(10000)
+
+    //make sure that before starting the suite tests all the produced fixtures have been processed
+    val latch = new CountDownLatch(6)
+    node.system.eventStream.subscribe(
+      node.system.actorOf(Props(new Actor {
+        override def receive = {
+          case _ => latch.countDown()
+        }
+      })), classOf[StoreTransaction])
+    latch.await(10, TimeUnit.SECONDS)
   }
 
   override def afterAll(): Unit = {
@@ -128,7 +138,7 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
   }
 
   "ExampleWallet" should "should able to retrieve all transactions for the second branch" in {
-    node.get_json(node.http_get("/transactions/33-55-10")).getElements.asScala.size should be (1)
+    node.get_json(node.http_get("/transactions/33-55-10")).getElements.asScala.size should be(1)
   }
 
   "ExampleWallet" should "should respond with empty transaction list for unknown branch" in {
@@ -153,15 +163,15 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
 
     LogRDD(LogStorage.newInstance(storageConf), new TimeRange(txn4.timestamp, txn6.timestamp))
       .present[StorageKey, Transaction](AvroSerde.create(avroConf))
-      .values.collect.sortBy(_.id) should be (Array(txn4, txn5, txn6))
+      .values.collect.sortBy(_.id) should be(Array(txn4, txn5, txn6))
 
     LogRDD(LogStorage.newInstance(storageConf), new TimeRange(txn3.timestamp, txn4.timestamp))
       .present[StorageKey, Transaction](AvroSerde.create(avroConf))
-      .values.collect.sortBy(_.id) should be (Array(txn3, txn4))
+      .values.collect.sortBy(_.id) should be(Array(txn3, txn4))
 
     LogRDD(LogStorage.newInstance(storageConf), new TimeRange(txn1.timestamp, txn4.timestamp))
       .present[StorageKey, Transaction](AvroSerde.create(avroConf))
-      .values.collect.sortBy(_.id) should be (Array(txn1, txn2, txn3, txn4))
+      .values.collect.sortBy(_.id) should be(Array(txn1, txn2, txn3, txn4))
 
   }
 
