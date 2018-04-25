@@ -98,7 +98,6 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     super.afterAll()
   }
 
-  //FIXME #177
   "Master Transition" should "not lead to inconsistent state" in {
     val requestCount = new AtomicInteger(0)
     val expected = new ConcurrentHashMap[String, String]()
@@ -111,11 +110,11 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
       val value = random.nextInt.toString
       requests += node1.http(POST, s"/$key/$value") map {
         case response =>
+          expected.put(key, value)
           if (i == 100) {
             //after a few writes have succeeded kill one node
             node2.shutdown()
           }
-          expected.put(key, value)
           Success(response.status)
       } recover {
         case e: Throwable => Failure(e)
@@ -124,9 +123,14 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     requestCount.set(requests.size)
     Await.result(Future.sequence(requests), specTimeout).foreach(_ should be(Success(SeeOther)))
 
+    Thread.sleep(5000)
+
     expected.asScala.foreach { case (key, value) =>
       val actualEntity = Await.result(node1.http(GET, s"/$key").map { response => response.entity }, specTimeout / 3)
       val expectedEntity = jsonStringEntity(value)
+      //FIXME #177 - the failures here manifest as actualEntity return null value while expecting some random int
+      //this could be manifestation of standby replica not being in sync with the underlying topic
+      //an attempt to prove this point is the Thread.sleep(5000) after shutdown
       actualEntity should be(expectedEntity)
     }
   }

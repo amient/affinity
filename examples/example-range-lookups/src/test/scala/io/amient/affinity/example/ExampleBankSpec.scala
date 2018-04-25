@@ -98,7 +98,8 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     node.awaitClusterReady()
     //TODO expose something in the AffinityTestBase to have precise blocking point that the input data was processed
     //e.g. awaitInputProcessed("input-stream") where watermark is the set of highest partition-offsets
-    Thread.sleep(5000)
+    //FIXME #177 this could be a solution to the general problem of syncing standbys
+    Thread.sleep(10000)
   }
 
   override def afterAll(): Unit = {
