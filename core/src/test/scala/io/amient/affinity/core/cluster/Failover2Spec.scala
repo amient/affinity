@@ -123,14 +123,9 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     requestCount.set(requests.size)
     Await.result(Future.sequence(requests), specTimeout).foreach(_ should be(Success(SeeOther)))
 
-//    Thread.sleep(5000)
-
     expected.asScala.foreach { case (key, value) =>
       val actualEntity = Await.result(node1.http(GET, s"/$key").map { response => response.entity }, specTimeout / 3)
       val expectedEntity = jsonStringEntity(value)
-      //FIXME #177 - the failures here manifest as actualEntity return null value while expecting some random int
-      //this could be manifestation of standby replica not being in sync with the underlying topic
-      //an attempt to prove this point is the Thread.sleep(5000) after shutdown
       actualEntity should be(expectedEntity)
     }
   }
