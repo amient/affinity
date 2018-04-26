@@ -20,7 +20,7 @@ public class Text {
     final public static Pattern alphanum = Pattern.compile("^["+ alphanumSet +"]+$");
     final public static Pattern alphanumFilter = Pattern.compile("[^"+ alphanumSet +"]");
 
-    final public static String nominalSet = "\\p{L}\\p{M}";
+    final public static String nominalSet = "\\p{L}\\p{M}\\-'\\u2018\\u2019\\u201B\\u2032\\u2013\\u2014";
     final public static Pattern nominal = Pattern.compile("^["+ nominalSet +"]+$");
     final public static Pattern nominalFilter = Pattern.compile("[^"+ nominalSet +"]");
 
@@ -75,7 +75,9 @@ public class Text {
                 error ="Controls, special characters, tabs and line feed characters are not allowed in " + field;
             } else if (pattern == alphanum) {
                 error ="Only letters, accents and numbers are allowed in" + field;
-            } else if (pattern == numeral) {
+            } else if (pattern == nominal) {
+                error ="Only letters, dashes and apostrophes are allowed in " + field;
+            }else if (pattern == numeral) {
                 error ="Only numerals are allowed in " + field;
             } else if (pattern == decimal) {
                 error ="Only decimal number characters are allowed in " + field;
