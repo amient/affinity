@@ -67,7 +67,7 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
       case http@HTTP(GET, PATH("timeout"), _, _) if http.timeout(200 millis) =>
       case HTTP(GET, PATH("clusterping"), _, response) => handleWith(response) {
         implicit val timeout = Timeout(1 second)
-        ks gather ClusterPing() map {
+        ks ??? ClusterPing() map {
           case pong => Encoder.json(OK, pong, gzip = false)
         }
       }

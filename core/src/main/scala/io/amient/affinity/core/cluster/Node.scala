@@ -139,7 +139,7 @@ class Node(config: Config) {
     try {
       val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
       implicit val timeout = Timeout(startupTimeout)
-      startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(serviceClass.newInstance())))
+      startupFutureWithShutdownFuse(controller ?! CreateContainer(group, partitions, Props(serviceClass.newInstance())))
     } catch {
       case NonFatal(e) =>
         throw new IllegalArgumentException(s"Could not start container for service $group with partitions ${partitions.mkString(", ")}", e)
@@ -149,7 +149,7 @@ class Node(config: Config) {
   def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
                                     (implicit tag: ClassTag[T]): Future[Unit] = {
     implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ack CreateContainer(group, partitions, Props(partitionCreator)))
+    startupFutureWithShutdownFuse(controller ?! CreateContainer(group, partitions, Props(partitionCreator)))
   }
 
   /**
@@ -160,7 +160,7 @@ class Node(config: Config) {
   def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
     implicit val timeout = Timeout(startupTimeout)
     httpGatewayPort.completeWith(startupFutureWithShutdownFuse {
-      controller ack CreateGateway(Props(creator))
+      controller ?! CreateGateway(Props(creator))
     })
   }
 

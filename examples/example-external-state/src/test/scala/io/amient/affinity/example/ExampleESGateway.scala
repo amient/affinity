@@ -44,7 +44,7 @@ class ExampleESGateway extends GatewayHttp {
 
     case HTTP(GET, PATH("news", "latest"), _, response) =>
       implicit val timeout = Timeout(5 seconds)
-      val latestNews: Future[List[String]] = keyspace gather GetLatest()
+      val latestNews: Future[List[String]] = keyspace ??? GetLatest()
       val responseText = latestNews.map(news=> "LATEST NEWS:\n" + news.mkString("\n"))
       handleAsText(response, responseText)
   }

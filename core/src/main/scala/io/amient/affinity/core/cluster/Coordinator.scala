@@ -122,7 +122,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       val currentMasters = getCurrentMasters.filter(clusterWide || _.path.address.hasLocalScope)
       val update = MasterUpdates(group, currentMasters, Set())
       implicit val timeout = Timeout(30 seconds)
-      val informed = watcher ack (if (clusterWide) update else update.localTo(watcher))
+      val informed = watcher ?! (if (clusterWide) update else update.localTo(watcher))
       informed.failed.foreach {
         case e: Throwable => if (!closed.get) {
           logger.error(e, "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, terminating the system.")
@@ -202,7 +202,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     if (!closed.get) watchers.foreach { case (watcher, global) =>
       implicit val timeout = Timeout(30 seconds)
       try {
-        val informed = watcher ack (if (global) fullUpdate else fullUpdate.localTo(watcher))
+        val informed = watcher ?! (if (global) fullUpdate else fullUpdate.localTo(watcher))
         informed.failed.foreach {
           case e: Throwable => if (!closed.get) {
             logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)

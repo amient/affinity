@@ -46,18 +46,18 @@ class ExampleBank extends GatewayStream with GatewayHttp {
   val defaultKeyspace = keyspace("default")
 
   input[Account, Transaction]("input-stream") { record: Record[Account, Transaction] =>
-    defaultKeyspace ack StoreTransaction(record.key, record.value)
+    defaultKeyspace ?! StoreTransaction(record.key, record.value)
   }
 
   override def handle: Receive = {
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode, INT(number)), _, response) =>
-      defaultKeyspace ack GetAccountTransactions(Account(sortcode, number)) map (handleAsJson(response, _))
+      defaultKeyspace ?! GetAccountTransactions(Account(sortcode, number)) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), QUERY(("before", before)), response) =>
-      defaultKeyspace gather GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
+      defaultKeyspace ??? GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), _, response) =>
-      defaultKeyspace gather GetBranchTransactions(sortcode) map (handleAsJson(response, _))
+      defaultKeyspace ??? GetBranchTransactions(sortcode) map (handleAsJson(response, _))
   }
 
 }

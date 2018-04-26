@@ -100,8 +100,8 @@ class Container(group: String) extends Actor {
 
     case request @ MasterUpdates(_, add, remove) => request(sender) ! {
       implicit val timeout = Timeout(startupTimeout)
-      remove.toList.foreach(ref => ref ack BecomeStandby())
-      add.toList.foreach(ref => ref ack BecomeMaster())
+      remove.toList.foreach(ref => ref ?! BecomeStandby())
+      add.toList.foreach(ref => ref ?! BecomeMaster())
     }
 
     case request@GracefulShutdown() => request(sender) ! context.stop(self)

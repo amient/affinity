@@ -43,11 +43,11 @@ class ExampleHttpsGatewaySpec extends FlatSpec with AffinityTestBase with Matche
       implicit val scheduler = node.system.scheduler
       implicit val context = node.system.dispatcher
       implicit val timeout = Timeout(3 seconds)
-      Await.result(node.gateway ack GetData("key1"), 3 seconds) should be(None)
-      Await.result(node.gateway ack PutData("key1", "value1"), 3 seconds) should be(None)
-      Await.result(node.gateway ack GetData("key1"), 3 seconds) should be(Some("value1"))
-      Await.result(node.gateway ack PutData("key1", "value2"), 3 seconds) should be(Some("value1"))
-      Await.result(node.gateway ack GetData("key1"), 3 seconds) should be(Some("value2"))
+      Await.result(node.gateway ?! GetData("key1"), 3 seconds) should be(None)
+      Await.result(node.gateway ?! PutData("key1", "value1"), 3 seconds) should be(None)
+      Await.result(node.gateway ?! GetData("key1"), 3 seconds) should be(Some("value1"))
+      Await.result(node.gateway ?! PutData("key1", "value2"), 3 seconds) should be(Some("value1"))
+      Await.result(node.gateway ?! GetData("key1"), 3 seconds) should be(Some("value2"))
     } finally {
       node.shutdown()
     }

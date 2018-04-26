@@ -89,7 +89,7 @@ class Keyspace(config: Config) extends Actor {
       val recipients = routes.values
       implicit val timeout = t
       implicit val scheduler = context.system.scheduler
-      Future.sequence(recipients.map(x => x.ref ack message))
+      Future.sequence(recipients.map(x => x.ref ?! message))
     }
 
     /**

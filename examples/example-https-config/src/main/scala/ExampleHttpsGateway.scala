@@ -45,9 +45,9 @@ class ExampleApiGateway extends Gateway {
 
   val simpleService = keyspace("simple-keyspace")
 
-  def getData(key: String): Future[Option[String]] = simpleService ack GetValue(key)
+  def getData(key: String): Future[Option[String]] = simpleService ?! GetValue(key)
 
-  def putData(key: String, value: String): Future[Option[String]] = simpleService ack PutValue(key, value)
+  def putData(key: String, value: String): Future[Option[String]] = simpleService ?! PutValue(key, value)
 
   override def handle: Receive = super.handle orElse {
     case request@GetData(key) => request(sender) ! getData(key)

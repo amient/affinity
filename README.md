@@ -116,6 +116,27 @@ There ws an experimintal piece of code around lightweight transactions that can 
 around orchestrated logic which use reversible Instructions to compensate failed operations
 but this was abandonned as for it to operate consistently distributed locks would have to be used.
 
+### Akka Patterns
+
+Standard Akka Patterns 
+
+- **! Tell** is a basic Akka fire-and-forget messaging pattern:
+
+- **? Ask** is a standard Akka pattern with timeout that can be imported from `akka.patterns.ask`
+
+After importing `io.amient.affinity.core.ack` there are several additional pattens available:
+
+- **?? Typed Ask** is similar to Ask but only messages of type `Reply[T]` can be sent and the response will be of type `T`
+
+- **message(sender) ! T** if message is of type `Reply[T]`, i.e. typed ask, this pattern can be used to respond 
+
+- **message(sender) ! Future[T]** same as above but here it is combined with pipeTo pattern so the future result reaches the sender when completed
+
+- **?! Ack with Retry** is same as ?? Ack but certain errors are retried up to 3 times using the timeout implicit as a delay between retries
+
+- **??? Scatter-Gather** messages of `Scatter[T]` can be sent to multiple actors and the response will be `T` which is combined from
+ 
+
 ## Http Layer
 
 In the Http Gateway, the HTTP Interface is completely async done with Akka Http.

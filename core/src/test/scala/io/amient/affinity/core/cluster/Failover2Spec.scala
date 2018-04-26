@@ -66,14 +66,14 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     override def handle: Receive = {
       case HTTP(GET, PATH(key), _, response) => handleWith(response) {
         implicit val timeout = Timeout(specTimeout / 5)
-        keyspace1 ack GetValue(key) map {
+        keyspace1 ?! GetValue(key) map {
           case valueOption => Encoder.json(OK, valueOption, gzip = false)
         }
       }
 
       case HTTP(POST, PATH(key, value), _, response) => handleWith(response) {
         implicit val timeout = Timeout(specTimeout / 5)
-        keyspace1 ack PutValue(key, value) map {
+        keyspace1 ?! PutValue(key, value) map {
           _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
         }
       }

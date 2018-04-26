@@ -37,27 +37,27 @@ trait GraphApi extends Gateway {
 
   protected def getVertexProps(vid: Int): Future[Option[VertexProps]] = {
     implicit val timeout = Timeout(1 seconds)
-    graphService ack GetVertexProps(vid)
+    graphService ?! GetVertexProps(vid)
   }
 
   protected def getGraphComponent(cid: Int): Future[Option[Component]] = {
     implicit val timeout = Timeout(1 seconds)
-    graphService ack GetComponent(cid)
+    graphService ?! GetComponent(cid)
   }
 
   protected def connect(v1: Int, v2: Int): Future[Set[Int]] = {
     implicit val timeout = Timeout(5 seconds)
     val ts = System.currentTimeMillis
-    graphService ack ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
-      case props1 => graphService ack ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
+    graphService ?! ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
+      case props1 => graphService ?! ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
         case props2 => collectComponent(v2) flatMap {
           case mergedComponent =>
             val newComponentID = mergedComponent.connected.min
-            graphService ack UpdateComponent(newComponentID, mergedComponent)
-            if (props1.component != newComponentID) graphService ack DeleteComponent(props1.component)
-            if (props2.component != newComponentID) graphService ack DeleteComponent(props2.component)
+            graphService ?! UpdateComponent(newComponentID, mergedComponent)
+            if (props1.component != newComponentID) graphService ?! DeleteComponent(props1.component)
+            if (props2.component != newComponentID) graphService ?! DeleteComponent(props2.component)
             Future.sequence(mergedComponent.connected.map { v =>
-              graphService ack UpdateVertexComponent(v, newComponentID)
+              graphService ?! UpdateVertexComponent(v, newComponentID)
             })
         }
       }
@@ -69,21 +69,21 @@ trait GraphApi extends Gateway {
     implicit val timeout = Timeout(5 seconds)
 
     val ts = System.currentTimeMillis
-    graphService ack ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
-      case props1 => graphService ack ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
+    graphService ?! ModifyGraph(v1, Edge(v2, ts), GOP.REMOVE) flatMap {
+      case props1 => graphService ?! ModifyGraph(v2, Edge(v1, ts), GOP.REMOVE) flatMap {
         case props2 => collectComponent(v1) flatMap {
           case component1 => collectComponent(v2) flatMap {
             case component2 =>
               val newComponentIDS = List(component1.connected.min, component2.connected.min)
-              graphService ack UpdateComponent(newComponentIDS(0), component1)
-              graphService ack UpdateComponent(newComponentIDS(1), component2)
-              if (!newComponentIDS.contains(props1.component)) graphService ack DeleteComponent(props1.component)
-              if (!newComponentIDS.contains(props2.component)) graphService ack DeleteComponent(props2.component)
+              graphService ?! UpdateComponent(newComponentIDS(0), component1)
+              graphService ?! UpdateComponent(newComponentIDS(1), component2)
+              if (!newComponentIDS.contains(props1.component)) graphService ?! DeleteComponent(props1.component)
+              if (!newComponentIDS.contains(props2.component)) graphService ?! DeleteComponent(props2.component)
               Future.sequence {
                 component1.connected.map { v =>
-                  graphService ack UpdateVertexComponent(v, newComponentIDS(0))
+                  graphService ?! UpdateVertexComponent(v, newComponentIDS(0))
                 } ++ component2.connected.map { v =>
-                  graphService ack UpdateVertexComponent(v, newComponentIDS(1))
+                  graphService ?! UpdateVertexComponent(v, newComponentIDS(1))
                 }
               }
           }
@@ -101,7 +101,7 @@ trait GraphApi extends Gateway {
       if (queue.isEmpty) {
         promise.success(Component(ts, agg))
       }
-      else graphService ack GetVertexProps(queue.head) map {
+      else graphService ?! GetVertexProps(queue.head) map {
         _ match {
           case None => throw new NoSuchElementException
           case Some(VertexProps(_, cid, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)
