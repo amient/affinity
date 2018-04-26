@@ -11,7 +11,7 @@ public class TextTest {
         assert(Text.apply(Text.literalFilter, input).equals("(Hello1١),[World'2٢],{\"ľšť\"},!£@$%5<somehack/>"));
         assert(Text.apply(Text.plaintextFilter, input).equals("(Hello1١),[World'2٢], {\"ľšť\"},!£@$%5some hack/"));
         assert(Text.apply(Text.alphanumFilter, input).equals("Hello1١World2٢ľšť5somehack"));
-        assert(Text.apply(Text.nominalFilter, input).equals("HelloWorldľšťsomehack"));
+        assert(Text.apply(Text.nominalFilter, input).equals("HelloWorld'ľšťsomehack"));
         assert(Text.apply(Text.numeralFilter, input).equals("1١2٢5"));
         assert(Text.apply(Text.decimalFilter, input).equals("125"));
         assert(Text.apply(Text.controlFilter, input).equals("\t\n" + (char)0));
@@ -47,8 +47,8 @@ public class TextTest {
     }
 
     @Test
-    public void nominalPatternMatchesUnicodeLettersAndNumbersOnly() {
-        assert( Text.is(Text.nominal,"Aľľščťžýáíéτσιαιγολοχβςανтераб"));
+    public void nominalPatternMatchesUnicodeLettersAccentsAndDashesOnly() {
+        assert( Text.is(Text.nominal,"Aľľščťžýáíéτσιαιγολοχβςανтераб-'–‘’‛′"));
         assert(!Text.is(Text.nominal,"1"));
         assert(!Text.is(Text.nominal,"2"));
         assert(!Text.is(Text.nominal,"3"));
@@ -68,7 +68,6 @@ public class TextTest {
         assert(!Text.is(Text.nominal,"٧"));
         assert(!Text.is(Text.nominal,"٨"));
         assert(!Text.is(Text.nominal,"٩"));
-        assert(!Text.is(Text.nominal,"-"));
         assert(!Text.is(Text.nominal,"_"));
         assert(!Text.is(Text.nominal,"$"));
         assert(!Text.is(Text.nominal,"£"));
