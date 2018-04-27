@@ -60,7 +60,7 @@ trait AckSupport {
 
 trait Reply[+T] {
 
-  def apply[TT >: T](sender: ActorRef): ReplyTo[TT] = new ReplyTo[TT](sender)
+  def apply[S >: T](sender: ActorRef): ReplyTo[S] = new ReplyTo[S](sender)
 
 }
 
@@ -126,11 +126,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     * @return
     */
   def ??[T](message: Reply[T])(implicit timeout: Timeout, context: ExecutionContext): Future[T] = {
-    target ? message map {
-      case result: T => result
-      case _: BoxedUnit => ().asInstanceOf[T]
-      case i => throw new RuntimeException(s"Unexpected response: ${i.getClass} for $message sent to $target")
-    }
+    target ? message map (result => (if (result.isInstanceOf[BoxedUnit]) () else result).asInstanceOf[T])
   }
 
   /**
@@ -161,9 +157,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     def attempt(retry: Int, delay: FiniteDuration = 0 seconds): Unit = {
       val f = if (delay.toMillis == 0) target ? message else after(delay, scheduler)(target ? message)
       f map {
-        case result: T => promise.success(result)
-        case _: BoxedUnit => promise.success(().asInstanceOf[T])
-        case i => promise.failure(new RuntimeException(s"Unexpected response: ${i.getClass} for $message sent to $target"))
+        result => promise.success((if (result.isInstanceOf[BoxedUnit]) () else result).asInstanceOf[T])
       } recover {
         case cause: AkkaException => promise.failure(cause)
         case cause: RequestException => promise.failure(cause)
