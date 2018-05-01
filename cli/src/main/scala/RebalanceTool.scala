@@ -1,3 +1,6 @@
+import java.io.{File, PrintWriter}
+import java.nio.file.Path
+
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
@@ -22,6 +25,7 @@ object RebalanceTool extends Tool {
     val ReplicationFactor = integer("replication.factor", true).doc("desired replication factor after rebalance")
     val Topic = string("topic", false).doc("only reblance a specific topic")
     val ConfigFile = filepath("config.file", false).doc("kafka client properties file for additional settings like security")
+    val OutputFile = filepath("output.file", false).doc("path to the .json file where the output assignment will be generated")
     doc("Tool for rebalancing partition replicas and leaders across kafka cluster")
   }
 
@@ -43,18 +47,22 @@ object RebalanceTool extends Tool {
     zkConf.Connect.setValue(conf.Zookeeper())
     val zkClient = ZkClients.get(zkConf)
     try {
-      apply(zkClient, conf.ReplicationFactor(), if (conf.Topic.isDefined) Some(conf.Topic()).toList else List.empty)
+      val topics = if (conf.Topic.isDefined) Some(conf.Topic()).toList else List.empty
+      val jsonFile = if (conf.OutputFile.isDefined) Some(conf.OutputFile()) else None
+      apply(zkClient, conf.ReplicationFactor(), topics, jsonFile)
     } finally {
       ZkClients.close(zkClient)
     }
 
   }
 
-  def apply(zkClient: ZkClient, targetReplFactor: Int, topicsOnly: List[String]): Unit = {
+  def apply(zkClient: ZkClient, targetReplFactor: Int, topicsOnly: List[String], jsonFile: Option[Path]): Unit = {
     val mapper = new ObjectMapper()
 
     val brokers: List[Int] = zkClient.getChildren("/brokers/ids").asScala.map(_.toInt).toList.sorted
     val numBrokers = brokers.length
+
+    if (targetReplFactor < 1) throw new IllegalArgumentException(s"Target replication factor must be at least 1")
 
     println(s"Available Brokers: [${brokers.mkString(",")}]")
     println(s"Target replication factor: $targetReplFactor")
@@ -85,25 +93,34 @@ object RebalanceTool extends Tool {
         }
     }
     println("---------------------------------------------------------------------------------------------------------")
-
     if (assignments.forall(!_.modified)) {
       try {
         print(27.toChar + "[92m")
         println("All topics are balanced")
       } finally print(27.toChar + "[0m")
-    } else {
-      val json = mapper.createObjectNode()
-      json.put("version", "1")
-      val jsonPartitions = json.putArray("partitions")
-      assignments.filter(_.modified).foreach {
-        assignment =>
-          val jsonAssignment = jsonPartitions.addObject()
-          jsonAssignment.put("topic", assignment.topic)
-          jsonAssignment.put("partition", assignment.partition)
-          val jsonReplicas = jsonAssignment.putArray("replicas")
-          assignment.target.foreach(jsonReplicas.add)
+    } else jsonFile.foreach { path =>
+      try {
+        print(27.toChar + "[93m")
+        print(s"Generating file ${path}")
+      } finally println(27.toChar + "[0m")
+      val pw = new PrintWriter(path.toFile)
+      try {
+        val json = mapper.createObjectNode()
+        json.put("version", "1")
+        val jsonPartitions = json.putArray("partitions")
+        assignments.filter(_.modified).foreach {
+          assignment =>
+            val jsonAssignment = jsonPartitions.addObject()
+            jsonAssignment.put("topic", assignment.topic)
+            jsonAssignment.put("partition", assignment.partition)
+            val jsonReplicas = jsonAssignment.putArray("replicas")
+            assignment.target.foreach(jsonReplicas.add)
+        }
+        pw.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json))
+
+      } finally {
+        pw.close()
       }
-      println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json))
     }
 
   }
