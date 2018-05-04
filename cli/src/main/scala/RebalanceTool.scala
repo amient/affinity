@@ -23,6 +23,8 @@ object RebalanceTool extends Tool {
   class RebalanceConf extends CfgStruct[RebalanceConf] {
     val Zookeeper = string("zookeeper", true).doc("connection to the zookeeper that coordinates the kafka cluster")
     val ReplicationFactor = integer("replication.factor", true).doc("desired replication factor after rebalance")
+    //TODO val RemoveBrokers = intlist("remove.brokeres", false).doc("brokers to ")
+    val IgnoreBroker = integer("ignore.broker", false).doc("broker to ignore in the assignment")
     val Topic = string("topic", false).doc("only reblance a specific topic")
     val ConfigFile = filepath("config.file", false).doc("kafka client properties file for additional settings like security")
     val OutputFile = filepath("output.file", false).doc("path to the .json file where the output assignment will be generated")
@@ -48,18 +50,20 @@ object RebalanceTool extends Tool {
     val zkClient = ZkClients.get(zkConf)
     try {
       val topics = if (conf.Topic.isDefined) Some(conf.Topic()).toList else List.empty
+      val ignoreBrokers: Set[Int] = if (conf.IgnoreBroker.isDefined) Set(conf.IgnoreBroker()) else Set.empty
       val jsonFile = if (conf.OutputFile.isDefined) Some(conf.OutputFile()) else None
-      apply(zkClient, conf.ReplicationFactor(), topics, jsonFile)
+      apply(zkClient, conf.ReplicationFactor(), topics, jsonFile, ignoreBrokers)
     } finally {
       ZkClients.close(zkClient)
     }
 
   }
 
-  def apply(zkClient: ZkClient, targetReplFactor: Int, topicsOnly: List[String], jsonFile: Option[Path]): Unit = {
+  def apply(zkClient: ZkClient, targetReplFactor: Int, topicsOnly: List[String], jsonFile: Option[Path], ignoreBrokers: Set[Int]): Unit = {
     val mapper = new ObjectMapper()
 
-    val brokers: List[Int] = zkClient.getChildren("/brokers/ids").asScala.map(_.toInt).toList.sorted
+    val brokers: List[Int] = zkClient.getChildren("/brokers/ids").asScala.map(_.toInt).toList
+      .filter(b => !ignoreBrokers.contains(b)).sorted
     val numBrokers = brokers.length
 
     if (targetReplFactor < 1) throw new IllegalArgumentException(s"Target replication factor must be at least 1")
