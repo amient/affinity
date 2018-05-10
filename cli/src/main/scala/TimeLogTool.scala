@@ -1,7 +1,10 @@
+import java.io.{File, FileInputStream}
+import java.util.Properties
+
 import com.indvd00m.ascii.render.api.{ICanvas, IContextBuilder, IRender}
 import com.indvd00m.ascii.render.elements.{Label, Line, Rectangle}
 import com.indvd00m.ascii.render.{Point, Render}
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.{LogEntry, LogStorage, LogStorageConf}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
@@ -51,7 +54,7 @@ object TimeLogTool extends Tool {
   }
 
   def printHelp(): Unit = {
-    println("Usage: timelog <kafka-bootstrap> <topic> [<partition> [<resolution-minutes>] [<from-datetime> [<to-datetime> [<from-offset> [<to-offset>]]]]]\n")
+    println("Usage: timelog <kafka-bootstrap|consumer-props-file> <topic> [<partition> [<resolution-minutes>] [<from-datetime> [<to-datetime> [<from-offset> [<to-offset>]]]]]\n")
   }
 
   def apply(bootstrap: String, topic: String): Unit = {
@@ -65,7 +68,7 @@ object TimeLogTool extends Tool {
             range: TimeRange = TimeRange.UNBOUNDED,
             offsetRange: (Long, Long) = (Long.MinValue, Long.MaxValue)): Unit = {
     val log = getKafkaLog(bootstrap, topic)
-    println(s"calculating compaction stats for range: $range..\n")
+    logger.info(s"calculating compaction stats for range: $range..\n")
     log.reset(partition, range)
     val (limitOffsetStart, limitOffsetStop) = offsetRange
     if (limitOffsetStart> 0) log.reset(partition, limitOffsetStart)
@@ -78,7 +81,7 @@ object TimeLogTool extends Tool {
     def addblock(): Unit = {
       val timerange: TimeRange = new TimeRange(blockmints, blockmaxts)
       blocks += ((timerange, startpos, endpos))
-      println(s"Block $startpos : $endpos -> $timerange")
+      logger.debug(s"Block $startpos : $endpos -> $timerange")
       startpos = -1L
       endpos = -1L
       blockmaxts = Long.MinValue
@@ -105,25 +108,36 @@ object TimeLogTool extends Tool {
         numRecords += 1
     }
     if (startpos > -1) addblock()
-    println("number of records: " + numRecords)
-    println("minimum timestamp: " + pretty(minTimestamp))
-    println("maximum timestamp: " + pretty(maxTimestamp))
-    println("minimum offset: " + minPosition)
-    println("maximum offset: " + maxPosition)
+    logger.info("number of records: " + numRecords)
+    logger.info("minimum timestamp: " + pretty(minTimestamp))
+    logger.info("maximum timestamp: " + pretty(maxTimestamp))
+    logger.info("minimum offset: " + minPosition)
+    logger.info("maximum offset: " + maxPosition)
     plot(blocks.toList)
   }
 
-  private def getKafkaLog(bootstrap: String, topic: String): KafkaLogStorage = {
-    println(s"initializing $bootstrap / $topic")
-    val conf = new LogStorageConf().apply(ConfigFactory.parseMap(Map(
+  private def getKafkaLog(bootstrapOrConfigFile: String, topic: String): KafkaLogStorage = {
+
+    val configFile = new File(bootstrapOrConfigFile)
+
+    val config = ConfigFactory.parseMap(Map(
       LogStorage.StorageConf.Class.path -> classOf[KafkaLogStorage].getName(),
-      KafkaStorageConf.BootstrapServers.path -> bootstrap,
       KafkaStorageConf.Topic.path -> topic
-    ).asJava))
-// TODO this type of configuration should also work:
-//    conf.Class.setValue(classOf[KafkaLogStorage])
-//    KafkaStorageConf(conf).BootstrapServers.setValue(bootstrap)
-//    KafkaStorageConf(conf).Topic.setValue(topic)
+    ).asJava)
+
+    val conf = new LogStorageConf().apply(if (configFile.exists) {
+      logger.info(s"initializing $topic from consumer properties file: $bootstrapOrConfigFile")
+      val consumerProps = new Properties()
+      consumerProps.load(new FileInputStream(configFile))
+      config
+        .withValue(KafkaStorageConf.BootstrapServers.path, ConfigValueFactory.fromAnyRef(consumerProps.getProperty("bootstrap.servers")))
+        .withFallback(ConfigFactory.parseMap(consumerProps.asScala.asJava)
+          .withoutPath("bootstrap.servers").atPath(KafkaStorageConf.Consumer.path))
+    } else {
+        logger.info(s"initializing $topic from bootstrap: $bootstrapOrConfigFile")
+        config.withValue(KafkaStorageConf.BootstrapServers.path, ConfigValueFactory.fromAnyRef(bootstrapOrConfigFile))
+    })
+
     LogStorage.newInstance(conf).asInstanceOf[KafkaLogStorage]
   }
 
