@@ -51,7 +51,7 @@ object TimeLogTool extends Tool {
   }
 
   def printHelp(): Unit = {
-    println("Usage: timelog <kafka-bootstrap> <topic> [<partition> [<resolution-minutes>] [<from-datetime> [<to-datetime>]]]\n")
+    println("Usage: timelog <kafka-bootstrap> <topic> [<partition> [<resolution-minutes>] [<from-datetime> [<to-datetime> [<from-offset> [<to-offset>]]]]]\n")
   }
 
   def apply(bootstrap: String, topic: String): Unit = {
