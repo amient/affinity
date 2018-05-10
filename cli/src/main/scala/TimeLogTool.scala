@@ -68,7 +68,7 @@ object TimeLogTool extends Tool {
             range: TimeRange = TimeRange.UNBOUNDED,
             offsetRange: (Long, Long) = (Long.MinValue, Long.MaxValue)): Unit = {
     val log = getKafkaLog(bootstrap, topic)
-    logger.info(s"calculating compaction stats for range: $range..\n")
+    println(s"calculating compaction stats for range: $range..\n")
     log.reset(partition, range)
     val (limitOffsetStart, limitOffsetStop) = offsetRange
     if (limitOffsetStart> 0) log.reset(partition, limitOffsetStart)
@@ -108,11 +108,11 @@ object TimeLogTool extends Tool {
         numRecords += 1
     }
     if (startpos > -1) addblock()
-    logger.info("number of records: " + numRecords)
-    logger.info("minimum timestamp: " + pretty(minTimestamp))
-    logger.info("maximum timestamp: " + pretty(maxTimestamp))
-    logger.info("minimum offset: " + minPosition)
-    logger.info("maximum offset: " + maxPosition)
+    println("number of records: " + numRecords)
+    println("minimum timestamp: " + pretty(minTimestamp))
+    println("maximum timestamp: " + pretty(maxTimestamp))
+    println("minimum offset: " + minPosition)
+    println("maximum offset: " + maxPosition)
     plot(blocks.toList)
   }
 
