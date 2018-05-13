@@ -42,15 +42,17 @@ Below is the table of all supported types, all which support default values.
     ----------------------------------------------------------------------------------------------------
     Null                            null
     Boolean                         boolean
-    Int                             int
-    @Fixed Int                      fixed(4)             Big endian
-    Long                            long
-    @Fixed Long                     fixed(8)             Big endian
+    Int                             int                  avro compressed binary
+    @Fixed Int                      fixed(4)             4-byte big endian 
+    Long                            long                 avro compressed binary
+    @Fixed Long                     fixed(8)             8-byte big endian
     Float                           float
     Double                          double
     String                          string               UTF-8
     @Fixed(size) String             fixed(size)          ASCII
-    Array[Byte]                     bytes                
+    Array[Byte]                     bytes                varible length byte array
+    @Fixed Array[Byte]              fixed(size)          fixed size byte array
+    UUID                            fixed(16)            16-byte uuid representation, same as when @Fixed 
     Map[String, T]   †              map(T)               Maps have to have String keys
     Iterable[T]      †              array(T)             List[T], Seq[T], Set[T], etc.
     Enumeration      †              enum                 only scala enums are suppored

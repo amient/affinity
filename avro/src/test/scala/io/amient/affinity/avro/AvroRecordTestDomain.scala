@@ -35,6 +35,8 @@ case class SimpleKey(val id: Int) extends AvroRecord {
   override def hashCode(): Int = id.hashCode()
 }
 
+case class UuidCompoundKey(@Fixed(16) uuid1: Array[Byte], uuid2: UUID, postfix: Long) extends AvroRecord
+
 case class CompoundKey(@Fixed(2) country: String, @Fixed(10) city: String, id2: Int) extends AvroRecord
 
 case class LongCompoundKey(@Fixed version: Long, @Fixed(2) country: String, @Fixed(4) city: String, value: Double) extends AvroRecord
