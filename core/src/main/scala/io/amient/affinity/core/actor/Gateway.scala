@@ -46,7 +46,7 @@ object Gateway {
   class GatewayConf extends CfgStruct[GatewayConf] {
     val Class = cls("class", classOf[Gateway], false).doc("Entry point class for all external requests, both http and stream inputs")
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000).doc("Size of the queue when the cluster enters suspended mode")
-    val Http = struct("http", new GatewayHttp.HttpConf)
+    val Http = struct("http", new GatewayHttp.HttpConf, false)
     val Stream = group("stream", classOf[LogStorageConf], false).doc("External input and output streams to which system is connected, if any")
   }
 

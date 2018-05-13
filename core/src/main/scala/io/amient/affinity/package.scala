@@ -35,8 +35,8 @@ package object affinity {
   }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Akka: AkkaConf = struct("akka", new AkkaConf)
-    val Affi: AffinityConf = struct("affinity", new AffinityConf)
+    val Akka: AkkaConf = struct("akka", new AkkaConf, false)
+    val Affi: AffinityConf = struct("affinity", new AffinityConf, true)
   }
 
   class AkkaConf extends CfgStruct[AkkaConf](Cfg.Options.IGNORE_UNKNOWN) {
@@ -54,11 +54,11 @@ package object affinity {
   }
 
   class AffinityConf extends CfgStruct[AffinityConf] {
-    val Avro: AvroConf = struct("avro", new AvroConf())
-    val Coordinator: CoorinatorConf = struct("coordinator", new CoorinatorConf)
+    val Avro: AvroConf = struct("avro", new AvroConf(), true)
+    val Coordinator: CoorinatorConf = struct("coordinator", new CoorinatorConf, true)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
     val Global = group("global", classOf[StateConf], false).doc("each global state has an ID and needs to be further configured")
-    val Node = struct("node", new NodeConf)
+    val Node = struct("node", new NodeConf, true)
   }
 
   object AffinityActorSystem {

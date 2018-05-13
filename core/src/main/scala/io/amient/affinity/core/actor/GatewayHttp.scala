@@ -61,8 +61,8 @@ object GatewayHttp {
   }
 
   class GatewayConf extends CfgStruct[GatewayConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Http = struct("affinity.node.gateway.http", new HttpConf)
-    val Tls = struct("affinity.node.gateway.tls", new TlsConf)
+    val Http = struct("affinity.node.gateway.http", new HttpConf, false)
+    //val Tls = struct("affinity.node.gateway.tls", new TlsConf, false) //TODO #184 multiple listeners
   }
 
   class HttpConf extends CfgStruct[HttpConf] {
@@ -70,7 +70,7 @@ object GatewayHttp {
     val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
     val Host = string("host", true).doc("host to which the http interface binds to")
     val Port = integer("port", true).doc("port to which the http interface binds to")
-    val Tls = struct("tls", new TlsConf)
+    val Tls = struct("tls", new TlsConf, false)
   }
 
   class TlsConf extends CfgStruct[TlsConf] {

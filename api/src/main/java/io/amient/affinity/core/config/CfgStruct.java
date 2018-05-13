@@ -213,8 +213,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return add(path, new CfgCls<>(c), true, Optional.of(defaultVal));
     }
 
-    public <X extends CfgStruct<X>> X struct(String path, X obj) {
-        return add(path, obj, false, Optional.empty());
+    public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
+        return add(path, obj, required, Optional.empty());
     }
 
     public <X extends CfgStruct<X>> X ref(X obj, boolean required) {

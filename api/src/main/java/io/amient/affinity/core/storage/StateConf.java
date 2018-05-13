@@ -33,9 +33,9 @@ public class StateConf extends CfgStruct<StateConf> {
     public Cfg<Long> MinTimestampUnixMs = longint("min.timestamp.ms", 0L)
             .doc("Any records with timestamp lower than this value will be immediately dropped");
 
-    public LogStorageConf Storage = struct("storage", new LogStorageConf());
+    public LogStorageConf Storage = struct("storage", new LogStorageConf(), false);
 
-    public MemStoreConf MemStore = struct("memstore", new MemStore.MemStoreConf());
+    public MemStoreConf MemStore = struct("memstore", new MemStore.MemStoreConf(), true);
 
     public Cfg<Integer> LockTimeoutMs = integer("lock.timeout.ms", 10000)
             .doc("When per-row locking is used, this time-out specifies how long a lock can be held by a single thread");

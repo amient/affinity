@@ -39,7 +39,7 @@ object ZookeeperSchemaRegistry {
   }
 
   class ZkAvroConf extends CfgStruct[ZkAvroConf](classOf[AvroConf]) {
-    val ZooKeeper = struct("schema.registry.zookeeper", new ZkConf)
+    val ZooKeeper = struct("schema.registry.zookeeper", new ZkConf, true)
     val ZkRoot = string("schema.registry.zookeeper.root", "/affinity-schema-registry")
       .doc("znode under which schemas will be stored")
   }

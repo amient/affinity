@@ -22,9 +22,11 @@ package io.amient.affinity.core.storage
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
+import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+
 import scala.language.postfixOps
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -41,6 +43,7 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
   val system = AffinityActorSystem.create("test",
     ConfigFactory.parseMap(Map(
       Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
+      Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
       Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
       Conf.Affi.Node.Gateway.Http.Port.path -> "0"
     ).asJava))
