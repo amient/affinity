@@ -28,6 +28,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Controller.FatalErrorShutdown
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ByteUtils, Reply}
 
@@ -111,9 +112,9 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   /**
     * watch changes in the coordinate group of routees in the whole cluster.
     *
-    * @param watcher actor which will receive the messages
-    * @param clusterWide  if true, the watcher will be notified of master status changes in the entire cluster
-    *                     if false, the watcher will be notified of master status changes local to that watcher
+    * @param watcher     actor which will receive the messages
+    * @param clusterWide if true, the watcher will be notified of master status changes in the entire cluster
+    *                    if false, the watcher will be notified of master status changes local to that watcher
     */
   def watch(watcher: ActorRef, clusterWide: Boolean): Unit = {
     synchronized {
@@ -125,8 +126,10 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       val informed = watcher ?! (if (clusterWide) update else update.localTo(watcher))
       informed.failed.foreach {
         case e: Throwable => if (!closed.get) {
-          logger.error(e, "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, terminating the system.")
-          system.terminate()
+          system.eventStream.publish(
+            FatalErrorShutdown(new RuntimeException(
+              "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, " +
+                "terminating the system.", e)))
         }
       }
     }
@@ -162,7 +165,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       })
 
       val actorRefs: Future[Iterable[(String, ActorRef)]] = attempts.map(_.collect {
-          case Success((handle, actor)) => (handle, actor)
+        case Success((handle, actor)) => (handle, actor)
       })
 
       val actors = Await.result(actorRefs, 1 minute)

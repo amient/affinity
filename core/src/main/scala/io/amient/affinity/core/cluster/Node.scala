@@ -66,7 +66,7 @@ class Node(config: Config) {
 
   implicit val system = AffinityActorSystem.create(actorSystemName, config)
 
-  private val log = LoggerFactory.getLogger(this.getClass)//Logging.getLogger(system, this)
+  private val log = LoggerFactory.getLogger(this.getClass) //Logging.getLogger(system, this)
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
@@ -74,23 +74,32 @@ class Node(config: Config) {
 
   private val clusterReady = new CountDownLatch(1)
 
-  system.eventStream.subscribe(system.actorOf(Props(new Actor {
+  @volatile private var shuttingDown = false
+
+  @volatile private var fatalError: Option[Throwable] = None
+
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  val systemEventsWatcher = system.actorOf(Props(new Actor {
     override def receive: Receive = {
       case GatewayClusterStatus(false) => clusterReady.countDown()
+      case FatalErrorShutdown(e) =>
+        fatalError = Some(e)
+        shutdown()
     }
-  })), classOf[GatewayClusterStatus])
+  }))
 
-  system.eventStream.subscribe(system.actorOf(Props(new Actor {
-    override def receive: Receive = {
-      case FatalErrorShutdown(e) => shutdown(Some(e))
-    }
-  })), classOf[FatalErrorShutdown])
+  system.eventStream.subscribe(systemEventsWatcher, classOf[GatewayClusterStatus])
+
+  system.eventStream.subscribe(systemEventsWatcher, classOf[FatalErrorShutdown])
 
   sys.addShutdownHook {
-    if (!system.whenTerminated.isCompleted) {
+    if (!shuttingDown) {
       log.info("process killed - attempting graceful shutdown")
+      fatalError = None
       shutdown()
     }
+    Await.ready(system.terminate, shutdownTimeout)
   }
 
   /**
@@ -99,28 +108,24 @@ class Node(config: Config) {
     * @return httpPort or -1 if gateway doesn't have http interface attached
     */
   def awaitClusterReady(): Unit = {
-    clusterReady.await(15, TimeUnit.SECONDS)
+    clusterReady.await(startupTimeout.toMillis, TimeUnit.MILLISECONDS)
   }
 
   def getHttpPort(): Int = {
     Await.result(httpGatewayPort.future, 15 seconds)
   }
 
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  final def shutdown(fatalError: Option[Throwable] = None): Unit = try {
+  final def shutdown(): Unit = if (!shuttingDown) {
+    shuttingDown = true
     implicit val timeout = Timeout(shutdownTimeout)
-    Await.ready(controller ? GracefulShutdown() flatMap { _ =>
-      log.debug("Shutdown completed, terminating actor system.")
-      system.terminate()
-    }, shutdownTimeout)
-    log.debug("Actor system terminated")
-  } finally {
-    fatalError.foreach {
-      e =>
+    Await.result(controller ? GracefulShutdown() flatMap { _ =>
+      fatalError.map { e =>
         log.error("Affinity Fatal Error", e)
-        System.exit(3)
-    }
+        Future.successful(System.exit(1))
+      }.getOrElse {
+        system.terminate()
+      }
+    }, shutdownTimeout)
   }
 
   implicit def partitionCreatorToProps[T <: Partition](creator: => T)(implicit tag: ClassTag[T]): Props = {
@@ -182,10 +187,9 @@ class Node(config: Config) {
   }
 
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {
-    eventual.failed.foreach {
-      case e: Throwable =>
-        log.error("Could not execute startup command", e)
-        shutdown()
+    eventual.failed.foreach { case e: Throwable =>
+      log.error("Could not execute startup command", e)
+      shutdown()
     }
     eventual
   }

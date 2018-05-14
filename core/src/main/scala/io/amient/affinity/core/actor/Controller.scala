@@ -128,11 +128,11 @@ class Controller extends Actor {
     }
 
     case request@GracefulShutdown() =>
-      implicit val timeout = Timeout(shutdownTimeout)
       request(sender) ! {
         Future.sequence {
           context.children.map { child =>
             log.debug("Requesting GracefulShutdown from " + child)
+            implicit val timeout = Timeout(shutdownTimeout)
             child ? GracefulShutdown() recover {
               case any =>
                 log.warning(s"$child failed while executing GracefulShutdown request: ", any.getMessage)
