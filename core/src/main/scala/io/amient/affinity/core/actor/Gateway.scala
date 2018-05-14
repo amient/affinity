@@ -66,7 +66,7 @@ trait Gateway extends ActorHandler {
 
   implicit def unitToVoidFuture(f: Future[Unit]): Future[Void] = f.map(null)(ExecutionContext.Implicits.global)
 
-  import context.dispatcher
+  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
   private var started = false
 
@@ -152,9 +152,8 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  abstract override def postStop(): Unit = try shutdown() finally super.postStop()
-
   abstract override def shutdown(): Unit = {
+    log.debug("Closing global state stores")
     globals.foreach {
       case (identifier, state) => try {
         state.close()

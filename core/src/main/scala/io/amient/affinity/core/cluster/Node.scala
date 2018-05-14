@@ -24,7 +24,7 @@ import java.nio.file.Paths
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import akka.actor.{Actor, Props}
-import akka.event.Logging
+import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
@@ -33,6 +33,7 @@ import io.amient.affinity.core.actor.Gateway.{GatewayClusterStatus, GatewayConf}
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 import io.amient.affinity.{AffinityActorSystem, Conf}
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -65,9 +66,7 @@ class Node(config: Config) {
 
   implicit val system = AffinityActorSystem.create(actorSystemName, config)
 
-  private val terminated = system.whenTerminated
-
-  private val log = Logging.getLogger(system, this)
+  private val log = LoggerFactory.getLogger(this.getClass)//Logging.getLogger(system, this)
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
@@ -81,8 +80,14 @@ class Node(config: Config) {
     }
   })), classOf[GatewayClusterStatus])
 
+  system.eventStream.subscribe(system.actorOf(Props(new Actor {
+    override def receive: Receive = {
+      case FatalErrorShutdown(e) => shutdown(Some(e))
+    }
+  })), classOf[FatalErrorShutdown])
+
   sys.addShutdownHook {
-    if (!terminated.isCompleted) {
+    if (!system.whenTerminated.isCompleted) {
       log.info("process killed - attempting graceful shutdown")
       shutdown()
     }
@@ -90,6 +95,7 @@ class Node(config: Config) {
 
   /**
     * Await all partitions in all keyspaces to have masters
+    *
     * @return httpPort or -1 if gateway doesn't have http interface attached
     */
   def awaitClusterReady(): Unit = {
@@ -100,14 +106,22 @@ class Node(config: Config) {
     Await.result(httpGatewayPort.future, 15 seconds)
   }
 
-  final def shutdown(): Unit = {
-    controller ! GracefulShutdown()
-    Await.ready(terminated, shutdownTimeout)
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  final def shutdown(fatalError: Option[Throwable] = None): Unit = try {
+    implicit val timeout = Timeout(shutdownTimeout)
+    Await.ready(controller ? GracefulShutdown() flatMap { _ =>
+      log.debug("Shutdown completed, terminating actor system.")
+      system.terminate()
+    }, shutdownTimeout)
+    log.debug("Actor system terminated")
+  } finally {
+    fatalError.foreach {
+      e =>
+        log.error("Affinity Fatal Error", e)
+        System.exit(3)
+    }
   }
-
-  import system.dispatcher
-
-  implicit val scheduler = system.scheduler
 
   implicit def partitionCreatorToProps[T <: Partition](creator: => T)(implicit tag: ClassTag[T]): Props = {
     Props(creator)
@@ -135,6 +149,8 @@ class Node(config: Config) {
       }
     }
   }
+
+  implicit val scheduler = system.scheduler
 
   def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
     try {
@@ -168,7 +184,7 @@ class Node(config: Config) {
   private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {
     eventual.failed.foreach {
       case e: Throwable =>
-        log.error(e, "Could not execute startup command")
+        log.error("Could not execute startup command", e)
         shutdown()
     }
     eventual

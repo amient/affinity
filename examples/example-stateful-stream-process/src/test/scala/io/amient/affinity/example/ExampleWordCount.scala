@@ -41,7 +41,8 @@ class ExampleWordCount extends GatewayStream {
           case None => Some(1)
           case Some(prev) => Some(prev + 1)
         }) flatMap {
-          updatedCount => out.append(new Record(word, updatedCount.get, record.timestamp))
+          updatedCount =>
+            out.append(new Record(word, updatedCount.get, record.timestamp))
           //any records written to out will be flushed automatically - gateway manages all declared outputs
         }
       }
