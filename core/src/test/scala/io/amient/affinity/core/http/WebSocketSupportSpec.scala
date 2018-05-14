@@ -125,8 +125,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   }
 
   override def afterAll: Unit = try {
-    controller ! GracefulShutdown()
-    Await.ready(system.whenTerminated, specTimeout)
+    Await.ready(controller ? GracefulShutdown() flatMap (_ => system.terminate), timeout.duration)
   } finally {
     super.afterAll
   }
