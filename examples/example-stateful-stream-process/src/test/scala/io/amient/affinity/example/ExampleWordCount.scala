@@ -30,25 +30,25 @@ class ExampleWordCount extends GatewayStream {
 
   val counter = global[String, Long]("state-counter")
 
-  input[Array[Byte], Array[Byte]]("input-stream") {
-    //raw input stream: keys are null, and values are plain string bytes
-    record: Record[Array[Byte], Array[Byte]] =>
-      val words = new String(record.value).split("\\s").toList
-      implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
-      val updates = words.map { word =>
-        //this operation is not idempotent so due to at-least-once guarantee, repeated inputs may be double-counted
-        counter.updateAndGet(word, current => current match {
-          case None => Some(1)
-          case Some(prev) => Some(prev + 1)
-        }) flatMap {
-          updatedCount => out.append(new Record(word, updatedCount.get, record.timestamp))
-          //any records written to out will be flushed automatically - gateway manages all declared outputs
-        }
+  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
+
+  input[Array[Byte], Array[Byte]]("input-stream") { record =>
+    //raw input stream: keys are null, and values are plain text bytes
+    val words = new String(record.value).split("\\s").toList
+    val updates = words.map { word =>
+      //this operation is not idempotent so due to at-least-once guarantee, repeated inputs may be double-counted
+      counter.updateAndGet(word, {
+        case None => Some(1)
+        case Some(prev) => Some(prev + 1)
+      }) flatMap {
+        updatedCount => out.append(new Record(word, updatedCount.get, record.timestamp))
+        //any records written to out will be flushed automatically - gateway manages all declared outputs
       }
-      // however to get end-to-end processing guarantee we need to return the ack from counter updates
-      // which is here summarized as Future.sequence of all individual word count updates
-      // as part of processing the record it will be added to the pool of futures that need complete when commit occurs
-      Future.sequence(updates)
+    }
+    // however to get end-to-end processing guarantee we need to return the ack from counter updates
+    // which is here summarized as Future.sequence of all individual word count updates
+    // as part of processing the record it will be added to the pool of futures that need complete when commit occurs
+    Future.sequence(updates)
   }
 
 }

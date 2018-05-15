@@ -46,6 +46,8 @@ object Controller {
 
   final case class GracefulShutdown() extends Reply[Unit]
 
+  final case class FatalErrorShutdown(e: Throwable)
+
 }
 
 class Controller extends Actor {
@@ -63,13 +65,7 @@ class Controller extends Actor {
 
   private val containers = scala.collection.mutable.Map[String, Promise[Unit]]()
 
-  override def postStop(): Unit = {
-    super.postStop()
-  }
-
-  import system.dispatcher
-
-  implicit val scheduler = context.system.scheduler
+  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1 minute) {
     case _: IllegalArgumentException ⇒ Resume
@@ -132,18 +128,18 @@ class Controller extends Actor {
     }
 
     case request@GracefulShutdown() =>
-      implicit val timeout = Timeout(shutdownTimeout)
       request(sender) ! {
         Future.sequence {
           context.children.map { child =>
             log.debug("Requesting GracefulShutdown from " + child)
+            implicit val timeout = Timeout(shutdownTimeout)
             child ? GracefulShutdown() recover {
               case any =>
                 log.warning(s"$child failed while executing GracefulShutdown request: ", any.getMessage)
                 context.stop(child)
             }
           }
-        } flatMap (_ => system.terminate()) map (_ => ())
+        } map(_ => ())
       }
 
     case anyOther => log.warning("Unknown controller message " + anyOther)

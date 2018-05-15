@@ -91,7 +91,9 @@ trait GatewayHttp extends Gateway {
   private val suspendedQueueMaxSize = conf.Node.Gateway.SuspendQueueMaxSize()
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
 
-  import context.{dispatcher, system}
+  import context.system
+
+  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
   private var isSuspended = true
 

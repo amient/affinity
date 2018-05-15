@@ -24,6 +24,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.event.Logging
 import io.amient.affinity.Conf
+import io.amient.affinity.core.actor.Controller.FatalErrorShutdown
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 import io.amient.affinity.core.util.{CompletedJavaFuture, EventTime, OutputDataStream, TimeRange}
@@ -33,7 +34,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.parallel.immutable.ParSeq
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, TimeoutException}
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
 
@@ -56,7 +57,7 @@ trait GatewayStream extends Gateway {
 
   private val declardOutputStreams = new ListBuffer[OutputDataStream[_, _]]
 
-  lazy val outpuStreams: ParSeq[OutputDataStream[_, _]] = declardOutputStreams.result().par
+  lazy val outputStreams: ParSeq[OutputDataStream[_, _]] = declardOutputStreams.result().par
 
   def output[K: ClassTag, V: ClassTag](streamIdentifier: String): OutputDataStream[K, V] = {
     val streamConf = nodeConf.Gateway.Stream(streamIdentifier)
@@ -121,9 +122,12 @@ trait GatewayStream extends Gateway {
         closed = true
         lock.notifyAll()
       }
+      logger.debug("Closing input streams")
       inputStreamManager.synchronized {
         inputStreamManager.join()
       }
+      logger.debug("Closing output streams")
+      outputStreams.foreach(_.close())
     } finally {
       super.shutdown()
     }
@@ -185,9 +189,9 @@ trait GatewayStream extends Gateway {
            *  Every <commitInterval> all outputs and work is flushed and then consumer is commited()
            */
           val now = System.currentTimeMillis()
-          if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval) {
+          if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval) try {
             //flush all outputs in parallel - these are all outputs declared in this gateway
-            outpuStreams.foreach(_.flush())
+            outputStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
             Await.result(Future.sequence(work.result), commitTimeout millis)
             //commit the records processed by this processor only since the last commit
@@ -196,12 +200,15 @@ trait GatewayStream extends Gateway {
             work.clear
             lastCommitTimestamp = now
             if (closed) finalized = true
+          } catch {
+            case _: TimeoutException =>
+              throw new TimeoutException(s"Input stream processor $identifier commit timed-out, consider increasing ${streamConfig.CommitTimeoutMs.path}")
           }
         }
 
       } catch {
         case _: InterruptedException =>
-        case e: Throwable => logger.error(e, s"Input stream processor: $identifier")
+        case e: Throwable => context.system.eventStream.publish(FatalErrorShutdown(e))
       } finally {
         logger.info(s"Finished input stream processor: $identifier (closed = $closed)")
         consumer.close()
