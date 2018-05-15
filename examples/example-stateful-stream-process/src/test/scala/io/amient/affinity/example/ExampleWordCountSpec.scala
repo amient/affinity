@@ -45,8 +45,6 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
     "affinity.avro.schema.registry.id" -> MemorySchemaRegistryId
   ).asJava).withFallback(ConfigFactory.parseResources("example-ssp.conf")).resolve()
 
-  val node = new Node(config)
-
   val inputTopic = config.getString("affinity.node.gateway.stream.input-stream.kafka.topic")
 
   val outputTopic = config.getString("affinity.node.gateway.stream.output-stream.kafka.topic")
@@ -73,14 +71,12 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
 
 
   override def beforeAll(): Unit = try {
-    node.start()
-    node.awaitClusterReady()
+
   } finally {
     super.beforeAll()
   }
 
   override def afterAll(): Unit = try {
-    node.shutdown()
     producer.close()
   } finally {
     super.afterAll()
@@ -92,20 +88,38 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
     val outputQueue = new LinkedBlockingQueue[ConsumerRecord[String, Long]]()
     def poll(): (String, Long) = {
       if (outputQueue.isEmpty) outputQueue.addAll(consumer.poll(10000).records(outputTopic).asScala.toList.asJava)
-      val record = outputQueue.poll(10000, TimeUnit.MILLISECONDS)
-      (record.key, record.value)
+      val record = outputQueue.poll(3000, TimeUnit.MILLISECONDS)
+      if (record == null) null else (record.key, record.value)
     }
+
     try {
-      producer.send(new ProducerRecord(inputTopic, null, "Hello".getBytes)).get()
-      poll() should be (("Hello", 1))
-      producer.send(new ProducerRecord(inputTopic, null, "Hello".getBytes)).get()
-      poll() should be (("Hello", 2))
-      producer.send(new ProducerRecord(inputTopic, null, "Hello".getBytes)).get()
-      poll() should be (("Hello", 3))
-      producer.send(new ProducerRecord(inputTopic, null, "World".getBytes)).get()
-      poll() should be (("World", 1))
-      producer.send(new ProducerRecord(inputTopic, null, "Hello World".getBytes)).get()
-      Set(poll(), poll()) should be(Set(("Hello", 4), ("World", 2)))
+      val node = new Node(config)
+      try {
+        node.start()
+        node.awaitClusterReady()
+        producer.send(new ProducerRecord(inputTopic, null, "Hello".getBytes)).get()
+        poll() should be(("Hello", 1))
+        producer.send(new ProducerRecord(inputTopic, null, "Hello".getBytes)).get()
+        poll() should be(("Hello", 2))
+        producer.send(new ProducerRecord(inputTopic, null, "Hello".getBytes)).get()
+        poll() should be(("Hello", 3))
+        producer.send(new ProducerRecord(inputTopic, null, "World".getBytes)).get()
+        poll() should be(("World", 1))
+        producer.send(new ProducerRecord(inputTopic, null, "Hello World".getBytes)).get()
+        Set(poll(), poll()) should be(Set(("Hello", 4), ("World", 2)))
+      } finally {
+        node.shutdown()
+      }
+
+      //restarting the node to test input stream resume behaviour")
+      val node2 = new Node(config)
+      try {
+        node2.start()
+        node2.awaitClusterReady()
+        poll() should be(null)
+      } finally {
+        node2.shutdown()
+      }
     } finally {
       consumer.close()
     }
