@@ -173,7 +173,7 @@ class KeyValueMediator[K](partition: ActorRef, state: State[K, _], key: K) exten
     val observable = state.addKeyValueObserver(key, observer.get)
 
     // send initial value on subscription TODO - maybe this is up to the client, e.g. websocket impl., to decide
-    observer.foreach(_.update(observable, state.get(key)))
+    observer.foreach(_.update(observable, state(key)))
   }
 
 
