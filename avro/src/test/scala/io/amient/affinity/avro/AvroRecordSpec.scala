@@ -20,6 +20,7 @@
 package io.amient.affinity.avro
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+import java.util.UUID
 
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
@@ -175,6 +176,20 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
 
+  "UUID in Compound Key" should "match to a UUID object" in {
+    val uuid = UUID.randomUUID()
+    val uuidBytes = ByteUtils.uuid(uuid)
+    val key = new UuidCompoundKey(uuidBytes, uuid, 1000L)
+    val bytes = newSerde.toBytes(key)
+    val prefix = newSerde.prefix(classOf[UuidCompoundKey], uuidBytes, uuid)
+    prefix.length should be (5 + 16 + 16)
+    true should be(ByteUtils.startsWith(bytes, prefix))
+    val deserialized = newSerde.fromBytes(bytes).asInstanceOf[UuidCompoundKey]
+    ByteUtils.uuid(deserialized.uuid1) should be(uuid)
+    deserialized.uuid2 should be (uuid)
+  }
+
+
   "Compound Key" should "have the same binary prefix as the whole key" in {
     def f(city: String, num: Int): CompoundKey = {
       val ck = new CompoundKey("UK", city, num)
@@ -196,7 +211,8 @@ class AvroRecordSpec extends FlatSpec with Matchers {
   }
 
   "Long Compound Key " should "have the same binary prefix as Simple Key" in {
-    AvroRecord.inferSchema[LongCompoundKey].toString should be("{\"type\":\"record\",\"name\":\"LongCompoundKey\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"version\",\"type\":{\"type\":\"fixed\",\"name\":\"version\",\"namespace\":\"\",\"size\":8,\"runtime\":\"long\"}},{\"name\":\"country\",\"type\":{\"type\":\"fixed\",\"name\":\"country\",\"namespace\":\"\",\"size\":2}},{\"name\":\"city\",\"type\":{\"type\":\"fixed\",\"name\":\"city\",\"namespace\":\"\",\"size\":4}},{\"name\":\"value\",\"type\":\"double\"}]}")
+
+    AvroRecord.inferSchema[LongCompoundKey].toString should be("{\"type\":\"record\",\"name\":\"LongCompoundKey\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"version\",\"type\":{\"type\":\"fixed\",\"name\":\"version\",\"namespace\":\"\",\"size\":8,\"runtime\":\"long\"}},{\"name\":\"country\",\"type\":{\"type\":\"fixed\",\"name\":\"country\",\"namespace\":\"\",\"size\":2,\"runtime\":\"string\"}},{\"name\":\"city\",\"type\":{\"type\":\"fixed\",\"name\":\"city\",\"namespace\":\"\",\"size\":4,\"runtime\":\"string\"}},{\"name\":\"value\",\"type\":\"double\"}]}")
     val key = LongCompoundKey(100L, "UK", "C001", 99.9)
     val bytes = newSerde.toBytes(key)
     val prefix = newSerde.prefix(classOf[LongCompoundKey], new java.lang.Long(100L), "UK", "C001")

@@ -22,6 +22,7 @@ package io.amient.affinity.avro.record
 import java.io.{ByteArrayOutputStream, InputStream}
 import java.nio.ByteBuffer
 import java.util
+import java.util.UUID
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSchemaRegistry
@@ -196,7 +197,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     * @param prefix values for the initial sequence of fixed fields as defined by the schema
     * @return bytes of the binary prefix including the avro serde 5-byte header
     */
-  override def prefix(cls: Class[_ <: Any], prefix: AnyRef*): Array[Byte] = {
+  override def prefix(cls: Class[_ <: Any], prefix: Object*): Array[Byte] = {
     val output = new ByteArrayOutputStream()
     val schema = AvroRecord.inferSchema(cls)
     val schemaId: Int = register(cls)
@@ -204,9 +205,11 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     ByteUtils.writeIntValue(schemaId, output) //schema id
     //all used prefix keys
     prefix.zip(schema.getFields.asScala.take(prefix.length).map(_.schema.getFixedSize)).foreach {
+      case (value: Array[Byte], fixedLen: Int) if (value.length == fixedLen) => output.write(value)
       case (value: String, fixedLen: Int) => output.write(AvroRecord.stringToFixed(value, fixedLen))
       case (value: Integer, 4) => ByteUtils.writeIntValue(value, output)
       case (value: java.lang.Long, 8) => ByteUtils.writeLongValue(value, output)
+      case (value: UUID, 16) => output.write(ByteUtils.uuid(value))
     }
     output.toByteArray
   }

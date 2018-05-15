@@ -21,6 +21,7 @@ package io.amient.affinity.avro.record
 
 import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 import java.lang.reflect.{Field, Parameter}
+import java.util.UUID
 import java.util.function.Supplier
 
 import io.amient.affinity.core.util.{ByteUtils, ThreadLocalCache}
@@ -315,15 +316,15 @@ object AvroRecord extends AvroExtractors {
       case BYTES => ByteUtils.bufToArray(datum.asInstanceOf[java.nio.ByteBuffer])
       case STRING if datum == null => null
       case STRING => datum.asInstanceOf[Utf8].toString
-      //TODO case FIXED if schema.getProp("runtime") == "uuid"
       case FIXED if schema.getProp("runtime") == "int" || datum.isInstanceOf[Int] =>
         ByteUtils.asIntValue(datum.asInstanceOf[GenericFixed].bytes())
-
       case FIXED if schema.getProp("runtime") == "long" || datum.isInstanceOf[Long] =>
         ByteUtils.asLongValue(datum.asInstanceOf[GenericFixed].bytes())
-
-      case FIXED => AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
-
+      case FIXED if schema.getProp("runtime") == "string" =>
+        AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
+      case FIXED if schema.getProp("runtime") == "uuid" =>
+        ByteUtils.uuid(datum.asInstanceOf[GenericFixed].bytes())
+      case FIXED => datum.asInstanceOf[GenericFixed].bytes()
       case invalidTopLevel => throw new IllegalArgumentException(s"$invalidTopLevel is not allowed as a top-level avro type")
     }
 
@@ -412,18 +413,27 @@ object AvroRecord extends AvroExtractors {
           val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
             case (assembler, (symbol: Symbol, i)) =>
               val fieldName = symbol.name.toString
+              val fieldType = symbol.typeSignature
               val fieldSchema = symbol.annotations.find(_.tree.tpe =:= typeOf[Fixed]).map { a =>
                 val fixedSize = a.tree.children.tail.collect { case Literal(Constant(size: Int)) => size }.headOption
-                val fieldType = symbol.typeSignature
                 fixedSize match {
                   case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
                   case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
-                  case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).size(size)
+                  case None if fieldType =:= typeOf[UUID] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+                  case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "string").size(size)
                   case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
-                  case Some(size) => throw new IllegalArgumentException(s"Only fixed string fields can have custom fixed size: @Fixed $fieldName: $fieldType")
+                  case Some(size) if fieldType =:= typeOf[Array[Byte]] => SchemaBuilder.builder().fixed(fieldName).size(size)
+                  case None if fieldType =:= typeOf[Array[Byte]] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
+                  case Some(_) => throw new IllegalArgumentException(s"Only fixed string fields can have custom fixed size: @Fixed $fieldName: $fieldType")
                   case None => throw new IllegalArgumentException(s"Only int, long and string can be used as fixed fields")
                 }
-              }.getOrElse(inferSchema(symbol.typeSignature))
+              }.getOrElse {
+                if (fieldType =:= typeOf[UUID]) {
+                  SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+                } else {
+                  inferSchema(symbol.typeSignature)
+                }
+              }
               val builder = assembler.name(fieldName)
               symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
                 a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
