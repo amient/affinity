@@ -20,7 +20,7 @@
 package io.amient.affinity.kafka
 
 import java.io.PrintStream
-import java.util.Properties
+import java.util.{Objects, Properties}
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
@@ -28,20 +28,20 @@ import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
 import io.amient.affinity.avro.{ConfluentSchemaRegistry, ZookeeperSchemaRegistry}
 import io.amient.affinity.core.util.EventTime
+import io.amient.affinity.kafka.AvroMessageFormatter.TimesstampToIso
 import kafka.common.MessageFormatter
 import org.apache.avro.generic.GenericContainer
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
 
 
 /**
-  * See README of this module for Usage in kafka console consumer utility:
+  * See README of this module for Usage in kafka console consumer utility.
   *
   */
 class AvroMessageFormatter extends MessageFormatter {
 
-  private var serde: AvroSerde = null
+  private var serde: AvroSerde = _
 
   private var pretty = false
   private var printKey = false
@@ -78,54 +78,57 @@ class AvroMessageFormatter extends MessageFormatter {
     }
   }
 
-  override def close(): Unit = {
-    if (serde != null) {
+  override def close(): Unit =
+    if (Objects.nonNull(serde)) {
       serde.close()
       serde = null
     }
-  }
 
-  val mapper = new ObjectMapper()
+  val mapper = new ObjectMapper
 
   override def writeTo(consumerRecord: ConsumerRecord[Array[Byte], Array[Byte]], output: PrintStream): Unit = {
+    if (printPartition) output.printf("%s: ", consumerRecord.partition.toString)
 
-    if (printPartition) {
-      output.print(consumerRecord.partition())
-      output.print(": ")
-    }
-    if (printOffset) {
-      output.print(consumerRecord.offset())
-      output.print("\t")
-    }
-    if (printTimestamps) {
-      output.print(EventTime.local(consumerRecord.timestamp()).toString)
-      output.print("\t")
-    }
+    if (printOffset) output.printf("%s\t", consumerRecord.offset.toString)
+
+    if (printTimestamps) output.printf("%s\t", consumerRecord.timestamp.iso)
+
     if (printKey) {
-      val key: Any = serde.fromBytes(consumerRecord.key)
-      val simpleJson: String = AvroJsonConverter.toJson(key)
-      output.print(simpleJson)
-      output.print("\t")
+      val key = serde.fromBytes(consumerRecord.key)
+      val simpleJson = AvroJsonConverter.toJson(key)
+      output.printf("%s\t", simpleJson)
     }
 
     if (printValue) {
-      val value: Any = serde.fromBytes(consumerRecord.value)
+      val value = serde.fromBytes(consumerRecord.value)
       if (printType) {
-        value match {
-          case container: GenericContainer => output.print(container.getSchema.getName)
-          case other: Any => output.print(other.getClass.getSimpleName)
+        val `type` = value match {
+          case container: GenericContainer => container.getSchema.getName
+          case _ => value.getClass.getSimpleName
         }
-        output.print(": ")
+
+        output.printf("%s: ", `type`)
       }
-      val simpleJson: String = AvroJsonConverter.toJson(value)
+
+      val simpleJson = AvroJsonConverter.toJson(value)
       if (pretty) {
-        val json: JsonNode = mapper.readTree(simpleJson)
-        output.print(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json))
+        val json = mapper.readTree(simpleJson)
+        output.append(mapper.writerWithDefaultPrettyPrinter.writeValueAsString(json))
       } else {
-        output.print(simpleJson)
+        output.append(simpleJson)
       }
     }
 
-    output.println()
+    val nonBlankLine = printPartition || printOffset || printTimestamps || printKey || printValue
+
+    if (nonBlankLine) output.println else output.flush
   }
+}
+
+object AvroMessageFormatter {
+
+  implicit class TimesstampToIso(val ts: Long) extends AnyVal {
+    def iso: String = EventTime.local(ts).toString
+  }
+
 }
