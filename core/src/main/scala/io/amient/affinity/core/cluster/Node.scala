@@ -36,11 +36,11 @@ import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
-import scala.util.control.NonFatal
 
 object Node {
 
@@ -132,46 +132,21 @@ class Node(config: Config) {
     Props(creator)
   }
 
-  def start(): Unit = {
-    startContainers()
-    startGateway()
+  def start(): Unit = try {
+    Await.result(Future.sequence(startGateway() +: startContainers()), startupTimeout)
+  } catch {
+    case e: Throwable =>
+      Await.result(system.terminate(), shutdownTimeout)
+      throw e
   }
 
-  def startGateway(): Unit = {
+  def startGateway(): Future[Int] = {
     if (conf.Affi.Node.Gateway.Class.isDefined) {
       startGateway(conf.Affi.Node.Gateway.Class().newInstance())
     } else {
       httpGatewayPort.success(-1)
+      Future.successful(-1)
     }
-  }
-
-  def startContainers(): Unit = {
-    if (conf.Affi.Node.Containers.isDefined) {
-      conf.Affi.Node.Containers().asScala.foreach {
-        case (group: String, value: CfgIntList) =>
-          val partitions = value().asScala.map(_.toInt).toList
-          startContainer(group, partitions)
-      }
-    }
-  }
-
-  implicit val scheduler = system.scheduler
-
-  def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
-    try {
-      val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
-      implicit val timeout = Timeout(startupTimeout)
-      startupFutureWithShutdownFuse(controller ?! CreateContainer(group, partitions, Props(serviceClass.newInstance())))
-    } catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException(s"Could not start container for service $group with partitions ${partitions.mkString(", ")}", e)
-    }
-  }
-
-  def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
-                                    (implicit tag: ClassTag[T]): Future[Unit] = {
-    implicit val timeout = Timeout(startupTimeout)
-    startupFutureWithShutdownFuse(controller ?! CreateContainer(group, partitions, Props(partitionCreator)))
   }
 
   /**
@@ -179,19 +154,36 @@ class Node(config: Config) {
     * @param tag
     * @tparam T
     */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Unit = {
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
     implicit val timeout = Timeout(startupTimeout)
-    httpGatewayPort.completeWith(startupFutureWithShutdownFuse {
-      controller ?! CreateGateway(Props(creator))
-    })
+    val result = controller ?? CreateGateway(Props(creator))
+    httpGatewayPort.completeWith(result)
+    result
   }
 
-  private def startupFutureWithShutdownFuse[T](eventual: Future[T]): Future[T] = {
-    eventual.failed.foreach { case e: Throwable =>
-      log.error("Could not execute startup command", e)
-      shutdown()
-    }
-    eventual
+
+  def startContainers(): Seq[Future[Unit]] = {
+    if (conf.Affi.Node.Containers.isDefined) {
+      conf.Affi.Node.Containers().asScala.toList.map {
+        case (group: String, value: CfgIntList) =>
+          val partitions = value().asScala.map(_.toInt).toList
+          startContainer(group, partitions)
+      }
+    } else List.empty
+  }
+
+  implicit val scheduler = system.scheduler
+
+  def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
+    val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
+    implicit val timeout = Timeout(startupTimeout)
+    controller ?? CreateContainer(group, partitions, Props(serviceClass.newInstance()))
+  }
+
+  def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
+                                    (implicit tag: ClassTag[T]): Future[Unit] = {
+    implicit val timeout = Timeout(startupTimeout)
+    controller ?? CreateContainer(group, partitions, Props(partitionCreator))
   }
 
 
