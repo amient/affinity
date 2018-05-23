@@ -31,7 +31,6 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.storage.LogStorage
 import io.amient.affinity.core.util.{AffinityTestBase, TimeRange}
 import io.amient.affinity.kafka.{EmbeddedKafka, KafkaAvroSerializer}
-import io.amient.affinity.spark.LogRDD
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}

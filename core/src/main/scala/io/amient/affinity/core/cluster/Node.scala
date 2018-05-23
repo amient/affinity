@@ -36,7 +36,6 @@ import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}

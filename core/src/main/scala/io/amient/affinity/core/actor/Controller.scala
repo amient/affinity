@@ -26,7 +26,6 @@ import akka.event.Logging
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.Conf
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
