@@ -20,10 +20,7 @@
 package io.amient.affinity.core.util;
 
 import java.io.Serializable;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.Period;
+import java.time.*;
 
 public class TimeRange implements Serializable {
 
@@ -64,8 +61,16 @@ public class TimeRange implements Serializable {
         return EventTime.local(start);
     }
 
+    public OffsetDateTime getLocalStart(ZoneId zone) {
+        return EventTime.local(start, zone);
+    }
+
     public OffsetDateTime getLocalEnd() {
         return EventTime.local(end);
+    }
+
+    public OffsetDateTime getLocalEnd(ZoneId zone) {
+        return EventTime.local(end, zone);
     }
 
     public boolean contains(long unixtimestamp) { return unixtimestamp >= start && unixtimestamp < end; }

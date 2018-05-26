@@ -87,6 +87,8 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
   override def beforeAll(): Unit = {
     super.beforeAll()
 
+    createTopic(topic)
+
     val stream = new OutputDataStream[Int, CompactionTestEvent](
       AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap))
     try {

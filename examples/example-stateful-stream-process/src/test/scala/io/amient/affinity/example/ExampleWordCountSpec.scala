@@ -71,7 +71,8 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
 
 
   override def beforeAll(): Unit = try {
-
+    createTopic(inputTopic)
+    createTopic(outputTopic)
   } finally {
     super.beforeAll()
   }

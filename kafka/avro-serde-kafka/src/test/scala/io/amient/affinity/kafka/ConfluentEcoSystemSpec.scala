@@ -170,6 +170,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       "schema.registry.url" -> registryUrl
     )
     val topic = "test"
+    createTopic(topic)
     val numWrites = new AtomicInteger(1000)
     val producer = new KafkaProducer[Int, Test](producerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
     try {

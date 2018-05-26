@@ -79,6 +79,7 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
 
 
   override def beforeAll(): Unit = {
+    createTopic(inputTopic)
     //produce test data for all tests
     val producer = new KafkaProducer[Account, Transaction](producerProps)
     try {
@@ -129,7 +130,7 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
     node.get_json(node.http_get("/transactions/11-10-30/88885454")).getElements.asScala.size should be(2)
   }
 
-  "ExampleWallet" should "should able to retrieve all transactions for the thrid account" in {
+  "ExampleWallet" should "should able to retrieve all transactions for the third account" in {
     node.get_json(node.http_get("/transactions/33-55-10/49772300")).getElements.asScala.size should be(1)
   }
 

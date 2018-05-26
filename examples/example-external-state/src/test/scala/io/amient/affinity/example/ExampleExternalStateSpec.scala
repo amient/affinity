@@ -44,6 +44,7 @@ class ExampleExternalStateSpec extends FlatSpec with AffinityTestBase with Embed
   val node = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
   override def beforeAll: Unit = try {
+    createTopic(topic)
     val externalProducer = createKafkaAvroProducer[String, String]()
     try {
       externalProducer.send(new ProducerRecord(topic, "10:30", "the universe is expanding"))
