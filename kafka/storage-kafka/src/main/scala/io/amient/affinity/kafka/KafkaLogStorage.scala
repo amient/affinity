@@ -305,6 +305,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
             case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
           }
         }
+        TimeUnit.MILLISECONDS.sleep(300)
       }
 
       if (exists.get) {

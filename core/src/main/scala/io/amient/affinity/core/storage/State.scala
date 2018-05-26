@@ -79,7 +79,7 @@ object State {
     val external = stateConf.External()
     val logOption = if (!stateConf.Storage.isDefined) None else Some {
       val storage = LogStorage.newInstance(stateConf.Storage)
-      storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
+      if (partition == 0) storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
       if (!external) {
         //if this storage is not managed externally, register key and value subjects in the registry
         for (registry <- asAvroRegistry(keySerde)) {

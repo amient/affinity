@@ -34,8 +34,8 @@ public class TimeRangeTest {
     @Test
     public void testLocals() {
         TimeRange range = new TimeRange(unix - 1000, unix);
-        assertEquals("2018-01-20T14:00Z", range.getLocalStart().toString());
-        assertEquals("2018-01-20T14:00:01Z", range.getLocalEnd().toString());
+        assertEquals("2018-01-20T14:00Z", range.getLocalStart(ZoneId.of("UTC")).toString());
+        assertEquals("2018-01-20T14:00:01Z", range.getLocalEnd(ZoneId.of("UTC")).toString());
     }
 
     @Test

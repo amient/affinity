@@ -69,6 +69,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
     val producer = new KafkaProducer[Int, TestRecord](producerConfig)
 
     val topic = "test"
+    createTopic(topic)
     val numWrites = new AtomicInteger(0)
     for (i <- (1 to 10)) {
       producer.send(new ProducerRecord[Int, TestRecord](

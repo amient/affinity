@@ -35,6 +35,7 @@ dependencies {
     }
     compile (group: 'io.confluent', name: 'kafka-schema-registry', version: project(':kafka').confluentVersion) {
         exclude group: 'com.fasterxml.jackson.core'
+        exclude group: 'org.apache.kafka'
     }
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: rootProject.jacksonVersion
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: rootProject.jacksonVersion
