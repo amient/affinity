@@ -152,14 +152,14 @@ case "$2" in
     publish)
         publish "$ROOT" "uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-spark_2.0"  ":spark:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_0.11" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_0.11" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_0.11" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_0.11" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.10" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.10" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.10" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.10" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
         git checkout "$ROOT"
         exit 0;
         ;;
