@@ -520,9 +520,9 @@ and different variants of scala, kafka and spark.
 
 #### Scala 2.11
     - core-scala_2.11
-    - kafka_0.10-scala_2.11 (Kafka 0.10.2.1, Confluent 3.2.2)
+    - kafka_1.1-scala_2.11 (Kafka 1.1.0, Confluent 4.1.0)
+    - kafka_1.0-scala_2.11 (Kafka 1.0.1, Confluent 4.0.0)
     - kafka_0.11-scala_2.11 (Kafka 0.11.0.2, Confluent 3.3.1)
-    - kafka_1.0-scala_2.11 (Kafka 1.0.0, Confluent 4.0.0)
     - spark_2.0-scala_2.11 (Spark 2.0.2)
 
 ## JavaScript (affinity.js)
