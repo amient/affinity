@@ -33,7 +33,7 @@ import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsum
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
-import org.apache.kafka.common.errors.{TopicExistsException, WakeupException}
+import org.apache.kafka.common.errors.{TopicExistsException, UnknownServerException, WakeupException}
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import org.slf4j.LoggerFactory
 
@@ -303,6 +303,8 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
             exists = Some(false)
           } catch {
             case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
+            case e: ExecutionException if e.getCause.isInstanceOf[UnknownServerException] && e.getCause.getMessage.contains("NodeExists")=>
+              //continue- since kafka 1.1 TopicExistsException is not wrapped correctly by the AdminClient
           }
         }
         TimeUnit.MILLISECONDS.sleep(300)
