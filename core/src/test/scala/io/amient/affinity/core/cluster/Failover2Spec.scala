@@ -47,7 +47,7 @@ import scala.util.{Failure, Random, Success, Try}
 
 class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  val specTimeout = 15 seconds
+  val specTimeout = 30 seconds
 
   override def numPartitions = 2
 

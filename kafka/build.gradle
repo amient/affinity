@@ -2,8 +2,8 @@ group = rootProject.group
 version = rootProject.version
 
 ext {
-    kafkaVersion = '1.0.0'
-    confluentVersion = '4.0.0'
+    kafkaVersion = '1.1.0'
+    confluentVersion = '4.1.1'
     //
     baseKafkaVersion = kafkaVersion.split("\\.")[0] + '.' + kafkaVersion.split("\\.")[1]
 }

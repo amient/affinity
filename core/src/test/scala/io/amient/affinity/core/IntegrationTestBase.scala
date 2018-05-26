@@ -67,8 +67,8 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
     val t = System.currentTimeMillis()
     servicesReady.synchronized {
       while (!servicesReady.contains(group)) {
-        if (System.currentTimeMillis() - t > 30000) throw new TimeoutException("Service didn't start within 30 seconds")
-        servicesReady.wait(1000)
+        if (System.currentTimeMillis() - t > 60000) throw new TimeoutException("Service didn't start within 1 minute")
+        servicesReady.wait(100)
       }
     }
   }
