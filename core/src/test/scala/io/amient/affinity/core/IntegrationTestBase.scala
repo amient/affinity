@@ -68,7 +68,7 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
     servicesReady.synchronized {
       while (!servicesReady.contains(group)) {
         if (System.currentTimeMillis() - t > 30000) throw new TimeoutException("Service didn't start within 30 seconds")
-        servicesReady.wait(1000)
+        servicesReady.wait(100)
       }
     }
   }
