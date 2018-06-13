@@ -51,7 +51,7 @@ object Node {
     val ShutdownTimeoutMs = longint("shutdown.timeout.ms", 30000).doc("Maximum time a node can take to shutdown gracefully")
     //TODO #107 is this a reasonable default
     val DataDir = filepath("data.dir", Paths.get("./.data")).doc("Location under which any local state or registers will be kept")
-    val SystemName = string("name", "AffinityNode").doc("ActorSystem name under which the Node presents itself in the Akka Cluster")
+    val SystemName = string("name", "Affinity").doc("ActorSystem name under which the Node presents itself in the Akka Cluster")
   }
 
 }

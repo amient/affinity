@@ -18,7 +18,9 @@
  */
 
 import com.typesafe.config._
+import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.util.Metrics
 
 import scala.util.control.NonFatal
 
@@ -34,7 +36,10 @@ object ExampleGraphMain extends App {
     require(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
     require(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
 
+    Metrics.enableJmx(Conf(config))
+
     new Node(node1config).start()
+
     new Node(ConfigFactory.parseResources("example-node2.conf").withFallback(config)).start()
 
   } catch {
