@@ -88,11 +88,12 @@ trait Gateway extends ActorHandler {
     */
   private var handlingSuspended = true
 
-  val onlineCounter = AffinityMetrics.counter("gateway.online")
+  val metrics = AffinityMetrics.forActorSystem(context.system)
+  val onlineCounter = metrics.counter("gateway.online")
 
-  def trace(groupName: String, result: Promise[_ <: Any]): Unit = AffinityMetrics.process(groupName, result)
+  def trace(groupName: String, result: Promise[_ <: Any]): Unit = metrics.process(groupName, result)
 
-  def trace(groupName: String, result: Future[Any]): Unit = AffinityMetrics.process(groupName, result)
+  def trace(groupName: String, result: Future[Any]): Unit = metrics.process(groupName, result)
 
   final def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")

@@ -47,7 +47,12 @@ object State {
     override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag](name: String,
+                                       partition: Int,
+                                       stateConf: StateConf,
+                                       numPartitions: Int,
+                                       system: ActorSystem): State[K, V] = {
+    val identifier = if (partition < 0) name else s"$name-$partition"
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
@@ -66,14 +71,22 @@ object State {
       if (prefixLen.isDefined) stateConf.MemStore.KeyPrefixSize.setValue(prefixLen.get)
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
+    val metrics = AffinityMetrics.forActorSystem(system)
     try {
-      create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
+      create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, metrics)
     } catch {
       case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, kvstore: MemStore, keySerde: AbstractSerde[K], valueSerde: AbstractSerde[V]): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag]( identifier: String,
+                                        partition: Int,
+                                        stateConf: StateConf,
+                                        numPartitions: Int,
+                                        kvstore: MemStore,
+                                        keySerde: AbstractSerde[K],
+                                        valueSerde: AbstractSerde[V],
+                                        metrics: AffinityMetrics): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
@@ -97,7 +110,7 @@ object State {
       storage.open(checkpointFile)
     }
     val keyClass: Class[K] = implicitly[ClassTag[K]].runtimeClass.asInstanceOf[Class[K]]
-    new State(identifier, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    new State(identifier, metrics, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -113,6 +126,7 @@ object State {
 
 
 class State[K, V](val identifier: String,
+                  val metrics: AffinityMetrics,
                   kvstore: MemStore,
                   logOption: Option[Log[_]],
                   partition: Int,
@@ -133,13 +147,13 @@ class State[K, V](val identifier: String,
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
 
-  val numKeysMeter = AffinityMetrics.register(s"state.$identifier.keys", new Gauge[Long] {
+  val numKeysMeter = metrics.register(s"state.$identifier.keys", new Gauge[Long] {
     override def getValue = numKeys
   })
 
-  val writesMeter = AffinityMetrics.meterAndHistogram(s"state.$identifier.writes")
+  val writesMeter = metrics.meterAndHistogram(s"state.$identifier.writes")
 
-  val readsMeter = AffinityMetrics.meterAndHistogram(s"state.$identifier.reads")
+  val readsMeter = metrics.meterAndHistogram(s"state.$identifier.reads")
 
   def uncheckedMediator(partition: ActorRef, key: Any): Props = {
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
