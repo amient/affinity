@@ -56,9 +56,7 @@ class HttpInterface(val httpHost: String, httpPort: Int, ssl: Option[SSLContext]
       incoming.to(Sink.foreach { connection =>
         connection.handleWithAsyncHandler { request =>
           val responsePromise = Promise[HttpResponse]()
-
           gateway ! HttpExchange(request, responsePromise)
-
           responsePromise.future
         }
       }).run()

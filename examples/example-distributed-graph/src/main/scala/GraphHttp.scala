@@ -53,17 +53,21 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * GET /vertex/<vertex>
       */
-    case HTTP(GET, PATH("vertex", INT(vid)), _, response) => handleWith(response) {
-      getVertexProps(vid) map (_ match {
-        case None => HttpResponse(StatusCodes.NotFound)
-        case Some(vertexProps) => Encoder.json(OK, vertexProps)
-      })
-    }
+    case HTTP(GET, PATH("vertex", INT(vid)), _, response) =>
+      trace("http.get-vertex", response)
+      handleWith(response) {
+        getVertexProps(vid) map (_ match {
+          case None => HttpResponse(StatusCodes.NotFound)
+          case Some(vertexProps) => Encoder.json(OK, vertexProps)
+        })
+      }
 
     /**
       * WebSocket GET /component?id=<vid>
       */
-    case HTTP(GET, PATH("component"), _, response) => response.success(Encoder.html(OK, html, gzip = true))
+    case HTTP(GET, PATH("component"), _, response) =>
+      response.success(Encoder.html(OK, html, gzip = true))
+
     case WEBSOCK(PATH("component"), QUERY(("id", INT(cid))), socket) =>
       connectKeyValueMediator(graphService, "components", cid) map {
         case keyValueMediator => avroWebSocket(socket, keyValueMediator)
@@ -72,26 +76,31 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * GET /component/<component>
       */
-    case HTTP(GET, PATH("component", INT(cid)), _, response) => handleWith(response) {
-      getGraphComponent(cid) map (_ match {
-        case None => HttpResponse(StatusCodes.NotFound)
-        case Some(component) => Encoder.json(OK, component)
-      })
-    }
+    case HTTP(GET, PATH("component", INT(cid)), _, response) =>
+      handleWith(response) {
+        trace("http.get-component", response)
+        getGraphComponent(cid) map (_ match {
+          case None => HttpResponse(StatusCodes.NotFound)
+          case Some(component) => Encoder.json(OK, component)
+        })
+      }
 
     /**
       * POST /connect/<vertex1>/<vertex2>
       */
-    case HTTP(POST, PATH("connect", INT(id), INT(id2)), _, response) => handleWith(response) {
-      connect(id, id2) map {
-        _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+    case HTTP(POST, PATH("connect", INT(id), INT(id2)), _, response) =>
+      handleWith(response) {
+        trace("http.post-connect", response)
+        connect(id, id2) map {
+          _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
+        }
       }
-    }
 
     /**
       * POST /disconnect/<vertex1>/<vertex2>
       */
     case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), query, response) => handleWith(response) {
+      trace("http.post-disconnect", response)
       disconnect(id, id2) map {
         _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))
       }

@@ -33,11 +33,11 @@ import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.{LogStorageConf, State}
-import io.amient.affinity.core.util.Metrics
+import io.amient.affinity.core.util.AffinityMetrics
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
@@ -88,7 +88,11 @@ trait Gateway extends ActorHandler {
     */
   private var handlingSuspended = true
 
-  val onlineCounter = Metrics.counter("gateway.online")
+  val onlineCounter = AffinityMetrics.counter("gateway.online")
+
+  def trace(groupName: String, result: Promise[_ <: Any]): Unit = AffinityMetrics.process(groupName, result)
+
+  def trace(groupName: String, result: Future[Any]): Unit = AffinityMetrics.process(groupName, result)
 
   final def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
