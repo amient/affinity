@@ -37,24 +37,24 @@ object AffinityMetrics extends MetricRegistry {
   }
 
   class ProcessMetrics(name: String) {
-    val inputCounter = counter(s"$name.counter")
-    val processDurations = histogram(s"$name.durations")
-    val successCounter = AffinityMetrics.counter(s"$name.successes")
-    val failureCounter = AffinityMetrics.counter(s"$name.failures")
+    val inputs = meter(s"$name.inputs")
+    val durations = histogram(s"$name.durations")
+    val successes = AffinityMetrics.meter(s"$name.successes")
+    val failures = AffinityMetrics.meter(s"$name.failures")
 
     def markStart(): Long = {
-      inputCounter.inc()
+      inputs.mark()
       EventTime.unix
     }
 
     def markSuccess(startTime: Long): Unit = {
-      processDurations.update(EventTime.unix - startTime)
-      successCounter.inc()
+      durations.update(EventTime.unix - startTime)
+      successes.mark()
     }
 
     def markFailure(startTime: Long): Unit = {
-      processDurations.update(EventTime.unix - startTime)
-      failureCounter.inc()
+      durations.update(EventTime.unix - startTime)
+      failures.mark()
     }
 
   }

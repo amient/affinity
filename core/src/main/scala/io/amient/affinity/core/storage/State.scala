@@ -25,6 +25,8 @@ import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import com.codahale.metrics.Gauge
+import com.codahale.metrics.MetricRegistry.MetricSupplier
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
@@ -32,7 +34,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
+import io.amient.affinity.core.util.{AffinityMetrics, CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -131,6 +133,12 @@ class State[K, V](val identifier: String,
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
+
+  val numKeysMeter = AffinityMetrics.gauge(s"state.$identifier.keys", new MetricSupplier[Gauge[_]] {
+    override def newMetric() = new Gauge[Long] {
+      override def getValue = numKeys
+    }
+  })
 
   def uncheckedMediator(partition: ActorRef, key: Any): Props = {
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
