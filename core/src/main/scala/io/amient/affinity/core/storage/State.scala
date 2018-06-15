@@ -140,6 +140,10 @@ class State[K, V](val identifier: String,
     }
   })
 
+  val writesMeter = AffinityMetrics.meterAndHistogram(s"state.$identifier.writes")
+
+  val readsMeter = AffinityMetrics.meterAndHistogram(s"state.$identifier.reads")
+
   def uncheckedMediator(partition: ActorRef, key: Any): Props = {
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
   }
@@ -199,10 +203,21 @@ class State[K, V](val identifier: String,
   def apply(key: K): Option[V] = apply(ByteBuffer.wrap(keySerde.toBytes(key)))
 
   private def apply(key: ByteBuffer): Option[V] = {
-    for (
-      cell: ByteBuffer <- option(kvstore(key));
-      byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
-    ) yield valueSerde.fromBytes(byteRecord.value)
+    val startTime = readsMeter.markStart()
+    try {
+      for (
+        cell: ByteBuffer <- option(kvstore(key));
+        byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
+      ) yield {
+        val result = valueSerde.fromBytes(byteRecord.value)
+        readsMeter.markSuccess(startTime)
+        result
+      }
+    } catch {
+      case e: Throwable =>
+        readsMeter.markFailure(startTime)
+        throw e
+    }
   }
 
   /**
@@ -214,13 +229,22 @@ class State[K, V](val identifier: String,
     * @return Map[K,V] as a transformation of Record.key -> Record.value
     */
   def range(range: TimeRange, prefix1: Any, prefixN: Any*): Map[K, V] = {
-    val builder = Map.newBuilder[K, V]
-    val it = iterator(range, (prefix1 +: prefixN): _*)
+    val startTime = readsMeter.markStart()
     try {
-      it.asScala.foreach(record => builder += record.key -> record.value)
-      builder.result()
-    } finally {
-      it.close()
+      val builder = Map.newBuilder[K, V]
+      val it = iterator(range, (prefix1 +: prefixN): _*)
+      try {
+        it.asScala.foreach(record => builder += record.key -> record.value)
+        val result = builder.result()
+        readsMeter.markSuccess(startTime, result.size.toLong)
+        result
+      } finally {
+        it.close()
+      }
+    } catch {
+      case e: Throwable =>
+        readsMeter.markFailure(startTime)
+        throw e
     }
   }
 
@@ -437,25 +461,33 @@ class State[K, V](val identifier: String,
     */
   private def put(key: Array[Byte], value: V): Future[Option[V]] = {
     if (external) throw new IllegalStateException("put() called on a read-only state")
-    val nowMs = System.currentTimeMillis()
-    val recordTimestamp = value match {
-      case e: EventTime => e.eventTimeUnix()
-      case _ => nowMs
-    }
-    if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
-      delete(key)
-    } else {
-      val valueBytes = valueSerde.toBytes(value)
-      logOption match {
-        case None =>
-          kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
-          Future.successful(Some(value))
-        case Some(log) =>
-          log.append(kvstore, key, valueBytes, recordTimestamp) map {
-            pos => Some(value)
-            //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
-          }
+    val nowMs = writesMeter.markStart()
+    try {
+      val recordTimestamp = value match {
+        case e: EventTime => e.eventTimeUnix()
+        case _ => nowMs
       }
+      if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
+        delete(key)
+      } else {
+        val valueBytes = valueSerde.toBytes(value)
+        logOption match {
+          case None =>
+            kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
+            writesMeter.markSuccess(nowMs)
+            Future.successful(Some(value))
+          case Some(log) =>
+            log.append(kvstore, key, valueBytes, recordTimestamp) map {
+              pos => //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
+                writesMeter.markSuccess(nowMs)
+                Some(value)
+            }
+        }
+      }
+    } catch {
+      case e: Throwable =>
+        writesMeter.markFailure(nowMs)
+        throw e
     }
   }
 
@@ -471,13 +503,25 @@ class State[K, V](val identifier: String,
     */
   private def delete(key: Array[Byte]): Future[Option[V]] = {
     if (external) throw new IllegalStateException("delete() called on a read-only state")
-    logOption match {
-      case None =>
-        kvstore.remove(ByteBuffer.wrap(key))
-        Future.successful(None)
-      case Some(log) =>
-        log.delete(kvstore, key) map (_ => None)
+    val startTime = writesMeter.markStart()
+    try {
+      logOption match {
+        case None =>
+          kvstore.remove(ByteBuffer.wrap(key))
+          writesMeter.markSuccess(startTime)
+          Future.successful(None)
+        case Some(log) =>
+          log.delete(kvstore, key) map { _ =>
+            writesMeter.markSuccess(startTime)
+            None
+          }
+      }
+    } catch {
+      case e: Throwable =>
+        writesMeter.markFailure(startTime)
+        throw e
     }
+
   }
 
   /*

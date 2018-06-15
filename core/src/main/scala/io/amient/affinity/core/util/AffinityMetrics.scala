@@ -14,7 +14,7 @@ object AffinityMetrics extends MetricRegistry {
 
   private val processMetricsMap = new ConcurrentHashMap[String, ProcessMetrics]()
 
-  private def getProcessMetrics(name: String): ProcessMetrics = {
+  def meterAndHistogram(name: String): ProcessMetrics = {
     processMetricsMap.get(name)  match {
       case null =>
         val m = new ProcessMetrics(name)
@@ -27,7 +27,7 @@ object AffinityMetrics extends MetricRegistry {
   def process(groupName: String, result: Promise[_]): Unit = process(groupName, result.future)
 
   def process(groupName: String, result: Future[Any]): Unit = {
-    val metrics = getProcessMetrics(groupName)
+    val metrics = meterAndHistogram(groupName)
     val startTime = metrics.markStart()
     result.onComplete {
       case Success(response: HttpResponse) => if (response.status.intValue() < 400) metrics.markSuccess(startTime) else metrics.markFailure(startTime)
@@ -37,19 +37,19 @@ object AffinityMetrics extends MetricRegistry {
   }
 
   class ProcessMetrics(name: String) {
-    val inputs = meter(s"$name.inputs")
+    val rate = meter(s"$name.rate")
     val durations = histogram(s"$name.durations")
     val successes = AffinityMetrics.meter(s"$name.successes")
     val failures = AffinityMetrics.meter(s"$name.failures")
 
     def markStart(): Long = {
-      inputs.mark()
+      rate.mark()
       EventTime.unix
     }
 
-    def markSuccess(startTime: Long): Unit = {
+    def markSuccess(startTime: Long, n: Long = 1): Unit = {
       durations.update(EventTime.unix - startTime)
-      successes.mark()
+      successes.mark(n)
     }
 
     def markFailure(startTime: Long): Unit = {
