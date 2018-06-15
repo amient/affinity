@@ -26,7 +26,6 @@ import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.codahale.metrics.Gauge
-import com.codahale.metrics.MetricRegistry.MetricSupplier
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
@@ -134,10 +133,8 @@ class State[K, V](val identifier: String,
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
 
-  val numKeysMeter = AffinityMetrics.gauge(s"state.$identifier.keys", new MetricSupplier[Gauge[_]] {
-    override def newMetric() = new Gauge[Long] {
-      override def getValue = numKeys
-    }
+  val numKeysMeter = AffinityMetrics.register(s"state.$identifier.keys", new Gauge[Long] {
+    override def getValue = numKeys
   })
 
   val writesMeter = AffinityMetrics.meterAndHistogram(s"state.$identifier.writes")

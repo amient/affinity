@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-import com.codahale.metrics.jmx.JmxReporter
+import com.codahale.metrics.JmxReporter
 import com.typesafe.config._
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.AffinityMetrics
