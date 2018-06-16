@@ -33,10 +33,11 @@ import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.storage.{LogStorageConf, State}
+import io.amient.affinity.core.util.AffinityMetrics
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
@@ -60,7 +61,7 @@ trait Gateway extends ActorHandler {
 
   import Gateway._
 
-  private val conf = Conf(context.system.settings.config).Affi
+  val conf = Conf(context.system.settings.config)
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
 
@@ -87,12 +88,19 @@ trait Gateway extends ActorHandler {
     */
   private var handlingSuspended = true
 
+  val metrics = AffinityMetrics.forActorSystem(context.system)
+  val onlineCounter = metrics.counter("gateway.online")
+
+  def trace(groupName: String, result: Promise[_ <: Any]): Unit = metrics.process(groupName, result)
+
+  def trace(groupName: String, result: Future[Any]): Unit = metrics.process(groupName, result)
+
   final def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     declaredGlobals.get(globalStateStore) match {
       case Some(globalState) => globalState.asInstanceOf[State[K, V]]
       case None =>
-        val bc = State.create[K, V](globalStateStore, 0, conf.Global(globalStateStore), 1, context.system)
+        val bc = State.create[K, V](globalStateStore, 0, conf.Affi.Global(globalStateStore), 1, context.system)
         declaredGlobals += (globalStateStore -> bc)
         bc
     }
@@ -104,7 +112,7 @@ trait Gateway extends ActorHandler {
       case Some((_, keyspaceActor, _)) => keyspaceActor
       case None =>
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
-        val serviceConf = conf.Keyspace(group)
+        val serviceConf = conf.Affi.Keyspace(group)
         if (!serviceConf.isDefined) throw new IllegalArgumentException(s"Keypsace $group is not defined")
         val ks = context.actorOf(Props(new Keyspace(serviceConf.config())), name = group)
         val coordinator = Coordinator.create(context.system, group)
@@ -181,7 +189,7 @@ trait Gateway extends ActorHandler {
 
     case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
       context.parent ! Controller.GatewayCreated(-1)
-      if (conf.Node.Gateway.Http.isDefined) {
+      if (conf.Affi.Node.Gateway.Http.isDefined) {
         log.warning("affinity.gateway.http interface is configured but the node is trying " +
           s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
       }
@@ -206,6 +214,7 @@ trait Gateway extends ActorHandler {
     if (gatewayShouldBeSuspended != handlingSuspended) {
       handlingSuspended = gatewayShouldBeSuspended
       onClusterStatus(gatewayShouldBeSuspended)
+      if (!handlingSuspended) onlineCounter.inc() else onlineCounter.dec()
 
       //if this is an actual external gateway (as opposed to gateway trait mixec into say partition)
       if (self.path.name == "gateway") {

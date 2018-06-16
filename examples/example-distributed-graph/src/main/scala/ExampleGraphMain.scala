@@ -17,8 +17,10 @@
  * limitations under the License.
  */
 
+import com.codahale.metrics.JmxReporter
 import com.typesafe.config._
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.util.AffinityMetrics
 
 import scala.util.control.NonFatal
 
@@ -34,7 +36,10 @@ object ExampleGraphMain extends App {
     require(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
     require(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
 
+    AffinityMetrics.addReporter(registry => JmxReporter.forRegistry(registry).inDomain("Affinity").build())
+
     new Node(node1config).start()
+
     new Node(ConfigFactory.parseResources("example-node2.conf").withFallback(config)).start()
 
   } catch {

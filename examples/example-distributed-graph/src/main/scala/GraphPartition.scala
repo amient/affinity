@@ -17,7 +17,6 @@
  * limitations under the License.
  */
 
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.storage.State
 import message.{Component, GOP, VertexProps, _}
