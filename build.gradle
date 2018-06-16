@@ -23,6 +23,7 @@ ext {
     slf4jVersion = '1.7.21'
     akkaVersion = '2.4.20'
     akkaHttpVersion = '10.0.10'
+    metricsVersion = '3.1.2'
     //
     avroVersion = '1.8.2' // avro version provides also org.codehouse.jackson transitively
     jacksonVersion = '2.6.5' // com.fasterxml.jackson - spark 2.x uses 2.6.5 while the newer kafka 2.9.1, as usually testing with embedded instances has conflicts

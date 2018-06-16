@@ -29,7 +29,7 @@ import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
-import io.amient.affinity.core.util.ByteUtils
+import io.amient.affinity.core.util.{AffinityMetrics, ByteUtils}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
@@ -156,7 +156,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
     val kvstore = new MemStoreSimpleMap(stateConf)
-    State.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
+    State.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, new AffinityMetrics)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {

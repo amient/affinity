@@ -16,6 +16,7 @@ dependencies {
     compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
     compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
     compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
+
     testCompile project(':ws-client')
     testCompile project(':kafka:test-util-kafka')
     testCompile project(':spark')

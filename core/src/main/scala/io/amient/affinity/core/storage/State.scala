@@ -25,6 +25,7 @@ import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import com.codahale.metrics.Gauge
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
@@ -32,7 +33,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.util.{CloseableIterator, EventTime, TimeRange}
+import io.amient.affinity.core.util.{AffinityMetrics, CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -46,7 +47,12 @@ object State {
     override def apply(config: Config): StateConf = new StateConf().apply(config)
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, system: ActorSystem): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag](name: String,
+                                       partition: Int,
+                                       stateConf: StateConf,
+                                       numPartitions: Int,
+                                       system: ActorSystem): State[K, V] = {
+    val identifier = if (partition < 0) name else s"$name-$partition"
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
@@ -65,14 +71,22 @@ object State {
       if (prefixLen.isDefined) stateConf.MemStore.KeyPrefixSize.setValue(prefixLen.get)
     }
     val kvstore = kvstoreConstructor.newInstance(stateConf)
+    val metrics = AffinityMetrics.forActorSystem(system)
     try {
-      create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde)
+      create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, metrics)
     } catch {
       case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
   }
 
-  def create[K: ClassTag, V: ClassTag](identifier: String, partition: Int, stateConf: StateConf, numPartitions: Int, kvstore: MemStore, keySerde: AbstractSerde[K], valueSerde: AbstractSerde[V]): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag]( identifier: String,
+                                        partition: Int,
+                                        stateConf: StateConf,
+                                        numPartitions: Int,
+                                        kvstore: MemStore,
+                                        keySerde: AbstractSerde[K],
+                                        valueSerde: AbstractSerde[V],
+                                        metrics: AffinityMetrics): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
@@ -96,7 +110,7 @@ object State {
       storage.open(checkpointFile)
     }
     val keyClass: Class[K] = implicitly[ClassTag[K]].runtimeClass.asInstanceOf[Class[K]]
-    new State(identifier, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    new State(identifier, metrics, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -112,6 +126,7 @@ object State {
 
 
 class State[K, V](val identifier: String,
+                  val metrics: AffinityMetrics,
                   kvstore: MemStore,
                   logOption: Option[Log[_]],
                   partition: Int,
@@ -131,6 +146,14 @@ class State[K, V](val identifier: String,
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
+
+  val numKeysMeter = metrics.register(s"state.$identifier.keys", new Gauge[Long] {
+    override def getValue = numKeys
+  })
+
+  val writesMeter = metrics.meterAndHistogram(s"state.$identifier.writes")
+
+  val readsMeter = metrics.meterAndHistogram(s"state.$identifier.reads")
 
   def uncheckedMediator(partition: ActorRef, key: Any): Props = {
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
@@ -191,10 +214,21 @@ class State[K, V](val identifier: String,
   def apply(key: K): Option[V] = apply(ByteBuffer.wrap(keySerde.toBytes(key)))
 
   private def apply(key: ByteBuffer): Option[V] = {
-    for (
-      cell: ByteBuffer <- option(kvstore(key));
-      byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
-    ) yield valueSerde.fromBytes(byteRecord.value)
+    val startTime = readsMeter.markStart()
+    try {
+      for (
+        cell: ByteBuffer <- option(kvstore(key));
+        byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
+      ) yield {
+        val result = valueSerde.fromBytes(byteRecord.value)
+        readsMeter.markSuccess(startTime)
+        result
+      }
+    } catch {
+      case e: Throwable =>
+        readsMeter.markFailure(startTime)
+        throw e
+    }
   }
 
   /**
@@ -206,13 +240,22 @@ class State[K, V](val identifier: String,
     * @return Map[K,V] as a transformation of Record.key -> Record.value
     */
   def range(range: TimeRange, prefix1: Any, prefixN: Any*): Map[K, V] = {
-    val builder = Map.newBuilder[K, V]
-    val it = iterator(range, (prefix1 +: prefixN): _*)
+    val startTime = readsMeter.markStart()
     try {
-      it.asScala.foreach(record => builder += record.key -> record.value)
-      builder.result()
-    } finally {
-      it.close()
+      val builder = Map.newBuilder[K, V]
+      val it = iterator(range, (prefix1 +: prefixN): _*)
+      try {
+        it.asScala.foreach(record => builder += record.key -> record.value)
+        val result = builder.result()
+        readsMeter.markSuccess(startTime, result.size.toLong)
+        result
+      } finally {
+        it.close()
+      }
+    } catch {
+      case e: Throwable =>
+        readsMeter.markFailure(startTime)
+        throw e
     }
   }
 
@@ -429,25 +472,33 @@ class State[K, V](val identifier: String,
     */
   private def put(key: Array[Byte], value: V): Future[Option[V]] = {
     if (external) throw new IllegalStateException("put() called on a read-only state")
-    val nowMs = System.currentTimeMillis()
-    val recordTimestamp = value match {
-      case e: EventTime => e.eventTimeUnix()
-      case _ => nowMs
-    }
-    if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
-      delete(key)
-    } else {
-      val valueBytes = valueSerde.toBytes(value)
-      logOption match {
-        case None =>
-          kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
-          Future.successful(Some(value))
-        case Some(log) =>
-          log.append(kvstore, key, valueBytes, recordTimestamp) map {
-            pos => Some(value)
-            //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
-          }
+    val nowMs = writesMeter.markStart()
+    try {
+      val recordTimestamp = value match {
+        case e: EventTime => e.eventTimeUnix()
+        case _ => nowMs
       }
+      if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
+        delete(key)
+      } else {
+        val valueBytes = valueSerde.toBytes(value)
+        logOption match {
+          case None =>
+            kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
+            writesMeter.markSuccess(nowMs)
+            Future.successful(Some(value))
+          case Some(log) =>
+            log.append(kvstore, key, valueBytes, recordTimestamp) map {
+              pos => //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
+                writesMeter.markSuccess(nowMs)
+                Some(value)
+            }
+        }
+      }
+    } catch {
+      case e: Throwable =>
+        writesMeter.markFailure(nowMs)
+        throw e
     }
   }
 
@@ -463,13 +514,25 @@ class State[K, V](val identifier: String,
     */
   private def delete(key: Array[Byte]): Future[Option[V]] = {
     if (external) throw new IllegalStateException("delete() called on a read-only state")
-    logOption match {
-      case None =>
-        kvstore.remove(ByteBuffer.wrap(key))
-        Future.successful(None)
-      case Some(log) =>
-        log.delete(kvstore, key) map (_ => None)
+    val startTime = writesMeter.markStart()
+    try {
+      logOption match {
+        case None =>
+          kvstore.remove(ByteBuffer.wrap(key))
+          writesMeter.markSuccess(startTime)
+          Future.successful(None)
+        case Some(log) =>
+          log.delete(kvstore, key) map { _ =>
+            writesMeter.markSuccess(startTime)
+            None
+          }
+      }
+    } catch {
+      case e: Throwable =>
+        writesMeter.markFailure(startTime)
+        throw e
     }
+
   }
 
   /*

@@ -61,11 +61,10 @@ trait Partition extends ActorHandler {
 
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
-    val identifier = if (partition < 0) store else s"$keyspace-$store-$partition"
     val conf = Conf(context.system.settings.config)
     val numPartitions = conf.Affi.Keyspace(keyspace).NumPartitions()
     val stateConf = conf.Affi.Keyspace(keyspace).State(store)
-    val state = State.create[K, V](identifier, partition, stateConf, numPartitions, context.system)
+    val state = State.create[K, V](s"$keyspace-$store", partition, stateConf, numPartitions, context.system)
     declaredStateStores.add((store, state))
     state
   }

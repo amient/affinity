@@ -86,9 +86,7 @@ trait GatewayHttp extends Gateway {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val conf = Conf(context.system.settings.config).Affi
-
-  private val suspendedQueueMaxSize = conf.Node.Gateway.SuspendQueueMaxSize()
+  private val suspendedQueueMaxSize = conf.Affi.Node.Gateway.SuspendQueueMaxSize()
   private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
 
   import context.system
@@ -97,17 +95,17 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
-  val sslContext = if (!conf.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
+  val sslContext = if (!conf.Affi.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
     log.info("Configuring SSL Context")
-    val password = conf.Node.Gateway.Http.Tls.KeyStorePassword().toCharArray
-    val ks = KeyStore.getInstance(conf.Node.Gateway.Http.Tls.KeyStoreStandard())
-    val is = if (conf.Node.Gateway.Http.Tls.KeyStoreResource.isDefined) {
-      val keystoreResource = conf.Node.Gateway.Http.Tls.KeyStoreResource()
+    val password = conf.Affi.Node.Gateway.Http.Tls.KeyStorePassword().toCharArray
+    val ks = KeyStore.getInstance(conf.Affi.Node.Gateway.Http.Tls.KeyStoreStandard())
+    val is = if (conf.Affi.Node.Gateway.Http.Tls.KeyStoreResource.isDefined) {
+      val keystoreResource = conf.Affi.Node.Gateway.Http.Tls.KeyStoreResource()
       log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
       getClass.getClassLoader.getResourceAsStream(keystoreResource)
     } else {
-      val keystoreFileName = conf.Node.Gateway.Http.Tls.KeyStoreFile()
+      val keystoreFileName = conf.Affi.Node.Gateway.Http.Tls.KeyStoreFile()
       log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
       new FileInputStream(keystoreFileName)
     }
@@ -122,7 +120,7 @@ trait GatewayHttp extends Gateway {
   }
 
   private val httpInterface: HttpInterface = new HttpInterface(
-    conf.Node.Gateway.Http.Host(), conf.Node.Gateway.Http.Port(), sslContext)
+    conf.Affi.Node.Gateway.Http.Host(), conf.Affi.Node.Gateway.Http.Port(), sslContext)
 
   lazy private val listener = httpInterface.bind(self)
 
