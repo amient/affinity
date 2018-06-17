@@ -89,7 +89,6 @@ trait Gateway extends ActorHandler {
   private var handlingSuspended = true
 
   val metrics = AffinityMetrics.forActorSystem(context.system)
-  val onlineCounter = metrics.counter("gateway.online")
 
   def trace(groupName: String, result: Promise[_ <: Any]): Unit = metrics.process(groupName, result)
 
@@ -214,7 +213,6 @@ trait Gateway extends ActorHandler {
     if (gatewayShouldBeSuspended != handlingSuspended) {
       handlingSuspended = gatewayShouldBeSuspended
       onClusterStatus(gatewayShouldBeSuspended)
-      if (!handlingSuspended) onlineCounter.inc() else onlineCounter.dec()
 
       //if this is an actual external gateway (as opposed to gateway trait mixec into say partition)
       if (self.path.name == "gateway") {

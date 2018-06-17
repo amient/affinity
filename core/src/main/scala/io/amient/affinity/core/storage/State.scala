@@ -79,14 +79,14 @@ object State {
     }
   }
 
-  def create[K: ClassTag, V: ClassTag]( identifier: String,
-                                        partition: Int,
-                                        stateConf: StateConf,
-                                        numPartitions: Int,
-                                        kvstore: MemStore,
-                                        keySerde: AbstractSerde[K],
-                                        valueSerde: AbstractSerde[V],
-                                        metrics: AffinityMetrics): State[K, V] = {
+  def create[K: ClassTag, V: ClassTag](identifier: String,
+                                       partition: Int,
+                                       stateConf: StateConf,
+                                       numPartitions: Int,
+                                       kvstore: MemStore,
+                                       keySerde: AbstractSerde[K],
+                                       valueSerde: AbstractSerde[V],
+                                       metrics: AffinityMetrics): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
@@ -214,19 +214,19 @@ class State[K, V](val identifier: String,
   def apply(key: K): Option[V] = apply(ByteBuffer.wrap(keySerde.toBytes(key)))
 
   private def apply(key: ByteBuffer): Option[V] = {
-    val startTime = readsMeter.markStart()
+    val timerContext = readsMeter.markStart()
     try {
       for (
         cell: ByteBuffer <- option(kvstore(key));
         byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
       ) yield {
         val result = valueSerde.fromBytes(byteRecord.value)
-        readsMeter.markSuccess(startTime)
+        readsMeter.markSuccess(timerContext)
         result
       }
     } catch {
       case e: Throwable =>
-        readsMeter.markFailure(startTime)
+        readsMeter.markFailure(timerContext)
         throw e
     }
   }
@@ -240,21 +240,21 @@ class State[K, V](val identifier: String,
     * @return Map[K,V] as a transformation of Record.key -> Record.value
     */
   def range(range: TimeRange, prefix1: Any, prefixN: Any*): Map[K, V] = {
-    val startTime = readsMeter.markStart()
+    val timerContext = readsMeter.markStart()
     try {
       val builder = Map.newBuilder[K, V]
       val it = iterator(range, (prefix1 +: prefixN): _*)
       try {
         it.asScala.foreach(record => builder += record.key -> record.value)
         val result = builder.result()
-        readsMeter.markSuccess(startTime, result.size.toLong)
+        readsMeter.markSuccess(timerContext, result.size.toLong)
         result
       } finally {
         it.close()
       }
     } catch {
       case e: Throwable =>
-        readsMeter.markFailure(startTime)
+        readsMeter.markFailure(timerContext)
         throw e
     }
   }
@@ -472,7 +472,8 @@ class State[K, V](val identifier: String,
     */
   private def put(key: Array[Byte], value: V): Future[Option[V]] = {
     if (external) throw new IllegalStateException("put() called on a read-only state")
-    val nowMs = writesMeter.markStart()
+    val nowMs = EventTime.unix
+    val timerContext = writesMeter.markStart()
     try {
       val recordTimestamp = value match {
         case e: EventTime => e.eventTimeUnix()
@@ -485,19 +486,24 @@ class State[K, V](val identifier: String,
         logOption match {
           case None =>
             kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
-            writesMeter.markSuccess(nowMs)
+            writesMeter.markSuccess(timerContext)
             Future.successful(Some(value))
           case Some(log) =>
-            log.append(kvstore, key, valueBytes, recordTimestamp) map {
-              pos => //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
-                writesMeter.markSuccess(nowMs)
+            log.append(kvstore, key, valueBytes, recordTimestamp) transform(
+              pos => { //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
+                writesMeter.markSuccess(timerContext)
                 Some(value)
-            }
+              },
+              error => {
+                writesMeter.markFailure(timerContext)
+                error
+              }
+            )
         }
       }
     } catch {
       case e: Throwable =>
-        writesMeter.markFailure(nowMs)
+        writesMeter.markFailure(timerContext)
         throw e
     }
   }
@@ -514,22 +520,26 @@ class State[K, V](val identifier: String,
     */
   private def delete(key: Array[Byte]): Future[Option[V]] = {
     if (external) throw new IllegalStateException("delete() called on a read-only state")
-    val startTime = writesMeter.markStart()
+    val timerContext = writesMeter.markStart()
     try {
       logOption match {
         case None =>
           kvstore.remove(ByteBuffer.wrap(key))
-          writesMeter.markSuccess(startTime)
+          writesMeter.markSuccess(timerContext)
           Future.successful(None)
         case Some(log) =>
-          log.delete(kvstore, key) map { _ =>
-            writesMeter.markSuccess(startTime)
-            None
-          }
+          log.delete(kvstore, key) transform(
+            _ => {
+              writesMeter.markSuccess(timerContext)
+              None
+            }, error => {
+            writesMeter.markFailure(timerContext)
+            error
+          })
       }
     } catch {
       case e: Throwable =>
-        writesMeter.markFailure(startTime)
+        writesMeter.markFailure(timerContext)
         throw e
     }
 

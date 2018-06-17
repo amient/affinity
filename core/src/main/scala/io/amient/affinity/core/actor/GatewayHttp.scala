@@ -95,6 +95,8 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
+  val onlineCounter = metrics.counter("http.gateway." + conf.Affi.Node.Gateway.Http.Port)
+
   val sslContext = if (!conf.Affi.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
     log.info("Configuring SSL Context")
@@ -143,6 +145,7 @@ trait GatewayHttp extends Gateway {
     if (isSuspended != suspended) {
       isSuspended = suspended
       log.info("Handling " + (if (suspended) "Suspended" else "Resumed"))
+      if (!isSuspended) onlineCounter.inc() else onlineCounter.dec()
       if (!isSuspended) {
         val reprocess = suspendedHttpRequestQueue.toList
         suspendedHttpRequestQueue.clear
