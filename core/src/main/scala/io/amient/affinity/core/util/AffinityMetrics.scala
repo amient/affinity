@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpResponse
-import com.codahale.metrics.{JmxReporter, MetricRegistry}
+import com.codahale.metrics.{JmxReporter, MetricRegistry, Timer}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
@@ -77,23 +77,19 @@ class AffinityMetrics extends MetricRegistry {
   }
 
   class ProcessMetrics(name: String) {
-    val rate = meter(s"$name.rate")
-    val durations = histogram(s"$name.durations")
-    val successes = meter(s"$name.successes")
-    val failures = meter(s"$name.failures")
+    val durations = timer(s"$name.timer")
+    val successes = meter(s"$name.success")
+    val failures = meter(s"$name.failure")
 
-    def markStart(): Long = {
-      rate.mark()
-      EventTime.unix
-    }
+    def markStart(): Timer.Context = durations.time()
 
-    def markSuccess(startTime: Long, n: Long = 1): Unit = {
-      durations.update(EventTime.unix - startTime)
+    def markSuccess(context: Timer.Context, n: Long = 1): Unit = {
+      context.stop
       successes.mark(n)
     }
 
-    def markFailure(startTime: Long): Unit = {
-      durations.update(EventTime.unix - startTime)
+    def markFailure(context: Timer.Context): Unit = {
+      context.stop
       failures.mark()
     }
 
