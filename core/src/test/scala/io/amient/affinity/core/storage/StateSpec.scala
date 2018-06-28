@@ -23,6 +23,7 @@ import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
+import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -40,13 +41,15 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   val specTimeout = 5 seconds
 
-  val system = AffinityActorSystem.create("test",
-    ConfigFactory.parseMap(Map(
-      Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
-      Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
-      Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
-      Conf.Affi.Node.Gateway.Http.Port.path -> "0"
-    ).asJava))
+  val cfg = ConfigFactory.parseMap(Map(
+    Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
+    Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
+    Conf.Affi.Node.Gateway.Listeners.path -> List(Map(
+      HttpInterfaceConf.Host.path -> "127.0.0.1",
+      HttpInterfaceConf.Port.path -> 0).asJava).asJava
+  ).asJava)
+
+  val system = AffinityActorSystem.create("test", cfg)
 
   override def afterAll: Unit = {
     Await.ready(system.terminate(), 15 seconds)

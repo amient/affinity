@@ -21,6 +21,8 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import com.typesafe.config.ConfigRenderOptions;
+import com.typesafe.config.ConfigValueFactory;
 import io.amient.affinity.core.util.TimeCryptoProof;
 import io.amient.affinity.core.util.TimeCryptoProofSHA256;
 import org.junit.Rule;
@@ -28,9 +30,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import javax.xml.soap.Node;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -49,12 +49,16 @@ public class CfgTest {
         private CfgLong StartupTimeoutMs = longint("startup.timeout.ms", true);
         private CfgLong ShutdownTimeoutMs = longint("shutdown.timeout.ms", 60000L);
         private CfgGroup<ServiceConfig> Services = group("service", ServiceConfig.class, false);
+        private CfgList<ExternalConfig> Externals = list("externals", ExternalConfig.class, false);
+    }
 
+    public static class ExternalConfig extends CfgStruct<ExternalConfig> {
+        private CfgString Description = string("description", true);
     }
 
     public static class ServiceConfig extends CfgStruct<ServiceConfig> {
         private CfgCls<TimeCryptoProof> Class = cls("class", TimeCryptoProof.class, true);
-        private CfgList IntList = list("intlist", CfgInt.class, false);
+        private CfgList IntList = intlist("intlist",false);
         private CfgGroup IntLists = group("lists", CfgIntList.class, false);
         private Cfg Undefined = string("undefined", false);
         private CfgGroup UndefinedGroup = group("undefined-group", UndefinedGroupConfig.class, false);
@@ -113,7 +117,12 @@ public class CfgTest {
             put(NodeConfig.Services.apply("myservice").UndefinedGroup.path("some.group.member.attribute"), "x");
         }});
 
-        NodeConfig applied = NodeConfig.apply(config);
+        Config configWithExternals = config.withValue(NodeConfig.Externals.path(), ConfigValueFactory.fromIterable(new ArrayList<Map<String, String>>() {{
+            add(new HashMap<String, String>() {{ put("description", "abc"); }});
+            add(new HashMap<String, String>() {{ put("description", "xyz"); }});
+        }}));
+
+        NodeConfig applied = NodeConfig.apply(configWithExternals);
         assertEquals(TimeCryptoProofSHA256.class, applied.Services.apply("myservice").Class.apply());
         assertEquals(Arrays.asList(1, 2, 3), applied.Services.apply("myservice").IntList.apply());
         assertEquals(Arrays.asList(1, 2, 3), applied.Services.apply("myservice").IntLists.apply("group1").apply());
@@ -122,6 +131,8 @@ public class CfgTest {
         assertTrue(applied.Services.apply("myservice").Class.isDefined());
         assertTrue(applied.Services.apply("myservice").IntList.isDefined());
         assertFalse(applied.Services.apply("myservice").Undefined.isDefined());
+        assertEquals("abc", applied.Externals.apply(0).Description.apply());
+        assertEquals("xyz", applied.Externals.apply(1).Description.apply());
     }
 
 

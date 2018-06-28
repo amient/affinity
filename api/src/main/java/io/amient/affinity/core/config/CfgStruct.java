@@ -230,7 +230,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return add(path, obj, required, Optional.empty());
     }
 
-    public <X, Y extends Cfg<X>> CfgList<X, Y> list(String path, Class<X> c, boolean required) {
+    public <X> CfgList<X> list(String path, Class<X> c, boolean required) {
         return add(path, new CfgList(c), required, Optional.empty());
     }
 

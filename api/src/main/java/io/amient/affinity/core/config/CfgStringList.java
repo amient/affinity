@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.config;
 
-public class CfgStringList extends CfgList<String, CfgString> {
+public class CfgStringList extends CfgList<String> {
     public CfgStringList() {
         super(CfgString.class);
     }

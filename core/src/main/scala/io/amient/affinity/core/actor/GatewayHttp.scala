@@ -19,12 +19,10 @@
 
 package io.amient.affinity.core.actor
 
-import java.io.FileInputStream
-import java.security.{KeyStore, SecureRandom}
+import java.net.InetSocketAddress
 import java.util
 import java.util.Optional
 import java.util.concurrent.ExecutionException
-import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import akka.event.Logging
@@ -42,45 +40,16 @@ import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http._
 import io.amient.affinity.core.util.ByteUtils
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.util.control.NonFatal
-
-object GatewayHttp {
-
-  object GatewayConf extends GatewayConf {
-    override def apply(config: Config) = new GatewayConf().apply(config)
-  }
-
-  class GatewayConf extends CfgStruct[GatewayConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Http = struct("affinity.node.gateway.http", new HttpConf, false)
-    //val Tls = struct("affinity.node.gateway.tls", new TlsConf, false) //TODO #184 multiple listeners
-  }
-
-  class HttpConf extends CfgStruct[HttpConf] {
-
-    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
-    val Host = string("host", true).doc("host to which the http interface binds to")
-    val Port = integer("port", true).doc("port to which the http interface binds to")
-    val Tls = struct("tls", new TlsConf, false)
-  }
-
-  class TlsConf extends CfgStruct[TlsConf] {
-    val KeyStoreStandard = string("keystore.standard", "PKCS12").doc("format of the keystore")
-    val KeyStorePassword = string("keystore.password", true).doc("password to the keystore file")
-    val KeyStoreResource = string("keystore.resource", false).doc("resource which holds the keystore, if file not used")
-    val KeyStoreFile = string("keystore.file", false).doc("file which contains the keystore contents, if resource not used")
-  }
-
-}
 
 trait GatewayHttp extends Gateway {
 
@@ -95,45 +64,22 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
-  val onlineCounter = metrics.counter("http.gateway." + conf.Affi.Node.Gateway.Http.Port)
+  val interfaces: List[HttpInterface] = conf.Affi.Node.Gateway.Listeners().asScala.map(new HttpInterface(_)).toList
 
-  val sslContext = if (!conf.Affi.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
-  sslContext.foreach { context =>
-    log.info("Configuring SSL Context")
-    val password = conf.Affi.Node.Gateway.Http.Tls.KeyStorePassword().toCharArray
-    val ks = KeyStore.getInstance(conf.Affi.Node.Gateway.Http.Tls.KeyStoreStandard())
-    val is = if (conf.Affi.Node.Gateway.Http.Tls.KeyStoreResource.isDefined) {
-      val keystoreResource = conf.Affi.Node.Gateway.Http.Tls.KeyStoreResource()
-      log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
-      getClass.getClassLoader.getResourceAsStream(keystoreResource)
-    } else {
-      val keystoreFileName = conf.Affi.Node.Gateway.Http.Tls.KeyStoreFile()
-      log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
-      new FileInputStream(keystoreFileName)
-    }
-    try {
-      ks.load(is, password)
-    } finally {
-      is.close()
-    }
-    val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(ks, password)
-    context.init(keyManagerFactory.getKeyManagers, null, new SecureRandom)
-  }
+  val listeners: List[InetSocketAddress] = interfaces.map(_.bind(self))
 
-  private val httpInterface: HttpInterface = new HttpInterface(
-    conf.Affi.Node.Gateway.Http.Host(), conf.Affi.Node.Gateway.Http.Port(), sslContext)
+  require(interfaces.size >= 1, "At least one interface must be defined for Http Gateway to function")
 
-  lazy private val listener = httpInterface.bind(self)
+  val onlineCounter = metrics.counter("http.gateway." + interfaces.head.port)
 
   abstract override def preStart(): Unit = {
     super.preStart()
     log.info("Gateway starting")
-    context.parent ! Controller.GatewayCreated(listener.getPort)
+    context.parent ! Controller.GatewayCreated(listeners.map(_.getPort))
   }
 
   abstract override def postStop(): Unit = try {
-    httpInterface.close()
+    interfaces.foreach(_.close)
     log.info("Http Interface closed")
     Http().shutdownAllConnectionPools()
   } finally {
@@ -156,7 +102,7 @@ trait GatewayHttp extends Gateway {
   }
 
   abstract override def manage: Receive = super.manage orElse {
-    case CreateGateway => context.parent ! Controller.GatewayCreated(listener.getPort)
+    case CreateGateway => context.parent ! Controller.GatewayCreated(listeners.map(_.getPort))
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)
@@ -529,7 +475,7 @@ trait WebSocketSupport extends GatewayHttp {
   trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
     val conf = Conf(context.system.settings.config).Affi
 
-    final val maxBufferSize = conf.Node.Gateway.Http.MaxWebSocketQueueSize()
+    final val maxBufferSize = conf.Node.Gateway.MaxWebSocketQueueSize()
 
     override def postStop(): Unit = {
       log.debug("WebSocket Upstream Actor Closing")

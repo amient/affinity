@@ -69,7 +69,7 @@ class Node(config: Config) {
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 
-  private val httpGatewayPort = Promise[Int]()
+  private val httpGatewayPort = Promise[List[Int]]()
 
   private val clusterReady = new CountDownLatch(1)
 
@@ -110,8 +110,8 @@ class Node(config: Config) {
     clusterReady.await(startupTimeout.toMillis, TimeUnit.MILLISECONDS)
   }
 
-  def getHttpPort(): Int = {
-    Await.result(httpGatewayPort.future, 15 seconds)
+  def getHttpPort(interface: Int): Int = {
+    Await.result(httpGatewayPort.future, 15 seconds)(interface)
   }
 
   final def shutdown(): Unit = if (!shuttingDown) {
@@ -139,12 +139,15 @@ class Node(config: Config) {
       throw e
   }
 
-  def startGateway(): Future[Int] = {
+  /**
+    * @return a future with list of ports indexed by the interface id 0-n
+    */
+  def startGateway(): Future[List[Int]] = {
     if (conf.Affi.Node.Gateway.Class.isDefined) {
       startGateway(conf.Affi.Node.Gateway.Class().newInstance())
     } else {
-      httpGatewayPort.success(-1)
-      Future.successful(-1)
+      httpGatewayPort.success(List())
+      Future.successful(List())
     }
   }
 
@@ -152,8 +155,9 @@ class Node(config: Config) {
     * @param creator
     * @param tag
     * @tparam T
+    * @return a future with list of ports indexed by the interface id 0-n
     */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[Int] = {
+  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[List[Int]] = {
     implicit val timeout = Timeout(startupTimeout)
     val result = controller ?? CreateGateway(Props(creator))
     httpGatewayPort.completeWith(result)

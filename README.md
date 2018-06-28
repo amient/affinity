@@ -435,26 +435,38 @@ In all examples and for all tests, logback binding is used.
 
 
 ## Node Context
-        affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3] 
-        affinity.node.container.<ID> [[]] (!)                                                   
+        affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3]
+        affinity.node.container.<ID>
+        affinity.node.container.<ID>.[] [INT] (!)
         affinity.node.data.dir [FILE-PATH] (./.data)                                            Location under which any local state or registers will be kept
         affinity.node.gateway.class [FQN] (-)                                                   Entry point class for all external requests, both http and stream inputs
-        affinity.node.gateway.http.host [STRING] (!)                                            host to which the http interface binds to
-        affinity.node.gateway.http.max.websocket.queue.size [INT] (100)                         number of messages that can be queued for delivery before blocking
-        affinity.node.gateway.http.port [INT] (!)                                               port to which the http interface binds to
-        affinity.node.gateway.http.tls.keystore.file [STRING] (-)                               file which contains the keystore contents, if resource not used
-        affinity.node.gateway.http.tls.keystore.password [STRING] (!)                           password to the keystore file
-        affinity.node.gateway.http.tls.keystore.resource [STRING] (-)                           resource which holds the keystore, if file not used
-        affinity.node.gateway.http.tls.keystore.standard [STRING] (PKCS12)                      format of the keystore
+        affinity.node.gateway.listeners                                                         list of listener interface configurations
+        affinity.node.gateway.listeners.[].host [STRING] (!)                                    host to which the http interface binds to
+        affinity.node.gateway.listeners.[].port [INT] (!)                                       port to which the http interface binds to
+        affinity.node.gateway.listeners.[].prefix [STRING] ()                                   http uri prefix for all endpoints on this interface, e.g. '/my-prefix'
+        affinity.node.gateway.listeners.[].tls.keystore.file [STRING] (-)                       file which contains the keystore contents, if resource not used
+        affinity.node.gateway.listeners.[].tls.keystore.password [STRING] (!)                   password to the keystore file
+        affinity.node.gateway.listeners.[].tls.keystore.resource [STRING] (-)                   resource which holds the keystore, if file not used
+        affinity.node.gateway.listeners.[].tls.keystore.standard [STRING] (PKCS12)              format of the keystore
+        affinity.node.gateway.max.websocket.queue.size [INT] (100)                              number of messages that can be queued for delivery before blocking
         affinity.node.gateway.stream [<ID>] (-)                                                 External input and output streams to which system is connected, if any
         affinity.node.gateway.stream.<ID>.class [FQN] (-)                                       Implementation of storage.LogStorage which will be used for persistence
         affinity.node.gateway.stream.<ID>.commit.interval.ms [LONG] (5000)                      Frequency at which consumed records will be committed to the log storage backend
         affinity.node.gateway.stream.<ID>.commit.timeout.ms [LONG] (30000)                      Number of milliseconds after which a commit is considered failed
         affinity.node.gateway.stream.<ID>.min.timestamp.ms [LONG] (0)                           Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
         affinity.node.gateway.suspend.queue.max.size [INT] (1000)                               Size of the queue when the cluster enters suspended mode
-        affinity.node.name [STRING] (AffinityNode)                                              ActorSystem name under which the Node presents itself in the Akka Cluster
-        affinity.node.shutdown.timeout.ms [INT] (30000)                                         Maximum time a node can take to shutdown gracefully
-        affinity.node.startup.timeout.ms [INT] (2147483647)                                     Maximum time a node can take to startup - this number must account for any potential state bootstrap
+        affinity.node.name [STRING] (Affinity)                                                  ActorSystem name under which the Node presents itself in the Akka Cluster
+        affinity.node.shutdown.timeout.ms [LONG] (30000)                                        Maximum time a node can take to shutdown gracefully
+        affinity.node.startup.timeout.ms [LONG] (2147483647)                                    Maximum time a node can take to startup - this number must account for any potential state bootstrap
+
+### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
+        affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)                  kafka connection string used for consumer and/or producer
+        affinity.node.gateway.stream.<ID>.kafka.consumer                                        any settings that the underlying version of kafka consumer client supports
+        affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)                  kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.node.gateway.stream.<ID>.kafka.producer                                        any settings that the underlying version of kafka producer client supports
+        affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)                    replication factor of the kafka topic
+        affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name
+
 
 ### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)                  kafka connection string used for consumer and/or producer

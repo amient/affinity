@@ -30,12 +30,24 @@ import scala.language.postfixOps
 
 class ExampleHttpsGatewaySpec extends FlatSpec with AffinityTestBase with Matchers {
 
-  val config = ConfigFactory.load("https-example-test")
-
   behavior of "Simple Api Gateway"
+
+  it should "work with multiple listeners" in {
+    val config = ConfigFactory.load("https-example")
+    val node = new Node(config)
+    node.start()
+    try {
+      node.awaitClusterReady
+      node.get_json(node.https_get("/secure/ping", 0)).asText() should be ("pong")
+      node.get_json(node.http_get("/unsafe/ping", 1)).asText() should be ("pong")
+    } finally {
+      node.shutdown()
+    }
+  }
 
   it should "work without the http layer" in {
 
+    val config = ConfigFactory.load("https-example-test")
     val node = new Node(config)
     node.start()
     try {
