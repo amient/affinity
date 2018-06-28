@@ -31,7 +31,7 @@ import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown
 import io.amient.affinity.core.actor.Keyspace.{CheckKeyspaceStatus, KeyspaceStatus}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
-import io.amient.affinity.core.config.CfgStruct
+import io.amient.affinity.core.config.{CfgList, CfgStruct}
 import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.storage.{LogStorageConf, State}
 import io.amient.affinity.core.util.AffinityMetrics
@@ -48,7 +48,8 @@ object Gateway {
   class GatewayConf extends CfgStruct[GatewayConf] {
     val Class = cls("class", classOf[Gateway], false).doc("Entry point class for all external requests, both http and stream inputs")
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000).doc("Size of the queue when the cluster enters suspended mode")
-    val Listeners = list("listeners", classOf[HttpInterfaceConf], false)
+    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
+    val Listeners: CfgList[HttpInterfaceConf] = list("listeners", classOf[HttpInterfaceConf], false).doc("list of listener interface configurations")
     val Stream = group("stream", classOf[LogStorageConf], false).doc("External input and output streams to which system is connected, if any")
   }
 

@@ -63,11 +63,12 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
+  //TODO #184 currently only using the first listener
   val httpConf: HttpInterfaceConf = conf.Affi.Node.Gateway.Listeners(0)
 
   val onlineCounter = metrics.counter("http.gateway." + httpConf.Port)
 
-  private[actor] val httpInterface: HttpInterface = new HttpInterface(httpConf)
+  private val httpInterface: HttpInterface = new HttpInterface(httpConf)
 
   lazy private val listener: InetSocketAddress = httpInterface.bind(self)
 
@@ -474,7 +475,7 @@ trait WebSocketSupport extends GatewayHttp {
   trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
     val conf = Conf(context.system.settings.config).Affi
 
-    final val maxBufferSize = httpInterface.maxWebSocketQueueSize
+    final val maxBufferSize = conf.Node.Gateway.MaxWebSocketQueueSize()
 
     override def postStop(): Unit = {
       log.debug("WebSocket Upstream Actor Closing")

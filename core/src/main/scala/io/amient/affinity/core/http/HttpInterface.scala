@@ -45,7 +45,6 @@ object HttpInterfaceConf extends HttpInterfaceConf {
 
 class HttpInterfaceConf extends CfgStruct[HttpInterfaceConf] {
 
-  val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
   val Host = string("host", true).doc("host to which the http interface binds to")
   val Port = integer("port", true).doc("port to which the http interface binds to")
   val Prefix = string("prefix", "").doc("http uri prefix for all endpoints on this interface, e.g. '/my-prefix'")
@@ -70,8 +69,6 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
   val port: Int = httpConf.Port()
 
   val prefix: Uri.Path = Uri.Path(httpConf.Prefix())
-
-  val maxWebSocketQueueSize = httpConf.MaxWebSocketQueueSize()
 
   val sslContext = if (!httpConf.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>

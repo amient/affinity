@@ -28,7 +28,7 @@ import java.util.List;
 
 public class CfgList<L> extends Cfg<List<L>> {
 
-    private final Class<? extends Cfg<L>> cls;
+    public final Class<? extends Cfg<L>> cls;
 
     public CfgList(Class<? extends Cfg<L>> cls) {
         this.cls = cls;
@@ -66,7 +66,7 @@ public class CfgList<L> extends Cfg<List<L>> {
 
     @Override
     public String parameterInfo() {
-        return "[]";
+        return "";
     }
 
     public L apply(Integer entry) {
@@ -74,5 +74,10 @@ public class CfgList<L> extends Cfg<List<L>> {
         return list.get(entry);
     }
 
+    @Override
+    public CfgList<L> doc(String description) {
+        super.doc(description);
+        return this;
+    }
 
 }
