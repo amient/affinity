@@ -49,11 +49,11 @@ public class CfgTest {
         private CfgLong StartupTimeoutMs = longint("startup.timeout.ms", true);
         private CfgLong ShutdownTimeoutMs = longint("shutdown.timeout.ms", 60000L);
         private CfgGroup<ServiceConfig> Services = group("service", ServiceConfig.class, false);
-        private CfgList Externals = list("externals", ExternalConfig.class, false);
+        private CfgList<ExternalConfig> Externals = list("externals", ExternalConfig.class, false);
     }
 
     public static class ExternalConfig extends CfgStruct<ExternalConfig> {
-        private CfgString Description = string("description", "...");
+        private CfgString Description = string("description", true);
     }
 
     public static class ServiceConfig extends CfgStruct<ServiceConfig> {
@@ -118,10 +118,8 @@ public class CfgTest {
         }});
 
         Config configWithExternals = config.withValue(NodeConfig.Externals.path(), ConfigValueFactory.fromIterable(new ArrayList<Map<String, String>>() {{
-//TODO #184 related
-//            add(new HashMap<String, String>() {{
-//                put("description", "xyz");
-//            }});
+            add(new HashMap<String, String>() {{ put("description", "abc"); }});
+            add(new HashMap<String, String>() {{ put("description", "xyz"); }});
         }}));
 
         NodeConfig applied = NodeConfig.apply(configWithExternals);
@@ -133,6 +131,8 @@ public class CfgTest {
         assertTrue(applied.Services.apply("myservice").Class.isDefined());
         assertTrue(applied.Services.apply("myservice").IntList.isDefined());
         assertFalse(applied.Services.apply("myservice").Undefined.isDefined());
+        assertEquals("abc", applied.Externals.apply(0).Description.apply());
+        assertEquals("xyz", applied.Externals.apply(1).Description.apply());
     }
 
 

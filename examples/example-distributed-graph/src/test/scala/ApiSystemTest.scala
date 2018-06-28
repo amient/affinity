@@ -23,6 +23,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.ws.WebSocketClient
@@ -39,9 +40,10 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   val config = ConfigFactory.load("example")
     .withValue(Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
-    .withValue(Conf.Affi.Node.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
-    .withValue(Conf.Affi.Node.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
-
+    .withValue(Conf.Affi.Node.Gateway.Listeners.path, ConfigValueFactory.fromIterable(List(Map(
+      HttpInterfaceConf.Host.path -> "127.0.0.1",
+      HttpInterfaceConf.Port.path -> 0
+    ).asJava).asJava))
 
   val nodeConfig = configure(config, Some(zkConnect), Some(kafkaBootstrap))
   val node2 = new Node(nodeConfig)

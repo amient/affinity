@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.actor
 
+import java.net.InetSocketAddress
 import java.util
 import java.util.Optional
 import java.util.concurrent.ExecutionException
@@ -40,7 +41,6 @@ import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
-import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http._
 import io.amient.affinity.core.util.ByteUtils
@@ -63,13 +63,13 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
-  val httpConf = conf.Affi.Node.Gateway.Http
+  val httpConf: HttpInterfaceConf = conf.Affi.Node.Gateway.Listeners(0)
 
   val onlineCounter = metrics.counter("http.gateway." + httpConf.Port)
 
-  private val httpInterface: HttpInterface = new HttpInterface(httpConf)
+  private[actor] val httpInterface: HttpInterface = new HttpInterface(httpConf)
 
-  lazy private val listener = httpInterface.bind(self)
+  lazy private val listener: InetSocketAddress = httpInterface.bind(self)
 
   abstract override def preStart(): Unit = {
     super.preStart()
@@ -474,7 +474,7 @@ trait WebSocketSupport extends GatewayHttp {
   trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
     val conf = Conf(context.system.settings.config).Affi
 
-    final val maxBufferSize = conf.Node.Gateway.Http.MaxWebSocketQueueSize()
+    final val maxBufferSize = httpInterface.maxWebSocketQueueSize
 
     override def postStop(): Unit = {
       log.debug("WebSocket Upstream Actor Closing")

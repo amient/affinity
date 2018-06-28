@@ -32,11 +32,16 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
+import com.typesafe.config.Config
 import io.amient.affinity.core.config.CfgStruct
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
+
+object HttpInterfaceConf extends HttpInterfaceConf {
+  override def apply(config: Config) = new HttpInterfaceConf().apply(config)
+}
 
 class HttpInterfaceConf extends CfgStruct[HttpInterfaceConf] {
 
@@ -65,6 +70,8 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
   val port: Int = httpConf.Port()
 
   val prefix: Uri.Path = Uri.Path(httpConf.Prefix())
+
+  val maxWebSocketQueueSize = httpConf.MaxWebSocketQueueSize()
 
   val sslContext = if (!httpConf.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>

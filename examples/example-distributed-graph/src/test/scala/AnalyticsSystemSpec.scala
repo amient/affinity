@@ -23,6 +23,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
+import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.storage.LogStorage
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
@@ -34,14 +35,17 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.reflect.ClassTag
+import scala.collection.JavaConverters._
 
 class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 4
 
   val config: Config = ConfigFactory.load("example")
-    .withValue(Conf.Affi.Node.Gateway.Http.Host.path, ConfigValueFactory.fromAnyRef("127.0.0.1"))
-    .withValue(Conf.Affi.Node.Gateway.Http.Port.path, ConfigValueFactory.fromAnyRef(0))
+    .withValue(Conf.Affi.Node.Gateway.Listeners.path, ConfigValueFactory.fromIterable(List(Map(
+      HttpInterfaceConf.Host.path -> "127.0.0.1",
+      HttpInterfaceConf.Port.path -> 0
+    ).asJava).asJava))
 
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))

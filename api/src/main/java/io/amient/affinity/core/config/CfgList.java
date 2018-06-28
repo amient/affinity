@@ -39,18 +39,20 @@ public class CfgList<L> extends Cfg<List<L>> {
         List<L> list = new LinkedList<>();
         Iterator<ConfigValue> it = config.getList(relPath).iterator();
         int i = 0;
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             try {
                 ConfigValue el = it.next();
                 Cfg<L> item = cls.newInstance();
                 item.setListPos(i);
                 item.setRelPath(relPath);
-                if (item instanceof CfgStruct) {
-                    item.apply(el.atKey(null));
-                } else {
-                    item.apply(config);
+                switch (el.valueType()) {
+                    case OBJECT:
+                        list.add((L) item.apply(el.atKey("x").getConfig("x")));
+                        break;
+                    default:
+                        list.add((L) el.unwrapped());
+                        break;
                 }
-                list.add((L) el.unwrapped());
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(e);
             } catch (IllegalAccessException e) {
@@ -68,7 +70,9 @@ public class CfgList<L> extends Cfg<List<L>> {
     }
 
     public L apply(Integer entry) {
-        return apply().get(entry);
+        List<L> list = apply();
+        return list.get(entry);
     }
+
 
 }
