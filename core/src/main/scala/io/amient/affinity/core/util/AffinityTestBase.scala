@@ -121,7 +121,6 @@ trait AffinityTestBase {
 
 class NodeWithTestMethods(underlying: Node) {
 
-  val httpPort = underlying.getHttpPort()
 
   private implicit val system = underlying.system
 
@@ -143,29 +142,33 @@ class NodeWithTestMethods(underlying: Node) {
     ConnectionContext.https(context)
   }
 
-  def wsuri(path: String) = new java.net.URI(s"ws://localhost:$httpPort$path")
+  def wsuri(path: String, interface: Int = 0) = new java.net.URI(s"ws://localhost:${underlying.getHttpPort(interface)}$path")
 
-  def wssuri(path: String) = new java.net.URI(s"wss://localhost:$httpPort$path")
+  def wssuri(path: String, interface: Int = 0) = new java.net.URI(s"wss://localhost:${underlying.getHttpPort(interface)}$path")
 
-  def http(method: HttpMethod, path: String): Future[HttpResponse] = {
-    http(HttpRequest(method = method, uri(path)))
+  def http(method: HttpMethod, path: String, interface: Int = 0): Future[HttpResponse] = {
+    http(HttpRequest(method = method, uri(path, interface)))
   }
 
-  def http_get(path: String, headers: List[HttpHeader] = List()): HttpResponse = {
-    Await.result(http(HttpRequest(method = HttpMethods.GET, uri(path), headers = headers)), 30 seconds)
+  def http_get(path: String, headers: List[HttpHeader], interface: Int): HttpResponse = {
+    Await.result(http(HttpRequest(method = HttpMethods.GET, uri(path, interface), headers = headers)), 30 seconds)
   }
 
-  def http_get(path: String): HttpResponse = {
-    Await.result(http(HttpRequest(method = HttpMethods.GET, uri(path))), 30 seconds)
+  def http_get(path: String, headers: List[HttpHeader]): HttpResponse = http_get(path, headers, interface = 0)
+
+  def http_get(path: String, interface: Int): HttpResponse = http_get(path, List(), interface)
+
+  def http_get(path: String): HttpResponse = http_get(path, interface = 0)
+
+  def https_get(path: String, headers: List[HttpHeader], interface: Int): HttpResponse = {
+    Await.result(http(HttpRequest(method = HttpMethods.GET, https_uri(path, interface), headers = headers)), 30 seconds)
   }
 
-  def https_get(path: String, headers: List[HttpHeader] = List()): HttpResponse = {
-    Await.result(http(HttpRequest(method = HttpMethods.GET, https_uri(path), headers = headers)), 30 seconds)
-  }
+  def https_get(path: String, headers: List[HttpHeader]): HttpResponse = https_get(path, headers, interface = 0)
 
-  def https_get(path: String): HttpResponse = {
-    Await.result(http(HttpRequest(method = HttpMethods.GET, https_uri(path))), 30 seconds)
-  }
+  def https_get(path: String, interface: Int): HttpResponse = https_get(path, List(), interface)
+
+  def https_get(path: String): HttpResponse = https_get(path, interface = 0)
 
   val mapper = new ObjectMapper()
 
@@ -194,9 +197,9 @@ class NodeWithTestMethods(underlying: Node) {
     Await.result(http(HttpRequest(entity = HttpEntity(ContentTypes.`application/json`, Encoder.json(json)), method = HttpMethods.POST, uri = https_uri(path), headers = headers)), 30 seconds)
   }
 
-  def uri(path: String) = Uri(s"http://localhost:$httpPort$path")
+  def uri(path: String, interface: Int = 0) = Uri(s"http://localhost:${underlying.getHttpPort(interface)}$path")
 
-  def https_uri(path: String) = Uri(s"https://localhost:$httpPort$path")
+  def https_uri(path: String, interface: Int = 0) = Uri(s"https://localhost:${underlying.getHttpPort(interface)}$path")
 
   def http(req: HttpRequest) = {
     val decodedResponse: Future[HttpResponse] = Http().singleRequest(req, testSSLContext) flatMap {

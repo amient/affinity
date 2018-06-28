@@ -26,11 +26,11 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
+public class CfgList<L> extends Cfg<List<L>> {
 
-    private final Class<C> cls;
+    public final Class<? extends Cfg<L>> cls;
 
-    public CfgList(Class<C> cls) {
+    public CfgList(Class<? extends Cfg<L>> cls) {
         this.cls = cls;
     }
 
@@ -39,14 +39,20 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
         List<L> list = new LinkedList<>();
         Iterator<ConfigValue> it = config.getList(relPath).iterator();
         int i = 0;
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             try {
                 ConfigValue el = it.next();
-                C item = cls.newInstance();
+                Cfg<L> item = cls.newInstance();
                 item.setListPos(i);
                 item.setRelPath(relPath);
-                item.apply(config);
-                list.add((L)el.unwrapped());
+                switch (el.valueType()) {
+                    case OBJECT:
+                        list.add((L) item.apply(el.atKey("x").getConfig("x")));
+                        break;
+                    default:
+                        list.add((L) el.unwrapped());
+                        break;
+                }
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(e);
             } catch (IllegalAccessException e) {
@@ -60,11 +66,18 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
 
     @Override
     public String parameterInfo() {
-        return "[]";
+        return "";
     }
 
     public L apply(Integer entry) {
-        return apply().get(entry);
+        List<L> list = apply();
+        return list.get(entry);
+    }
+
+    @Override
+    public CfgList<L> doc(String description) {
+        super.doc(description);
+        return this;
     }
 
 }

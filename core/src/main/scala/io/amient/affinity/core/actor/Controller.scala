@@ -39,9 +39,9 @@ object Controller {
 
   final case class ContainerOnline(group: String)
 
-  final case class CreateGateway(handlerProps: Props) extends Reply[Int]
+  final case class CreateGateway(handlerProps: Props) extends Reply[List[Int]]
 
-  final case class GatewayCreated(httpPort: Int)
+  final case class GatewayCreated(httpPorts: List[Int])
 
   final case class GracefulShutdown() extends Reply[Unit]
 
@@ -60,7 +60,7 @@ class Controller extends Actor {
 
   val system = context.system
 
-  private var gatewayPromise: Promise[Int] = null
+  private var gatewayPromise: Promise[List[Int]] = null
 
   private val containers = scala.collection.mutable.Map[String, Promise[Unit]]()
 
@@ -111,7 +111,7 @@ class Controller extends Actor {
     case request@CreateGateway(gatewayProps) => try {
       val gatewayRef = context.actorOf(gatewayProps, name = "gateway")
       context.watch(gatewayRef)
-      gatewayPromise = Promise[Int]()
+      gatewayPromise = Promise[List[Int]]()
       request(sender) ! gatewayPromise.future
       gatewayRef ! CreateGateway
     } catch {
@@ -121,9 +121,9 @@ class Controller extends Actor {
     case Terminated(child) if (child.path.name == "gateway") =>
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
-    case GatewayCreated(httpPort) => if (!gatewayPromise.isCompleted) {
+    case GatewayCreated(httpPorts) => if (!gatewayPromise.isCompleted) {
       log.info("Gateway online (with http)")
-      gatewayPromise.success(httpPort)
+      gatewayPromise.success(httpPorts)
     }
 
     case request@GracefulShutdown() =>

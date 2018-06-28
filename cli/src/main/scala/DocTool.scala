@@ -8,7 +8,7 @@ import io.amient.affinity.avro.{ConfluentSchemaRegistry, LocalSchemaRegistry, Me
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.{CoordinatorEmbedded, CoordinatorZk}
-import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgStruct}
+import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgList, CfgStruct}
 import io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb
 import io.amient.affinity.kafka.KafkaLogStorage
 import io.amient.affinity.kafka.KafkaStorage.{KafkaStateConf, KafkaStorageConf}
@@ -102,6 +102,11 @@ object DocTool extends Tool {
         val g = group.getGroupClass.newInstance()
         g.setPath(group.path("<ID>"))
         apply(g)
+      case list: CfgList[_] =>
+        printInfo(cfg)
+        val l = list.cls.newInstance()
+        l.setPath(list.path("[]"))
+        apply(l)
       case _ => printInfo(cfg)
     }
 

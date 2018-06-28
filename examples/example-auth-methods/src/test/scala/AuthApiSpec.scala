@@ -24,6 +24,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.{CoordinatorEmbedded, Node}
+import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.core.util.{AffinityTestBase, TimeCryptoProofSHA256}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -37,8 +38,10 @@ class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with Befo
     Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
     Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
     Conf.Affi.Global("settings").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-    Conf.Affi.Node.Gateway.Http.Host.path -> "127.0.0.1",
-    Conf.Affi.Node.Gateway.Http.Port.path -> "0"
+    Conf.Affi.Node.Gateway.Listeners.path -> List(Map(
+      HttpInterfaceConf.Host.path -> "127.0.0.1",
+      HttpInterfaceConf.Port.path -> 0
+    ).asJava).asJava
   ).asJava)
 
   val publicKey = "pkey1"

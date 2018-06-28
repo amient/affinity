@@ -115,7 +115,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
     }
   })) map {
-    case port: Int => port
+    case port :: Nil => port
   }, timeout.duration)
 
   override def beforeAll(): Unit = try {
