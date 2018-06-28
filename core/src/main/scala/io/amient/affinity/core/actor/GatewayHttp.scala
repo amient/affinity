@@ -19,12 +19,9 @@
 
 package io.amient.affinity.core.actor
 
-import java.io.FileInputStream
-import java.security.{KeyStore, SecureRandom}
 import java.util
 import java.util.Optional
 import java.util.concurrent.ExecutionException
-import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import akka.event.Logging
@@ -42,7 +39,6 @@ import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -53,34 +49,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.util.control.NonFatal
-
-object GatewayHttp {
-
-  object GatewayConf extends GatewayConf {
-    override def apply(config: Config) = new GatewayConf().apply(config)
-  }
-
-  class GatewayConf extends CfgStruct[GatewayConf](Cfg.Options.IGNORE_UNKNOWN) {
-    val Http = struct("affinity.node.gateway.http", new HttpConf, false)
-    //val Tls = struct("affinity.node.gateway.tls", new TlsConf, false) //TODO #184 multiple listeners
-  }
-
-  class HttpConf extends CfgStruct[HttpConf] {
-
-    val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
-    val Host = string("host", true).doc("host to which the http interface binds to")
-    val Port = integer("port", true).doc("port to which the http interface binds to")
-    val Tls = struct("tls", new TlsConf, false)
-  }
-
-  class TlsConf extends CfgStruct[TlsConf] {
-    val KeyStoreStandard = string("keystore.standard", "PKCS12").doc("format of the keystore")
-    val KeyStorePassword = string("keystore.password", true).doc("password to the keystore file")
-    val KeyStoreResource = string("keystore.resource", false).doc("resource which holds the keystore, if file not used")
-    val KeyStoreFile = string("keystore.file", false).doc("file which contains the keystore contents, if resource not used")
-  }
-
-}
 
 trait GatewayHttp extends Gateway {
 
@@ -95,34 +63,11 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
-  val onlineCounter = metrics.counter("http.gateway." + conf.Affi.Node.Gateway.Http.Port)
+  val httpConf = conf.Affi.Node.Gateway.Http
 
-  val sslContext = if (!conf.Affi.Node.Gateway.Http.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
-  sslContext.foreach { context =>
-    log.info("Configuring SSL Context")
-    val password = conf.Affi.Node.Gateway.Http.Tls.KeyStorePassword().toCharArray
-    val ks = KeyStore.getInstance(conf.Affi.Node.Gateway.Http.Tls.KeyStoreStandard())
-    val is = if (conf.Affi.Node.Gateway.Http.Tls.KeyStoreResource.isDefined) {
-      val keystoreResource = conf.Affi.Node.Gateway.Http.Tls.KeyStoreResource()
-      log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
-      getClass.getClassLoader.getResourceAsStream(keystoreResource)
-    } else {
-      val keystoreFileName = conf.Affi.Node.Gateway.Http.Tls.KeyStoreFile()
-      log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
-      new FileInputStream(keystoreFileName)
-    }
-    try {
-      ks.load(is, password)
-    } finally {
-      is.close()
-    }
-    val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(ks, password)
-    context.init(keyManagerFactory.getKeyManagers, null, new SecureRandom)
-  }
+  val onlineCounter = metrics.counter("http.gateway." + httpConf.Port)
 
-  private val httpInterface: HttpInterface = new HttpInterface(
-    conf.Affi.Node.Gateway.Http.Host(), conf.Affi.Node.Gateway.Http.Port(), sslContext)
+  private val httpInterface: HttpInterface = new HttpInterface(httpConf)
 
   lazy private val listener = httpInterface.bind(self)
 

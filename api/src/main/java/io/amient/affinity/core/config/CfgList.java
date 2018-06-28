@@ -26,11 +26,11 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
+public class CfgList<L> extends Cfg<List<L>> {
 
-    private final Class<C> cls;
+    private final Class<? extends Cfg<L>> cls;
 
-    public CfgList(Class<C> cls) {
+    public CfgList(Class<? extends Cfg<L>> cls) {
         this.cls = cls;
     }
 
@@ -42,11 +42,15 @@ public class CfgList<L, C extends Cfg<L>> extends Cfg<List<L>> {
         while(it.hasNext()) {
             try {
                 ConfigValue el = it.next();
-                C item = cls.newInstance();
+                Cfg<L> item = cls.newInstance();
                 item.setListPos(i);
                 item.setRelPath(relPath);
-                item.apply(config);
-                list.add((L)el.unwrapped());
+                if (item instanceof CfgStruct) {
+                    item.apply(el.atKey(null));
+                } else {
+                    item.apply(config);
+                }
+                list.add((L) el.unwrapped());
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(e);
             } catch (IllegalAccessException e) {
