@@ -189,7 +189,7 @@ trait Gateway extends ActorHandler {
     }
 
     case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
-      context.parent ! Controller.GatewayCreated(-1)
+      context.parent ! Controller.GatewayCreated(List())
       if (conf.Affi.Node.Gateway.Listeners.isDefined) {
         log.warning("affinity.gateway has listeners configured but the node is trying " +
           s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")

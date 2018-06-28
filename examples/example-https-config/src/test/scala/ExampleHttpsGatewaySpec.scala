@@ -32,13 +32,14 @@ class ExampleHttpsGatewaySpec extends FlatSpec with AffinityTestBase with Matche
 
   behavior of "Simple Api Gateway"
 
-  it should "work with https listener" in {
+  it should "work with multiple listeners" in {
     val config = ConfigFactory.load("https-example")
     val node = new Node(config)
     node.start()
     try {
       node.awaitClusterReady
-      node.get_json(node.https_get("/secure/ping")).asText() should be ("pong")
+      node.get_json(node.https_get("/secure/ping", 0)).asText() should be ("pong")
+      node.get_json(node.http_get("/unsafe/ping", 1)).asText() should be ("pong")
     } finally {
       node.shutdown()
     }

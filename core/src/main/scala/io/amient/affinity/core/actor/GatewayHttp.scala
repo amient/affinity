@@ -45,6 +45,7 @@ import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http._
 import io.amient.affinity.core.util.ByteUtils
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
@@ -63,23 +64,22 @@ trait GatewayHttp extends Gateway {
 
   private var isSuspended = true
 
-  //TODO #184 currently only using the first listener
-  val httpConf: HttpInterfaceConf = conf.Affi.Node.Gateway.Listeners(0)
+  val interfaces: List[HttpInterface] = conf.Affi.Node.Gateway.Listeners().asScala.map(new HttpInterface(_)).toList
 
-  val onlineCounter = metrics.counter("http.gateway." + httpConf.Port)
+  val listeners: List[InetSocketAddress] = interfaces.map(_.bind(self))
 
-  private val httpInterface: HttpInterface = new HttpInterface(httpConf)
+  require(interfaces.size >= 1, "At least one interface must be defined for Http Gateway to function")
 
-  lazy private val listener: InetSocketAddress = httpInterface.bind(self)
+  val onlineCounter = metrics.counter("http.gateway." + interfaces.head.port)
 
   abstract override def preStart(): Unit = {
     super.preStart()
     log.info("Gateway starting")
-    context.parent ! Controller.GatewayCreated(listener.getPort)
+    context.parent ! Controller.GatewayCreated(listeners.map(_.getPort))
   }
 
   abstract override def postStop(): Unit = try {
-    httpInterface.close()
+    interfaces.foreach(_.close)
     log.info("Http Interface closed")
     Http().shutdownAllConnectionPools()
   } finally {
@@ -102,7 +102,7 @@ trait GatewayHttp extends Gateway {
   }
 
   abstract override def manage: Receive = super.manage orElse {
-    case CreateGateway => context.parent ! Controller.GatewayCreated(listener.getPort)
+    case CreateGateway => context.parent ! Controller.GatewayCreated(listeners.map(_.getPort))
 
     case exchange: HttpExchange if (isSuspended) =>
       log.warning("Handling suspended, enqueuing request: " + exchange.request)
