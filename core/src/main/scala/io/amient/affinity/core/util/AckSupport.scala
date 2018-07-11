@@ -33,14 +33,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.runtime.BoxedUnit
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
 
 /**
   * These are utilities for stateless Akka Ack pattern.
   * They are used where a chain of events has to be guaranteed to have completed.
   * For example, Coordinator identifies a new master and sends AddMaster to the respective Gateway.
   * Gateway in turn sends an ack message to the given Partition to BecomeMaster and
-  * the partition must in turn ack that it has completed the transition succesfully.
+  * the partition must in turn ack that it has completed the transition successfully.
   * The response ack returns back up the chain until Coordinator is sure that the
   * partition has transitioned its state and knows it is now a Master.
   *
@@ -90,7 +89,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
 
 
   /**
-    * Scatter Gather
+    * Typed Scatter Gather
     *
     * @param scatter
     * @param timeout
@@ -100,22 +99,8 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     * @return gathered and aggregated result T
     */
   def ???[T](scatter: Scatter[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = {
-    gather(scatter)
-  }
-
-  /**
-    *
-    * @param scatter
-    * @param timeout
-    * @param scheduler
-    * @param context
-    * @tparam T
-    * @return gathered and aggregated result T
-    */
-  def gather[T](scatter: Scatter[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = {
     ??(ScatterGather(scatter, timeout)).map(_.reduce(scatter.gather))
   }
-
 
   /**
     * Typed Ask
@@ -130,7 +115,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
   }
 
   /**
-    * Ack - Type Ask with Retries
+    * Ack - Typed Ask with Retries
     *
     * @param message
     * @param timeout
@@ -138,20 +123,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     * @param context
     * @return Future response of type T
     */
-  def ?![T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = ack(message)
-
-  /**
-    * initiator ack() which is used where the guaranteed processin of the message is required
-    * from the target actor.
-    *
-    * @param message
-    * @param timeout
-    * @param scheduler
-    * @param context
-    * @return
-    */
-
-  def ack[T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = {
+  def ?![T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = {
     val promise = Promise[T]()
 
     def attempt(retry: Int, delay: FiniteDuration = 0 seconds): Unit = {
@@ -182,44 +154,6 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
 
     attempt(2)
     promise.future
-  }
-
-  /**
-    * Intermediate reply with future. An ack is sent to the `target` actor when the future completes.
-    *
-    * @param request message which is being replied to
-    * @param closure which must return future on which the acknowledgement depends
-    * @tparam T
-    */
-
-  @deprecated("use request(sender) ! ...", "2.6.5")
-  def replyWith[T](request: Reply[T])(closure: => Future[T])(implicit context: ExecutionContext): Unit = {
-    try {
-      val f: Future[T] = closure
-      f onComplete {
-        case Success(result) => target ! result
-        case Failure(e) => target ! Status.Failure(e)
-      }
-    } catch {
-      case NonFatal(e) => target ! Status.Failure(e)
-    }
-  }
-
-  /**
-    * end of chain reply which runs the given closure and reports either a success or failure
-    * back to the target requester.
-    *
-    * @param request message which is being replied to
-    * @param closure of which result will be send as the acknowledgement value
-    */
-  @deprecated("use request(sender) ! ...", "2.6.5")
-  def reply[T](request: Reply[T])(closure: => T): Unit = {
-    try {
-      val result: T = closure
-      target ! result
-    } catch {
-      case NonFatal(e) => target ! Status.Failure(e)
-    }
   }
 
 }
