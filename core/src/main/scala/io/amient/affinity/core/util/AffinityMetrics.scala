@@ -23,16 +23,15 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpResponse
-import com.codahale.metrics.{JmxReporter, MetricRegistry, Timer}
+import com.codahale.metrics.{MetricRegistry, Timer}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 object AffinityMetrics {
-  type Reporter = MetricRegistry => JmxReporter
-  private val reporters = scala.collection.mutable.ListBuffer[Reporter]()
+  private val reporters = scala.collection.mutable.ListBuffer[MetricRegistry => Unit]()
 
-  def addReporter(f: Reporter): Unit = reporters += f
+  def apply(f: MetricRegistry => Unit): Unit = reporters += f
 
   private val metricsRegistries = new ConcurrentHashMap[ActorSystem, AffinityMetrics]()
 
@@ -40,7 +39,7 @@ object AffinityMetrics {
     metricsRegistries.get(system) match {
       case null =>
         val registry = new AffinityMetrics
-        reporters.foreach(_(registry).start)
+        reporters.foreach(_(registry))
         metricsRegistries.put(system, registry)
         registry
       case registry => registry
