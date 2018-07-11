@@ -576,6 +576,7 @@ class State[K, V](val identifier: String,
       logOption.foreach(_.close())
     } finally {
       kvstore.close()
+      metrics.remove(s"state.$identifier.keys")
     }
   }
 

@@ -36,7 +36,7 @@ object ExampleGraphMain extends App {
     require(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
     require(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
 
-    AffinityMetrics.addReporter(registry => JmxReporter.forRegistry(registry).inDomain("Affinity").build())
+    AffinityMetrics.apply(registry => JmxReporter.forRegistry(registry).inDomain("Affinity").build().start())
 
     new Node(node1config).start()
 
