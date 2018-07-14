@@ -30,6 +30,7 @@ import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
+import scala.collection.parallel.ParMap
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -57,7 +58,7 @@ trait Partition extends ActorHandler {
 
   private var started = false
   private val declaredStateStores: CopyOnWriteArrayList[(String, State[_, _])] = new CopyOnWriteArrayList[(String, State[_, _])]()
-  private lazy val stateStores: Map[String, State[_, _]] = declaredStateStores.iterator().asScala.toMap
+  private lazy val stateStores: ParMap[String, State[_, _]] = declaredStateStores.iterator().asScala.toMap.par
 
   def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
