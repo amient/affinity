@@ -37,7 +37,7 @@ public class StateConf extends CfgStruct<StateConf> {
 
     public MemStoreConf MemStore = struct("memstore", new MemStore.MemStoreConf(), true);
 
-    public Cfg<Integer> LockTimeoutMs = integer("lock.timeout.ms", 10000)
+    public Cfg<Long> LockTimeoutMs = longint("lock.timeout.ms", 10000L)
             .doc("When per-row locking is used, this time-out specifies how long a lock can be held by a single thread");
 }
 
