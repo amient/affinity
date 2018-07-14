@@ -136,7 +136,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         POS checkpoint = getCheckpoint();
         long t = EventTime.unix();
         POS endOffset = storage.reset(partition, checkpoint);
-        log.debug("Bootstrap " + identifier + " from checkpoint:" + checkpoint + " to end-offset: " + endOffset);
+        log.debug("Bootstrapping " + identifier + " from checkpoint:" + checkpoint + " to end-offset: " + endOffset);
         long numRecordsProcessed = 0L;
         if (endOffset != null) {
             Iterator<LogEntry<POS>> i = storage.boundedIterator();
@@ -151,7 +151,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             updateCheckpoint(endOffset);
             checkpointWriter.accept(0L);
         }
-        log.debug("Bootstrap - completed: " + identifier + ", new checkpoint= " + getCheckpoint() +  ", duration.ms = " + (EventTime.unix() - t));
+        log.debug("Bootstrap completed: " + identifier + ", new checkpoint= " + getCheckpoint() +  ", duration.ms = " + (EventTime.unix() - t));
         return numRecordsProcessed;
     }
 
