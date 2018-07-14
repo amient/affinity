@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage
 
 import java.io.Closeable
+import java.lang
 import java.nio.ByteBuffer
 import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
@@ -39,6 +40,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.language.{existentials, implicitConversions}
 import scala.reflect.ClassTag
+import scala.util.control.Breaks._
 import scala.util.control.NonFatal
 
 object State {
@@ -88,7 +90,7 @@ object State {
                                        valueSerde: AbstractSerde[V],
                                        metrics: AffinityMetrics): State[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
-    val lockTimeoutMs = stateConf.LockTimeoutMs()
+    val lockTimeoutMs: lang.Long = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
     val external = stateConf.External()
     val logOption = if (!stateConf.Storage.isDefined) None else Some {
@@ -134,7 +136,7 @@ class State[K, V](val identifier: String,
                   keySerde: AbstractSerde[K],
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
-                  val lockTimeoutMs: Int = 10000,
+                  val lockTimeoutMs: Long = 10000,
                   val external: Boolean = false) extends ObservableState[K] with Closeable {
 
   self =>
@@ -275,10 +277,23 @@ class State[K, V](val identifier: String,
     *         Success(None) if the write was persisted but the operation resulted in the value was expired immediately
     *         Failure(ex) if the operation failed due to exception
     */
-  def replace(key: K, value: V): Future[Option[V]] = put(keySerde.toBytes(key), value).map(w => {
-    push(key, w);
-    w
-  })
+  def replace(key: K, value: V): Future[Option[V]] = {
+    val l = lock(key)
+    try {
+      put(keySerde.toBytes(key), value).transform(w => {
+        unlock(key, l)
+        push(key, w)
+        w
+      }, f => {
+        unlock(key, l)
+        f
+      })
+    } catch {
+      case e: Throwable =>
+        unlock(key, l)
+        throw e
+    }
+  }
 
   /**
     * delete the given key
@@ -288,10 +303,23 @@ class State[K, V](val identifier: String,
     *         Success(None) if the key was deleted
     *         Failure(ex) if the operation failed due to exception
     */
-  def delete(key: K): Future[Option[V]] = delete(keySerde.toBytes(key)).map(w => {
-    push(key, w);
-    w
-  })
+  def delete(key: K): Future[Option[V]] = {
+    val l = lock(key)
+    try {
+      delete(keySerde.toBytes(key)).transform(w => {
+        unlock(key, l)
+        push(key, w);
+        w
+      }, f => {
+        unlock(key, l)
+        f
+      })
+    } catch {
+    case e: Throwable =>
+      unlock(key, l)
+      throw e
+    }
+  }
 
   /**
     * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
@@ -323,24 +351,6 @@ class State[K, V](val identifier: String,
     case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
     case None => Some(value)
   }).map(_.get)
-
-  /**
-    * This is similar to apply(key) except it also applies row lock which is useful if the client
-    * wants to make sure that the returned value incorporates all changes applied to it in update operations
-    * within the same sequence.
-    *
-    * @param key
-    * @return
-    */
-  @deprecated("use apply(key)", "0.6.6")
-  def get(key: K): Option[V] = {
-    val l = lock(key)
-    try {
-      apply(key)
-    } finally {
-      unlock(key, l)
-    }
-  }
 
   /**
     * atomic get-and-update if the current and updated value are the same the no modifications are made to
@@ -418,47 +428,6 @@ class State[K, V](val identifier: String,
     }
   }
 
-
-  /**
-    * update enables per-key observer pattern for incremental updates with transformed return value
-    *
-    * @param key  key which is going to be updated
-    * @param pf   putImpl function which maps the current value Option[V] at the given key to 3 values:
-    *             1. Option[Any] is the incremental putImpl event
-    *             2. Option[V] is the new state for the given key as a result of the incremntal putImpl
-    *             3. R which is the result value expected by the caller
-    * @return Future[R] which will be successful if the put operation of Option[V] of the pf succeeds
-    */
-  @deprecated("Use getAndUpdate or updateAndGet", "0.6.0")
-  def transform[R](key: K)(pf: PartialFunction[Option[V], (Option[Any], Option[V], R)]): Future[R] = {
-    try {
-      val k = keySerde.toBytes(key)
-      val l = lock(key)
-      try {
-        pf(apply(ByteBuffer.wrap(k))) match {
-          case (None, _, result) =>
-            unlock(key, l)
-            Future.successful(result)
-          case (Some(increment), changed, result) =>
-            val f = if (changed.isDefined) put(k, changed.get) else delete(k)
-            f.transform({
-              s => unlock(key, l); s
-            }, {
-              e => unlock(key, l); e
-            }) andThen {
-              case _ => push(key, increment)
-            } map (_ => result)
-        }
-      } catch {
-        case e: Throwable =>
-          unlock(key, l)
-          throw e
-      }
-    } catch {
-      case NonFatal(e) => Future.failed(e)
-    }
-  }
-
   /**
     * An asynchronous non-blocking put operation which inserts or updates the value
     * at the given key. The value is first updated in the kvstore and then a future is created
@@ -473,15 +442,15 @@ class State[K, V](val identifier: String,
   private def put(key: Array[Byte], value: V): Future[Option[V]] = {
     if (external) throw new IllegalStateException("put() called on a read-only state")
     val nowMs = EventTime.unix
-    val timerContext = writesMeter.markStart()
-    try {
-      val recordTimestamp = value match {
-        case e: EventTime => e.eventTimeUnix()
-        case _ => nowMs
-      }
-      if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
-        delete(key)
-      } else {
+    val recordTimestamp = value match {
+      case e: EventTime => e.eventTimeUnix()
+      case _ => nowMs
+    }
+    if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
+      delete(key)
+    } else {
+      val timerContext = writesMeter.markStart()
+      try {
         val valueBytes = valueSerde.toBytes(value)
         logOption match {
           case None =>
@@ -500,11 +469,11 @@ class State[K, V](val identifier: String,
               }
             )
         }
+      } catch {
+        case e: Throwable =>
+          writesMeter.markFailure(timerContext)
+          throw e
       }
-    } catch {
-      case e: Throwable =>
-        writesMeter.markFailure(timerContext)
-        throw e
     }
   }
 
@@ -552,7 +521,6 @@ class State[K, V](val identifier: String,
   /**
     * State listeners can be instantiated at the partition level and are notified for any change in this State.
     */
-  //FIXMe this has to become listen(state)(pf) of the ActorState
   def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
@@ -583,31 +551,34 @@ class State[K, V](val identifier: String,
   /**
     * row locking functionality
     */
+  private class RowLock extends AnyRef
 
-  private val locks = new ConcurrentHashMap[K, java.lang.Long]
+  private val locks = new ConcurrentHashMap[K, RowLock]
 
-  private def unlock(key: K, l: java.lang.Long): Unit = {
-    if (!locks.remove(key, l)) {
-      throw new IllegalMonitorStateException(s"$key is locked by another Thread")
+  private def lock(key: K): RowLock = {
+    val lock = new RowLock()
+    breakable {
+      val start = System.currentTimeMillis
+      do {
+        val existingLock = locks.putIfAbsent(key, lock)
+        if (existingLock == null) break else existingLock.synchronized {
+          existingLock.wait(lockTimeoutMs)
+          val waitedMs = System.currentTimeMillis - start
+          if (waitedMs >= lockTimeoutMs) {
+            throw new TimeoutException(s"Could not acquire lock for $key in $lockTimeoutMs ms")
+          }
+        }
+      } while (true)
     }
+    return lock
   }
 
-  private def lock(key: K): java.lang.Long = {
-    val l = Thread.currentThread.getId
-    var counter = 0
-    val start = System.currentTimeMillis
-    while (locks.putIfAbsent(key, l) != null) {
-      counter += 1
-      val sleepTime = math.log(counter.toDouble).round
-      if (sleepTime > 0) {
-        if (System.currentTimeMillis - start > lockTimeoutMs) {
-          throw new TimeoutException(s"Could not acquire lock for $key in $lockTimeoutMs ms")
-        } else {
-          Thread.sleep(sleepTime)
-        }
-      }
+  private def unlock(key: K, lock: RowLock): Unit = {
+    if (!locks.remove(key, lock)) {
+      throw new IllegalMonitorStateException(s"$key is locked by another operation")
+    } else lock.synchronized {
+      lock.notifyAll()
     }
-    l
   }
 
 }
