@@ -19,12 +19,12 @@
 
 package io.amient.affinity.example
 
-import io.amient.affinity.core.actor.GatewayStream
+import io.amient.affinity.core.actor.{GatewayStream, GlobalState}
 import io.amient.affinity.core.storage.Record
 
 import scala.concurrent.Future
 
-class ExampleWordCount extends GatewayStream {
+class ExampleWordCount extends GatewayStream with GlobalState {
 
   val out = output[String, Long]("output-stream")
 

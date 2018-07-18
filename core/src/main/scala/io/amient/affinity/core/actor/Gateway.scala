@@ -33,14 +33,13 @@ import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.config.{CfgList, CfgStruct}
 import io.amient.affinity.core.http.HttpInterfaceConf
-import io.amient.affinity.core.storage.{LogStorageConf, State}
+import io.amient.affinity.core.storage.LogStorageConf
 import io.amient.affinity.core.util.AffinityMetrics
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
-import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
 object Gateway {
@@ -79,11 +78,6 @@ trait Gateway extends ActorHandler {
   private val declaredKeyspaces = mutable.Map[String, (Coordinator, ActorRef, AtomicBoolean)]()
   private lazy val keyspaces = declaredKeyspaces.toMap
 
-  /**
-    * internal lisf of all declared globals and their final version referenced global state stores
-    */
-  private val declaredGlobals = mutable.Map[String, State[_, _]]()
-  private lazy val globals = declaredGlobals.toMap
 
   /**
     * internal gateway suspension flag is set to true whenever any of the keyspaces is suspended
@@ -95,17 +89,6 @@ trait Gateway extends ActorHandler {
   def trace(groupName: String, result: Promise[_ <: Any]): Unit = metrics.process(groupName, result)
 
   def trace(groupName: String, result: Future[Any]): Unit = metrics.process(groupName, result)
-
-  final def global[K: ClassTag, V: ClassTag](globalStateStore: String): State[K, V] = {
-    if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
-    declaredGlobals.get(globalStateStore) match {
-      case Some(globalState) => globalState.asInstanceOf[State[K, V]]
-      case None =>
-        val bc = State.create[K, V](globalStateStore, 0, conf.Affi.Global(globalStateStore), 1, context.system)
-        declaredGlobals += (globalStateStore -> bc)
-        bc
-    }
-  }
 
   final def keyspace(group: String): ActorRef = {
     if (started) throw new IllegalStateException("Cannot declare keyspace after the actor has started")
@@ -145,11 +128,6 @@ trait Gateway extends ActorHandler {
     super.preStart()
     started = true
 
-    // first bootstrap all global state stores
-    globals.values.foreach(_.boot)
-    // any thereafter switch them to passive mode for the remainder of the runtime
-    globals.values.foreach(_.tail)
-
     evaluateSuspensionStatus() //each gateway starts in a suspended mode so in case there are no keyspaces this will resume it
 
     // finally - set up a watch for each referenced keyspace coordinator
@@ -162,14 +140,6 @@ trait Gateway extends ActorHandler {
   }
 
   abstract override def postStop(): Unit =  try {
-    log.debug("Closing global state stores")
-    globals.foreach {
-      case (identifier, state) => try {
-        state.close()
-      } catch {
-        case NonFatal(e) => log.error(e, s"Could not close cleanly global state: $identifier ")
-      }
-    }
     keyspaces.foreach {
       case (identifier, (coordinator, _, _)) => try {
         coordinator.unwatch(self)
