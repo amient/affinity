@@ -116,7 +116,7 @@ trait GatewayStream extends Gateway {
     super.preStart()
   }
 
-  abstract override def shutdown(): Unit = {
+  abstract override def postStop(): Unit = {
     try if (!closed) {
       lock.synchronized {
         closed = true
@@ -129,7 +129,7 @@ trait GatewayStream extends Gateway {
       logger.debug("Closing output streams")
       outputStreams.foreach(_.close())
     } finally {
-      super.shutdown()
+      super.postStop()
     }
   }
 

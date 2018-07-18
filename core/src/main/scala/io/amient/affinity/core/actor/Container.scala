@@ -19,13 +19,13 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, ActorPath, ActorRef, Terminated}
+import akka.actor.{Actor, ActorPath, ActorRef}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
-import io.amient.affinity.core.actor.Controller.{ContainerOnline, GracefulShutdown}
+import io.amient.affinity.core.actor.Controller.ContainerOnline
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 
@@ -103,8 +103,5 @@ class Container(group: String) extends Actor {
       remove.toList.foreach(ref => ref ?! BecomeStandby())
       add.toList.foreach(ref => ref ?! BecomeMaster())
     }
-
-    case request@GracefulShutdown() => request(sender) ! context.stop(self)
-
   }
 }

@@ -30,8 +30,8 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.pattern.ask
 import akka.util.Timeout
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.{IntegrationTestBase, ack}
-import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.IntegrationTestBase
+import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway}
 import io.amient.affinity.core.actor.{RegisterMediatorSubscriber, _}
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
@@ -125,7 +125,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   }
 
   override def afterAll: Unit = try {
-    Await.ready(controller ? GracefulShutdown() flatMap (_ => system.terminate), timeout.duration)
+    Await.ready(system.terminate(), timeout.duration)
   } finally {
     super.afterAll
   }
