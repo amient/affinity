@@ -469,7 +469,7 @@ trait WebSocketSupport extends GatewayHttp {
 
   }
 
-  trait UpstreamActor extends ActorPublisher[Message] with Actor {
+  trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
     val conf = Conf(context.system.settings.config).Affi
 
     final val maxBufferSize = conf.Node.Gateway.MaxWebSocketQueueSize()
@@ -490,18 +490,15 @@ trait WebSocketSupport extends GatewayHttp {
       }
     }
 
-    final override def receive: Receive = manage orElse handle orElse {
-      case msg: Message => push(msg)
-      case other: Any => log.warning(s"only Message types can be pushed, ignoring: $other")
-    }
-
-    def handle: Receive = PartialFunction.empty
-
-    private def manage: Receive = {
+    override def manage: Receive = {
       case Request(_) => push()
       case Cancel => log.warning("UpstreamActor received Cancel event")
     }
 
+    override def unhandled: Receive = {
+      case msg: Message => push(msg)
+      case other: Any => log.warning(s"only Message types can be pushed, ignoring: $other")
+    }
   }
 
 

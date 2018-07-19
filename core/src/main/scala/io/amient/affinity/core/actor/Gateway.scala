@@ -124,6 +124,8 @@ trait Gateway extends ActorHandler {
     }
   }
 
+  def onClusterStatus(suspended: Boolean) = ()
+
   abstract override def preStart(): Unit = {
     super.preStart()
     started = true
