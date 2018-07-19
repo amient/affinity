@@ -116,15 +116,13 @@ class Node(config: Config) {
 
   final def shutdown(): Unit = if (!shuttingDown) {
     shuttingDown = true
-    implicit val timeout = Timeout(shutdownTimeout)
-    Await.result(controller ? GracefulShutdown() flatMap { _ =>
-      fatalError.map { e =>
-        log.error("Affinity Fatal Error", e)
-        Future.successful(System.exit(1))
-      }.getOrElse {
-        system.terminate()
-      }
+    Await.result(fatalError.map { e =>
+      log.error("Affinity Fatal Error", e)
+      Future.successful(System.exit(1))
+    }.getOrElse {
+      system.terminate()
     }, shutdownTimeout)
+    log.info("Node shutdown completed")
   }
 
   implicit def partitionCreatorToProps[T <: Partition](creator: => T)(implicit tag: ClassTag[T]): Props = {

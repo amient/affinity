@@ -23,13 +23,10 @@ import akka.AkkaException
 import akka.actor.SupervisorStrategy.{Escalate, Restart, Resume}
 import akka.actor.{Actor, InvalidActorNameException, OneForOneStrategy, Props, Terminated}
 import akka.event.Logging
-import akka.pattern.ask
-import akka.util.Timeout
-import io.amient.affinity.Conf
 import io.amient.affinity.core.util.Reply
 
+import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
@@ -43,8 +40,6 @@ object Controller {
 
   final case class GatewayCreated(httpPorts: List[Int])
 
-  final case class GracefulShutdown() extends Reply[Unit]
-
   final case class FatalErrorShutdown(e: Throwable)
 
 }
@@ -52,9 +47,6 @@ object Controller {
 class Controller extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
-
-  private val conf = Conf(context.system.settings.config)
-  private val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
   import Controller._
 
@@ -125,21 +117,6 @@ class Controller extends Actor {
       log.info("Gateway online (with http)")
       gatewayPromise.success(httpPorts)
     }
-
-    case request@GracefulShutdown() =>
-      request(sender) ! {
-        Future.sequence {
-          context.children.map { child =>
-            log.debug("Requesting GracefulShutdown from " + child)
-            implicit val timeout = Timeout(shutdownTimeout)
-            child ? GracefulShutdown() recover {
-              case any =>
-                log.warning(s"$child failed while executing GracefulShutdown request: ", any.getMessage)
-                context.stop(child)
-            }
-          }
-        } map(_ => ())
-      }
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
   }

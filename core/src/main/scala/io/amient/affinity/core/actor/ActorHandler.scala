@@ -33,6 +33,4 @@ trait ActorHandler extends Actor {
 
   def onClusterStatus(suspended: Boolean) = ()
 
-  def shutdown() = ()
-
 }

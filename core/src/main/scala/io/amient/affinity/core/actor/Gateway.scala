@@ -27,7 +27,7 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.Conf
-import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.actor.Keyspace.{CheckKeyspaceStatus, KeyspaceStatus}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
@@ -161,7 +161,7 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  abstract override def shutdown(): Unit = {
+  abstract override def postStop(): Unit =  try {
     log.debug("Closing global state stores")
     globals.foreach {
       case (identifier, state) => try {
@@ -178,15 +178,11 @@ trait Gateway extends ActorHandler {
         case NonFatal(e) => log.warning(s"Could not close coordinators for keyspace: $identifier", e);
       }
     }
+  } finally {
+    super.postStop()
   }
 
   abstract override def manage = super.manage orElse {
-
-    case request@GracefulShutdown() => request(sender) ! {
-      shutdown()
-      log.info("Gateway shutdown completed")
-      context.stop(self)
-    }
 
     case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
       context.parent ! Controller.GatewayCreated(List())
