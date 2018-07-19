@@ -40,7 +40,7 @@ import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.actor.Controller.{CreateGateway, GracefulShutdown}
+import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http._
 import io.amient.affinity.core.util.ByteUtils
@@ -111,9 +111,6 @@ trait GatewayHttp extends Gateway {
       } else {
         new RuntimeException("Suspension queue overflow")
       }
-
-    case request@GracefulShutdown() => request(sender) ! context.stop(self)
-
   }
 
   override def unhandled: Receive = {
