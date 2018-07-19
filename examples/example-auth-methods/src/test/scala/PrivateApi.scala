@@ -22,7 +22,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{HttpResponse, headers}
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.GatewayHttp
+import io.amient.affinity.core.actor.{GatewayHttp, GlobalState}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.storage.State
@@ -38,7 +38,7 @@ final case class ConfigEntry(description: String, @JsonIgnore salt: String) exte
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
 }
 
-trait PrivateApi extends GatewayHttp {
+trait PrivateApi extends GatewayHttp with GlobalState {
 
   import context.dispatcher
 

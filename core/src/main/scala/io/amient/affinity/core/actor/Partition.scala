@@ -42,7 +42,7 @@ case class RegisterMediatorSubscriber(subscriber: ActorRef)
 case class BecomeStandby() extends Reply[Unit]
 case class BecomeMaster() extends Reply[Unit]
 
-trait Partition extends ActorHandler {
+trait Partition extends Actor {
 
   private val log = Logging.getLogger(context.system, this)
 
@@ -102,7 +102,11 @@ trait Partition extends ActorHandler {
     } finally super.postStop()
   }
 
-  abstract override def manage: Receive = super.manage orElse {
+  final override def receive: Receive = manage orElse handle
+
+  def handle: Receive = PartialFunction.empty
+
+  private def manage: Receive = {
 
     case msg@BecomeMaster() =>
       msg(sender) ! {} //acking the receipt of the instruction immediately
