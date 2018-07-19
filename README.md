@@ -17,6 +17,7 @@
   * [Keyspaces](#key-space-definitions)
   * [Node Context](#node-context)
   * [Important Akka Configuration Options](#important-akka-configuration-options)
+  * [Metrics](#metrics)
 - [Development](#development)
   * [Cross-builds](#cross-builds)
     + [Current master versions](#current-master-versions)
@@ -488,6 +489,9 @@ In all examples and for all tests, logback binding is used.
         akka.remote.netty.tcp.hostname [STRING] (-)                                             
         akka.remote.netty.tcp.port [INT] (-)                                                    
 
+## Metrics
+
+..TODO
 
 # Development 
 
