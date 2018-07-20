@@ -55,9 +55,9 @@ object AvroJsonConverter {
 
   def toAvro(json: String, schema: Schema): Any = {
 
-    def to(json: JsonNode, schema: Schema): Any = {
+    def to(json: JsonNode, schema: Schema): Any = try {
       schema.getType match {
-        case Schema.Type.NULL if json.isNull => null
+        case Schema.Type.NULL if json == null || json.isNull => null
         case Schema.Type.BOOLEAN if json.isBoolean => json.getBooleanValue
         case Schema.Type.INT if json.isNumber => json.getIntValue
         case Schema.Type.LONG if json.isNumber => json.getLongValue
@@ -80,12 +80,18 @@ object AvroJsonConverter {
         case Schema.Type.RECORD if json.isObject =>
           val builder = new GenericRecordBuilder(schema)
           schema.getFields.asScala foreach { field =>
-            val d = json.get(field.name)
-            builder.set(field, to(d, field.schema()))
+            try {
+              val d = json.get(field.name)
+              builder.set(field, to(d, field.schema()))
+            } catch {
+              case e: Throwable => throw new RuntimeException(s"Can't convert json field `$field` with value ${json.get(field.name)} using schema: ${field.schema}",e)
+            }
           }
           builder.build()
-        case _ => throw new IllegalArgumentException(s"Can't convert ${json} using schema: $schema")
+        case x => throw new IllegalArgumentException(s"Unsupported schema type `$x`")
       }
+    } catch {
+      case e: Throwable => throw new RuntimeException(s"Can't convert ${json} using schema: $schema",e)
     }
 
     AvroRecord.read(to(mapper.readTree(json), schema), schema)
