@@ -27,7 +27,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.core.actor.Keyspace.KeyspaceStatus
+import io.amient.affinity.core.actor.GroupStatus
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.http.HttpExchange
@@ -47,28 +47,28 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
     ConfigFactory.load("integrationtests").withValue(EmbedConf(Conf.Affi.Coordinator).ID.path,
       ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet())))
 
-  private val servicesReady = scala.collection.mutable.Set[String]()
+  private val groupsReady = scala.collection.mutable.Set[String]()
   system.eventStream.subscribe(system.actorOf(Props(new Actor {
     override def receive: Receive = {
-      case KeyspaceStatus(g, false) => {
-        servicesReady.synchronized {
-          servicesReady.add(g)
-          servicesReady.notifyAll()
+      case GroupStatus(g, false) => {
+        groupsReady.synchronized {
+          groupsReady.add(g)
+          groupsReady.notifyAll()
         }
       }
     }
-  })), classOf[KeyspaceStatus])
+  })), classOf[GroupStatus])
 
   override def afterAll: Unit = {
     Await.ready(system.terminate(), 15 seconds)
   }
 
-  def awaitServiceReady(group: String): Unit = {
+  def awaitGroupReady(group: String): Unit = {
     val t = System.currentTimeMillis()
-    servicesReady.synchronized {
-      while (!servicesReady.contains(group)) {
+    groupsReady.synchronized {
+      while (!groupsReady.contains(group)) {
         if (System.currentTimeMillis() - t > 30000) throw new TimeoutException("Service didn't start within 30 seconds")
-        servicesReady.wait(100)
+        groupsReady.wait(100)
       }
     }
   }

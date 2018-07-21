@@ -119,7 +119,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   }, timeout.duration)
 
   override def beforeAll(): Unit = try {
-    awaitServiceReady("region")
+    awaitGroupReady("region")
   } finally {
     super.beforeAll()
   }
