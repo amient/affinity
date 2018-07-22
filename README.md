@@ -323,12 +323,11 @@ In cases where eventual read consistency is sufficient, standby(s)
 could also be used as read replicas but this is currently not implemented.
 
 Sometimes it is necessary to use global state rather than partitioned
-Keyspace. In this case all gateways that hold reference to a global
+Keyspace. In this case all actors that hold a reference to a global
 state see the same data. It is a useful concept, similar to broadcast
-variables in batch processors but because Affinity provides
-a read-write api on top of its stores, the global state consistency
-is not as strong as that of partitioned Keyspace because there is not
-a single actor guarding it.
+variables in batch processors and global tables in Kafka Streams. 
+Global stores use single master for writes but all reads are local.
+That means that reads are not fully linearized but eventually consistent.
 
 # Configuration
 

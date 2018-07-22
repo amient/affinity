@@ -47,7 +47,7 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
         case request@Delete(key) => request(sender) ! underlying.delete(key)
         case request@Insert(key, value) => request(sender) ! underlying.insert(key, value)
         case request@GetAndUpdate(key, f) => request(sender) ! underlying.getAndUpdate(key, f)
-        case request@UpdateAndGet(key, f) => request(sender) ! underlying.updateAndGet(key, f)
+        case request@UpdateAndGet(key, f)=> request(sender) ! underlying.updateAndGet(key, f)
       }
     }), name = partition.toString)
   }), name = identifier)

@@ -28,7 +28,7 @@ class ExampleWordCount extends GatewayStream with GlobalState {
 
   val out = output[String, Long]("output-stream")
 
-  val counter = global2[String, Long]("state-counter")
+  val counter = global[String, Long]("state-counter")
 
   private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
