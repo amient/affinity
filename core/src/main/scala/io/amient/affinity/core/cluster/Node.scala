@@ -21,10 +21,9 @@ package io.amient.affinity.core.cluster
 
 
 import java.nio.file.Paths
-import java.util.concurrent.{CountDownLatch, TimeUnit}
+import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
 
 import akka.actor.{Actor, Props}
-import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.core.ack
@@ -108,6 +107,9 @@ class Node(config: Config) {
     */
   def awaitClusterReady(): Unit = {
     clusterReady.await(startupTimeout.toMillis, TimeUnit.MILLISECONDS)
+    if (clusterReady.getCount > 0) {
+      throw new TimeoutException(s"Cluster did not become ready in ${startupTimeout.toMillis} ms")
+    }
   }
 
   def getHttpPort(interface: Int): Int = {
