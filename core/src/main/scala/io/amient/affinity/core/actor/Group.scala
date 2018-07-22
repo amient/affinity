@@ -99,8 +99,7 @@ class Group(identifier: String, numPartitions: Int) extends ActorHandler {
     val shouldBeSuspended = routes.size != numPartitions
     if (shouldBeSuspended != suspended) {
       suspended = shouldBeSuspended
-      //parent will be a gateway which needs to collate all suspension states
-      //TODO however gateway only recognizes keyspaces atm
+      //parent will be a gateway which needs to collate all suspension states to a single flag
       context.parent ! GroupStatus(identifier, suspended)
     }
   }

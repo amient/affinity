@@ -22,11 +22,10 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials, HttpChallenge}
 import akka.http.scaladsl.model.{HttpResponse, headers}
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.{GatewayHttp, GlobalState}
+import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.state.KVStore
-import io.amient.affinity.core.storage.State
 import io.amient.affinity.core.util.{TimeCryptoProof, TimeCryptoProofSHA256}
 import org.codehaus.jackson.annotate.JsonIgnore
 
@@ -39,7 +38,7 @@ final case class ConfigEntry(description: String, @JsonIgnore salt: String) exte
   @JsonIgnore val crypto = new TimeCryptoProofSHA256(salt)
 }
 
-trait PrivateApi extends GatewayHttp with GlobalState {
+trait PrivateApi extends GatewayHttp {
 
   import context.dispatcher
 

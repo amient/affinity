@@ -22,7 +22,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.{Path, Query}
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.{GatewayHttp, GlobalState}
+import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.state.KVStore
@@ -32,7 +32,7 @@ import scala.language.postfixOps
 
 case class ProtectedProfile(hello: String = "world") extends AvroRecord
 
-trait PublicApi extends GatewayHttp with GlobalState {
+trait PublicApi extends GatewayHttp {
 
   private val settings: KVStore[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 

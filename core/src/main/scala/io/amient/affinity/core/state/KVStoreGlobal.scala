@@ -14,8 +14,8 @@ import scala.reflect.ClassTag
 
 
 /**
-  * KVStoreGlobal is not sharded even though the underlying storage may have multiple partitions.
-  * All data from global store will be replicated locally for reaing.
+  * KVStoreGlobal is a state store whose data are replicated locally for reading to every gateway that references it.
+  * Global stores currently must have exactly 1 partition (TODO #201)
   * Writes will be directed at the elected master.
   *
   * @param identifier   name of the global store
@@ -42,6 +42,7 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
 
   val container = context.actorOf(Props(new Container(identifier) {
     context.actorOf(Props(new Partition {
+      state[K,V](identifier, underlying)
       override def handle = {
         case request@Replace(key, value) => request(sender) ! underlying.replace(key, value)
         case request@Delete(key) => request(sender) ! underlying.delete(key)
@@ -56,12 +57,7 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
 
   implicit val timeout = Timeout(30 seconds) //TODO the state should have timeouts already configurable
 
-  override private[affinity] def boot(): Unit = underlying.boot()
-
-  override private[affinity] def tail(): Unit = underlying.tail()
-
   override def close(): Unit = underlying.close()
-
 
   /**
     * get an iterator for all records that are strictly not expired

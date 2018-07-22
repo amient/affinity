@@ -30,6 +30,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.config.{CfgList, CfgStruct}
 import io.amient.affinity.core.http.HttpInterfaceConf
+import io.amient.affinity.core.state.{KVStore, KVStoreGlobal}
 import io.amient.affinity.core.storage.LogStorageConf
 import io.amient.affinity.core.util.AffinityMetrics
 
@@ -37,6 +38,8 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
+import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 object Gateway {
 
@@ -72,7 +75,10 @@ trait Gateway extends ActorHandler {
     * internal map of all declared keyspaces (keyspace: String -> (Coordinator, KeyspaceActorRef, SuspendedFlag)
     */
   private val declaredKeyspaces = mutable.Map[String, (ActorRef, AtomicBoolean)]()
-  private lazy val keyspaces = declaredKeyspaces.toMap
+  private lazy val keyspaces: Map[String, (ActorRef, AtomicBoolean)] = declaredKeyspaces.toMap
+
+  private val declaredGlobals = mutable.Map[String, (KVStoreGlobal[_, _], AtomicBoolean)]()
+  private lazy val globals: Map[String, (KVStoreGlobal[_, _], AtomicBoolean)] = declaredGlobals.toMap
 
   /**
     * internal gateway suspension flag is set to true whenever any of the keyspaces is suspended
@@ -99,6 +105,17 @@ trait Gateway extends ActorHandler {
     }
   }
 
+  final def global[K: ClassTag, V: ClassTag](globalName: String): KVStore[K,V] = {
+    if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
+    declaredGlobals.get(globalName) match {
+      case Some((globalStore, _)) => globalStore.asInstanceOf[KVStoreGlobal[K, V]]
+      case None =>
+        val bc = new KVStoreGlobal[K, V](globalName, conf.Affi.Global(globalName), context)
+        declaredGlobals += (globalName -> ((bc, new AtomicBoolean(true))))
+        bc
+    }
+  }
+
   final def connectKeyValueMediator(keyspace: ActorRef, stateStoreName: String, key: Any): Future[ActorRef] = {
     implicit val timeout = Timeout(1 second)
     keyspace ? CreateKeyValueMediator(stateStoreName, key) collect {
@@ -122,8 +139,20 @@ trait Gateway extends ActorHandler {
   abstract override def preStart(): Unit = {
     super.preStart()
     started = true
-    //each gateway starts in a suspended mode so in case there are no keyspaces the following will resume it
+    //each gateway starts in a suspended mode so in case there are no keyspaces or globals the following will resume it
     evaluateSuspensionStatus()
+  }
+
+  abstract override def postStop(): Unit = try {
+    logger.debug("Closing global state stores")
+    globals.foreach { case (identifier, (store, _)) => try {
+      store.close()
+    } catch {
+      case NonFatal(e) => logger.error(e, s"Could not close cleanly global state: $identifier ")
+    }
+    }
+  } finally {
+    super.postStop()
   }
 
   abstract override def manage = super.manage orElse {
@@ -135,9 +164,14 @@ trait Gateway extends ActorHandler {
           s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
       }
     case msg@GroupStatus(group, suspended) if keyspaces.contains(group) =>
-      val (_, keyspaceCurrentlySuspended) = keyspaces(group)
-      if (keyspaceCurrentlySuspended.get != suspended) {
+      if (keyspaces(group)._2.get != suspended) {
         keyspaces(group)._2.set(suspended)
+        evaluateSuspensionStatus(Some(msg))
+      }
+
+    case msg@GroupStatus(group, suspended) if globals.contains(group) =>
+      if (globals(group)._2.get != suspended) {
+        globals(group)._2.set(suspended)
         evaluateSuspensionStatus(Some(msg))
       }
 
@@ -145,7 +179,7 @@ trait Gateway extends ActorHandler {
   }
 
   private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {
-    val gatewayShouldBeSuspended = keyspaces.exists(_._2._2.get)
+    val gatewayShouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
     if (gatewayShouldBeSuspended != handlingSuspended) {
       handlingSuspended = gatewayShouldBeSuspended
       onClusterStatus(gatewayShouldBeSuspended)

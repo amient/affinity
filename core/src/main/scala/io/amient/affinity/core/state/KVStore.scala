@@ -9,10 +9,6 @@ import scala.concurrent.Future
 
 trait KVStore[K, V] extends Closeable {
 
-  private[affinity] def boot(): Unit
-
-  private[affinity] def tail(): Unit
-
   /**
     * get an iterator for all records that are strictly not expired
     *

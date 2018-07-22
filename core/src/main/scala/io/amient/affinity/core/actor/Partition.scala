@@ -60,13 +60,16 @@ trait Partition extends ActorHandler {
   private val declaredStateStores: CopyOnWriteArrayList[(String, State[_, _])] = new CopyOnWriteArrayList[(String, State[_, _])]()
   private lazy val stateStores: ParMap[String, State[_, _]] = declaredStateStores.iterator().asScala.toMap.par
 
-  def state[K: ClassTag, V: ClassTag](store: String)(implicit group: String, partition: Int): State[K, V] = {
+  def state[K: ClassTag, V: ClassTag](name: String)(implicit group: String, partition: Int): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     val conf = Conf(context.system.settings.config)
     val numPartitions = conf.Affi.Keyspace(group).NumPartitions()
-    val stateConf = conf.Affi.Keyspace(group).State(store)
-    val state = State.create[K, V](s"$group-$store", partition, stateConf, numPartitions, context.system)
-    declaredStateStores.add((store, state))
+    val stateConf = conf.Affi.Keyspace(group).State(name)
+    state(name, State.create[K, V](s"$group-$name", partition, stateConf, numPartitions, context.system))
+  }
+
+  private[affinity] def state[K, V](name: String, state: State[K,V]): State[K,V] = {
+    declaredStateStores.add((name, state))
     state
   }
 
