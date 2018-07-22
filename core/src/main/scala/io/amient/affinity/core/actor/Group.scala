@@ -19,7 +19,7 @@ trait Routed {
   def key: Any
 }
 
-final case class GroupStatus(_keyspace: String, suspended: Boolean)
+final case class GroupStatus(identifier: String, suspended: Boolean)
 
 class Group(identifier: String, numPartitions: Int) extends ActorHandler {
 
@@ -39,7 +39,7 @@ class Group(identifier: String, numPartitions: Int) extends ActorHandler {
 
   override def preStart(): Unit = {
     super.preStart()
-    // set up a watch for each referenced keyspace coordinator
+    // set up a watch for each referenced group coordinator
     // coordinator will be sending MasterUpdates(..) messages for this group whenever a master actor
     // is added or removed to/from the routing tables
     coordinator.watch(self, clusterWide = true)
@@ -50,7 +50,7 @@ class Group(identifier: String, numPartitions: Int) extends ActorHandler {
       coordinator.unwatch(self)
       coordinator.close()
     } catch {
-      case NonFatal(e) => logger.warning(s"Could not close coordinator for keyspace: $identifier", e);
+      case NonFatal(e) => logger.warning(s"Could not close coordinator for group: $identifier", e);
     }
   } finally {
     super.postStop()
@@ -100,6 +100,7 @@ class Group(identifier: String, numPartitions: Int) extends ActorHandler {
     if (shouldBeSuspended != suspended) {
       suspended = shouldBeSuspended
       //parent will be a gateway which needs to collate all suspension states
+      //TODO however gateway only recognizes keyspaces atm
       context.parent ! GroupStatus(identifier, suspended)
     }
   }

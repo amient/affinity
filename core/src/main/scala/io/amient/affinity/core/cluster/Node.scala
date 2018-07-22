@@ -133,8 +133,11 @@ class Node(config: Config) {
     Await.result(Future.sequence(startGateway() +: startContainers()), startupTimeout)
   } catch {
     case e: Throwable =>
-      Await.result(system.terminate(), shutdownTimeout)
-      throw e
+      try {
+        Await.result(system.terminate(), shutdownTimeout)
+      } finally {
+        throw e
+      }
   }
 
   /**
@@ -170,7 +173,9 @@ class Node(config: Config) {
           val partitions = value().asScala.map(_.toInt).toList
           startContainer(group, partitions)
       }
-    } else List.empty
+    } else {
+      List.empty
+    }
   }
 
   implicit val scheduler = system.scheduler

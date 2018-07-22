@@ -134,12 +134,14 @@ trait Gateway extends ActorHandler {
         logger.warning("affinity.gateway has listeners configured but the node is trying " +
           s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
       }
-    case msg@GroupStatus(group, suspended) =>
+    case msg@GroupStatus(group, suspended) if keyspaces.contains(group) =>
       val (_, keyspaceCurrentlySuspended) = keyspaces(group)
       if (keyspaceCurrentlySuspended.get != suspended) {
         keyspaces(group)._2.set(suspended)
         evaluateSuspensionStatus(Some(msg))
       }
+
+    case GroupStatus(group, _) => logger.warning(s"GroupStatus for unrecognized group type: $group")
   }
 
   private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {

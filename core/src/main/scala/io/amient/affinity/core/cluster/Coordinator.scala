@@ -207,12 +207,12 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         val informed = watcher ?! (if (global) fullUpdate else fullUpdate.localTo(watcher))
         informed.failed.foreach {
           case e: Throwable => if (!closed.get) {
-            logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)
+            logger.error(e, s"Could not notify watcher: $watcher(global = $global)")
           }
         }
       } catch {
         case e: Throwable => if (!closed.get) {
-          logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)
+          logger.error(e, s"Could not notify watcher: $watcher(global = $global)")
         }
       }
     }
