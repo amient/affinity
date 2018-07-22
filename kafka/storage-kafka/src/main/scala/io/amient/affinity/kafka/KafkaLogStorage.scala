@@ -130,6 +130,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   }
 
   override def reset(partition: Int, range: TimeRange): Unit = {
+    log.debug(s"Resetting $topic/$partition to $range")
     val tp = new TopicPartition(topic, partition)
     this.range = range
     kafkaConsumer.assign(List(tp).asJava)

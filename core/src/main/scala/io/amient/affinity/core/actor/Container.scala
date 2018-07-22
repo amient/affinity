@@ -98,7 +98,7 @@ class Container(group: String) extends Actor {
       coordinator.unregister(partitions(ref))
       partitions -= ref
 
-    case request @ MasterUpdates(_, add, remove) => request(sender) ! {
+    case request @ MasterUpdates(add, remove) => request(sender) ! {
       implicit val timeout = Timeout(startupTimeout)
       remove.toList.foreach(ref => ref ?! BecomeStandby())
       add.toList.foreach(ref => ref ?! BecomeMaster())

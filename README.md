@@ -323,12 +323,11 @@ In cases where eventual read consistency is sufficient, standby(s)
 could also be used as read replicas but this is currently not implemented.
 
 Sometimes it is necessary to use global state rather than partitioned
-Keyspace. In this case all gateways that hold reference to a global
+Keyspace. In this case all actors that hold a reference to a global
 state see the same data. It is a useful concept, similar to broadcast
-variables in batch processors but because Affinity provides
-a read-write api on top of its stores, the global state consistency
-is not as strong as that of partitioned Keyspace because there is not
-a single actor guarding it.
+variables in batch processors and global tables in Kafka Streams. 
+Global stores use single master for writes but all reads are local.
+That means that reads are not fully linearized but eventually consistent.
 
 # Configuration
 
@@ -385,7 +384,8 @@ In all examples and for all tests, logback binding is used.
 ## Global State
         affinity.global [<ID>] (-)                                                              each global state has an ID and needs to be further configured
         affinity.global.<ID>.external [TRUE|FALSE] (false)                                      If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly
-        affinity.global.<ID>.lock.timeout.ms [INT] (10000)                                      When per-row locking is used, this time-out specifies how long a lock can be held by a single thread
+        affinity.global.<ID>.lock.timeout.ms [INT] (10000)                                      How long a lock can be held by a single thread before throwing a TimeoutException
+        affinity.global.<ID>.write.timeout.ms [INT] (10000)                                     How long can any of the write operation on a global store take before throwing TimeoutException
         affinity.global.<ID>.memstore.class [FQN] (!)                                           Implementation of storage.MemStore that will be used for lookups
         affinity.global.<ID>.memstore.data.dir [FILE-PATH] (-)                                  Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set
         affinity.global.<ID>.memstore.key.prefix.size [INT] (-)                                 Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields

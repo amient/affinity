@@ -25,7 +25,7 @@ import java.security.cert.CertificateFactory
 import java.security.{KeyStore, SecureRandom}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.zip.GZIPInputStream
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
 
@@ -39,9 +39,11 @@ import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
+import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.util.AffinityTestBase.embeddedCoordinatorId
 import org.apache.avro.util.ByteBufferInputStream
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
@@ -53,6 +55,7 @@ import scala.language.{implicitConversions, postfixOps}
 
 object AffinityTestBase {
   val akkaPort = new AtomicInteger(15001)
+  var embeddedCoordinatorId = new AtomicLong(1)
 }
 
 trait AffinityTestBase {
@@ -68,35 +71,40 @@ trait AffinityTestBase {
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
-    val layer1: Config = config
+    val layer1: Config = if (config.hasPath(EmbedConf(Conf.Affi.Coordinator).ID.path)) {
+      config
+    } else {
+      config.withValue(EmbedConf(Conf.Affi.Coordinator).ID.path, ConfigValueFactory.fromAnyRef(embeddedCoordinatorId.incrementAndGet()))
+    }
+
+    val layer2: Config = layer1
       .withValue(Conf.Affi.Node.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
-      .withValue(Conf.Affi.Node.StartupTimeoutMs.path, ConfigValueFactory.fromAnyRef(15000))
       .withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(AffinityTestBase.akkaPort.getAndIncrement()))
 
-    val layer2: Config = zkConnect match {
-      case None => layer1
+    val layer3: Config = zkConnect match {
+      case None => layer2
       case Some(zkConnectString) =>
-        layer1
+        layer2
           .withValue(CoordinatorZkConf(Conf.Affi.Coordinator).ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
           .withValue(ZkAvroConf(Conf.Affi.Avro).ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {
-      case None => layer2
+      case None => layer3
       case Some(kafkaBootstrapString) =>
-        val keySpaceStores = if (!layer2.hasPath(Conf.Affi.Keyspace.path())) List.empty else layer2
+        val keySpaceStores = if (!layer3.hasPath(Conf.Affi.Keyspace.path())) List.empty else layer3
           .getObject(Conf.Affi.Keyspace.path()).keySet().asScala
           .flatMap { ks =>
-            layer2.getObject(Conf.Affi.Keyspace(ks).State.path).keySet().asScala.map {
+            layer3.getObject(Conf.Affi.Keyspace(ks).State.path).keySet().asScala.map {
               case stateName => Conf.Affi.Keyspace(ks).State(stateName).path()
             }
           }
 
-        val globalStores = if (!layer2.hasPath(Conf.Affi.Global.path())) List.empty else layer2
+        val globalStores = if (!layer3.hasPath(Conf.Affi.Global.path())) List.empty else layer3
           .getObject(Conf.Affi.Global.path()).keySet().asScala
           .map { ks => Conf.Affi.Global(ks).path }
 
-        (keySpaceStores ++ globalStores).foldLeft(layer2) {
+        (keySpaceStores ++ globalStores).foldLeft(layer3) {
           case (c, stateStorePath) =>
             val stateConfig = c.getConfig(stateStorePath)
             if (!stateConfig.getString("storage.class").toLowerCase.contains("kafka")) c else {

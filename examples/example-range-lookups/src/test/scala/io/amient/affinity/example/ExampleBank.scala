@@ -27,7 +27,6 @@ import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Rou
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util.{EventTime, Reply, Scatter, TimeRange}
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -73,6 +72,8 @@ case class GetBranchTransactions(sortcode: String, beforeUnixTs: Long = Long.Max
 class DefaultPartition extends Partition {
 
   val transactions = state[StorageKey, Transaction]("transactions")
+
+  implicit val executor = context.dispatcher
 
   override def handle: Receive = {
 

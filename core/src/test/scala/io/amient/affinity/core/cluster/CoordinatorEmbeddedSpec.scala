@@ -51,7 +51,7 @@ class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
       update1 synchronized {
         coordinator1.watch(system.actorOf(Props(new Actor {
           override def receive: Receive = {
-            case MasterUpdates(g, add, del) => update1 synchronized update1.set(s"$g, ${add.size}, ${del.size}")
+            case MasterUpdates(add, del) => update1 synchronized update1.set(s"${add.size}, ${del.size}")
           }
         }), "subscriber1"), false)
       }
@@ -62,12 +62,12 @@ class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
       update2 synchronized {
         coordinator2.watch(system.actorOf(Props(new Actor {
           override def receive: Receive = {
-            case MasterUpdates(g, add, del) => update2 synchronized update2.set(s"$g, ${add.size}, ${del.size}")
+            case MasterUpdates(add, del) => update2 synchronized update2.set(s"${add.size}, ${del.size}")
           }
         }), "subscriber2"), true)
         update2.wait(1000)
-        update2.get should be("group1, 1, 0")
-        update1.get should be("group1, 1, 0")
+        update2.get should be("1, 0")
+        update1.get should be("1, 0")
       }
       coordinator2.close()
 

@@ -34,6 +34,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
+import io.amient.affinity.core.state.KVStore
 import io.amient.affinity.core.util.{AffinityMetrics, CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConverters._
@@ -137,7 +138,7 @@ class State[K, V](val identifier: String,
                   valueSerde: AbstractSerde[V],
                   val ttlMs: Long = -1,
                   val lockTimeoutMs: Long = 10000,
-                  val external: Boolean = false) extends ObservableState[K] with Closeable {
+                  val external: Boolean = false) extends ObservableState[K] with KVStore[K,V] {
 
   self =>
 
@@ -320,25 +321,6 @@ class State[K, V](val identifier: String,
       throw e
     }
   }
-
-  /**
-    * update is a syntactic sugar for update where the value is always overriden unless the current value is the same
-    *
-    * @param key   to updateImpl
-    * @param value new value to be associated with the key
-    * @return Future Optional of the value previously held at the key position
-    */
-  def update(key: K, value: V): Future[Option[V]] = getAndUpdate(key, _ => Some(value))
-
-  /**
-    * remove is a is a syntactic sugar for update where None is used as Value
-    * it is different from delete in that it returns the removed value
-    * which is more costly.
-    *
-    * @param key to remove
-    * @return Future Optional of the value previously held at the key position
-    */
-  def remove(key: K): Future[Option[V]] = getAndUpdate(key, _ => None)
 
   /**
     * insert is a syntactic sugar for update which is only executed if the key doesn't exist yet
