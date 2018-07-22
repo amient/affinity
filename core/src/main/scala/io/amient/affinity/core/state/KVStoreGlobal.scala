@@ -1,5 +1,7 @@
 package io.amient.affinity.core.state
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.{ActorContext, Props}
 import akka.util.Timeout
 import io.amient.affinity.core.ack
@@ -8,7 +10,6 @@ import io.amient.affinity.core.storage.{State, StateConf}
 import io.amient.affinity.core.util.{Reply, TimeRange}
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 
@@ -26,6 +27,7 @@ import scala.reflect.ClassTag
   */
 class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateConf, context: ActorContext) extends KVStore[K, V] {
 
+  //TODO #122 for the following messages as well
   case class Replace(key: K, value: V) extends Routed with Reply[Option[V]]
   case class Delete(key: K) extends Routed with Reply[Option[V]]
   case class Insert(key: K, value: V) extends Routed with Reply[V]
@@ -55,7 +57,7 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
 
   implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
-  implicit val timeout = Timeout(30 seconds) //TODO the state should have timeouts already configurable
+  implicit val timeout = Timeout(conf.WriteTimeoutMs(), TimeUnit.MILLISECONDS)
 
   override def close(): Unit = underlying.close()
 

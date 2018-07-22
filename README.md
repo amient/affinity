@@ -384,7 +384,8 @@ In all examples and for all tests, logback binding is used.
 ## Global State
         affinity.global [<ID>] (-)                                                              each global state has an ID and needs to be further configured
         affinity.global.<ID>.external [TRUE|FALSE] (false)                                      If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly
-        affinity.global.<ID>.lock.timeout.ms [INT] (10000)                                      When per-row locking is used, this time-out specifies how long a lock can be held by a single thread
+        affinity.global.<ID>.lock.timeout.ms [INT] (10000)                                      How long a lock can be held by a single thread before throwing a TimeoutException
+        affinity.global.<ID>.write.timeout.ms [INT] (10000)                                     How long can any of the write operation on a global store take before throwing TimeoutException
         affinity.global.<ID>.memstore.class [FQN] (!)                                           Implementation of storage.MemStore that will be used for lookups
         affinity.global.<ID>.memstore.data.dir [FILE-PATH] (-)                                  Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set
         affinity.global.<ID>.memstore.key.prefix.size [INT] (-)                                 Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields
