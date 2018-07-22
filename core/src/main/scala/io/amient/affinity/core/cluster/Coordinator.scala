@@ -53,10 +53,9 @@ object Coordinator {
     override protected def specializations(): util.Set[String] = Set("zookeeper", "embedded").asJava
   }
 
-  final case class MasterUpdates(_keyspace: String, add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
+  final case class MasterUpdates(add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
     def localTo(actor: ActorRef): MasterUpdates = {
       MasterUpdates(
-        _keyspace,
         add.filter(_.path.address == actor.path.address),
         remove.filter(_.path.address == actor.path.address)
       )
@@ -121,7 +120,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       watchers += watcher -> clusterWide
 
       val currentMasters = getCurrentMasters.filter(clusterWide || _.path.address.hasLocalScope)
-      val update = MasterUpdates(group, currentMasters, Set())
+      val update = MasterUpdates(currentMasters, Set())
       implicit val timeout = Timeout(30 seconds)
       val informed = watcher ?! (if (clusterWide) update else update.localTo(watcher))
       informed.failed.foreach {
@@ -183,7 +182,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         val add = currentMasters.filter(!prevMasters.contains(_))
         val remove = prevMasters.filter(!currentMasters.contains(_))
         if (!add.isEmpty || !remove.isEmpty) {
-          val update = MasterUpdates(group, add, remove)
+          val update = MasterUpdates(add, remove)
           notifyWatchers(update)
         }
       }
@@ -208,12 +207,12 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
         val informed = watcher ?! (if (global) fullUpdate else fullUpdate.localTo(watcher))
         informed.failed.foreach {
           case e: Throwable => if (!closed.get) {
-            logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)
+            logger.error(e, s"Could not notify watcher: $watcher(global = $global)")
           }
         }
       } catch {
         case e: Throwable => if (!closed.get) {
-          logger.warning(s"Could not notify watcher: $watcher(global = $global) due to " + e.getCause)
+          logger.error(e, s"Could not notify watcher: $watcher(global = $global)")
         }
       }
     }

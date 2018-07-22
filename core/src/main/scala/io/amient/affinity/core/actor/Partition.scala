@@ -47,9 +47,9 @@ trait Partition extends ActorHandler {
   private val log = Logging.getLogger(context.system, this)
 
   /**
-    * keyspace identifier
+    * group identifier
     */
-  implicit val keyspace = self.path.parent.name
+  implicit val group = self.path.parent.name
 
   /**
     * partition id
@@ -60,20 +60,23 @@ trait Partition extends ActorHandler {
   private val declaredStateStores: CopyOnWriteArrayList[(String, State[_, _])] = new CopyOnWriteArrayList[(String, State[_, _])]()
   private lazy val stateStores: ParMap[String, State[_, _]] = declaredStateStores.iterator().asScala.toMap.par
 
-  def state[K: ClassTag, V: ClassTag](store: String)(implicit keyspace: String, partition: Int): State[K, V] = {
+  def state[K: ClassTag, V: ClassTag](name: String)(implicit group: String, partition: Int): State[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     val conf = Conf(context.system.settings.config)
-    val numPartitions = conf.Affi.Keyspace(keyspace).NumPartitions()
-    val stateConf = conf.Affi.Keyspace(keyspace).State(store)
-    val state = State.create[K, V](s"$keyspace-$store", partition, stateConf, numPartitions, context.system)
-    declaredStateStores.add((store, state))
+    val numPartitions = conf.Affi.Keyspace(group).NumPartitions()
+    val stateConf = conf.Affi.Keyspace(group).State(name)
+    state(name, State.create[K, V](s"$group-$name", partition, stateConf, numPartitions, context.system))
+  }
+
+  private[affinity] def state[K, V](name: String, state: State[K,V]): State[K,V] = {
+    declaredStateStores.add((name, state))
     state
   }
 
 
   override def preStart(): Unit = {
     started = true
-    log.debug(s"Starting keyspace: $keyspace, partition: $partition")
+    log.debug(s"Starting partition $partition of group $group")
     //on start-up every partition is a standby which also requires a blocking bootstrap first
     become(standby = true)
     //only after states have caught up we make the partition online and available to cooridnators
@@ -96,7 +99,7 @@ trait Partition extends ActorHandler {
 
   override def postStop(): Unit = {
     try {
-      log.debug(s"Stopping keyspace: $keyspace, partition: $partition")
+      log.debug(s"Stopping partition $partition of group $group")
       context.parent ! PartitionOffline(self)
       closeStateStores()
     } finally super.postStop()
@@ -134,9 +137,9 @@ trait Partition extends ActorHandler {
       if (state.external || standby) state.tail
     }
     if (standby) {
-      log.debug(s"Became standby for partition $keyspace/$partition")
+      log.debug(s"${self.path} Became standby for partition $group/$partition")
     } else {
-      log.debug(s"Became master for partition $keyspace/$partition")
+      log.debug(s"${self.path} became master for partition $group/$partition")
     }
   }
 

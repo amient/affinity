@@ -25,7 +25,7 @@ import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
-import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.state.KVStore
 import io.amient.affinity.core.util.{TimeCryptoProof, TimeCryptoProofSHA256}
 import org.codehaus.jackson.annotate.JsonIgnore
 
@@ -42,7 +42,7 @@ trait PrivateApi extends GatewayHttp {
 
   import context.dispatcher
 
-  private val settings: State[String, ConfigEntry] = global[String, ConfigEntry]("settings")
+  private val settings: KVStore[String, ConfigEntry] = global[String, ConfigEntry]("settings")
 
   abstract override def handle: Receive = super.handle orElse {
 

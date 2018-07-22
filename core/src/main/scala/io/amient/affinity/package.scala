@@ -22,7 +22,7 @@ package io.amient
 import akka.actor.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.actor.Keyspace.KeyspaceConf
+import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
 import io.amient.affinity.core.cluster.Node.NodeConf
 import io.amient.affinity.core.config._
@@ -64,8 +64,24 @@ package object affinity {
   object AffinityActorSystem {
     val defaultConfig = ConfigFactory.parseResources(getClass.getClassLoader, "affinity.conf")
     require(defaultConfig.hasPath("akka.actor.serializers.avro"))
+
     def apply(config: Config): Config = config.withFallback(defaultConfig)
+
     def create(name: String, config: Config): ActorSystem = ActorSystem.create(name, apply(config))
+  }
+
+  object KeyspaceConf extends KeyspaceConf {
+    override def apply(config: Config): KeyspaceConf = new KeyspaceConf().apply(config)
+  }
+
+  class KeyspaceConf extends CfgStruct[KeyspaceConf] {
+    val PartitionClass = cls("class", classOf[Partition], true)
+      .doc("Implementation of core.actor.Partition of whose instances is the Keyspace composed")
+
+    val NumPartitions = integer("num.partitions", true)
+      .doc("Total number of partitions in the Keyspace")
+
+    val State = group("state", classOf[StateConf], false).doc("Keyspace may have any number of States, each identified by its ID - each state within a Keyspace is co-partitioned identically")
   }
 
 }

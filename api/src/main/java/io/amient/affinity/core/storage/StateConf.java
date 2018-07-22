@@ -38,6 +38,9 @@ public class StateConf extends CfgStruct<StateConf> {
     public MemStoreConf MemStore = struct("memstore", new MemStore.MemStoreConf(), true);
 
     public Cfg<Long> LockTimeoutMs = longint("lock.timeout.ms", 10000L)
-            .doc("When per-row locking is used, this time-out specifies how long a lock can be held by a single thread");
+            .doc("How long a lock can be held by a single thread before throwing a TimeoutException");
+
+    public Cfg<Long> WriteTimeoutMs = longint("write.timeout.ms", 10000L)
+            .doc("How long can any of the write operation on a global store take before throwing a TimeoutException");
 }
 

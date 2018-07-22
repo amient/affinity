@@ -113,9 +113,9 @@ class Controller extends Actor {
     case Terminated(child) if (child.path.name == "gateway") =>
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
-    case GatewayCreated(httpPorts) => if (!gatewayPromise.isCompleted) {
-      log.info("Gateway online (with http)")
-      gatewayPromise.success(httpPorts)
+    case GatewayCreated(ports) => if (!gatewayPromise.isCompleted) {
+      if (ports.length > 0) log.info("Gateway online (with http)") else log.info("Gateway online (stream only)")
+      gatewayPromise.success(ports)
     }
 
     case anyOther => log.warning("Unknown controller message " + anyOther)
