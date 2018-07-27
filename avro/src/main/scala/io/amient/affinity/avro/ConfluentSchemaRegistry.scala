@@ -110,7 +110,8 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
     val entity = mapper.createObjectNode()
     entity.put("schema", schema.toString)
     val j = mapper.readValue(post(s"/subjects/$subject/versions", entity.toString), classOf[JsonNode])
-    if (j.has("error_code")) throw new RuntimeException(subject + ": " + schema.getFullName + " - " + j.get("message").getTextValue)
+    if (j.has("error_code")) throw new RuntimeException(
+      s"could not register schema subject: ${schema.getFullName} due to ${j.get("message").getTextValue}, schema: ${schema}")
     if (j.has("id")) j.get("id").getIntValue else throw new IllegalArgumentException
   }
 
