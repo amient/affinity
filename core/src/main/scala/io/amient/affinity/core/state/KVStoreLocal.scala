@@ -89,7 +89,7 @@ object KVStoreLocal {
     val lockTimeoutMs: lang.Long = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
     val external = stateConf.External()
-    val logOption = if (!stateConf.Storage.isDefined) None else Some {
+    val logOption = if (!stateConf.Storage.isDefined || !stateConf.Storage.Class.isDefined) None else Some {
       val storage = LogStorage.newInstance(stateConf.Storage)
       if (partition == 0) storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
       if (!external) {
