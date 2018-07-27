@@ -91,6 +91,8 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
       Future.sequence(recipients.map(x => x.ref ?! message))
     }
 
+    case other: Any => sender ! Failure(new RuntimeException(s"Message addressed to Group must be either Routed or ScatterGather: $other"))
+
   }
 
   private def evaluateSuspensionStatus() = {
