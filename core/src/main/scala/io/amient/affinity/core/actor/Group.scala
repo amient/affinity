@@ -6,10 +6,10 @@ import akka.actor.Status.Failure
 import akka.event.Logging
 import akka.routing.{ActorRefRoutee, GetRoutees, Routees}
 import akka.serialization.SerializationExtension
-import io.amient.affinity.core.{Murmur2Partitioner, ack}
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 import io.amient.affinity.core.util.{Reply, ScatterGather}
+import io.amient.affinity.core.{Partitioner, ack, any2ref}
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -21,15 +21,13 @@ trait Routed {
 
 final case class GroupStatus(identifier: String, suspended: Boolean)
 
-class Group(identifier: String, numPartitions: Int) extends ActorHandler {
+class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) extends ActorHandler {
 
   private val logger = Logging.getLogger(context.system, this)
 
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
   val serialization = SerializationExtension(context.system)
-
-  val partitioner = new Murmur2Partitioner
 
   implicit val executor = context.dispatcher
 
@@ -106,19 +104,7 @@ class Group(identifier: String, numPartitions: Int) extends ActorHandler {
 
   private def getRoutee(key: Any): ActorRefRoutee = {
 
-    val routableKey: AnyRef = key match {
-      case ref: AnyRef => ref
-      case b: Byte => new lang.Byte(b)
-      case c: Char => new lang.Character(c)
-      case z: Boolean => new lang.Boolean(z)
-      case s: Short => new lang.Short(s)
-      case i: Int => new lang.Integer(i)
-      case l: Long => new lang.Long(l)
-      case f: Float => new lang.Float(f)
-      case d: Double => new lang.Double(d)
-    }
-
-    val serializedKey = serialization.serialize(routableKey).get
+    val serializedKey = serialization.serialize(any2ref(key)).get
     val partition = partitioner.partition(serializedKey, numPartitions)
 
     //log.trace(serializedKey.mkString(".") + " over " + numPartitions + " to " + partition)

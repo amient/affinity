@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage;
 
 import com.typesafe.config.ConfigFactory;
+import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.MemoryLogStorage;
 import io.amient.affinity.core.util.TimeRange;
 import org.junit.Test;

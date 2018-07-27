@@ -25,6 +25,7 @@ import java.{lang, util}
 
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.{Cfg, CfgStruct}
+import io.amient.affinity.core.state.StateConf
 import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util.{EventTime, JavaPromise, MappedJavaFuture, TimeRange}
 import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf

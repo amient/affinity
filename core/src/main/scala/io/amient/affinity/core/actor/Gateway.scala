@@ -27,6 +27,7 @@ import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
 import io.amient.affinity.Conf
+import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.config.{CfgList, CfgStruct}
 import io.amient.affinity.core.http.HttpInterfaceConf
@@ -99,7 +100,8 @@ trait Gateway extends ActorHandler {
         if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
         val serviceConf = conf.Affi.Keyspace(identifier)
         if (!serviceConf.isDefined) throw new IllegalArgumentException(s"Keypsace $identifier is not defined")
-        val ks = context.actorOf(Props(new Group(identifier, serviceConf.NumPartitions())), name = identifier)
+        val partitioner = new Murmur2Partitioner
+        val ks = context.actorOf(Props(new Group(identifier, serviceConf.NumPartitions(), partitioner)), name = identifier)
         declaredKeyspaces += (identifier -> ((ks, new AtomicBoolean(true))))
         ks
     }

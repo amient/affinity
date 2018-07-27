@@ -33,7 +33,7 @@ import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.FailoverTestPartition.{GetValue, PutValue}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.state.KVStoreLocal
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
@@ -88,8 +88,8 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   override def beforeAll(): Unit = try {
     val stateConf = Conf(config).Affi.Keyspace("keyspace1").State("consistency-test")
-    val p0 = State.create[String, String]("consistency-test", 0, stateConf, 2, node1.system)
-    val p1 = State.create[String, String]("consistency-test", 1, stateConf, 2, node1.system)
+    val p0 = KVStoreLocal.create[String, String]("consistency-test", 0, stateConf, 2, node1.system)
+    val p1 = KVStoreLocal.create[String, String]("consistency-test", 1, stateConf, 2, node1.system)
     p0.boot()
     p1.boot()
     Await.result(Future.sequence(List(

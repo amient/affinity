@@ -17,7 +17,7 @@
   * [Keyspaces](#key-space-definitions)
   * [Node Context](#node-context)
   * [Important Akka Configuration Options](#important-akka-configuration-options)
-  * [Metrics](#metrics)
+- [Metrics](#metrics)
 - [Development](#development)
   * [Cross-builds](#cross-builds)
     + [Current master versions](#current-master-versions)
@@ -383,18 +383,19 @@ In all examples and for all tests, logback binding is used.
 
 ## Global State
         affinity.global [<ID>] (-)                                                              each global state has an ID and needs to be further configured
-        affinity.global.<ID>.external [TRUE|FALSE] (false)                                      If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly
-        affinity.global.<ID>.lock.timeout.ms [INT] (10000)                                      How long a lock can be held by a single thread before throwing a TimeoutException
-        affinity.global.<ID>.write.timeout.ms [INT] (10000)                                     How long can any of the write operation on a global store take before throwing TimeoutException
+        affinity.global.<ID>.external [TRUE|FALSE] (false)                                      If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly. Number of partitions will be also detected from the underlying storage log.
+        affinity.global.<ID>.lock.timeout.ms [LONG] (10000)                                     How long a lock can be held by a single thread before throwing a TimeoutException
         affinity.global.<ID>.memstore.class [FQN] (!)                                           Implementation of storage.MemStore that will be used for lookups
         affinity.global.<ID>.memstore.data.dir [FILE-PATH] (-)                                  Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set
         affinity.global.<ID>.memstore.key.prefix.size [INT] (-)                                 Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields
         affinity.global.<ID>.min.timestamp.ms [LONG] (0)                                        Any records with timestamp lower than this value will be immediately dropped
+        affinity.global.<ID>.partitions [INT] (-)                                               Number of partitions (this setting cannot be applied to state stores defined within a Keyspace)
         affinity.global.<ID>.storage.class [FQN] (-)                                            Implementation of storage.LogStorage which will be used for persistence
         affinity.global.<ID>.storage.commit.interval.ms [LONG] (5000)                           Frequency at which consumed records will be committed to the log storage backend
         affinity.global.<ID>.storage.commit.timeout.ms [LONG] (30000)                           Number of milliseconds after which a commit is considered failed
         affinity.global.<ID>.storage.min.timestamp.ms [LONG] (0)                                Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
         affinity.global.<ID>.ttl.sec [INT] (-1)                                                 Per-record expiration which will based off event-time if the data class implements EventTime trait
+        affinity.global.<ID>.write.timeout.ms [LONG] (10000)                                    How long can any of the write operation on a global store take before throwing a TimeoutException
 
 ### Global State Storage(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.global.<ID>.storage.kafka.bootstrap.servers [STRING] (!)                       kafka connection string used for consumer and/or producer
@@ -408,21 +409,23 @@ In all examples and for all tests, logback binding is used.
 
 
 ## Keyspaces
-        affinity.keyspace [<ID>] (-)                                                            
+        affinity.keyspace [<ID>] (-)
         affinity.keyspace.<ID>.class [FQN] (!)                                                  Implementation of core.actor.Partition of whose instances is the Keyspace composed
         affinity.keyspace.<ID>.num.partitions [INT] (!)                                         Total number of partitions in the Keyspace
         affinity.keyspace.<ID>.state [<ID>] (-)                                                 Keyspace may have any number of States, each identified by its ID - each state within a Keyspace is co-partitioned identically
-        affinity.keyspace.<ID>.state.<ID>.external [TRUE|FALSE] (false)                         If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly
-        affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms [INT] (10000)                         When per-row locking is used, this time-out specifies how long a lock can be held by a single thread
+        affinity.keyspace.<ID>.state.<ID>.external [TRUE|FALSE] (false)                         If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly. Number of partitions will be also detected from the underlying storage log.
+        affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms [LONG] (10000)                        How long a lock can be held by a single thread before throwing a TimeoutException
         affinity.keyspace.<ID>.state.<ID>.memstore.class [FQN] (!)                              Implementation of storage.MemStore that will be used for lookups
         affinity.keyspace.<ID>.state.<ID>.memstore.data.dir [FILE-PATH] (-)                     Local path where data of this MemStore will be kept - this setting will be derived from the node.data.dir if not set
         affinity.keyspace.<ID>.state.<ID>.memstore.key.prefix.size [INT] (-)                    Number of head bytes, used for optimized range lookups - this setting will be automatically generated for AvroRecord classes which declare Fixed fields
         affinity.keyspace.<ID>.state.<ID>.min.timestamp.ms [LONG] (0)                           Any records with timestamp lower than this value will be immediately dropped
+        affinity.keyspace.<ID>.state.<ID>.partitions [INT] (-)                                  Number of partitions (this setting cannot be applied to state stores defined within a Keyspace)
         affinity.keyspace.<ID>.state.<ID>.storage.class [FQN] (-)                               Implementation of storage.LogStorage which will be used for persistence
         affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms [LONG] (5000)              Frequency at which consumed records will be committed to the log storage backend
         affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms [LONG] (30000)              Number of milliseconds after which a commit is considered failed
         affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms [LONG] (0)                   Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
         affinity.keyspace.<ID>.state.<ID>.ttl.sec [INT] (-1)                                    Per-record expiration which will based off event-time if the data class implements EventTime trait
+        affinity.keyspace.<ID>.state.<ID>.write.timeout.ms [LONG] (10000)                       How long can any of the write operation on a global store take before throwing a TimeoutException
 
 ### Keyspaces Storage(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.bootstrap.servers [STRING] (!)          kafka connection string used for consumer and/or producer
@@ -469,27 +472,19 @@ In all examples and for all tests, logback binding is used.
         affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name
 
 
-### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
-        affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)                  kafka connection string used for consumer and/or producer
-        affinity.node.gateway.stream.<ID>.kafka.consumer                                        any settings that the underlying version of kafka consumer client supports
-        affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)                  kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
-        affinity.node.gateway.stream.<ID>.kafka.producer                                        any settings that the underlying version of kafka producer client supports
-        affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)                    replication factor of the kafka topic
-        affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name
-
-
 ## Important Akka Configuration Options
         akka.actor.provider [STRING] (-)                                                        Set this to "akka.remote.RemoteActorRefProvider" when running in a cluster
-        akka.http.server.idle-timeout [STRING] (infinite)                                       
-        akka.http.server.max-connections [INT] (1000)                                           
-        akka.http.server.remote-address-header [STRING] (on)                                    
-        akka.http.server.request-timeout [STRING] (30s)                                         
-        akka.http.server.server-header [STRING] (-)                                             
-        akka.remote.enabled-transports [[]] (-)                                                 Set this to ["akka.remote.netty.tcp"] when running in a cluster
-        akka.remote.netty.tcp.hostname [STRING] (-)                                             
-        akka.remote.netty.tcp.port [INT] (-)                                                    
+        akka.http.server.idle-timeout [STRING] (infinite)
+        akka.http.server.max-connections [INT] (1000)
+        akka.http.server.remote-address-header [STRING] (on)
+        akka.http.server.request-timeout [STRING] (30s)
+        akka.http.server.server-header [STRING] (-)
+        akka.remote.enabled-transports                                                          Set this to ["akka.remote.netty.tcp"] when running in a cluster
+        akka.remote.enabled-transports.[] [STRING] (!)
+        akka.remote.netty.tcp.hostname [STRING] (-)
+        akka.remote.netty.tcp.port [INT] (-)
 
-## Metrics
+# Metrics
 
 ..TODO
 

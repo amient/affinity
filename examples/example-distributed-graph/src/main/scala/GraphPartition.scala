@@ -18,16 +18,16 @@
  */
 
 import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.state.KVStoreLocal
 import message.{Component, GOP, VertexProps, _}
 
 import scala.collection.immutable.Set
 
 class GraphPartition extends Partition {
 
-  val graph: State[Int, VertexProps] = state("graph")
+  val graph: KVStoreLocal[Int, VertexProps] = state("graph")
 
-  val components: State[Int, Component] = state("components")
+  val components: KVStoreLocal[Int, Component] = state("components")
 
   import context.dispatcher
 

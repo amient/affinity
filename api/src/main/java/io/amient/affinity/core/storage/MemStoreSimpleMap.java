@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
 
@@ -39,7 +40,7 @@ public class MemStoreSimpleMap extends MemStore {
     }
 
     @Override
-    protected boolean isPersistent() {
+    public boolean isPersistent() {
         return false;
     }
 

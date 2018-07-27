@@ -28,7 +28,8 @@ import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.serde.Serde
-import io.amient.affinity.core.storage.{MemStoreSimpleMap, State}
+import io.amient.affinity.core.state.{KVStoreConf, KVStoreLocal}
+import io.amient.affinity.core.storage.MemStoreSimpleMap
 import io.amient.affinity.core.util.{AffinityMetrics, ByteUtils}
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
@@ -145,9 +146,9 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
   }
 
   private def createStateStoreForPartition(topic: String, partition: Int) = {
-    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.Storage.Class.path -> classOf[KafkaLogStorage].getName,
-      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+    val stateConf = KVStoreConf(ConfigFactory.parseMap(Map(
+      KVStoreConf.Storage.Class.path -> classOf[KafkaLogStorage].getName,
+      KVStoreConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
       KafkaStorage.StateConf.Storage.Topic.path -> topic,
       KafkaStorage.StateConf.Storage.BootstrapServers.path -> kafkaBootstrap,
       KafkaStorage.StateConf.Storage.Producer.path -> Map().asJava,
@@ -156,7 +157,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
     val kvstore = new MemStoreSimpleMap(stateConf)
-    State.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, new AffinityMetrics)
+    KVStoreLocal.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, new AffinityMetrics)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {

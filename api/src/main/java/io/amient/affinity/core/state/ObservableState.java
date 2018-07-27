@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.storage;
+package io.amient.affinity.core.state;
 
 import java.util.*;
 

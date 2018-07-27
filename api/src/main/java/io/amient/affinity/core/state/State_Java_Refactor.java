@@ -17,9 +17,12 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.storage;
+package io.amient.affinity.core.state;
 
 import io.amient.affinity.core.serde.AbstractSerde;
+import io.amient.affinity.core.storage.Log;
+import io.amient.affinity.core.storage.MemStore;
+import io.amient.affinity.core.storage.Record;
 import io.amient.affinity.core.util.*;
 
 import java.io.Closeable;

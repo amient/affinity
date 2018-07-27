@@ -20,6 +20,7 @@
 package io.amient.affinity.core.storage;
 
 import io.amient.affinity.core.config.*;
+import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
 import org.slf4j.Logger;
@@ -74,7 +75,7 @@ public abstract class MemStore implements Closeable {
         }
     }
 
-    protected abstract boolean isPersistent();
+    public abstract boolean isPersistent();
 
     public abstract CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer keyPrefix);
 

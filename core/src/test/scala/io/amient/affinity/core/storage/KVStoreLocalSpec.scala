@@ -24,6 +24,7 @@ import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
 import io.amient.affinity.core.http.HttpInterfaceConf
+import io.amient.affinity.core.state.{KVStoreLocal, KVStoreConf}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -37,7 +38,7 @@ case class ExampleCompoundKey(@Fixed key1:Long, @Fixed(1) key2: String, subkey: 
 
 case class ExpirableValue(data: String, val eventTimeUnix: Long) extends AvroRecord with EventTime
 
-class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
+class KVStoreLocalSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   val specTimeout = 5 seconds
 
@@ -60,21 +61,21 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
   behavior of "State"
 
   it should "not allow writes and deletes in read-only state" in {
-    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      State.StateConf.External.path -> "true"
+    val stateConf = KVStoreConf(ConfigFactory.parseMap(Map(
+      KVStoreConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+      KVStoreConf.External.path -> "true"
     ).asJava))
-    val state = State.create[Long, ExpirableValue]("read-only-store", 0, stateConf, 1, system)
+    val state = KVStoreLocal.create[Long, ExpirableValue]("read-only-store", 0, stateConf, 1, system)
     an[IllegalStateException] should be thrownBy (Await.result(state.insert(1L, ExpirableValue("one", 1)), specTimeout))
     an[IllegalStateException] should be thrownBy (Await.result(state.delete(1L), specTimeout))
   }
 
   it should "work without ttl" in {
 
-    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName
+    val stateConf = KVStoreConf(ConfigFactory.parseMap(Map(
+      KVStoreConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName
     ).asJava))
-    val state = State.create[Long, ExpirableValue]("no-ttl-store", 0, stateConf, 1, system)
+    val state = KVStoreLocal.create[Long, ExpirableValue]("no-ttl-store", 0, stateConf, 1, system)
 
     val nowMs = System.currentTimeMillis()
 
@@ -89,12 +90,12 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
   }
 
   it should "clean expired entries when ttl set" in {
-    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
-      State.StateConf.TtlSeconds.path -> 5
+    val stateConf = KVStoreConf(ConfigFactory.parseMap(Map(
+      KVStoreConf.MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+      KVStoreConf.TtlSeconds.path -> 5
     ).asJava))
 
-    val state = State.create[Long, ExpirableValue]("ttl-store", 0, stateConf, 1, system)
+    val state = KVStoreLocal.create[Long, ExpirableValue]("ttl-store", 0, stateConf, 1, system)
 
     val nowMs = System.currentTimeMillis()
 
@@ -110,10 +111,10 @@ class StateSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll {
   }
 
   it should "manage 1-N mappings when compound key prefix is used" in {
-    val stateConf = State.StateConf(ConfigFactory.parseMap(Map(
-      State.StateConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
+    val stateConf = KVStoreConf(ConfigFactory.parseMap(Map(
+      KVStoreConf.MemStore.Class.path -> classOf[MemStoreSortedMap].getName
     ).asJava))
-    val state = State.create[ExampleCompoundKey, String]("prefix-key-store", 0, stateConf, 1, system)
+    val state = KVStoreLocal.create[ExampleCompoundKey, String]("prefix-key-store", 0, stateConf, 1, system)
 
     state.insert(ExampleCompoundKey(1000L, "x", 1), "value11")
     state.insert(ExampleCompoundKey(1000L, "y", 2), "value12")
