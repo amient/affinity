@@ -3,6 +3,7 @@ package io.amient.affinity.core.storage;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
+import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.CloseableIterator;
 import org.junit.Test;
 

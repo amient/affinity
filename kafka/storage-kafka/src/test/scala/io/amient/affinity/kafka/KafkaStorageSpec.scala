@@ -27,7 +27,7 @@ import io.amient.affinity.avro.ZookeeperSchemaRegistry
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.state.KVStoreLocal
 import io.amient.affinity.core.util.{AffinityTestBase, ByteUtils}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.apache.kafka.clients.consumer.KafkaConsumer
@@ -85,10 +85,10 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     super.afterAll()
   }
 
-  private def createStateStoreForPartition(keyspace: String, partition: Int, store: String): State[Int, TestRecord] = {
+  private def createStateStoreForPartition(keyspace: String, partition: Int, store: String): KVStoreLocal[Int, TestRecord] = {
     val conf = Conf(config)
     val stateConf = conf.Affi.Keyspace(keyspace).State(store)
-    val state = State.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
+    val state = KVStoreLocal.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
     state.boot()
     state
   }
@@ -133,7 +133,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     runTestWithState(state, topic, 10)
   }
 
-  private def runTestWithState(state: State[Int, TestRecord], topic: String, numRecords: Int): Unit = {
+  private def runTestWithState(state: KVStoreLocal[Int, TestRecord], topic: String, numRecords: Int): Unit = {
     val numWrites = new AtomicInteger(numRecords)
     val numToWrite = numWrites.get
     val l = System.currentTimeMillis()

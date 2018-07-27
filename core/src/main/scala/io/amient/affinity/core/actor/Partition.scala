@@ -26,7 +26,7 @@ import akka.actor.{Actor, ActorRef, Status}
 import akka.event.Logging
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
-import io.amient.affinity.core.storage.State
+import io.amient.affinity.core.state.KVStoreLocal
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
@@ -57,18 +57,19 @@ trait Partition extends ActorHandler {
   implicit val partition = self.path.name.toInt
 
   private var started = false
-  private val declaredStateStores: CopyOnWriteArrayList[(String, State[_, _])] = new CopyOnWriteArrayList[(String, State[_, _])]()
-  private lazy val stateStores: ParMap[String, State[_, _]] = declaredStateStores.iterator().asScala.toMap.par
+  private val declaredStateStores: CopyOnWriteArrayList[(String, KVStoreLocal[_, _])] = new CopyOnWriteArrayList[(String, KVStoreLocal[_, _])]()
+  private lazy val stateStores: ParMap[String, KVStoreLocal[_, _]] = declaredStateStores.iterator().asScala.toMap.par
 
-  def state[K: ClassTag, V: ClassTag](name: String)(implicit group: String, partition: Int): State[K, V] = {
+  def state[K: ClassTag, V: ClassTag](name: String)(implicit group: String, partition: Int): KVStoreLocal[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     val conf = Conf(context.system.settings.config)
     val numPartitions = conf.Affi.Keyspace(group).NumPartitions()
     val stateConf = conf.Affi.Keyspace(group).State(name)
-    state(name, State.create[K, V](s"$group-$name", partition, stateConf, numPartitions, context.system))
+    if (stateConf.Partitions.isDefined) throw new IllegalArgumentException("State defined inside a Keyspace cannot override number of partitions")
+    state(name, KVStoreLocal.create[K, V](s"$group-$name", partition, stateConf, numPartitions, context.system))
   }
 
-  private[affinity] def state[K, V](name: String, state: State[K,V]): State[K,V] = {
+  private[affinity] def state[K, V](name: String, state: KVStoreLocal[K,V]): KVStoreLocal[K,V] = {
     declaredStateStores.add((name, state))
     state
   }
@@ -126,7 +127,7 @@ trait Partition extends ActorHandler {
     }
   }
 
-  private[core] def getStateStore(stateStoreName: String): State[_, _] = {
+  private[core] def getStateStore(stateStoreName: String): KVStoreLocal[_, _] = {
     if (!started) throw new IllegalStateException("Cannot get state store rererence before the actor has started")
     stateStores(stateStoreName)
   }
@@ -151,7 +152,7 @@ trait Partition extends ActorHandler {
 
 }
 
-class KeyValueMediator[K](partition: ActorRef, state: State[K, _], key: K) extends Actor {
+class KeyValueMediator[K](partition: ActorRef, state: KVStoreLocal[K, _], key: K) extends Actor {
 
   private var observer: Option[Observer] = None
 

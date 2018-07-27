@@ -38,6 +38,7 @@ class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with Befo
     Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
     Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
     Conf.Affi.Global("settings").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
+    Conf.Affi.Global("settings").Partitions.path -> "1",
     Conf.Affi.Node.Gateway.Listeners.path -> List(Map(
       HttpInterfaceConf.Host.path -> "127.0.0.1",
       HttpInterfaceConf.Port.path -> 0

@@ -1,5 +1,6 @@
 package io.amient.affinity.core.storage;
 
+import io.amient.affinity.core.state.ObservableState;
 import io.amient.affinity.core.util.EventTime;
 import io.amient.affinity.core.util.MappedJavaFuture;
 import org.slf4j.Logger;

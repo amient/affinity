@@ -23,9 +23,8 @@ semantics or other strong guarantees, the problem can be delegated to
 ## Running the ExampleApp
 
 First you'll need Zookeeper and Kafka running locally for which there is a
-docker compose file.
+docker compose file in the root folder
     
-    cd ./examples/example-distributed-graph
     docker-compose up
  
 
@@ -34,7 +33,7 @@ e.g. from the Kafka home dir:
  
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --create \
         --topic graph --partitions 4 --replication-factor 1 --config cleanup.policy=compact
-    
+    ../sdsdsdf
     ./bin/kafka-topics.sh --zookeeper localhost:2181 --create \
         --topic components --partitions 4 --replication-factor 1 --config cleanup.policy=compact
 

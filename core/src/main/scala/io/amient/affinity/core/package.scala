@@ -19,6 +19,20 @@
 
 package io.amient.affinity
 
+import java.lang
+
 import io.amient.affinity.core.util.AckSupport
 
-package object core extends AckSupport
+package object core extends AckSupport {
+  def any2ref(any: Any): AnyRef = any match {
+    case ref: AnyRef => ref
+    case b: Byte => new lang.Byte(b)
+    case c: Char => new lang.Character(c)
+    case z: Boolean => new lang.Boolean(z)
+    case s: Short => new lang.Short(s)
+    case i: Int => new lang.Integer(i)
+    case l: Long => new lang.Long(l)
+    case f: Float => new lang.Float(f)
+    case d: Double => new lang.Double(d)
+  }
+}

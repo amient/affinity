@@ -23,7 +23,7 @@ import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
 import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
-import io.amient.affinity.core.storage.StateConf;
+import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import org.junit.Rule;
 import org.junit.Test;

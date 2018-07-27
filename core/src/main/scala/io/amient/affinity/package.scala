@@ -26,7 +26,7 @@ import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
 import io.amient.affinity.core.cluster.Node.NodeConf
 import io.amient.affinity.core.config._
-import io.amient.affinity.core.storage.StateConf
+import io.amient.affinity.core.state.StateConf
 
 package object affinity {
 

@@ -17,9 +17,8 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.storage
+package io.amient.affinity.core.state
 
-import java.io.Closeable
 import java.lang
 import java.nio.ByteBuffer
 import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
@@ -34,7 +33,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.state.KVStore
+import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util.{AffinityMetrics, CloseableIterator, EventTime, TimeRange}
 
 import scala.collection.JavaConverters._
@@ -44,17 +43,13 @@ import scala.reflect.ClassTag
 import scala.util.control.Breaks._
 import scala.util.control.NonFatal
 
-object State {
-
-  object StateConf extends StateConf {
-    override def apply(config: Config): StateConf = new StateConf().apply(config)
-  }
+object KVStoreLocal {
 
   def create[K: ClassTag, V: ClassTag](name: String,
                                        partition: Int,
                                        stateConf: StateConf,
                                        numPartitions: Int,
-                                       system: ActorSystem): State[K, V] = {
+                                       system: ActorSystem): KVStoreLocal[K, V] = {
     val identifier = if (partition < 0) name else s"$name-$partition"
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
@@ -89,7 +84,7 @@ object State {
                                        kvstore: MemStore,
                                        keySerde: AbstractSerde[K],
                                        valueSerde: AbstractSerde[V],
-                                       metrics: AffinityMetrics): State[K, V] = {
+                                       metrics: AffinityMetrics): KVStoreLocal[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs: lang.Long = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
@@ -113,7 +108,7 @@ object State {
       storage.open(checkpointFile)
     }
     val keyClass: Class[K] = implicitly[ClassTag[K]].runtimeClass.asInstanceOf[Class[K]]
-    new State(identifier, metrics, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    new KVStoreLocal(identifier, metrics, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
   }
 
 
@@ -128,17 +123,17 @@ object State {
 }
 
 
-class State[K, V](val identifier: String,
-                  val metrics: AffinityMetrics,
-                  kvstore: MemStore,
-                  logOption: Option[Log[_]],
-                  partition: Int,
-                  keyClass: Class[K],
-                  keySerde: AbstractSerde[K],
-                  valueSerde: AbstractSerde[V],
-                  val ttlMs: Long = -1,
-                  val lockTimeoutMs: Long = 10000,
-                  val external: Boolean = false) extends ObservableState[K] with KVStore[K,V] {
+class KVStoreLocal[K, V](val identifier: String,
+                         val metrics: AffinityMetrics,
+                         kvstore: MemStore,
+                         logOption: Option[Log[_]],
+                         partition: Int,
+                         keyClass: Class[K],
+                         keySerde: AbstractSerde[K],
+                         valueSerde: AbstractSerde[V],
+                         val ttlMs: Long = -1,
+                         val lockTimeoutMs: Long = 10000,
+                         val external: Boolean = false) extends ObservableState[K] with KVStore[K,V] {
 
   self =>
 

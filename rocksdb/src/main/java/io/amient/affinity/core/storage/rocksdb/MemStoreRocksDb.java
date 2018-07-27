@@ -22,7 +22,7 @@ package io.amient.affinity.core.storage.rocksdb;
 import io.amient.affinity.core.config.CfgStruct;
 import io.amient.affinity.core.util.CloseableIterator;
 import io.amient.affinity.core.storage.MemStore;
-import io.amient.affinity.core.storage.StateConf;
+import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import org.rocksdb.*;
 import org.slf4j.LoggerFactory;
@@ -85,7 +85,7 @@ public class MemStoreRocksDb extends MemStore {
     private final RocksDB internal;
 
     @Override
-    protected boolean isPersistent() {
+    public boolean isPersistent() {
         return true;
     }
 
