@@ -56,6 +56,11 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return this;
     }
 
+    @Override
+    public boolean isDefined() {
+        return properties.stream().filter(p -> p.getValue().isRequired() && !p.getValue().isDefined()).count() == 0;
+    }
+
     public CfgStruct(Class<? extends CfgStruct<?>> inheritFrom, Options... options) {
         this.options = Arrays.asList(options);
         try {
@@ -65,15 +70,15 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        setDefaultValue((T) this);
-    }
-
-    public CfgStruct(Options... options) {
-        this.options = Arrays.asList(options);
+        setValue((T) this);
     }
 
     public CfgStruct() {
         this(Options.STRICT);
+    }
+    public CfgStruct(Options... options) {
+        this.options = Arrays.asList(options);
+        setValue((T) this);
     }
 
     @Override
@@ -85,7 +90,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public final T apply(CfgStruct<?> conf) throws IllegalArgumentException {
         if (conf.path() == null) throw new IllegalArgumentException();
         if (conf.parent != null && conf.parent.getClass().isAssignableFrom(this.getClass())) {
-            return (T)conf.parent;
+            return (T) conf.parent;
         } else {
             T z = apply(conf.config());
             final AtomicReference<T> self = new AtomicReference<>(z);
@@ -122,6 +127,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
                         cfg.apply(this.config);
                     }
                     if (cfg.required && !cfg.isDefined()) {
+                        System.out.println(propPath);
                         throw new IllegalArgumentException(propPath + " is required" + (path().isEmpty() ? "" : " in " + path()));
                     }
                 } catch (IllegalArgumentException e) {
