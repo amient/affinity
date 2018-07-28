@@ -187,14 +187,14 @@ public class CfgTest {
     @Test
     public void specializeConfig() {
         ServiceConfig serviceConf = new ServiceConfig();
-        assert(serviceConf.isDefined()); //structs can never be undefined
+        assert(!serviceConf.isDefined());
         assert(serviceConf.Class.path().equals("class"));
         NodeConfig nodeConfig = new NodeConfig();
         //attaching to en empty node
         serviceConf.apply(nodeConfig);
         assert(serviceConf.Class.path().equals("class"));
         //attaching to a non-empty path
-        assert(nodeConfig.isDefined()); //structs can never be undefined
+        assert(!nodeConfig.isDefined());
         assert(nodeConfig.Services.path().equals("service"));
         serviceConf.apply(nodeConfig.Services.apply("x"));
         assert(serviceConf.Class.path().equals("service.x.class"));
