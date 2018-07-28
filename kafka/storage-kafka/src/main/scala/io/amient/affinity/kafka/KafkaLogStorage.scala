@@ -283,8 +283,9 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
       if (kafkaStorageConf.Consumer.isDefined) {
         val consumerConfig = kafkaStorageConf.Consumer.config()
-        consumerConfig.entrySet.asScala.foreach { case (entry) =>
-          put(entry.getKey, entry.getValue.unwrapped())
+        val allowedAdminConfigs = AdminClientConfig.configNames
+        consumerConfig.entrySet.asScala.filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
+          case (entry) => put(entry.getKey, entry.getValue.unwrapped())
         }
       }
     }

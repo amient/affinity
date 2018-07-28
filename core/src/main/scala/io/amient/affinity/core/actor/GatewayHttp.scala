@@ -38,7 +38,6 @@ import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import com.typesafe.config.Config
-import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
@@ -55,14 +54,9 @@ trait GatewayHttp extends Gateway {
 
   private val log = Logging.getLogger(context.system, this)
 
-  private val suspendedQueueMaxSize = conf.Affi.Node.Gateway.SuspendQueueMaxSize()
-  private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[HttpExchange]()
-
   import context.system
 
   private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
-
-  private var isSuspended = true
 
   val interfaces: List[HttpInterface] = conf.Affi.Node.Gateway.Listeners().asScala.map(new HttpInterface(_)).toList
 
@@ -86,31 +80,28 @@ trait GatewayHttp extends Gateway {
     super.postStop()
   }
 
-  abstract override def onClusterStatus(suspended: Boolean): Unit = {
-    super.onClusterStatus(suspended)
-    if (isSuspended != suspended) {
-      isSuspended = suspended
-      log.info("Handling " + (if (suspended) "Suspended" else "Resumed"))
-      if (!isSuspended) onlineCounter.inc() else onlineCounter.dec()
-      if (!isSuspended) {
-        val reprocess = suspendedHttpRequestQueue.toList
-        suspendedHttpRequestQueue.clear
-        if (reprocess.length > 0) log.warning(s"Re-processing ${reprocess.length} suspended http requests")
-        reprocess.foreach(handle(_))
-      }
-    }
+  abstract override def suspend(): Unit = try {
+    log.info("Http Gateway Suspended")
+    onlineCounter.dec()
+  } finally {
+    super.suspend
+  }
+
+  abstract override def resume(): Unit = try {
+    log.info("Http Gateway Resumed")
+    onlineCounter.inc()
+  } finally {
+    super.resume
   }
 
   abstract override def manage: Receive = super.manage orElse {
     case CreateGateway => context.parent ! Controller.GatewayCreated(listeners.map(_.getPort))
+  }
 
-    case exchange: HttpExchange if (isSuspended) =>
-      log.warning("Handling suspended, enqueuing request: " + exchange.request)
-      if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
-        suspendedHttpRequestQueue += exchange
-      } else {
-        new RuntimeException("Suspension queue overflow")
-      }
+  override def onHold(message: Any, sender: ActorRef): Unit = message match {
+    case exchange: HttpExchange if conf.Affi.Node.Gateway.RejectSuspendedHttpRequests() =>
+      exchange.promise.success(HttpResponse(StatusCodes.ServiceUnavailable))
+    case _ => super.onHold(message, sender)
   }
 
   override def unhandled: Receive = {
@@ -118,6 +109,7 @@ trait GatewayHttp extends Gateway {
       //no handler matched the HttpExchange
       exchange.promise.success(HttpResponse(NotFound, entity = "Server did not understand your request"))
     }
+    case other => throw new IllegalArgumentException(s"GatewayHttp can only handle HttpExchange messages")
   }
 
   def accept(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
@@ -470,9 +462,10 @@ trait WebSocketSupport extends GatewayHttp {
   }
 
   trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
-    val conf = Conf(context.system.settings.config).Affi
 
-    final val maxBufferSize = conf.Node.Gateway.MaxWebSocketQueueSize()
+    final val maxBufferSize = conf.Affi.Node.Gateway.MaxWebSocketQueueSize()
+
+    override def preStart() = resume
 
     override def postStop(): Unit = {
       log.debug("WebSocket Upstream Actor Closing")

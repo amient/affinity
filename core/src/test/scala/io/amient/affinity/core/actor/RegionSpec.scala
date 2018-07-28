@@ -55,25 +55,25 @@ class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPat
             context.actorOf(testPartition, name = partition.toString)
           }
         }), name = "region")
-        eventually { coordinator.services.size should be(4) }
+        eventually { coordinator.members.size should be(4) }
 
         //first stop Partition explicitly - it shouldn't be restarted
         import system.dispatcher
-        system.actorSelection(ActorPath.fromString(coordinator.services.head._1)).resolveOne.foreach {
+        system.actorSelection(ActorPath.fromString(coordinator.members.head._1)).resolveOne.foreach {
           case actorRef => system.stop(actorRef)
         }
-        eventually { coordinator.services.size should be(3) }
+        eventually { coordinator.members.size should be(3) }
 
         //now simulate error in one of the partitions
-        val partitionToFail = coordinator.services.head._1
+        val partitionToFail = coordinator.members.head._1
         system.actorSelection(ActorPath.fromString(partitionToFail)).resolveOne.foreach {
           case actorRef => actorRef ! new IllegalStateException("Exception expected by the Test")
         }
-        eventually  { coordinator.services.size should be(2) }
-        eventually  { coordinator.services should not contain(partitionToFail) }
+        eventually  { coordinator.members.size should be(2) }
+        eventually  { coordinator.members should not contain(partitionToFail) }
 
         // it had a failure, it should be restarted
-        eventually { coordinator.services.size should be(3) }
+        eventually { coordinator.members.size should be(3) }
         region ! PoisonPill
 
       } finally {

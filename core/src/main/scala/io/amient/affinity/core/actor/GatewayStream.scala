@@ -22,8 +22,6 @@ package io.amient.affinity.core.actor
 import java.io.Closeable
 import java.util.concurrent.{Executors, TimeUnit}
 
-import akka.event.Logging
-import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Controller.FatalErrorShutdown
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
@@ -41,15 +39,13 @@ import scala.reflect.ClassTag
 trait GatewayStream extends Gateway {
 
   @volatile private var closed = false
-  @volatile private var clusterSuspended = true
+  @volatile private var suspendedSync = true
 
   private val lock = new Object
 
-  private val logger = Logging.getLogger(context.system, this)
-
   private val config = context.system.settings.config
 
-  private val nodeConf = Conf(config).Affi.Node
+  private val nodeConf = conf.Affi.Node
 
   type InputStreamProcessor[K, V] = Record[K, V] => Future[Any]
 
@@ -133,14 +129,22 @@ trait GatewayStream extends Gateway {
     }
   }
 
-  abstract override def onClusterStatus(suspended: Boolean) = synchronized {
-    if (clusterSuspended != suspended) {
-      lock.synchronized {
-        this.clusterSuspended = suspended
-        lock.notifyAll()
-      }
-      super.onClusterStatus(suspended)
+  abstract override def suspend() = try synchronized {
+    lock.synchronized {
+      this.suspendedSync = true
+      lock.notifyAll()
     }
+  } finally {
+    super.suspend
+  }
+
+  abstract override def resume() = try synchronized {
+    lock.synchronized {
+      this.suspendedSync = false
+      lock.notifyAll()
+    }
+  } finally {
+    super.resume
   }
 
   class RunnableInputStream[K, V](identifier: String,
@@ -170,9 +174,9 @@ trait GatewayStream extends Gateway {
         while ((!closed && !finalized) || !lastCommit.isDone) {
           //clusterSuspended is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
           //should be suspended anyway and hang so no need to do it for every record
-          if (clusterSuspended) {
+          if (suspendedSync) {
             logger.info(s"Pausing input stream processor: $identifier")
-            while (clusterSuspended) {
+            while (suspendedSync) {
               lock.synchronized(lock.wait())
               if (closed) return
             }
