@@ -23,7 +23,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.actor.Partition
-import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
+import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.Node.NodeConf
 import io.amient.affinity.core.config._
 import io.amient.affinity.core.state.StateConf
@@ -55,7 +55,7 @@ package object affinity {
 
   class AffinityConf extends CfgStruct[AffinityConf] {
     val Avro: AvroConf = struct("avro", new AvroConf(), true)
-    val Coordinator: CoorinatorConf = struct("coordinator", new CoorinatorConf, true)
+    val Coordinator: CoordinatorConf = struct("coordinator", new CoordinatorConf, true)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
     val Global = group("global", classOf[StateConf], false).doc("each global state has an ID and needs to be further configured")
     val Node = struct("node", new NodeConf, true)

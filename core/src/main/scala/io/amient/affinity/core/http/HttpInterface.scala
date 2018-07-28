@@ -53,6 +53,7 @@ class HttpInterfaceConf extends CfgStruct[HttpInterfaceConf] {
 }
 
 class TlsConf extends CfgStruct[TlsConf] {
+
   val KeyStoreStandard = string("keystore.standard", "PKCS12").doc("format of the keystore")
   val KeyStorePassword = string("keystore.password", true).doc("password to the keystore file")
   val KeyStoreResource = string("keystore.resource", false).doc("resource which holds the keystore, if file not used")
@@ -75,7 +76,7 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
 
   val prefix: Uri.Path = Uri.Path(httpConf.Prefix())
 
-  val sslContext = if (!httpConf.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
+  val sslContext = if (!httpConf.Tls.isDefined()) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
     logger.info("Configuring SSL Context")
     val password = httpConf.Tls.KeyStorePassword().toCharArray

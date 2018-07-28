@@ -24,7 +24,7 @@ import java.util
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
-import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
+import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
@@ -39,16 +39,16 @@ object CoordinatorZk {
     override def apply(config: Config) = new CoordinatorZkConf()(config)
   }
 
-  class CoordinatorZkConf extends CfgStruct[CoordinatorZkConf](classOf[CoorinatorConf]) {
+  class CoordinatorZkConf extends CfgStruct[CoordinatorZkConf](classOf[CoordinatorConf]) {
     val ZooKeeper = struct("zookeeper", new ZkConf, true)
     val ZkRoot = string("zookeeper.root", "/affinity")
       .doc("znode under which coordination data between affinity nodes will be registered")
   }
 }
 
-class CoordinatorZk(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) {
+class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) extends Coordinator(system, group) {
 
-  val conf = CoordinatorZkConf(Conf(system.settings.config).Affi.Coordinator)
+  val conf = CoordinatorZkConf(_conf)
   val zkConf = conf.ZooKeeper()
   val zkRoot = conf.ZkRoot()
   val groupRoot = s"$zkRoot/$group"

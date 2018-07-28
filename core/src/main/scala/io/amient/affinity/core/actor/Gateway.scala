@@ -92,7 +92,7 @@ trait Gateway extends ActorHandler {
       case None =>
         if (started) throw new IllegalStateException("All required affinity services must be declared in the constructor")
         val serviceConf = conf.Affi.Keyspace(identifier)
-        if (!serviceConf.isDefined) throw new IllegalArgumentException(s"Keypsace $identifier is not defined")
+        if (!serviceConf.isDefined()) throw new IllegalArgumentException(s"Keypsace $identifier is not defined")
         val partitioner = new Murmur2Partitioner
         val ks = context.actorOf(Props(new Group(identifier, serviceConf.NumPartitions(), partitioner)), name = identifier)
         declaredKeyspaces += (identifier -> ((ks, new AtomicBoolean(true))))

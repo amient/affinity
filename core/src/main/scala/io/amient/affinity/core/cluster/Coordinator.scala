@@ -42,11 +42,11 @@ import scala.util.{Failure, Success}
 
 object Coordinator {
 
-  object CoorinatorConf extends CoorinatorConf {
-    override def apply(config: Config): CoorinatorConf = new CoorinatorConf().apply(config)
+  object CoordinatorConf extends CoordinatorConf {
+    override def apply(config: Config): CoordinatorConf = new CoordinatorConf().apply(config)
   }
 
-  class CoorinatorConf extends CfgStruct[CoorinatorConf] {
+  class CoordinatorConf extends CfgStruct[CoordinatorConf] {
     val Class = cls("class", classOf[Coordinator], classOf[CoordinatorZk])
       .doc("implementation of coordinator must extend cluster.Coordinator")
 
@@ -64,9 +64,9 @@ object Coordinator {
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
-    val cls = Conf(config).Affi.Coordinator.Class()
-    val constructor = cls.getConstructor(classOf[ActorSystem], classOf[String], classOf[Config])
-    constructor.newInstance(system, group, config)
+    val conf: CoordinatorConf =  Conf(config).Affi.Coordinator
+    val constructor = conf.Class().getConstructor(classOf[ActorSystem], classOf[String], classOf[CoordinatorConf])
+    constructor.newInstance(system, group, conf)
   }
 }
 
@@ -83,6 +83,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   private val logger = Logging.getLogger(system, this)
 
   private val handles = scala.collection.mutable.Map[String, ActorRef]()
+
+  def members: Map[String, String] = handles.toMap.mapValues(_.path.toString)
 
   protected val closed = new AtomicBoolean(false)
 
