@@ -60,7 +60,8 @@ object LogRDDSpecUniverse {
     LogStorage.StorageConf.Class.path -> classOf[KafkaLogStorage].getName,
     KafkaStorageConf.BootstrapServers.path -> kafkaBootstrap,
     KafkaStorageConf.Topic.path -> topic,
-    KafkaStorageConf.Partitions.path -> numPartitions
+    KafkaStorageConf.Partitions.path -> numPartitions,
+    "kafka.producer.retries" -> "1"
   ))
 
   def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.UNBOUNDED)
