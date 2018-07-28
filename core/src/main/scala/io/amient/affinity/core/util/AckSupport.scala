@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core.util
 
-import java.lang
 import java.util.concurrent.TimeoutException
 
 import akka.AkkaException

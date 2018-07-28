@@ -199,11 +199,12 @@ listens on ZooKeeper namespace where partitions are registered by their Containe
 If multiple Partitions Actors register for the same physical partition, the Coordinator uses distributed
 logic to choose one of them as master and the others become standby.
 
-If any of the partitions hasn't been registered in the ZooKeeper the Keyspace puts the Gateway into a
-suspended mode until all partitions are online and registered. When all Keyspaces have all partitions
-registered as online, the Gateway is Resumed. Suspension and Resumption events affect the input
-traffic of the Gateway - input streams are paused and resumed and http traffic is put on hold for
-a configured timeout.
+If any of the partitions hasn't been registered in the Coordinator the Keyspace goes into a
+suspended mode which in turn suspends all Gateways that hold reference to it until all partitions
+are online and registered. When all Keyspaces have all partitions registered as online, all Gateways
+are Resumed. Suspension and Resumption events affect the input traffic of the Gateway
+- input streams are paused and resumed and http traffic is, depending on configuration, either put on hold
+for certain time or returns 503 Service Unavialable.
 
 On becoming a Master, the Partition Actor stops consuming (tailing) the the
 underlying topic, because the master receives all the writes, its in-memory
@@ -401,6 +402,7 @@ In all examples and for all tests, logback binding is used.
         affinity.global.<ID>.storage.kafka.bootstrap.servers [STRING] (!)                       kafka connection string used for consumer and/or producer
         affinity.global.<ID>.storage.kafka.consumer                                             any settings that the underlying version of kafka consumer client supports
         affinity.global.<ID>.storage.kafka.consumer.group.id [STRING] (-)                       kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.global.<ID>.storage.kafka.partitions [INT] (-)                                 requird number of partitions
         affinity.global.<ID>.storage.kafka.producer                                             any settings that the underlying version of kafka producer client supports
         affinity.global.<ID>.storage.kafka.replication.factor [INT] (1)                         replication factor of the kafka topic
         affinity.global.<ID>.storage.kafka.topic [STRING] (!)                                   kafka topic name
@@ -431,6 +433,7 @@ In all examples and for all tests, logback binding is used.
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.bootstrap.servers [STRING] (!)          kafka connection string used for consumer and/or producer
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer                                any settings that the underlying version of kafka consumer client supports
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.group.id [STRING] (-)          kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.partitions [INT] (-)                    requird number of partitions
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.producer                                any settings that the underlying version of kafka producer client supports
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.replication.factor [INT] (1)            replication factor of the kafka topic
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)                      kafka topic name
@@ -458,15 +461,17 @@ In all examples and for all tests, logback binding is used.
         affinity.node.gateway.stream.<ID>.commit.interval.ms [LONG] (5000)                      Frequency at which consumed records will be committed to the log storage backend
         affinity.node.gateway.stream.<ID>.commit.timeout.ms [LONG] (30000)                      Number of milliseconds after which a commit is considered failed
         affinity.node.gateway.stream.<ID>.min.timestamp.ms [LONG] (0)                           Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
-        affinity.node.gateway.suspend.queue.max.size [INT] (1000)                               Size of the queue when the cluster enters suspended mode
+        affinity.node.gateway.suspended.reject [TRUE|FALSE] (true)                              controls how http requests are treated in suspended state: true - immediately rejected with 503 Service Unavailable; false - enqueued for reprocessing on resumption
         affinity.node.name [STRING] (Affinity)                                                  ActorSystem name under which the Node presents itself in the Akka Cluster
         affinity.node.shutdown.timeout.ms [LONG] (30000)                                        Maximum time a node can take to shutdown gracefully
         affinity.node.startup.timeout.ms [LONG] (2147483647)                                    Maximum time a node can take to startup - this number must account for any potential state bootstrap
+        affinity.node.suspend.queue.max.size [INT] (1000)                                       Size of the queue when the cluster enters suspended mode
 
 ### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)                  kafka connection string used for consumer and/or producer
         affinity.node.gateway.stream.<ID>.kafka.consumer                                        any settings that the underlying version of kafka consumer client supports
         affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)                  kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
+        affinity.node.gateway.stream.<ID>.kafka.partitions [INT] (-)                            requird number of partitions
         affinity.node.gateway.stream.<ID>.kafka.producer                                        any settings that the underlying version of kafka producer client supports
         affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)                    replication factor of the kafka topic
         affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name

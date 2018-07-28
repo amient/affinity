@@ -19,16 +19,56 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
+import akka.event.Logging
+import io.amient.affinity.Conf
 
 trait ActorHandler extends Actor {
 
-  final override def receive: Receive = manage orElse handle orElse unhandled
+  val logger = Logging.getLogger(context.system, this)
+
+  final val conf = Conf(context.system.settings.config)
+
+  private var suspended: Boolean = true
+
+  private val suspendedQueueMaxSize = conf.Affi.Node.SuspendQueueMaxSize()
+
+  private val suspendedHttpRequestQueue = scala.collection.mutable.ListBuffer[Any]()
+
+  def isSuspended = suspended
+
+  final override def receive: Receive = manage orElse hold orElse handle orElse unhandled
 
   def manage: Receive = PartialFunction.empty
 
+  def suspend: Unit = suspended = true
+
+  final def hold: Receive = {
+    case message: Any if (suspended) => onHold(message, sender)
+  }
+
+  def onHold(message: Any, sender: ActorRef): Unit = {
+    logger.warning("Suspended handling: " + message)
+    if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
+      suspendedHttpRequestQueue += message
+    } else {
+      new RuntimeException("Suspension queue overflow")
+    }
+
+  }
+
+  def resume: Unit = {
+    suspended = false
+    val reprocess = suspendedHttpRequestQueue.toList
+    suspendedHttpRequestQueue.clear
+    if (reprocess.length > 0) logger.info(s"Re-processing ${reprocess.length} suspended http requests")
+    reprocess.foreach(handle(_))
+  }
+
   def handle: Receive = PartialFunction.empty
 
-  def unhandled: Receive = PartialFunction.empty
+  def unhandled: Receive = {
+    case any => logger.warning(s"Unhandled message $any")
+  }
 
 }

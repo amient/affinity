@@ -22,11 +22,9 @@ package io.amient.affinity.core.actor
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{ActorRef, Props}
-import akka.event.Logging
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.Conf
 import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.config.{CfgList, CfgStruct}
@@ -46,9 +44,9 @@ object Gateway {
 
   class GatewayConf extends CfgStruct[GatewayConf] {
     val Class = cls("class", classOf[Gateway], false).doc("Entry point class for all external requests, both http and stream inputs")
-    val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000).doc("Size of the queue when the cluster enters suspended mode")
     val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
     val Listeners: CfgList[HttpInterfaceConf] = list("listeners", classOf[HttpInterfaceConf], false).doc("list of listener interface configurations")
+    val RejectSuspendedHttpRequests = bool("suspended.reject", true, true).doc("controls how http requests are treated in suspended state: true - immediately rejected with 503 Service Unavailable; false - enqueued for reprocessing on resumption")
     val Stream = group("stream", classOf[LogStorageConf], false).doc("External input and output streams to which system is connected, if any")
   }
 
@@ -58,11 +56,7 @@ object Gateway {
 
 trait Gateway extends ActorHandler {
 
-  private val logger = Logging.getLogger(context.system, this)
-
   import Gateway._
-
-  val conf = Conf(context.system.settings.config)
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)(ExecutionContext.Implicits.global)
 
@@ -72,6 +66,10 @@ trait Gateway extends ActorHandler {
 
   private var started = false
 
+  private var offlineGroups = List[String]()
+
+  private var stopping = false
+
   /**
     * internal map of all declared keyspaces (keyspace: String -> (Coordinator, KeyspaceActorRef, SuspendedFlag)
     */
@@ -80,11 +78,6 @@ trait Gateway extends ActorHandler {
 
   private val declaredGlobals = mutable.Map[String, (KVStoreGlobal[_, _], AtomicBoolean)]()
   private lazy val globals: Map[String, (KVStoreGlobal[_, _], AtomicBoolean)] = declaredGlobals.toMap
-
-  /**
-    * internal gateway suspension flag is set to true whenever any of the keyspaces is suspended
-    */
-  private var handlingSuspended = true
 
   val metrics = AffinityMetrics.forActorSystem(context.system)
 
@@ -97,7 +90,7 @@ trait Gateway extends ActorHandler {
     declaredKeyspaces.get(identifier) match {
       case Some((keyspaceActor, _)) => keyspaceActor
       case None =>
-        if (!handlingSuspended) throw new IllegalStateException("All required affinity services must be declared in the constructor")
+        if (started) throw new IllegalStateException("All required affinity services must be declared in the constructor")
         val serviceConf = conf.Affi.Keyspace(identifier)
         if (!serviceConf.isDefined) throw new IllegalArgumentException(s"Keypsace $identifier is not defined")
         val partitioner = new Murmur2Partitioner
@@ -107,7 +100,7 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  final def global[K: ClassTag, V: ClassTag](globalName: String): KVStore[K,V] = {
+  final def global[K: ClassTag, V: ClassTag](globalName: String): KVStore[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     declaredGlobals.get(globalName) match {
       case Some((globalStore, _)) => globalStore.asInstanceOf[KVStoreGlobal[K, V]]
@@ -136,17 +129,19 @@ trait Gateway extends ActorHandler {
     }
   }
 
-  def onClusterStatus(suspended: Boolean) = ()
-
   abstract override def preStart(): Unit = {
     super.preStart()
-    started = true
     //each gateway starts in a suspended mode so in case there are no keyspaces or globals the following will resume it
     evaluateSuspensionStatus()
+    started = true
   }
 
   abstract override def postStop(): Unit = try {
     logger.debug("Closing global state stores")
+    stopping = true
+    if (offlineGroups.size > 0) {
+      logger.warning(s"Offline groups: ${offlineGroups.mkString(", ")}; in ${self.path}")
+    }
     globals.foreach { case (identifier, (store, _)) => try {
       store.close()
     } catch {
@@ -178,20 +173,22 @@ trait Gateway extends ActorHandler {
       }
 
     case GroupStatus(group, _) => logger.warning(s"GroupStatus for unrecognized group type: $group")
+
   }
 
   private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {
-    val gatewayShouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
-    if (gatewayShouldBeSuspended != handlingSuspended) {
-      handlingSuspended = gatewayShouldBeSuspended
-      onClusterStatus(gatewayShouldBeSuspended)
-
-      //if this is an actual external gateway (as opposed to gateway trait mixec into say partition)
+    val shouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
+    if (shouldBeSuspended != isSuspended) {
+      if (shouldBeSuspended) suspend else resume
       if (self.path.name == "gateway") {
+        //if this is an actual external gateway (as opposed to gateway trait mixed into partition)
         //publish some messages for synchronizing test utitlities
         msg.foreach(context.system.eventStream.publish) // this one is for IntegrationTestBase
-        context.system.eventStream.publish(GatewayClusterStatus(gatewayShouldBeSuspended)) //this one for SystemTestBase
+        context.system.eventStream.publish(GatewayClusterStatus(isSuspended)) //this one for SystemTestBase
       }
+    }
+    if (started && isSuspended && !stopping) {
+      offlineGroups = (keyspaces.filter(_._2._2.get) ++ globals.filter(_._2._2.get)).map(_._1).toList
     }
   }
 

@@ -44,8 +44,6 @@ case class BecomeMaster() extends Reply[Unit]
 
 trait Partition extends ActorHandler {
 
-  private val log = Logging.getLogger(context.system, this)
-
   /**
     * group identifier
     */
@@ -77,9 +75,10 @@ trait Partition extends ActorHandler {
 
   override def preStart(): Unit = {
     started = true
-    log.debug(s"Starting partition $partition of group $group")
+    logger.debug(s"Starting partition $partition of group $group")
     //on start-up every partition is a standby which also requires a blocking bootstrap first
     become(standby = true)
+    resume
     //only after states have caught up we make the partition online and available to cooridnators
     context.parent ! PartitionOnline(self)
     super.preStart()
@@ -100,7 +99,7 @@ trait Partition extends ActorHandler {
 
   override def postStop(): Unit = {
     try {
-      log.debug(s"Stopping partition $partition of group $group")
+      logger.debug(s"Stopping partition $partition of group $group")
       context.parent ! PartitionOffline(self)
       closeStateStores()
     } finally super.postStop()
@@ -138,15 +137,15 @@ trait Partition extends ActorHandler {
       if (state.external || standby) state.tail
     }
     if (standby) {
-      log.debug(s"${self.path} Became standby for partition $group/$partition")
+      logger.debug(s"${self.path} Became standby for partition $group/$partition")
     } else {
-      log.debug(s"${self.path} became master for partition $group/$partition")
+      logger.debug(s"${self.path} became master for partition $group/$partition")
     }
   }
 
   private[core] def closeStateStores(): Unit = stateStores.foreach {
     case (id, state) => try state.close catch {
-      case NonFatal(e) => log.error(e, s"Could not close store $id")
+      case NonFatal(e) => logger.error(e, s"Could not close store $id")
     }
   }
 

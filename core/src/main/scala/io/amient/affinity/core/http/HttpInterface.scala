@@ -63,7 +63,7 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
 
   implicit val materializer = ActorMaterializer.create(system)
 
-  val log = Logging.getLogger(system, this)
+  val logger = Logging.getLogger(system, this)
 
   val systemConf =  Conf(system.settings.config)
   val startupTimeout = systemConf.Affi.Node.StartupTimeoutMs().toLong milliseconds
@@ -77,16 +77,16 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
 
   val sslContext = if (!httpConf.Tls.isDefined) None else Some(SSLContext.getInstance("TLS"))
   sslContext.foreach { context =>
-    log.info("Configuring SSL Context")
+    logger.info("Configuring SSL Context")
     val password = httpConf.Tls.KeyStorePassword().toCharArray
     val ks = KeyStore.getInstance(httpConf.Tls.KeyStoreStandard())
     val is = if (httpConf.Tls.KeyStoreResource.isDefined) {
       val keystoreResource = httpConf.Tls.KeyStoreResource()
-      log.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
+      logger.info("Configuring SSL KeyStore from resouce: " + keystoreResource)
       getClass.getClassLoader.getResourceAsStream(keystoreResource)
     } else {
       val keystoreFileName = httpConf.Tls.KeyStoreFile()
-      log.info("Configuring SSL KeyStore from file: " + keystoreFileName)
+      logger.info("Configuring SSL KeyStore from file: " + keystoreFileName)
       new FileInputStream(keystoreFileName)
     }
     try {
@@ -111,7 +111,7 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
 
   def bind(gateway: ActorRef): InetSocketAddress = {
     close()
-    log.debug(s"binding http interface $host:$port$prefix")
+    logger.debug(s"binding http interface $host:$port$prefix")
     val sink: Sink[IncomingConnection, Future[Done]] = if (prefix.isEmpty) {
       Sink.foreach { connection: IncomingConnection =>
         connection.handleWithAsyncHandler { request: HttpRequest =>
@@ -135,13 +135,13 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
 
     val bindingFuture: Future[Http.ServerBinding] = incoming.to(sink).run()
     binding = Await.result(bindingFuture, startupTimeout)
-    log.info(s"http interface listening on ${binding.localAddress}")
+    logger.info(s"http interface listening on ${binding.localAddress}")
     binding.localAddress
   }
 
   def close(): Unit = {
     if (binding != null) {
-      log.debug("unbinding http interface")
+      logger.debug("unbinding http interface")
       Await.result(binding.unbind(), shutdownTimeout)
     }
   }

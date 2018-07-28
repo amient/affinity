@@ -25,7 +25,7 @@ import akka.actor.{Actor, InvalidActorNameException, OneForOneStrategy, Props, T
 import akka.event.Logging
 import io.amient.affinity.core.util.Reply
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
@@ -33,8 +33,6 @@ import scala.util.control.NonFatal
 object Controller {
 
   final case class CreateContainer(group: String, partitions: List[Int], partitionProps: Props) extends Reply[Unit]
-
-  final case class ContainerOnline(group: String)
 
   final case class CreateGateway(handlerProps: Props) extends Reply[List[Int]]
 
@@ -81,11 +79,8 @@ class Controller extends Actor {
             context.actorOf(partitionProps, name = partition.toString)
           }
         }), name = group)
-        val promise = Promise[Unit]()
-        containers.put(group, promise)
-        promise.future
+        Future.successful(())
       } catch {
-        case _: InvalidActorNameException => containers(group).future
         case NonFatal(e) =>
           log.error(e, s"Could not create container for $group with partitions $partitions")
           throw e
@@ -95,10 +90,6 @@ class Controller extends Actor {
     case Terminated(child) if (containers.contains(child.path.name)) =>
       val promise = containers(child.path.name)
       if (!promise.isCompleted) promise.failure(new AkkaException("Container initialisation failed"))
-
-    case ContainerOnline(group) => containers(group) match {
-      case promise => if (!promise.isCompleted) containers(group).success(())
-    }
 
     case request@CreateGateway(gatewayProps) => try {
       val gatewayRef = context.actorOf(gatewayProps, name = "gateway")

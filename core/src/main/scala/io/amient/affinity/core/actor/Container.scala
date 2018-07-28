@@ -25,7 +25,6 @@ import akka.util.Timeout
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
-import io.amient.affinity.core.actor.Controller.ContainerOnline
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
 
@@ -89,9 +88,6 @@ class Container(group: String) extends Actor {
       val handle = coordinator.register(partitionActorPath)
       log.debug(s"Partition online: handle=$handle, path=${partitionActorPath}")
       partitions += (ref -> handle)
-      if (partitions.values.forall(_ != null)) {
-        context.parent ! ContainerOnline(group)
-      }
 
     case PartitionOffline(ref) =>
       log.debug(s"Partition offline: handle=${partitions(ref)}, path=${ref.path}")

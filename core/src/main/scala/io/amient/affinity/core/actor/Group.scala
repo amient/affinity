@@ -1,9 +1,6 @@
 package io.amient.affinity.core.actor
 
-import java.lang
-
 import akka.actor.Status.Failure
-import akka.event.Logging
 import akka.routing.{ActorRefRoutee, GetRoutees, Routees}
 import akka.serialization.SerializationExtension
 import io.amient.affinity.core.cluster.Coordinator
@@ -23,8 +20,6 @@ final case class GroupStatus(identifier: String, suspended: Boolean)
 
 class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) extends ActorHandler {
 
-  private val logger = Logging.getLogger(context.system, this)
-
   private val routes = mutable.Map[Int, ActorRefRoutee]()
 
   val serialization = SerializationExtension(context.system)
@@ -32,8 +27,6 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
   implicit val executor = context.dispatcher
 
   val coordinator = Coordinator.create(context.system, identifier)
-
-  private var suspended = true
 
   override def preStart(): Unit = {
     super.preStart()
@@ -97,10 +90,10 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
 
   private def evaluateSuspensionStatus() = {
     val shouldBeSuspended = routes.size != numPartitions
-    if (shouldBeSuspended != suspended) {
-      suspended = shouldBeSuspended
+    if (shouldBeSuspended != isSuspended) {
+      if (shouldBeSuspended) suspend else resume
       //parent will be a gateway which needs to collate all suspension states to a single flag
-      context.parent ! GroupStatus(identifier, suspended)
+      context.parent ! GroupStatus(identifier, isSuspended)
     }
   }
 

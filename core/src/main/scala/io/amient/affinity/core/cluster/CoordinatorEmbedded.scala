@@ -26,12 +26,12 @@ import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
-import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
+import io.amient.affinity.core.cluster.CoordinatorEmbedded.{EmbedConf, groups}
 import io.amient.affinity.core.config.CfgStruct
 
 import scala.collection.mutable
 
-object CoordinatorEmbedded extends Observable {
+object CoordinatorEmbedded {
 
   final val AutoCoordinatorId = new AtomicInteger(1000000)
 
@@ -43,69 +43,60 @@ object CoordinatorEmbedded extends Observable {
     val ID = integer("embedded.id", true).doc("embedded coordinator instances must have the same id to work together")
   }
 
-  private val services = mutable.Map[String, mutable.Map[String, String]]()
+  private val groups = mutable.Map[String, CoordinatedGroup]()
 
-  def get(space: String): Map[String, String] = synchronized {
-    services.get(space) match {
-      case None => Map()
-      case Some(g) => g.toMap
+  private def get(group: String, observer: Observer): CoordinatedGroup = {
+    (synchronized(if (!groups.contains(group)) {
+      val g = new CoordinatedGroup
+      groups += group -> g
+      g
+    } else groups(group))) match {
+      case g => g.addObserver(observer); g
     }
   }
 
-  def remove(space: String, handle: String) = update(space) { g =>
-    g -= handle
-  }
+  private class CoordinatedGroup() extends Observable {
+    private val members = mutable.Map[String, String]()
 
-  def put(space: String, handle: String) = {
-    update(space) { g =>
-      g += handle -> handle
+    override def addObserver(o: Observer): Unit = {
+      super.addObserver(o)
+      o.update(this, get)
+    }
+
+    def remove(handle: String) = {
+      synchronized(members -= handle)
       setChanged()
+      notifyObservers(get)
     }
-    notifyObservers((space, services(space).toMap))
-  }
 
-  private def update(group: String)(f: mutable.Map[String, String] => Unit) = synchronized {
-    if (!services.contains(group)) services += group -> mutable.Map()
-    f(services(group))
-  }
-
-  override def addObserver(o: Observer): Unit = {
-    super.addObserver(o)
-    services.foreach { case (space, mapping) =>
-      o.update(this, (space, mapping.toMap))
+    def put(handle: String) = {
+      synchronized(members += handle -> handle)
+      setChanged()
+      notifyObservers(get)
     }
+
+    def get = synchronized(members.toMap)
+
   }
 
 }
+
 
 class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
 
   val conf = EmbedConf(Conf(system.settings.config).Affi.Coordinator)
   val id = conf.ID()
-  val space = s"$id:$group"
+  private val realm = CoordinatorEmbedded.get(s"$id:$group", this)
 
-  CoordinatorEmbedded.addObserver(this)
-
-  def services: Map[String, String] = CoordinatorEmbedded.get(space)
+  def members: Map[String, String] = realm.get
 
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
-    CoordinatorEmbedded.put(space, handle)
+    realm.put(handle)
     handle
   }
 
-  override def unregister(handle: String): Unit = {
-    CoordinatorEmbedded.remove(space, handle)
-  }
+  override def unregister(handle: String): Unit = realm.remove(handle)
 
-  override def update(o: Observable, arg: scala.Any): Unit = {
-    arg.asInstanceOf[(String, Map[String, String])] match {
-      case (s, services) if (s == space) => {
-        if (!closed.get) {
-          updateGroup(services)
-        }
-      }
-      case _ =>
-    }
-  }
+  override def update(o: Observable, arg: scala.Any): Unit = updateGroup(arg.asInstanceOf[Map[String, String]])
 }
