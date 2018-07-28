@@ -53,6 +53,16 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
         return newInstance(LogStorage.StorageConf.apply(config));
     }
 
+    static LogStorage newInstanceExists(LogStorageConf conf)
+            throws ClassNotFoundException,
+            NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+
+        LogStorage instance = newInstance(conf);
+        instance.ensureExists();
+        return instance;
+    }
+
     static LogStorage newInstance(LogStorageConf conf)
             throws ClassNotFoundException,
             NoSuchMethodException, IllegalAccessException,
@@ -117,6 +127,8 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      * @return subject name of the log values
      */
     String valueSubject();
+
+    void ensureExists();
 
     /**
      * ensure confiugration of the underlying physical log. This call may be called concurrently
