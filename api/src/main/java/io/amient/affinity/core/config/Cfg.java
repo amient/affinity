@@ -27,6 +27,7 @@ import java.util.NoSuchElementException;
 
 abstract public class Cfg<T> implements Serializable {
 
+
     public enum Options {
         STRICT, IGNORE_UNKNOWN
     }

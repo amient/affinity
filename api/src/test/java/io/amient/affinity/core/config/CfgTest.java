@@ -64,6 +64,13 @@ public class CfgTest {
         private CfgGroup UndefinedGroup = group("undefined-group", UndefinedGroupConfig.class, false);
     }
 
+    public static class ExtendedServiceConfig extends CfgStruct<ExtendedServiceConfig> {
+        private CfgString Info = string("info", false);
+        public ExtendedServiceConfig() {
+            super(ServiceConfig.class, Options.STRICT);
+        }
+    }
+
     public static class UndefinedGroupConfig extends CfgStruct<UndefinedGroupConfig> {
         public UndefinedGroupConfig() {
             super(Options.IGNORE_UNKNOWN);
@@ -191,6 +198,16 @@ public class CfgTest {
         assert(nodeConfig.Services.path().equals("service"));
         serviceConf.apply(nodeConfig.Services.apply("x"));
         assert(serviceConf.Class.path().equals("service.x.class"));
+    }
+
+    @Test
+    public void extendedConfig() {
+        ServiceConfig serviceConf = new ServiceConfig();
+        ExtendedServiceConfig extendedConfig = new ExtendedServiceConfig().apply(serviceConf);
+        extendedConfig.Info.setValue("hello");
+        assert(new ExtendedServiceConfig().apply(serviceConf).Info.apply().equals("hello"));
+        assert(new ExtendedServiceConfig().apply(new ServiceConfig().apply(extendedConfig)).Info.apply().equals("hello"));
+
     }
 
 }

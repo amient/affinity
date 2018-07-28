@@ -25,14 +25,18 @@ import com.typesafe.config.ConfigFactory;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested {
 
     public final List<Options> options;
 
-    private List<Map.Entry<String, Cfg<?>>> properties = new LinkedList<>();
+    protected List<Map.Entry<String, Cfg<?>>> properties = new LinkedList<>();
 
     private Config config;
+
+    protected CfgStruct<?> parent = null;
+    private List<CfgStruct<?>> children = new LinkedList<>();
 
     Set<String> extensions = new HashSet<String>() {{
         addAll(specializations());
@@ -40,6 +44,10 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     protected Set<String> specializations() {
         return Collections.emptySet();
+    }
+
+    protected void addChild(CfgStruct<?> child) {
+        children.add(child);
     }
 
     @Override
@@ -76,9 +84,22 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     public final T apply(CfgStruct<?> conf) throws IllegalArgumentException {
         if (conf.path() == null) throw new IllegalArgumentException();
-        T self = apply(conf.config());
-        self.setPath(conf.path());
-        return self;
+        if (conf.parent != null && conf.parent.getClass().isAssignableFrom(this.getClass())) {
+            return (T)conf.parent;
+        } else {
+            T z = apply(conf.config());
+            final AtomicReference<T> self = new AtomicReference<>(z);
+            self.get().setPath(conf.path());
+            conf.children.forEach(x -> {
+                if (self.get().getClass().isAssignableFrom(x.getClass())) {
+                    self.set((T) x);
+                }
+            });
+            T result = self.get();
+            result.parent = conf;
+            if (result == z) conf.addChild(result);
+            return result;
+        }
     }
 
     public final T apply(Map<String, ?> config) {
@@ -125,7 +146,6 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             if (!errorMessage.isEmpty()) {
                 throw new IllegalArgumentException(errorMessage);
             }
-            setValue((T) this);
             return (T) this;
         }
         return (T) this;
@@ -214,7 +234,9 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     }
 
     public <X extends CfgStruct<X>> X struct(String path, X obj, boolean required) {
-        return add(path, obj, required, Optional.empty());
+        X x = add(path, obj, required, Optional.empty());
+        obj.setValue(obj);
+        return x;
     }
 
     public <X extends CfgStruct<X>> X ref(X obj, boolean required) {
@@ -278,7 +300,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     public Map<String, Cfg<?>> map() {
         TreeMap<String, Cfg<?>> result = new TreeMap<>();
-        properties.forEach(prop -> result. put(prop.getKey(), prop.getValue()));
+        properties.forEach(prop -> result.put(prop.getKey(), prop.getValue()));
         return result;
     }
 
