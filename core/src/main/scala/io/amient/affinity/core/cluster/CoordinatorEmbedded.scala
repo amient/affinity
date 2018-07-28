@@ -56,9 +56,11 @@ object CoordinatorEmbedded extends Observable {
     g -= handle
   }
 
-  def put(space: String, handle: String) = update(space) { g =>
-    g += handle -> handle
-    setChanged()
+  def put(space: String, handle: String) = {
+    update(space) { g =>
+      g += handle -> handle
+      setChanged()
+    }
     notifyObservers((space, services(space).toMap))
   }
 

@@ -69,14 +69,6 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
     put("schema.registry.id", MemorySchemaRegistryId)
   }
 
-
-  override def beforeAll(): Unit = try {
-    createTopic(inputTopic)
-    createTopic(outputTopic)
-  } finally {
-    super.beforeAll()
-  }
-
   override def afterAll(): Unit = try {
     producer.close()
   } finally {

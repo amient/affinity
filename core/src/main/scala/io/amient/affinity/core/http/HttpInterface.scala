@@ -22,8 +22,8 @@ package io.amient.affinity.core.http
 import java.io.FileInputStream
 import java.net.InetSocketAddress
 import java.security.{KeyStore, SecureRandom}
-import javax.net.ssl.{KeyManagerFactory, SSLContext}
 
+import javax.net.ssl.{KeyManagerFactory, SSLContext}
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.Logging
@@ -33,6 +33,7 @@ import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
+import io.amient.affinity.Conf
 import io.amient.affinity.core.config.CfgStruct
 
 import scala.concurrent.duration._
@@ -63,6 +64,10 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
   implicit val materializer = ActorMaterializer.create(system)
 
   val log = Logging.getLogger(system, this)
+
+  val systemConf =  Conf(system.settings.config)
+  val startupTimeout = systemConf.Affi.Node.StartupTimeoutMs().toLong milliseconds
+  val shutdownTimeout =  systemConf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
   val host: String = httpConf.Host()
 
@@ -129,7 +134,7 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
     }
 
     val bindingFuture: Future[Http.ServerBinding] = incoming.to(sink).run()
-    binding = Await.result(bindingFuture, 10 seconds)
+    binding = Await.result(bindingFuture, startupTimeout)
     log.info(s"http interface listening on ${binding.localAddress}")
     binding.localAddress
   }
@@ -137,7 +142,7 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
   def close(): Unit = {
     if (binding != null) {
       log.debug("unbinding http interface")
-      Await.result(binding.unbind(), 15 seconds)
+      Await.result(binding.unbind(), shutdownTimeout)
     }
   }
 

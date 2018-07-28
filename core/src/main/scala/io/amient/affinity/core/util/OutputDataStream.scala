@@ -27,7 +27,7 @@ import scala.language.existentials
 
 class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
 
-  lazy val storage = LogStorage.newInstance(conf)
+  lazy val storage = LogStorage.newInstanceExists(conf)
 
   def append(record: Record[K, V]): Future[_ <: Comparable[_]] = {
     val binaryRecord = new Record(keySerde.toBytes(record.key), valSerde.toBytes(record.value), record.timestamp)

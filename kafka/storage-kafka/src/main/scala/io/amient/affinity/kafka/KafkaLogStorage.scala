@@ -58,6 +58,7 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[LogStorageConf]) {
     val Topic = string("kafka.topic", true).doc("kafka topic name")
+    val Partitions = integer("kafka.partitions", false).doc("requird number of partitions ")
     val ReplicationFactor = integer("kafka.replication.factor", 1).doc("replication factor of the kafka topic")
     val BootstrapServers = string("kafka.bootstrap.servers", true).doc("kafka connection string used for consumer and/or producer")
     val Producer = struct("kafka.producer", new KafkaProducerConf, false).doc("any settings that the underlying version of kafka producer client supports")
@@ -268,6 +269,14 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def isTombstone(entry: LogEntry[lang.Long]) = entry.value == null
 
+  override def ensureExists(): Unit = {
+    if (kafkaStorageConf.Partitions.isDefined) {
+      ensureCorrectConfiguration(-1, kafkaStorageConf.Partitions(), true)
+    } else {
+      throw new IllegalArgumentException(s"storage configuration for topic $topic must have partitions property set to a postivie integer")
+    }
+  }
+
   override def ensureCorrectConfiguration(ttlMs: Long, numPartitions: Int, readonly: Boolean): Unit = {
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
@@ -298,10 +307,9 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
           exists = Some(true)
         } else {
           val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
-          schemaTopicRequest.configs(topicConfigs.asJava)
           try {
             admin.createTopics(List(schemaTopicRequest).asJava).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-            log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor, configs: $topicConfigs")
+            log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor")
             exists = Some(false)
           } catch {
             case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue

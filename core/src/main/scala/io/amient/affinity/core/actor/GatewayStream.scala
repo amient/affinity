@@ -67,7 +67,7 @@ trait GatewayStream extends Gateway {
     } else {
       val keySerde: AbstractSerde[K] = Serde.of[K](config)
       val valSerde: AbstractSerde[V] = Serde.of[V](config)
-      val outpuDataStream = new OutputDataStream(keySerde, valSerde, streamConf)
+      val outpuDataStream = new OutputDataStream[K, V](keySerde, valSerde, streamConf)
       declardOutputStreams += outpuDataStream
       outpuDataStream
     }
@@ -150,7 +150,7 @@ trait GatewayStream extends Gateway {
                                   processor: InputStreamProcessor[K, V]) extends Runnable with Closeable {
 
     val minTimestamp = streamConfig.MinTimestamp()
-    val consumer = LogStorage.newInstance(streamConfig)
+    val consumer = LogStorage.newInstanceExists(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
     val work = new ListBuffer[Future[Any]]
     val commitInterval: Long = streamConfig.CommitIntervalMs()

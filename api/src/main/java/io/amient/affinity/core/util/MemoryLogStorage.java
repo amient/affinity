@@ -160,6 +160,11 @@ public class MemoryLogStorage implements LogStorage<Long> {
     }
 
     @Override
+    public void ensureExists() {
+
+    }
+
+    @Override
     public void ensureCorrectConfiguration(long ttlMs, int numPartitions, boolean readonly) { }
 
     public final class WritePromise extends JavaPromise<Long> {
