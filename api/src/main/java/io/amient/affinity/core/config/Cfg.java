@@ -27,6 +27,7 @@ import java.util.NoSuchElementException;
 
 abstract public class Cfg<T> implements Serializable {
 
+
     public enum Options {
         STRICT, IGNORE_UNKNOWN
     }
@@ -81,7 +82,7 @@ abstract public class Cfg<T> implements Serializable {
 
     final public boolean isRequired() { return this.required; }
 
-    final public boolean isDefined() {
+    public boolean isDefined() {
         return value.isPresent() || defaultValue.isPresent();
     }
 

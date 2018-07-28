@@ -25,7 +25,7 @@ import java.util.{Observable, Observer}
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
-import io.amient.affinity.core.cluster.Coordinator.CoorinatorConf
+import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.CoordinatorEmbedded.{EmbedConf, groups}
 import io.amient.affinity.core.config.CfgStruct
 
@@ -39,7 +39,7 @@ object CoordinatorEmbedded {
     override def apply(config: Config): EmbedConf = new EmbedConf().apply(config)
   }
 
-  class EmbedConf extends CfgStruct[EmbedConf](classOf[CoorinatorConf]) {
+  class EmbedConf extends CfgStruct[EmbedConf](classOf[CoordinatorConf]) {
     val ID = integer("embedded.id", true).doc("embedded coordinator instances must have the same id to work together")
   }
 
@@ -82,13 +82,11 @@ object CoordinatorEmbedded {
 }
 
 
-class CoordinatorEmbedded(system: ActorSystem, group: String, config: Config) extends Coordinator(system, group) with Observer {
+class CoordinatorEmbedded(system: ActorSystem, group: String, _conf: CoordinatorConf) extends Coordinator(system, group) with Observer {
 
-  val conf = EmbedConf(Conf(system.settings.config).Affi.Coordinator)
+  val conf = EmbedConf(_conf)
   val id = conf.ID()
   private val realm = CoordinatorEmbedded.get(s"$id:$group", this)
-
-  def members: Map[String, String] = realm.get
 
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString

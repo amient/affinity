@@ -64,6 +64,13 @@ public class CfgTest {
         private CfgGroup UndefinedGroup = group("undefined-group", UndefinedGroupConfig.class, false);
     }
 
+    public static class ExtendedServiceConfig extends CfgStruct<ExtendedServiceConfig> {
+        private CfgString Info = string("info", false);
+        public ExtendedServiceConfig() {
+            super(ServiceConfig.class, Options.STRICT);
+        }
+    }
+
     public static class UndefinedGroupConfig extends CfgStruct<UndefinedGroupConfig> {
         public UndefinedGroupConfig() {
             super(Options.IGNORE_UNKNOWN);
@@ -180,17 +187,27 @@ public class CfgTest {
     @Test
     public void specializeConfig() {
         ServiceConfig serviceConf = new ServiceConfig();
-        assert(!serviceConf.isDefined()); //structs can never be undefined
+        assert(serviceConf.isDefined()); //structs can never be undefined
         assert(serviceConf.Class.path().equals("class"));
         NodeConfig nodeConfig = new NodeConfig();
         //attaching to en empty node
         serviceConf.apply(nodeConfig);
         assert(serviceConf.Class.path().equals("class"));
         //attaching to a non-empty path
-        assert(!nodeConfig.isDefined()); //structs can never be undefined
+        assert(nodeConfig.isDefined()); //structs can never be undefined
         assert(nodeConfig.Services.path().equals("service"));
         serviceConf.apply(nodeConfig.Services.apply("x"));
         assert(serviceConf.Class.path().equals("service.x.class"));
+    }
+
+    @Test
+    public void extendedConfig() {
+        ServiceConfig serviceConf = new ServiceConfig();
+        ExtendedServiceConfig extendedConfig = new ExtendedServiceConfig().apply(serviceConf);
+        extendedConfig.Info.setValue("hello");
+        assert(new ExtendedServiceConfig().apply(serviceConf).Info.apply().equals("hello"));
+        assert(new ExtendedServiceConfig().apply(new ServiceConfig().apply(extendedConfig)).Info.apply().equals("hello"));
+
     }
 
 }
