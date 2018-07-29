@@ -47,7 +47,7 @@ object LocalSchemaRegistry {
 
 class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(config: Config) = this(LocalAvroConf(config).DataPath())
+  def this(_conf: AvroConf) = this(LocalAvroConf(_conf).DataPath())
 
   def checkDataPath(): Unit = {
     require(dataPath != null)

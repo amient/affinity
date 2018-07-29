@@ -7,7 +7,7 @@ import scala.util.control.NonFatal
 trait Tool {
   def Conf: CfgStruct[_]
 
-  def cliOptions = Conf.map.asScala.keys.map(cliArg).mkString(",")
+  def cliOptions = Conf.toMap.asScala.keys.map(cliArg).mkString(",")
 
   def cliArg(propertyName: String): String = s"--${propertyName.replace(".", "-")}"
 
@@ -18,7 +18,7 @@ trait Tool {
   final def apply(args: List[String]): Unit = apply(args, ConfigFactory.empty)
 
   def apply(args: List[String], config: Config): Unit = {
-    val cliKeys = Conf.map.asScala.keys.map(prop => cliArg(prop) -> prop).toMap
+    val cliKeys = Conf.toMap.asScala.keys.map(prop => cliArg(prop) -> prop).toMap
     args match {
       case cliArg :: cliValue :: tail if cliKeys.contains(cliArg) =>
         apply(tail, config.withValue(propKey(cliArg), ConfigValueFactory.fromAnyRef(cliValue)))
@@ -48,12 +48,12 @@ try {
         println(e.getMessage)
         println(s"Usage: affinity-cli $command [arguments]")
         println("\nRequired arguments: ")
-        tool.Conf.map.asScala.filter(_._2.isRequired).foreach {
+        tool.Conf.toMap.asScala.filter(_._2.isRequired).foreach {
           case (name, cfg) =>
             println(s"\t\t${(tool.cliArg(name) + " <"+cfg.parameterInfo+">").padTo(40, ' ')}\t${cfg.description}")
         }
         println("\nOptional arguments: ")
-        tool.Conf.map.asScala.filter(!_._2.isRequired).foreach {
+        tool.Conf.toMap.asScala.filter(!_._2.isRequired).foreach {
           case (name, cfg) =>
             println(s"\t\t${(tool.cliArg(name) + " <"+cfg.parameterInfo+">").padTo(40, ' ')}\t${cfg.description}")
         }

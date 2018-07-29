@@ -36,7 +36,7 @@ object RebalanceTool extends Tool {
   }
 
   def printHelp(): Unit = {
-    Conf.map().asScala.foreach(println)
+    Conf.toMap().asScala.foreach(println)
     println("Usage: rebalance --bootstrap-server <kafka-bootstrap-server> [--config-file <kafka-client-properties-file>]\n")
     sys.exit(1)
   }

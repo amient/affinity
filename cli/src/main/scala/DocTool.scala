@@ -93,7 +93,7 @@ object DocTool extends Tool {
         if (!struct.description().isEmpty) {
           printInfo(struct)
         }
-        struct.map.values().asScala.foreach(item => apply(item))
+        struct.toMap.values().asScala.foreach(item => apply(item))
 //        if (struct.options.contains(Cfg.Options.IGNORE_UNKNOWN)) {
 //          println(s"\t${struct.path}.*")
 //        }

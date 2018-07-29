@@ -84,13 +84,11 @@ object MemorySchemaRegistry {
 
 class MemorySchemaRegistry(universe: MemorySchemaRegistry.Universe) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(conf: MemAvroConf) = this {
-    MemorySchemaRegistry.createUniverse(if (conf.ID.isDefined) Some(conf.ID()) else None)
-  }
+  def this(conf: MemAvroConf) = this(MemorySchemaRegistry.createUniverse(if (conf.ID.isDefined) Some(conf.ID()) else None))
 
-  def this(config: Config) = this(MemAvroConf(AvroSerde.AbsConf).apply(config))
+  def this(_conf: AvroConf) = this(MemAvroConf.apply(_conf))
 
-  def this() = this(ConfigFactory.empty)
+  def this() = this(new MemAvroConf())
 
   /**
     * @param id

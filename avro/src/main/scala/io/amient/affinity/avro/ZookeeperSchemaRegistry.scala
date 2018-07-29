@@ -60,8 +60,8 @@ class ZookeeperSchemaRegistry(zkRoot: String, zk: ZkClient) extends AvroSerde wi
     zk
   })
 
-  def this(config: Config) = this {
-    new ZkAvroConf().apply(config)
+  def this(_conf: AvroConf) = this {
+    new ZkAvroConf().apply(_conf)
   }
 
   override def close(): Unit = ZkClients.close(zk)

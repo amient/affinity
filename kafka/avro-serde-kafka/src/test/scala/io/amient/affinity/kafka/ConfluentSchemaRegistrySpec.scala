@@ -23,6 +23,7 @@ import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.ConfluentSchemaRegistry
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -53,8 +54,8 @@ class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedCo
 
   behavior of "ConfluentSchemaRegistry"
 
-  val serde = new ConfluentSchemaRegistry(ConfigFactory.parseMap(Map(
-    CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
+  val serde = new ConfluentSchemaRegistry(CfAvroConf(Map(
+    CfAvroConf(AvroConf).ConfluentSchemaRegistryUrl.path -> registryUrl
   )))
 
   serde.register[SimpleKey]
