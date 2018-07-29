@@ -49,9 +49,11 @@ object ConfluentSchemaRegistry {
 
 class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(config: Config) = this {
-    val conf = CfAvroConf(config)
-    new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl())
+  def this(conf: CfAvroConf) = this(new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl()))
+
+  def this(_conf: AvroConf) = this {
+    print(_conf)
+    CfAvroConf(_conf)
   }
 
   override def close(): Unit = ()

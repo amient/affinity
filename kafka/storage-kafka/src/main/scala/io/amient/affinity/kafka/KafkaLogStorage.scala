@@ -88,17 +88,15 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     put("max.in.flight.requests.per.connection", "1")
     put("max.block.ms", Long.MaxValue.toString)
     if (kafkaStorageConf.Producer.isDefined) {
-      val producerConfig = kafkaStorageConf.Producer.config()
-      if (producerConfig != null) {
-        if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
-        if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom key.serializer")
-        if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom value.serializer")
-        if (producerConfig.hasPath("max.in.flight.requests.per.connection")) log.warn("Changing producer max.in.flight.requests.per.connection from recommended: 1")
-        if (producerConfig.hasPath("max.block.ms")) log.warn("Changing producer max.block.ms from recommended: Long.MaxValue")
-        if (producerConfig.hasPath("retries")) log.warn("Changing producer retries from recommended: Int.MaxValue")
-        producerConfig.entrySet.asScala.foreach { case (entry) =>
-          put(entry.getKey, entry.getValue.unwrapped())
-        }
+      val producerConfig = kafkaStorageConf.Producer.toMap()
+      if (producerConfig.containsKey("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
+      if (producerConfig.containsKey("key.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom key.serializer")
+      if (producerConfig.containsKey("value.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom value.serializer")
+      if (producerConfig.containsKey("max.in.flight.requests.per.connection")) log.warn("Changing producer max.in.flight.requests.per.connection from recommended: 1")
+      if (producerConfig.containsKey("max.block.ms")) log.warn("Changing producer max.block.ms from recommended: Long.MaxValue")
+      if (producerConfig.containsKey("retries")) log.warn("Changing producer retries from recommended: Int.MaxValue")
+      producerConfig.entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+        put(entry.getKey, entry.getValue.apply.toString)
       }
     }
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
@@ -109,15 +107,13 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   private val consumerProps = new Properties() {
     put("auto.offset.reset", "earliest")
     if (kafkaStorageConf.Consumer.isDefined) {
-      val consumerConfig = kafkaStorageConf.Consumer.config()
-      if (consumerConfig != null) {
-        if (consumerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
-        if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
-        if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
-        if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
-        consumerConfig.entrySet.asScala.foreach { case (entry) =>
-          put(entry.getKey, entry.getValue.unwrapped())
-        }
+      val consumerConfig = kafkaStorageConf.Consumer.toMap()
+      if (consumerConfig.containsKey("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
+      if (consumerConfig.containsKey("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
+      if (consumerConfig.containsKey("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
+      if (consumerConfig.containsKey("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
+      consumerConfig.entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+        put(entry.getKey, entry.getValue.apply.toString)
       }
     }
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
@@ -286,12 +282,10 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
       if (kafkaStorageConf.Consumer.isDefined) {
-        val consumerConfig = kafkaStorageConf.Consumer.config()
-        if (consumerConfig != null) {
-          val allowedAdminConfigs = AdminClientConfig.configNames
-          consumerConfig.entrySet.asScala.filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
-            case (entry) => put(entry.getKey, entry.getValue.unwrapped())
-          }
+        val consumerConfig = kafkaStorageConf.Consumer.toMap()
+        val allowedAdminConfigs = AdminClientConfig.configNames
+        consumerConfig.entrySet.asScala.filter(_.getValue.isDefined).filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
+          case (entry) => put(entry.getKey, entry.getValue.apply.toString)
         }
       }
     }
@@ -320,8 +314,8 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
             exists = Some(false)
           } catch {
             case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
-            case e: ExecutionException if e.getCause.isInstanceOf[UnknownServerException] && e.getCause.getMessage.contains("NodeExists")=>
-              //continue- since kafka 1.1 TopicExistsException is not wrapped correctly by the AdminClient
+            case e: ExecutionException if e.getCause.isInstanceOf[UnknownServerException] && e.getCause.getMessage.contains("NodeExists") =>
+            //continue- since kafka 1.1 TopicExistsException is not wrapped correctly by the AdminClient
           }
         }
         TimeUnit.MILLISECONDS.sleep(300)

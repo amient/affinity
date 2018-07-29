@@ -20,9 +20,9 @@
 package io.amient.affinity.kafka
 
 import java.io.PrintStream
+import java.net.URL
 import java.util.{Objects, Properties}
 
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
@@ -60,19 +60,16 @@ class AvroMessageFormatter extends MessageFormatter {
     if (props.containsKey("print.type")) printType = true
     if (props.containsKey("no.value")) printValue = false
     if (props.containsKey("schema.registry.url")) {
-      serde = new ConfluentSchemaRegistry(ConfigFactory.empty
-        .withValue(CfAvroConf.ConfluentSchemaRegistryUrl.path,
-          ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.url"))))
+      val conf = new CfAvroConf()
+      conf.ConfluentSchemaRegistryUrl.setValue(new URL(props.getProperty("schema.registry.url")))
+      serde = new ConfluentSchemaRegistry(conf)
     } else if (props.containsKey("schema.registry.zookeeper.connect")) {
-      val config1 = ConfigFactory.empty
-        .withValue(ZkAvroConf.ZooKeeper.Connect.path,
-          ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.connect")))
-
-      val config2 = if (!props.containsKey("schema.registry.zookeeper.root")) config1 else {
-        config1.withValue(ZkAvroConf.ZkRoot.path,
-          ConfigValueFactory.fromAnyRef(props.getProperty("schema.registry.zookeeper.root")))
+      val conf = new ZkAvroConf()
+      conf.ZooKeeper.Connect.setValue(props.getProperty("schema.registry.zookeeper.connect"))
+      if (!props.containsKey("schema.registry.zookeeper.root")) {
+        conf.ZkRoot.setValue(props.getProperty("schema.registry.zookeeper.root"))
       }
-      serde = new ZookeeperSchemaRegistry(config2)
+      serde = new ZookeeperSchemaRegistry(conf)
     } else {
       throw new IllegalArgumentException("Required --property schema.registry.url OR --property schema.zookeeper.connect")
     }

@@ -33,6 +33,8 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
 
     protected List<Map.Entry<String, Cfg<?>>> properties = new LinkedList<>();
 
+    protected List<Map.Entry<String, CfgString>> externalProperties = new LinkedList<>();
+
     private Config config;
 
     protected CfgStruct<?> parent = null;
@@ -76,6 +78,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
     public CfgStruct() {
         this(Options.STRICT);
     }
+
     public CfgStruct(Options... options) {
         this.options = Arrays.asList(options);
         setValue((T) this);
@@ -102,6 +105,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
             });
             T result = self.get();
             result.parent = conf;
+//            result.externalProperties = conf.externalProperties;
             if (result == z) conf.addChild(result);
             return result;
         }
@@ -127,27 +131,33 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
                         cfg.apply(this.config);
                     }
                     if (cfg.required && !cfg.isDefined()) {
-                        System.out.println(propPath);
                         throw new IllegalArgumentException(propPath + " is required" + (path().isEmpty() ? "" : " in " + path()));
                     }
                 } catch (IllegalArgumentException e) {
                     errors.append(e.getMessage() + "\n");
                 }
             });
-            if (!options.contains(Options.IGNORE_UNKNOWN)) {
-                this.config.entrySet().forEach(entry -> {
-                    boolean existingProperty = properties.stream().filter((p) ->
-                            p.getKey().equals(entry.getKey())
-                                    || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey() + "."))
-                    ).count() > 0;
-                    boolean allowedViaExtensions = extensions.stream().filter((s) ->
-                            s.equals(entry.getKey()) || entry.getKey().startsWith(s + ".")
-                    ).count() > 0;
-                    if (!existingProperty && !allowedViaExtensions) {
+
+            externalProperties.clear();
+            //if (!options.contains(Options.IGNORE_UNKNOWN)) {
+            this.config.entrySet().forEach(entry -> {
+                boolean existingProperty = properties.stream().filter((p) ->
+                        p.getKey().equals(entry.getKey())
+                                || (p.getValue() instanceof CfgNested && entry.getKey().startsWith(p.getKey() + "."))
+                ).count() > 0;
+                boolean allowedViaExtensions = extensions.stream().filter((s) ->
+                        s.equals(entry.getKey()) || entry.getKey().startsWith(s + ".")
+                ).count() > 0;
+                if (!existingProperty && !allowedViaExtensions) {
+                    if (!options.contains(Options.IGNORE_UNKNOWN)) {
                         errors.append(entry.getKey() + " is not a known property" + (path().isEmpty() ? "" : " of " + path()) + "\n");
+                    } else {
+                        CfgString c = new CfgString();
+                        c.setValue(entry.getValue().unwrapped().toString());
+                        externalProperties.add(new AbstractMap.SimpleEntry<String, CfgString>(entry.getKey(), c));
                     }
-                });
-            }
+                }
+            });
             String errorMessage = errors.toString();
             if (!errorMessage.isEmpty()) {
                 throw new IllegalArgumentException(errorMessage);
@@ -162,7 +172,7 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return "";
     }
 
-    public Config config() {
+    Config config() {
         return config;
     }
 
@@ -304,9 +314,10 @@ public class CfgStruct<T extends CfgStruct> extends Cfg<T> implements CfgNested 
         return result.toString();
     }
 
-    public Map<String, Cfg<?>> map() {
+    public Map<String, Cfg<?>> toMap() {
         TreeMap<String, Cfg<?>> result = new TreeMap<>();
         properties.forEach(prop -> result.put(prop.getKey(), prop.getValue()));
+        externalProperties.forEach(prop -> result.put(prop.getKey(), prop.getValue()));
         return result;
     }
 

@@ -67,7 +67,7 @@ object AvroSerde {
   def create(conf: AvroConf): AvroSerde = {
     val registryClass: Class[_ <: AvroSerde] = conf.Class()
     try {
-      registryClass.getConstructor(classOf[Config]).newInstance(conf.config())
+      registryClass.getConstructor(classOf[AvroConf]).newInstance(conf)
     } catch {
       case _: NoSuchMethodException => registryClass.newInstance()
     }
