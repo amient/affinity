@@ -71,6 +71,12 @@ public class CfgGroup<G extends Cfg<?>> extends Cfg<Map<String, G>> implements C
         return "<ID>";
     }
 
+    public G apply(String entry, G value) {
+        value.setRelPath(entry);
+        value.setPath(path(entry));
+        return value;
+    }
+
     public G apply(String entry) {
         Map<String, G> group;
         try {

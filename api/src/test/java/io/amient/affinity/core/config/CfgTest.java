@@ -21,7 +21,6 @@ package io.amient.affinity.core.config;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import com.typesafe.config.ConfigRenderOptions;
 import com.typesafe.config.ConfigValueFactory;
 import io.amient.affinity.core.util.TimeCryptoProof;
 import io.amient.affinity.core.util.TimeCryptoProofSHA256;
@@ -29,12 +28,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import javax.xml.soap.Node;
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class CfgTest {
 
@@ -62,9 +58,12 @@ public class CfgTest {
         private CfgGroup IntLists = group("lists", CfgIntList.class, false);
         private Cfg Undefined = string("undefined", false);
         private CfgGroup UndefinedGroup = group("undefined-group", UndefinedGroupConfig.class, false);
+        private CfgStruct<UndefinedGroupConfig> Empty = struct("empty", new UndefinedGroupConfig(), false);
+        private CfgStruct<NestedStruct> Nested = struct("nested", new NestedStruct(), false);
     }
 
     public static class ExtendedServiceConfig extends CfgStruct<ExtendedServiceConfig> {
+        private CfgString Data = string("data", true);
         private CfgString Info = string("info", false);
         public ExtendedServiceConfig() {
             super(ServiceConfig.class, Options.STRICT);
@@ -74,6 +73,13 @@ public class CfgTest {
     public static class UndefinedGroupConfig extends CfgStruct<UndefinedGroupConfig> {
         public UndefinedGroupConfig() {
             super(Options.IGNORE_UNKNOWN);
+        }
+    }
+
+    public static class NestedStruct extends CfgStruct<NestedStruct> {
+        private CfgString Required = string("required", true);
+        public NestedStruct() {
+            super(Options.STRICT);
         }
     }
 
@@ -98,6 +104,20 @@ public class CfgTest {
             put(NodeConfig.Services.apply("wrongstruct").path("something.we.dont.recognize"), 20);
         }});
         NodeConfig.apply(config);
+    }
+
+    @Test
+    public void reportMissingRequiredPropertyOfNestedStructThatIsOptionalOnlyIfNestedIsDefined() {
+        ServiceConfig serviceConf = new ServiceConfig();
+        serviceConf.apply(new HashMap<String, Object>() {{
+            put("class", TimeCryptoProofSHA256.class.getName());
+        }});
+        ex.expect(IllegalArgumentException.class);
+        ex.expectMessage("required is required in nested");
+        serviceConf.apply(new HashMap<String, Object>() {{
+            put("class", TimeCryptoProofSHA256.class.getName());
+            put("nested", new HashMap<String, Object>());
+        }});
     }
 
     @Test
@@ -130,6 +150,8 @@ public class CfgTest {
         }}));
 
         NodeConfig applied = NodeConfig.apply(configWithExternals);
+        assertNotEquals(applied.Services.apply("myservice").config(), null);
+        assertEquals(applied.Services.apply("myservice").Empty.config(), null);
         assertEquals(TimeCryptoProofSHA256.class, applied.Services.apply("myservice").Class.apply());
         assertEquals(Arrays.asList(1, 2, 3), applied.Services.apply("myservice").IntList.apply());
         assertEquals(Arrays.asList(1, 2, 3), applied.Services.apply("myservice").IntLists.apply("group1").apply());
@@ -185,19 +207,22 @@ public class CfgTest {
     }
 
     @Test
-    public void specializeConfig() {
+    public void attachConfig() {
         ServiceConfig serviceConf = new ServiceConfig();
         assert(!serviceConf.isDefined());
         assert(serviceConf.Class.path().equals("class"));
         NodeConfig nodeConfig = new NodeConfig();
-        //attaching to en empty node
-        serviceConf.apply(nodeConfig);
-        assert(serviceConf.Class.path().equals("class"));
         //attaching to a non-empty path
         assert(!nodeConfig.isDefined());
         assert(nodeConfig.Services.path().equals("service"));
-        serviceConf.apply(nodeConfig.Services.apply("x"));
-        assert(serviceConf.Class.path().equals("service.x.class"));
+        ServiceConfig newInGroup = nodeConfig.Services.apply("x");
+        newInGroup.Class.setValue(TimeCryptoProofSHA256.class);
+        ServiceConfig attachedToGroup = nodeConfig.Services.apply("y", serviceConf);
+        serviceConf.Class.setValue(TimeCryptoProofSHA256.class);
+        assert(newInGroup.Class.path().equals("service.x.class"));
+        assert(nodeConfig.Services.apply("x").Class.apply().equals(TimeCryptoProofSHA256.class));
+        assert(attachedToGroup.Class.path().equals("service.y.class"));
+        assert(attachedToGroup.Class.apply().equals(TimeCryptoProofSHA256.class));
     }
 
     @Test
