@@ -89,14 +89,16 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     put("max.block.ms", Long.MaxValue.toString)
     if (kafkaStorageConf.Producer.isDefined) {
       val producerConfig = kafkaStorageConf.Producer.config()
-      if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
-      if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom key.serializer")
-      if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom value.serializer")
-      if (producerConfig.hasPath("max.in.flight.requests.per.connection")) log.warn("Changing producer max.in.flight.requests.per.connection from recommended: 1")
-      if (producerConfig.hasPath("max.block.ms")) log.warn("Changing producer max.block.ms from recommended: Long.MaxValue")
-      if (producerConfig.hasPath("retries")) log.warn("Changing producer retries from recommended: Int.MaxValue")
-      producerConfig.entrySet.asScala.foreach { case (entry) =>
-        put(entry.getKey, entry.getValue.unwrapped())
+      if (producerConfig != null) {
+        if (producerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
+        if (producerConfig.hasPath("key.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom key.serializer")
+        if (producerConfig.hasPath("value.serializer")) throw new IllegalArgumentException("Binary kafka stream cannot use custom value.serializer")
+        if (producerConfig.hasPath("max.in.flight.requests.per.connection")) log.warn("Changing producer max.in.flight.requests.per.connection from recommended: 1")
+        if (producerConfig.hasPath("max.block.ms")) log.warn("Changing producer max.block.ms from recommended: Long.MaxValue")
+        if (producerConfig.hasPath("retries")) log.warn("Changing producer retries from recommended: Int.MaxValue")
+        producerConfig.entrySet.asScala.foreach { case (entry) =>
+          put(entry.getKey, entry.getValue.unwrapped())
+        }
       }
     }
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
@@ -108,12 +110,14 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     put("auto.offset.reset", "earliest")
     if (kafkaStorageConf.Consumer.isDefined) {
       val consumerConfig = kafkaStorageConf.Consumer.config()
-      if (consumerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
-      if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
-      if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
-      if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
-      consumerConfig.entrySet.asScala.foreach { case (entry) =>
-        put(entry.getKey, entry.getValue.unwrapped())
+      if (consumerConfig != null) {
+        if (consumerConfig.hasPath("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
+        if (consumerConfig.hasPath("enable.auto.commit")) throw new IllegalArgumentException("enable.auto.commit cannot be overriden for KafkaStroage consumer")
+        if (consumerConfig.hasPath("key.deserializer")) throw new IllegalArgumentException("key.deserializer cannot be overriden for KafkaStroage consumer")
+        if (consumerConfig.hasPath("value.deserializer")) throw new IllegalArgumentException("value.deserializer cannot be overriden for KafkaStroage consumer")
+        consumerConfig.entrySet.asScala.foreach { case (entry) =>
+          put(entry.getKey, entry.getValue.unwrapped())
+        }
       }
     }
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
@@ -283,9 +287,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
       if (kafkaStorageConf.Consumer.isDefined) {
         val consumerConfig = kafkaStorageConf.Consumer.config()
-        val allowedAdminConfigs = AdminClientConfig.configNames
-        consumerConfig.entrySet.asScala.filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
-          case (entry) => put(entry.getKey, entry.getValue.unwrapped())
+        if (consumerConfig != null) {
+          val allowedAdminConfigs = AdminClientConfig.configNames
+          consumerConfig.entrySet.asScala.filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
+            case (entry) => put(entry.getKey, entry.getValue.unwrapped())
+          }
         }
       }
     }

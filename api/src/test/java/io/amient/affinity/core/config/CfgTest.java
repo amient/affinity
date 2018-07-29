@@ -58,7 +58,8 @@ public class CfgTest {
         private CfgGroup IntLists = group("lists", CfgIntList.class, false);
         private Cfg Undefined = string("undefined", false);
         private CfgGroup UndefinedGroup = group("undefined-group", UndefinedGroupConfig.class, false);
-        private CfgStruct<UndefinedGroupConfig> Empty = struct("empty", new UndefinedGroupConfig());
+        private CfgStruct<UndefinedGroupConfig> Empty = struct("empty", new UndefinedGroupConfig(), false);
+        private CfgStruct<NestedStruct> Nested = struct("nested", new NestedStruct(), false);
     }
 
     public static class ExtendedServiceConfig extends CfgStruct<ExtendedServiceConfig> {
@@ -72,6 +73,13 @@ public class CfgTest {
     public static class UndefinedGroupConfig extends CfgStruct<UndefinedGroupConfig> {
         public UndefinedGroupConfig() {
             super(Options.IGNORE_UNKNOWN);
+        }
+    }
+
+    public static class NestedStruct extends CfgStruct<NestedStruct> {
+        private CfgString Required = string("required", true);
+        public NestedStruct() {
+            super(Options.STRICT);
         }
     }
 
@@ -96,6 +104,20 @@ public class CfgTest {
             put(NodeConfig.Services.apply("wrongstruct").path("something.we.dont.recognize"), 20);
         }});
         NodeConfig.apply(config);
+    }
+
+    @Test
+    public void reportMissingRequiredPropertyOfNestedStructThatIsOptionalOnlyIfNestedIsDefined() {
+        ServiceConfig serviceConf = new ServiceConfig();
+        serviceConf.apply(new HashMap<String, Object>() {{
+            put("class", TimeCryptoProofSHA256.class.getName());
+        }});
+        ex.expect(IllegalArgumentException.class);
+        ex.expectMessage("required is required in nested");
+        serviceConf.apply(new HashMap<String, Object>() {{
+            put("class", TimeCryptoProofSHA256.class.getName());
+            put("nested", new HashMap<String, Object>());
+        }});
     }
 
     @Test
@@ -129,7 +151,7 @@ public class CfgTest {
 
         NodeConfig applied = NodeConfig.apply(configWithExternals);
         assertNotEquals(applied.Services.apply("myservice").config(), null);
-        assertNotEquals(applied.Services.apply("myservice").Empty.config(), null);
+        assertEquals(applied.Services.apply("myservice").Empty.config(), null);
         assertEquals(TimeCryptoProofSHA256.class, applied.Services.apply("myservice").Class.apply());
         assertEquals(Arrays.asList(1, 2, 3), applied.Services.apply("myservice").IntList.apply());
         assertEquals(Arrays.asList(1, 2, 3), applied.Services.apply("myservice").IntLists.apply("group1").apply());
