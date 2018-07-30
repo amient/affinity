@@ -156,7 +156,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     )))
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
-    val kvstore = new MemStoreSimpleMap(stateConf)
+    val kvstore = new MemStoreSimpleMap("test", stateConf, null)
     KVStoreLocal.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, new AffinityMetrics)
   }
 

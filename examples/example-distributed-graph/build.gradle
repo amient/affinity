@@ -12,6 +12,7 @@ ext {
 
 dependencies {
     compile project(':core')
+    compile project(':rocksdb')
     compile project(':kafka:storage-kafka')
     compile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
     compile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"

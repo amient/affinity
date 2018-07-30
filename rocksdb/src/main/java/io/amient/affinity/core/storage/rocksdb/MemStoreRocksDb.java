@@ -19,11 +19,14 @@
 
 package io.amient.affinity.core.storage.rocksdb;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
+import io.amient.affinity.core.config.Cfg;
 import io.amient.affinity.core.config.CfgStruct;
-import io.amient.affinity.core.util.CloseableIterator;
-import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.state.StateConf;
+import io.amient.affinity.core.storage.MemStore;
 import io.amient.affinity.core.util.ByteUtils;
+import io.amient.affinity.core.util.CloseableIterator;
 import org.rocksdb.*;
 import org.slf4j.LoggerFactory;
 
@@ -40,10 +43,20 @@ public class MemStoreRocksDb extends MemStore {
 
     public static class MemStoreRocksDbConf extends CfgStruct<MemStoreRocksDbConf> {
 
+        //reads
+        public Cfg<Boolean> AllowMmapReads = bool("allow.mmap.reads", true, false).doc("on 64-bit systems memory mapped files can be enabled");
+        public Cfg<Long> BlockCacheSize = longint("cache.size.bytes", 0).doc("LRU cache size, if 0, cache will not be used");
+
+        //writes
+        public Cfg<Long> WriteBufferSize = longint("write.buffer.size", false).doc("sets the size of a single memtable");
+        public Cfg<Integer> WriteMaxWriteBufferNumber = integer("max.write.buffers", false).doc("sets the maximum number of memtables, both active and immutable");
+        public Cfg<Integer> WriteMinWriteBufferToMergeNumber = integer("min.write.buffers.to.merge", false).doc("the minimum number of memtables to be merged before flushing to storage");
+        public Cfg<Boolean> AllowConcurrentMemtableWrite = bool("allow.concurrent.writes", true, false).doc("allow concurrent writes to a memtable");
+
         public MemStoreRocksDbConf() {
             super(MemStoreConf.class);
         }
-        //TODO on 64-bit systems memory mapped files can be enabled
+
     }
 
     private static Map<Path, Long> refs = new HashMap<>();
@@ -70,36 +83,102 @@ public class MemStoreRocksDb extends MemStore {
         }
     }
 
-    synchronized private static final void releaseDbInstance(Path pathToData) {
+    synchronized private static final boolean releaseDbInstance(Path pathToData) {
         if (!refs.containsKey(pathToData)) {
-            return;
+            return false;
         } else if (refs.get(pathToData) > 1) {
             refs.put(pathToData, refs.get(pathToData) - 1);
+            return false;
         } else {
             refs.remove(pathToData);
             instances.get(pathToData).close();
+            return true;
         }
     }
 
     private final Path pathToData;
     private final RocksDB internal;
+    private final String identifier;
+    private final MetricRegistry metrics;
+    private final Long cacheSize;
 
     @Override
     public boolean isPersistent() {
         return true;
     }
 
-    public MemStoreRocksDb(StateConf conf) throws IOException {
+    public MemStoreRocksDb(String identifier, StateConf conf, MetricRegistry metrics) throws IOException {
         super(conf);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
         log.info("Opening RocksDb MemStore: " + pathToData);
         Files.createDirectories(pathToData);
         MemStoreRocksDbConf rocksDbConf = new MemStoreRocksDbConf().apply(conf.MemStore);
+
+        //read tuning options and prefixes
         Options rocksOptions = new Options().setCreateIfMissing(true);
+        this.cacheSize = rocksDbConf.BlockCacheSize.apply();
+        int cacheNumShardBits;
         if (conf.MemStore.KeyPrefixSize.isDefined()) {
-            rocksOptions.useCappedPrefixExtractor(conf.MemStore.KeyPrefixSize.apply());
+            int prefixSizeInBytes = conf.MemStore.KeyPrefixSize.apply();
+            rocksOptions.useCappedPrefixExtractor(prefixSizeInBytes);
+            cacheNumShardBits = prefixSizeInBytes * 8;
+        } else {
+            cacheNumShardBits = -1;
         }
+        if (cacheSize > 0) rocksOptions.setRowCache(new LRUCache(cacheSize, cacheNumShardBits, true));
+        rocksOptions.setAllowMmapReads(rocksDbConf.AllowMmapReads.apply());
+        //TODO rocksOptions.setMemtablePrefixBloomSizeRatio()
+
+        //writes tuning options
+        if (rocksDbConf.WriteBufferSize.isDefined()) rocksOptions.setWriteBufferSize(rocksDbConf.WriteBufferSize.apply());
+        if (rocksDbConf.WriteMaxWriteBufferNumber.isDefined()) rocksOptions.setMaxWriteBufferNumber(rocksDbConf.WriteMaxWriteBufferNumber.apply());
+        if (rocksDbConf.WriteMinWriteBufferToMergeNumber.isDefined()) rocksOptions.setMinWriteBufferNumberToMerge(rocksDbConf.WriteMinWriteBufferToMergeNumber.apply());
+        rocksOptions.setAllowConcurrentMemtableWrite(rocksDbConf.AllowConcurrentMemtableWrite.apply());
+
+        //...
+        //TODO compaction configs
+        //rocksOptions.setLevel0FileNumCompactionTrigger()
+
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
+        this.metrics = metrics;
+        this.identifier = identifier;
+        if (metrics != null) {
+            metrics.register("state." + identifier + ".rocksdb.index.size", new Gauge<Long>() {
+                @Override
+                public Long getValue() {
+                    try {
+                        return internal.getLongProperty("rocksdb.estimate-table-readers-mem");
+                    } catch (RocksDBException e) {
+                        log.warn("Could not read rocksdb.estimate-table-readers-mem property", e);
+                        return 0L;
+                    }
+                }
+            });
+
+            metrics.register("state." + identifier + ".rocksdb.memtable.size", new Gauge<Long>() {
+                @Override
+                public Long getValue() {
+                    try {
+                        return internal.getLongProperty("rocksdb.cur-size-all-mem-tables");
+                    } catch (RocksDBException e) {
+                        log.warn("Could not read rocksdb.cur-size-all-mem-tables property", e);
+                        return 0L;
+                    }
+                }
+            });
+
+            if (cacheSize > 0) metrics.register("state." + identifier + ".rocksdb.blockcache.size", new Gauge<Long>() {
+                @Override
+                public Long getValue() {
+                    try {
+                        return internal.getLongProperty("rocksdb.block-cache-usage");
+                    } catch (RocksDBException e) {
+                        log.warn("Could not read rocksdb.block-cache-usage property", e);
+                        return 0L;
+                    }
+                }
+            });
+        }
     }
 
     @Override
@@ -184,7 +263,13 @@ public class MemStoreRocksDb extends MemStore {
 
     @Override
     public void close() throws IOException {
-        releaseDbInstance(pathToData);
+        if (releaseDbInstance(pathToData)) {
+            if (metrics != null) {
+                metrics.remove("state." + identifier + ".rocksdb.index.size");
+                metrics.remove("state." + identifier + ".rocksdb.memtable.size");
+                if (cacheSize > 0) metrics.remove("state." + identifier + ".rocksdb.blockcache.size");
+            }
+        }
     }
 
     private Optional<ByteBuffer> get(byte[] key) {

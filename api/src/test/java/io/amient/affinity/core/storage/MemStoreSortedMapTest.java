@@ -20,7 +20,7 @@ public class MemStoreSortedMapTest {
         Config config = ConfigFactory.empty()
                 .withValue(template.MemStore.Class.path(), ConfigValueFactory.fromAnyRef(MemStoreSortedMap.class.getName()));
 
-        MemStore instance = new MemStoreSortedMap(new StateConf().apply(config));
+        MemStore instance = new MemStoreSortedMap("test", new StateConf().apply(config), null);
         try {
             instance.put(ByteBuffer.wrap("key1-A".getBytes()), ByteBuffer.wrap("value1A".getBytes()));
             instance.put(ByteBuffer.wrap("key1-B".getBytes()), ByteBuffer.wrap("value1B".getBytes()));
