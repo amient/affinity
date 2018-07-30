@@ -51,10 +51,7 @@ class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends Avr
 
   def this(conf: CfAvroConf) = this(new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl()))
 
-  def this(_conf: AvroConf) = this {
-    print(_conf)
-    CfAvroConf(_conf)
-  }
+  def this(_conf: AvroConf) = this(CfAvroConf(_conf))
 
   override def close(): Unit = ()
 
