@@ -15,6 +15,7 @@ publishing {
 }
 
 dependencies {
+    compile group: 'io.dropwizard.metrics', name: 'metrics-core', version: metricsVersion
     compile group: 'com.typesafe', name: 'config', version: typesafeConfigVersion
     compile group: 'com.101tec', name: 'zkclient', version: zkClientVersion
     compile group: 'org.jooq', name: 'jool', version: '0.9.12'
