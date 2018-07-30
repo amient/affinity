@@ -22,7 +22,7 @@ ext {
     scalaCheckVersion = '1.12.5'
     slf4jVersion = '1.7.21'
     akkaVersion = '2.4.20'
-    akkaHttpVersion = '10.0.10'
+    akkaHttpVersion = '10.0.13'
     metricsVersion = '3.1.2'
     //
     avroVersion = '1.8.2' // avro version provides also org.codehouse.jackson transitively

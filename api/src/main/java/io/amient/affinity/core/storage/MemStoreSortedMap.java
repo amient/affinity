@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
+import com.codahale.metrics.MetricRegistry;
 import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
@@ -32,7 +33,7 @@ public class MemStoreSortedMap extends MemStore {
 
     final private ConcurrentSkipListMap<ByteBuffer, ByteBuffer> internal2 = new ConcurrentSkipListMap<>();
 
-    public MemStoreSortedMap(StateConf conf) throws IOException {
+    public MemStoreSortedMap(String identifier, StateConf conf, MetricRegistry metrics) throws IOException {
         super(conf);
     }
 

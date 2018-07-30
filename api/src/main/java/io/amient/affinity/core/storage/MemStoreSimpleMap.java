@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.storage;
 
+import com.codahale.metrics.MetricRegistry;
 import io.amient.affinity.core.state.StateConf;
 import io.amient.affinity.core.util.ByteUtils;
 import io.amient.affinity.core.util.CloseableIterator;
@@ -35,7 +36,7 @@ public class MemStoreSimpleMap extends MemStore {
 
     final private ConcurrentHashMap<ByteBuffer, byte[]> internal = new ConcurrentHashMap<>();
 
-    public MemStoreSimpleMap(StateConf conf) throws IOException {
+    public MemStoreSimpleMap(String identifier, StateConf conf, MetricRegistry metrics) throws IOException {
         super(conf);
     }
 

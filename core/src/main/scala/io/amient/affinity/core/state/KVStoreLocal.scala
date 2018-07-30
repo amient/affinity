@@ -25,7 +25,7 @@ import java.util.concurrent.{ConcurrentHashMap, TimeoutException}
 import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import com.codahale.metrics.Gauge
+import com.codahale.metrics.{Gauge, MetricRegistry}
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
@@ -55,7 +55,7 @@ object KVStoreLocal {
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
     val kvstoreClass = stateConf.MemStore.Class()
-    val kvstoreConstructor = kvstoreClass.getConstructor(classOf[StateConf])
+    val kvstoreConstructor = kvstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
     if (!stateConf.MemStore.DataDir.isDefined) {
       val nodeConf = Conf(system.settings.config).Affi.Node
       if (nodeConf.DataDir.isDefined) {
@@ -68,8 +68,8 @@ object KVStoreLocal {
       val prefixLen = AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord]))
       if (prefixLen.isDefined) stateConf.MemStore.KeyPrefixSize.setValue(prefixLen.get)
     }
-    val kvstore = kvstoreConstructor.newInstance(stateConf)
     val metrics = AffinityMetrics.forActorSystem(system)
+    val kvstore = kvstoreConstructor.newInstance(identifier, stateConf, metrics)
     try {
       create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, metrics)
     } catch {

@@ -38,7 +38,6 @@ dependencies {
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-http-core_' + baseScalaVersion, version: akkaHttpVersion
     compile group: 'com.typesafe.akka', name: 'akka-slf4j_' + baseScalaVersion, version: akkaVersion
-    compile group: 'io.dropwizard.metrics', name: 'metrics-core', version: metricsVersion
 
     testCompile project(':kafka:storage-kafka')
     testCompile project(':kafka:test-util-kafka')

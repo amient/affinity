@@ -408,6 +408,12 @@ In all examples and for all tests, logback binding is used.
         affinity.global.<ID>.storage.kafka.topic [STRING] (!)                                   kafka topic name
 
 ### Global State Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
+        affinity.global.<ID>.allow.concurrent.writes [TRUE|FALSE] (false)                       allow concurrent writes to a memtable
+        affinity.global.<ID>.allow.mmap.reads [TRUE|FALSE] (false)                              on 64-bit systems memory mapped files can be enabled
+        affinity.global.<ID>.cache.size.bytes [LONG] (0)                                        LRU cache size, if 0, cache will not be used
+        affinity.global.<ID>.max.write.buffers [INT] (-)                                        sets the maximum number of memtables, both active and immutable
+        affinity.global.<ID>.min.write.buffers.to.merge [INT] (-)                               the minimum number of memtables to be merged before flushing to storage
+        affinity.global.<ID>.write.buffer.size [LONG] (-)                                       sets the size of a single memtable
 
 
 ## Keyspaces
@@ -439,6 +445,12 @@ In all examples and for all tests, logback binding is used.
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)                      kafka topic name
 
 ### Keyspaces Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
+        affinity.keyspace.<ID>.state.<ID>.allow.concurrent.writes [TRUE|FALSE] (false)          allow concurrent writes to a memtable
+        affinity.keyspace.<ID>.state.<ID>.allow.mmap.reads [TRUE|FALSE] (false)                 on 64-bit systems memory mapped files can be enabled
+        affinity.keyspace.<ID>.state.<ID>.cache.size.bytes [LONG] (0)                           LRU cache size, if 0, cache will not be used
+        affinity.keyspace.<ID>.state.<ID>.max.write.buffers [INT] (-)                           sets the maximum number of memtables, both active and immutable
+        affinity.keyspace.<ID>.state.<ID>.min.write.buffers.to.merge [INT] (-)                  the minimum number of memtables to be merged before flushing to storage
+        affinity.keyspace.<ID>.state.<ID>.write.buffer.size [LONG] (-)                          sets the size of a single memtable
 
 
 ## Node Context
