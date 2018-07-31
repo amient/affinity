@@ -350,9 +350,6 @@ It doesn't provide any binding for compile configuration, that is left to applic
 In all examples and for all tests, logback binding is used.
 
 
-## Avro
-        affinity.avro.schema.registry.class [FQN] (!)                                           one of ConfluentSchemaRegistry, ZookeeperSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
-
 ### Avro (io.amient.affinity.avro.ConfluentSchemaRegistry)
         affinity.avro.schema.registry.url [URL] (http://localhost:8081)                         Confluent Schema Registry connection base URL
 
@@ -410,9 +407,12 @@ In all examples and for all tests, logback binding is used.
 ### Global State Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
         affinity.global.<ID>.allow.concurrent.writes [TRUE|FALSE] (false)                       allow concurrent writes to a memtable
         affinity.global.<ID>.allow.mmap.reads [TRUE|FALSE] (false)                              on 64-bit systems memory mapped files can be enabled
-        affinity.global.<ID>.cache.size.bytes [LONG] (0)                                        LRU cache size, if 0, cache will not be used
+        affinity.global.<ID>.block.size [LONG] (4096)                                           rocks db basic block size
+        affinity.global.<ID>.cache.size.bytes [LONG] (8388608)                                  LRU cache size, if set to 0, cache will be completely turned off
         affinity.global.<ID>.max.write.buffers [INT] (-)                                        sets the maximum number of memtables, both active and immutable
         affinity.global.<ID>.min.write.buffers.to.merge [INT] (-)                               the minimum number of memtables to be merged before flushing to storage
+        affinity.global.<ID>.optimize.filters.for.hits [TRUE|FALSE] (true)                      saves memory on bloom filters at the cost of higher i/o when the key is not found
+        affinity.global.<ID>.optimize.for.point.lookup [TRUE|FALSE] (true)                      keep this on if you don't need to keep the data sorted and only use Put() and Get()
         affinity.global.<ID>.write.buffer.size [LONG] (-)                                       sets the size of a single memtable
 
 
@@ -447,9 +447,12 @@ In all examples and for all tests, logback binding is used.
 ### Keyspaces Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
         affinity.keyspace.<ID>.state.<ID>.allow.concurrent.writes [TRUE|FALSE] (false)          allow concurrent writes to a memtable
         affinity.keyspace.<ID>.state.<ID>.allow.mmap.reads [TRUE|FALSE] (false)                 on 64-bit systems memory mapped files can be enabled
-        affinity.keyspace.<ID>.state.<ID>.cache.size.bytes [LONG] (0)                           LRU cache size, if 0, cache will not be used
+        affinity.keyspace.<ID>.state.<ID>.block.size [LONG] (4096)                              rocks db basic block size
+        affinity.keyspace.<ID>.state.<ID>.cache.size.bytes [LONG] (8388608)                     LRU cache size, if set to 0, cache will be completely turned off
         affinity.keyspace.<ID>.state.<ID>.max.write.buffers [INT] (-)                           sets the maximum number of memtables, both active and immutable
         affinity.keyspace.<ID>.state.<ID>.min.write.buffers.to.merge [INT] (-)                  the minimum number of memtables to be merged before flushing to storage
+        affinity.keyspace.<ID>.state.<ID>.optimize.filters.for.hits [TRUE|FALSE] (true)         saves memory on bloom filters at the cost of higher i/o when the key is not found
+        affinity.keyspace.<ID>.state.<ID>.optimize.for.point.lookup [TRUE|FALSE] (true)         keep this on if you don't need to keep the data sorted and only use Put() and Get()
         affinity.keyspace.<ID>.state.<ID>.write.buffer.size [LONG] (-)                          sets the size of a single memtable
 
 

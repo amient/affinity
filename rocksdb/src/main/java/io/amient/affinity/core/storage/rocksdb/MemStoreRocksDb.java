@@ -43,11 +43,13 @@ public class MemStoreRocksDb extends MemStore {
 
     public static class MemStoreRocksDbConf extends CfgStruct<MemStoreRocksDbConf> {
 
-        //reads
-        public Cfg<Boolean> AllowMmapReads = bool("allow.mmap.reads", true, false).doc("on 64-bit systems memory mapped files can be enabled");
-        public Cfg<Long> BlockCacheSize = longint("cache.size.bytes", 0).doc("LRU cache size, if 0, cache will not be used");
+        public Cfg<Long> BlockSize = longint("block.size", 4 * 1024).doc("rocks db basic block size");
+        public Cfg<Boolean> OptimizeFiltersForHits = bool("optimize.filters.for.hits", true, true).doc("saves memory on bloom filters at the cost of higher i/o when the key is not found");
+        public Cfg<Boolean> OptimizeForPointLookup = bool("optimize.for.point.lookup", true, true).doc("keep this on if you don't need to keep the data sorted and only use Put() and Get()");
 
-        //writes
+        //
+        public Cfg<Boolean> AllowMmapReads = bool("allow.mmap.reads", true, false).doc("on 64-bit systems memory mapped files can be enabled");
+        public Cfg<Long> BlockCacheSize = longint("cache.size.bytes", 8 * 1024 * 1024).doc("LRU cache size, if set to 0, cache will be completely turned off");
         public Cfg<Long> WriteBufferSize = longint("write.buffer.size", false).doc("sets the size of a single memtable");
         public Cfg<Integer> WriteMaxWriteBufferNumber = integer("max.write.buffers", false).doc("sets the maximum number of memtables, both active and immutable");
         public Cfg<Integer> WriteMinWriteBufferToMergeNumber = integer("min.write.buffers.to.merge", false).doc("the minimum number of memtables to be merged before flushing to storage");
@@ -100,7 +102,7 @@ public class MemStoreRocksDb extends MemStore {
     private final RocksDB internal;
     private final String identifier;
     private final MetricRegistry metrics;
-    private final Long cacheSize;
+    private final Long blockCacheSize;
 
     @Override
     public boolean isPersistent() {
@@ -116,28 +118,35 @@ public class MemStoreRocksDb extends MemStore {
 
         //read tuning options and prefixes
         Options rocksOptions = new Options().setCreateIfMissing(true);
-        this.cacheSize = rocksDbConf.BlockCacheSize.apply();
+        this.blockCacheSize = rocksDbConf.BlockCacheSize.apply();
         int cacheNumShardBits;
         if (conf.MemStore.KeyPrefixSize.isDefined()) {
+            rocksDbConf.OptimizeForPointLookup.setValue(false); // we'll need iterators when using prefixes
             int prefixSizeInBytes = conf.MemStore.KeyPrefixSize.apply();
             rocksOptions.useCappedPrefixExtractor(prefixSizeInBytes);
             cacheNumShardBits = prefixSizeInBytes * 8;
         } else {
             cacheNumShardBits = -1;
         }
-        if (cacheSize > 0) rocksOptions.setRowCache(new LRUCache(cacheSize, cacheNumShardBits, true));
-        rocksOptions.setAllowMmapReads(rocksDbConf.AllowMmapReads.apply());
-        //TODO rocksOptions.setMemtablePrefixBloomSizeRatio()
-
-        //writes tuning options
+        BlockBasedTableConfig blockTableConfig = new BlockBasedTableConfig();
+        if (blockCacheSize > 0) {
+            blockTableConfig.setBlockCache(new LRUCache(blockCacheSize, cacheNumShardBits, true));
+        } else {
+            blockTableConfig.noBlockCache();
+        }
+        blockTableConfig.setBlockSize(rocksDbConf.BlockSize.apply());
         if (rocksDbConf.WriteBufferSize.isDefined()) rocksOptions.setWriteBufferSize(rocksDbConf.WriteBufferSize.apply());
         if (rocksDbConf.WriteMaxWriteBufferNumber.isDefined()) rocksOptions.setMaxWriteBufferNumber(rocksDbConf.WriteMaxWriteBufferNumber.apply());
         if (rocksDbConf.WriteMinWriteBufferToMergeNumber.isDefined()) rocksOptions.setMinWriteBufferNumberToMerge(rocksDbConf.WriteMinWriteBufferToMergeNumber.apply());
         rocksOptions.setAllowConcurrentMemtableWrite(rocksDbConf.AllowConcurrentMemtableWrite.apply());
+        rocksOptions.setAllowMmapReads(rocksDbConf.AllowMmapReads.apply());
+        rocksOptions.setTableFormatConfig(blockTableConfig);
+        if (rocksDbConf.OptimizeFiltersForHits.apply()) rocksOptions.optimizeFiltersForHits();
+        if (rocksDbConf.OptimizeForPointLookup.apply()) rocksOptions.optimizeForPointLookup(blockCacheSize);
 
-        //...
-        //TODO compaction configs
-        //rocksOptions.setLevel0FileNumCompactionTrigger()
+        //TODO rocksOptions.setBloomLocality()
+        //TODO rocksOptions.setMemtablePrefixBloomSizeRatio()
+        //TODO rocksOptions.setLevel0FileNumCompactionTrigger()
 
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
         this.metrics = metrics;
@@ -167,7 +176,7 @@ public class MemStoreRocksDb extends MemStore {
                 }
             });
 
-            if (cacheSize > 0) metrics.register("state." + identifier + ".rocksdb.blockcache.size", new Gauge<Long>() {
+            if (blockCacheSize > 0) metrics.register("state." + identifier + ".rocksdb.blockcache.size", new Gauge<Long>() {
                 @Override
                 public Long getValue() {
                     try {
@@ -267,7 +276,7 @@ public class MemStoreRocksDb extends MemStore {
             if (metrics != null) {
                 metrics.remove("state." + identifier + ".rocksdb.index.size");
                 metrics.remove("state." + identifier + ".rocksdb.memtable.size");
-                if (cacheSize > 0) metrics.remove("state." + identifier + ".rocksdb.blockcache.size");
+                if (blockCacheSize > 0) metrics.remove("state." + identifier + ".rocksdb.blockcache.size");
             }
         }
     }
