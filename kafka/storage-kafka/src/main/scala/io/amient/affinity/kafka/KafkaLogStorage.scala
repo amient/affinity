@@ -80,8 +80,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   val kafkaStorageConf = KafkaStorageConf(conf)
 
   val topic = kafkaStorageConf.Topic()
+  val replicationFactor = kafkaStorageConf.ReplicationFactor().toShort
+
   val keySubject: String = s"${topic}-key"
   val valueSubject: String = s"${topic}-value"
+
+  private val adminTimeoutMs: Long = 30000
 
   private val producerConfig = new Properties() {
     put("retries", Int.MaxValue.toString)
@@ -271,13 +275,95 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def ensureExists(): Unit = {
     if (kafkaStorageConf.Partitions.isDefined) {
-      ensureCorrectConfiguration(-1, kafkaStorageConf.Partitions(), true)
+      val admin = getAdminClient
+      try {
+        createTopicIfNotExists(admin, kafkaStorageConf.Partitions())
+      } finally {
+        admin.close()
+      }
     } else {
       throw new IllegalArgumentException(s"storage configuration for topic $topic must have partitions property set to a postivie integer")
     }
   }
 
   override def ensureCorrectConfiguration(ttlMs: Long, numPartitions: Int, readonly: Boolean): Unit = {
+    val admin = getAdminClient
+    try {
+
+      val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
+
+      val topicConfigs = Map(
+        TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
+        TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
+        TopicConfig.MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
+        TopicConfig.RETENTION_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
+        TopicConfig.RETENTION_BYTES_CONFIG -> "-1"
+      )
+
+      createTopicIfNotExists(admin, numPartitions)
+
+      log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
+      val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
+      val actualConfig = admin.describeConfigs(List(topicConfigResource).asJava)
+        .values().asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+      val configOutOfSync = topicConfigs.filter { case (k, v) => actualConfig.get(k).value() != v }
+      if (readonly) {
+        if (configOutOfSync.nonEmpty) log.warn(s"External topic $topic configuration doesn't match the state expectations: $configOutOfSync")
+      } else if (configOutOfSync.nonEmpty) {
+        val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }.asJavaCollection
+        admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)).asJava)
+          .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        log.info(s"Topic $topic configuration altered successfully")
+      } else {
+        log.debug(s"Topic $topic configuration is up to date")
+      }
+
+    } finally {
+      admin.close()
+    }
+  }
+
+  private def createTopicIfNotExists(admin: AdminClient, numPartitions: Int): Unit = {
+
+    def _create(): Unit = {
+      val start = System.currentTimeMillis
+      while (System.currentTimeMillis < start + adminTimeoutMs) {
+        if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.MILLISECONDS).contains(topic)) {
+          return
+        } else {
+          val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
+          try {
+            admin.createTopics(List(schemaTopicRequest).asJava).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+            log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor")
+            return
+          } catch {
+            case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
+            case e: ExecutionException if e.getCause.isInstanceOf[UnknownServerException] && e.getCause.getMessage.contains("NodeExists") =>
+            //continue- since kafka 1.1 TopicExistsException is not wrapped correctly by the AdminClient
+          }
+        }
+        TimeUnit.MILLISECONDS.sleep(300)
+      }
+      throw new RuntimeException(s"Failed to create topic $topic within admin timeout: $adminTimeoutMs")
+    }
+
+    def _verify(): Unit = {
+      log.debug(s"Checking that topic $topic has correct number of partitions: ${numPartitions}")
+      val description = admin.describeTopics(List(topic).asJava).values.asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+      if (description.partitions().size() != numPartitions) {
+        throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()} partitions, expecting: $numPartitions")
+      }
+      log.debug(s"Checking that topic $topic has correct replication factor: ${replicationFactor}")
+      val actualReplFactor = description.partitions().get(0).replicas().size()
+      if (actualReplFactor < replicationFactor) {
+        throw new IllegalStateException(s"Kafka topic $topic has $actualReplFactor, expecting: $replicationFactor")
+      }
+    }
+    _create()
+    _verify()
+  }
+
+  private def getAdminClient: AdminClient = {
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
@@ -289,68 +375,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         }
       }
     }
-    val admin = AdminClient.create(adminProps)
-    try {
-      val adminTimeoutMs: Long = 15000
-      val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
-      val replicationFactor = kafkaStorageConf.ReplicationFactor().toShort
-      val topicConfigs = Map(
-        TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
-        TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
-        TopicConfig.MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
-        TopicConfig.RETENTION_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
-        TopicConfig.RETENTION_BYTES_CONFIG -> "-1"
-      )
-
-      var exists: Option[Boolean] = None
-      while (!exists.isDefined) {
-        if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.MILLISECONDS).contains(topic)) {
-          exists = Some(true)
-        } else {
-          val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
-          try {
-            admin.createTopics(List(schemaTopicRequest).asJava).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-            log.info(s"Created topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor")
-            exists = Some(false)
-          } catch {
-            case e: ExecutionException if e.getCause.isInstanceOf[TopicExistsException] => //continue
-            case e: ExecutionException if e.getCause.isInstanceOf[UnknownServerException] && e.getCause.getMessage.contains("NodeExists") =>
-            //continue- since kafka 1.1 TopicExistsException is not wrapped correctly by the AdminClient
-          }
-        }
-        TimeUnit.MILLISECONDS.sleep(300)
-      }
-
-      if (exists.get) {
-        log.debug(s"Checking that topic $topic has correct number of partitions: ${numPartitions}")
-        val description = admin.describeTopics(List(topic).asJava).values.asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-        if (description.partitions().size() != numPartitions) {
-          throw new IllegalStateException(s"Kafka topic $topic has ${description.partitions().size()} partitions, expecting: $numPartitions")
-        }
-        log.debug(s"Checking that topic $topic has correct replication factor: ${replicationFactor}")
-        val actualReplFactor = description.partitions().get(0).replicas().size()
-        if (actualReplFactor < replicationFactor) {
-          throw new IllegalStateException(s"Kafka topic $topic has $actualReplFactor, expecting: $replicationFactor")
-        }
-        log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
-        val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
-        val actualConfig = admin.describeConfigs(List(topicConfigResource).asJava)
-          .values().asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-        val configOutOfSync = topicConfigs.exists { case (k, v) => actualConfig.get(k).value() != v }
-        if (readonly) {
-          if (configOutOfSync) log.warn(s"External State configuration doesn't match the state configuration: $topicConfigs")
-        } else if (configOutOfSync) {
-          val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }.asJavaCollection
-          admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)).asJava)
-            .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-          log.info(s"Topic $topic configuration altered successfully")
-        } else {
-          log.debug(s"Topic $topic configuration is up to date")
-        }
-      }
-    } finally {
-      admin.close()
-    }
+    AdminClient.create(adminProps)
   }
 
 }
