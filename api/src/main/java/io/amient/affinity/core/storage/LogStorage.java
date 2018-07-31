@@ -53,7 +53,7 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
         return newInstance(LogStorage.StorageConf.apply(config));
     }
 
-    static LogStorage newInstanceExists(LogStorageConf conf)
+    static LogStorage newInstanceEnsureExists(LogStorageConf conf)
             throws ClassNotFoundException,
             NoSuchMethodException, IllegalAccessException,
             InvocationTargetException, InstantiationException {

@@ -154,7 +154,7 @@ trait GatewayStream extends Gateway {
                                   processor: InputStreamProcessor[K, V]) extends Runnable with Closeable {
 
     val minTimestamp = streamConfig.MinTimestamp()
-    val consumer = LogStorage.newInstanceExists(streamConfig)
+    val consumer = LogStorage.newInstanceEnsureExists(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
     val work = new ListBuffer[Future[Any]]
     val commitInterval: Long = streamConfig.CommitIntervalMs()
@@ -171,6 +171,7 @@ trait GatewayStream extends Gateway {
         logger.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommitTimestamp = System.currentTimeMillis()
         var finalized = false
+        logger.info(s"Starting input stream processor: $identifier")
         while ((!closed && !finalized) || !lastCommit.isDone) {
           //clusterSuspended is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
           //should be suspended anyway and hang so no need to do it for every record
@@ -197,7 +198,8 @@ trait GatewayStream extends Gateway {
             //flush all outputs in parallel - these are all outputs declared in this gateway
             outputStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
-            Await.result(Future.sequence(work.result), commitTimeout millis)
+            val uncommittedWork = work.result
+            if (uncommittedWork.size > 0) Await.result(Future.sequence(uncommittedWork), commitTimeout millis)
             //commit the records processed by this processor only since the last commit
             lastCommit = consumer.commit() //trigger new commit
             //clear the work accumulator for the next commit
