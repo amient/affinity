@@ -43,6 +43,7 @@ class KVStoreLocalSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll
   val specTimeout = 5 seconds
 
   val cfg = ConfigFactory.parseMap(Map(
+    Conf.Affi.SystemName.path -> "kv-store-local-spec",
     Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
     Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
     Conf.Affi.Node.Gateway.Listeners.path -> List(Map(

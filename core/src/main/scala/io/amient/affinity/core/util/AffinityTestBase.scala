@@ -27,7 +27,6 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.zip.GZIPInputStream
-import javax.net.ssl.{SSLContext, TrustManagerFactory}
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpEncodings
@@ -39,11 +38,10 @@ import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
-import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.core.util.AffinityTestBase.embeddedCoordinatorId
+import javax.net.ssl.{SSLContext, TrustManagerFactory}
 import org.apache.avro.util.ByteBufferInputStream
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
@@ -71,14 +69,11 @@ trait AffinityTestBase {
   }
 
   def configure(config: Config, zkConnect: Option[String], kafkaBootstrap: Option[String]): Config = {
-    val layer1: Config = if (config.hasPath(EmbedConf(Conf.Affi.Coordinator).ID.path)) {
-      config
-    } else {
-      config.withValue(EmbedConf(Conf.Affi.Coordinator).ID.path, ConfigValueFactory.fromAnyRef(embeddedCoordinatorId.incrementAndGet()))
+    val layer1: Config = if (config.hasPath(Conf.Affi.SystemName.path)) config else {
+      config.withValue(Conf.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
     }
 
     val layer2: Config = layer1
-      .withValue(Conf.Affi.Node.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString))
       .withValue(Conf.Akka.Port.path, ConfigValueFactory.fromAnyRef(AffinityTestBase.akkaPort.getAndIncrement()))
 
     val layer3: Config = zkConnect match {

@@ -5,9 +5,8 @@ import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.{ConfluentSchemaRegistry, LocalSchemaRegistry, MemorySchemaRegistry, ZookeeperSchemaRegistry}
-import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
+import io.amient.affinity.core.cluster.CoordinatorZk
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
-import io.amient.affinity.core.cluster.{CoordinatorEmbedded, CoordinatorZk}
 import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgList, CfgStruct}
 import io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb
 import io.amient.affinity.kafka.KafkaLogStorage
@@ -26,6 +25,10 @@ object DocTool extends Tool {
   }
 
   def apply(config: Config): Unit = {
+
+    println("\n\n## HOCON Configuration Files Structure")
+    apply(affinity.Conf.Affi)
+
     println("\n\n## Avro")
     apply(affinity.Conf.Affi.Avro)
 
@@ -46,9 +49,6 @@ object DocTool extends Tool {
 
     println(s"\n### Coordinator (${classOf[CoordinatorZk].getName})")
     apply(CoordinatorZkConf(affinity.Conf.Affi.Coordinator))
-
-    println(s"\n### Coordinator (${classOf[CoordinatorEmbedded].getName})")
-    apply(EmbedConf(affinity.Conf.Affi.Coordinator))
 
     println("\n\n## Global State")
     apply(affinity.Conf.Affi.Global)

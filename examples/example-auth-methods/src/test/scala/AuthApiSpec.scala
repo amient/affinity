@@ -35,6 +35,7 @@ import scala.language.postfixOps
 class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with BeforeAndAfterAll {
 
   val config = ConfigFactory.parseMap(Map(
+    Conf.Affi.SystemName.path -> "auth-api-spec",
     Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
     Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
     Conf.Affi.Global("settings").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
