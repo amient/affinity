@@ -40,6 +40,7 @@ class ZkCoordinatorSpec extends FlatSpec with AffinityTestBase with EmbeddedZooK
   def config = configure("distributedit", zkConnect = Some(zkConnect))
 
   val system = AffinityActorSystem.create("test", config)
+
   val node1 = new Node(config)
   node1.startGateway(new GatewayHttp {
 
@@ -86,7 +87,7 @@ class ZkCoordinatorSpec extends FlatSpec with AffinityTestBase with EmbeddedZooK
     super.afterAll()
   }
 
-  it should "do something that is not completely cear" in {
+  it should "do something that is not completely clear" in {
 
     //  try {
     //    val coordinator1 = Coordinator.create(system, "group1")

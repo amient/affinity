@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core
 
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 
 import akka.actor.{Actor, ActorSystem, Props}
@@ -28,8 +29,6 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.core.actor.GroupStatus
-import io.amient.affinity.core.cluster.CoordinatorEmbedded
-import io.amient.affinity.core.cluster.CoordinatorEmbedded.EmbedConf
 import io.amient.affinity.core.http.HttpExchange
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, Matchers, Suite, WordSpecLike}
@@ -44,8 +43,8 @@ trait IntegrationTestBase extends WordSpecLike with BeforeAndAfterAll with Match
   self: Suite =>
 
   val system: ActorSystem = AffinityActorSystem.create("IntegrationTestSystem",
-    ConfigFactory.load("integrationtests").withValue(EmbedConf(Conf.Affi.Coordinator).ID.path,
-      ConfigValueFactory.fromAnyRef(CoordinatorEmbedded.AutoCoordinatorId.incrementAndGet())))
+    ConfigFactory.load("integrationtests")
+      .withValue(Conf.Affi.SystemName.path, ConfigValueFactory.fromAnyRef(UUID.randomUUID().toString)))
 
   private val groupsReady = scala.collection.mutable.Set[String]()
   system.eventStream.subscribe(system.actorOf(Props(new Actor {

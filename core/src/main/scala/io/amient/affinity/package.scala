@@ -55,6 +55,7 @@ package object affinity {
 
   class AffinityConf extends CfgStruct[AffinityConf] {
     val Avro: AvroConf = struct("avro", new AvroConf(), true)
+    val SystemName = string("system.name", true).doc("Identifier which defines the whole system and the namespace of the Coordinators - all nodes in the same system must have the same system.name")
     val Coordinator: CoordinatorConf = struct("coordinator", new CoordinatorConf, true)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
     val Global = group("global", classOf[StateConf], false).doc("each global state has an ID and needs to be further configured")

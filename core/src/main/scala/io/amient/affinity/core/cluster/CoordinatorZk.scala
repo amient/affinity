@@ -51,11 +51,11 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
   val conf = CoordinatorZkConf(_conf)
   val zkConf = conf.ZooKeeper()
   val zkRoot = conf.ZkRoot()
-  val groupRoot = s"$zkRoot/$group"
+  val groupRoot = s"$zkRoot/${system.name}/$group"
 
   private val zk = ZkClients.get(zkConf)
 
-  if (!zk.exists(zkRoot)) zk.createPersistent(groupRoot, true)
+  if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
 
   val initialChildren = zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
@@ -66,7 +66,6 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
   updateChildren(initialChildren)
 
   override def register(actorPath: ActorPath): String = {
-    if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
     zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
   }
 

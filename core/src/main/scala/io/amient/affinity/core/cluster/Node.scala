@@ -50,7 +50,6 @@ object Node {
     val StartupTimeoutMs = longint("startup.timeout.ms", Integer.MAX_VALUE).doc("Maximum time a node can take to startup - this number must account for any potential state bootstrap")
     val ShutdownTimeoutMs = longint("shutdown.timeout.ms", 30000).doc("Maximum time a node can take to shutdown gracefully")
     val DataDir = filepath("data.dir", Paths.get("./.data")).doc("Location under which any local state or registers will be kept")
-    val SystemName = string("name", "Affinity").doc("ActorSystem name under which the Node presents itself in the Akka Cluster")
   }
 
 }
@@ -58,11 +57,11 @@ object Node {
 class Node(config: Config) {
 
   val conf = Conf(config)
-  private val actorSystemName: String = conf.Affi.Node.SystemName()
+  
   val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
   val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
-  implicit val system = AffinityActorSystem.create(actorSystemName, config)
+  implicit val system = AffinityActorSystem.create(conf.Affi.SystemName(), config)
 
   private val log = LoggerFactory.getLogger(this.getClass) //Logging.getLogger(system, this)
 
