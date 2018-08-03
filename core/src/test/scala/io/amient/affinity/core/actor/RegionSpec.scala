@@ -19,17 +19,33 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{ActorPath, PoisonPill, Props}
+import akka.actor.{ActorPath, ActorSystem, PoisonPill, Props}
 import akka.util.Timeout
-import io.amient.affinity.core.IntegrationTestBase
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.core.cluster.Coordinator
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 
-class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPatience {
+class RegionSpecPartition extends Partition {
+  override def preStart(): Unit = {
+    Thread.sleep(100)
+    super.preStart()
+  }
+
+  override def handle: Receive = {
+    case e: IllegalStateException => context.stop(self)
+    case _ =>
+  }
+}
+
+class RegionSpec extends WordSpecLike with Matchers with Eventually with IntegrationPatience {
+
+  val system: ActorSystem = AffinityActorSystem.create(ConfigFactory.load("regionspec"))
 
   val testPartition = Props(new Partition {
     override def preStart(): Unit = {
@@ -43,9 +59,10 @@ class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPat
     }
   })
 
+
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-//      val zk = new EmbeddedZookeperServer {}
+      //      val zk = new EmbeddedZookeperServer {}
       try {
         val coordinator = Coordinator.create(system, "region")
         try {
@@ -89,7 +106,7 @@ class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPat
           coordinator.close
         }
       } finally {
-//        zk.close()
+        //        zk.close()
       }
     }
   }

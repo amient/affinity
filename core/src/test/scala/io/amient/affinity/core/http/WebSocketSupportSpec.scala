@@ -23,112 +23,57 @@ import java.io.IOException
 import java.net.URI
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
-import akka.actor.{ActorRef, PoisonPill, Props}
+import akka.actor.{ActorRef, PoisonPill}
 import akka.event.{Logging, LoggingAdapter}
+import akka.http.scaladsl.model.HttpMethods.GET
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.pattern.ask
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.IntegrationTestBase
-import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway}
 import io.amient.affinity.core.actor.{RegisterMediatorSubscriber, _}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
 import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, JsonMessageHandler, TextMessageHandler}
 import org.apache.avro.generic.GenericData
 import org.codehaus.jackson.JsonNode
-import org.scalatest.Matchers
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Promise}
 import scala.language.postfixOps
 
-class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
 
-  import system.dispatcher
+class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matchers {
+
+
+  val node = new Node(ConfigFactory.load("websocketsupportspec"))
 
   val specTimeout = 6 seconds
 
-  private val controller = system.actorOf(Props(new Controller), name = "controller")
-  implicit val timeout = Timeout(specTimeout)
+  val httpPort = Await.result(node.startGateway(), specTimeout).head
 
-  controller ! CreateContainer("region", List(0, 1, 2, 3), Props(new Partition() {
-    val data = state[Int, Envelope]("test")
+  node.startContainers()
 
-    override def handle: Receive = {
-      case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
-      case ID(s) => data.push(s, ID(s+1))
-    }
-  }))
+  import node.system.dispatcher
 
-  val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with WebSocketSupport {
+  implicit val materializer = ActorMaterializer.create(node.system)
 
-    private val log: LoggingAdapter = Logging.getLogger(context.system, this)
-
-    val regionService = keyspace("region")
-
-    override def handle: Receive = {
-
-      case WEBSOCK(PATH("test-avro-socket", INT(x)), _, socket) =>
-        connectKeyValueMediator(regionService, "test", x) map {
-          case keyValueMediator => avroWebSocket(socket, keyValueMediator)
-        }
-
-      case HTTP(HttpMethods.GET, PATH("update-it"), _, response) =>
-        accept(response, regionService ? Envelope(ID(2), Side.RIGHT))
-
-      case WEBSOCK(PATH("test-json-socket"), _, socket) =>
-        connectKeyValueMediator(regionService, "test", 2) map {
-          case keyValueMediator => jsonWebSocket(socket, keyValueMediator)
-        }
-
-      case WEBSOCK(PATH("test-custom-socket"), _, socket) =>
-        customWebSocket(socket, new DownstreamActor {
-
-            private var mediator: ActorRef = null
-
-            override def onClose(upstream: ActorRef): Unit = if (mediator != null) mediator ! PoisonPill
-
-            override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
-              case TextMessage.Strict("Hello") =>
-                connectKeyValueMediator(regionService, "test", 3) map {
-                  case keyValueMediator =>
-                    log.info(s"subscribing to $keyValueMediator")
-                    this.mediator = keyValueMediator
-                    upstream ! TextMessage.Strict("Welcome")
-                    upstream ! TextMessage.Strict("Here is your token")
-                    keyValueMediator ! RegisterMediatorSubscriber(upstream)
-                }
-              case msg if mediator == null => log.warning(s"IGNORING DOWNSTREAM - MEDIATOR NOT CONNECTED: $msg")
-              case TextMessage.Strict("Write") if mediator != null => mediator ! ID(3)
-
-            }
-
-          }, new UpstreamActor {
-            override def handle: Receive = {
-              case None => push("{}")
-              case Some(base: Envelope) => push(Encoder.json(base))
-              case id:ID => push(Encoder.json(id))
-            }
-          })
-
-    }
-  })) map {
-    case port :: Nil => port
-  }, timeout.duration)
-
-  override def beforeAll(): Unit = try {
-    awaitGroupReady("region")
-  } finally {
-    super.beforeAll()
+  def http_get(uri: Uri): String = {
+    val promise = Promise[HttpResponse]()
+    node.system.actorSelection("/user/controller/gateway") ! HttpExchange(HttpRequest(GET, uri), promise)
+    val response = Await.result(promise.future flatMap (_.toStrict(2 second)), 2 seconds)
+    Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
   }
 
-  override def afterAll: Unit = try {
-    Await.ready(system.terminate(), timeout.duration)
-  } finally {
-    super.afterAll
-  }
+
+  override def beforeAll(): Unit = node.awaitClusterReady()
+
+  override def afterAll: Unit = node.shutdown()
 
   "AvroWebSocket channel" must {
 
@@ -136,6 +81,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       (try {
         val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-avro-socket/100"), new AvroMessageHandler() {
           override def onMessage(message: scala.Any): Unit = ()
+
           override def onError(e: Throwable): Unit = ()
         })
         try {
@@ -153,6 +99,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       val wsqueue = new LinkedBlockingQueue[AnyRef]()
       val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-avro-socket/101"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
+
         override def onMessage(message: AnyRef): Unit = if (message != null) wsqueue.add(message)
       })
       try {
@@ -175,6 +122,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       val wsqueue = new LinkedBlockingQueue[AnyRef]()
       val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-avro-socket/102"), new AvroMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
+
         override def onMessage(message: AnyRef): Unit = if (message != null) wsqueue.add(message)
       })
       try {
@@ -196,6 +144,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       val wsqueue = new LinkedBlockingQueue[JsonNode]()
       val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-json-socket"), new JsonMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
+
         override def onMessage(message: JsonNode) = wsqueue.add(message)
       })
       try {
@@ -215,15 +164,16 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
       val wsqueue = new LinkedBlockingQueue[String]()
       val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-custom-socket"), new TextMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
+
         override def onMessage(message: String) = wsqueue.add(message)
       })
       try {
         ws.send("Hello")
-        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("Welcome")
-        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("Here is your token")
-        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("{}") //initial value of the key
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("Welcome")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("Here is your token")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("{}") //initial value of the key
         ws.send("Write")
-        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be ("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
 
       } finally {
         ws.close()
@@ -231,4 +181,70 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
     }
   }
 
+}
+
+class WebSocketSpecGateway extends GatewayHttp with WebSocketSupport {
+  private val log: LoggingAdapter = Logging.getLogger(context.system, this)
+
+  val regionService = keyspace("region")
+
+  import context.dispatcher
+
+  override def handle: Receive = {
+
+    case WEBSOCK(PATH("test-avro-socket", INT(x)), _, socket) =>
+      connectKeyValueMediator(regionService, "test", x) map {
+        case keyValueMediator => avroWebSocket(socket, keyValueMediator)
+      }
+
+    case HTTP(HttpMethods.GET, PATH("update-it"), _, response) =>
+      implicit val specTimeout = Timeout(6 seconds)
+      accept(response, regionService ? Envelope(ID(2), Side.RIGHT))
+
+    case WEBSOCK(PATH("test-json-socket"), _, socket) =>
+      connectKeyValueMediator(regionService, "test", 2) map {
+        case keyValueMediator => jsonWebSocket(socket, keyValueMediator)
+      }
+
+    case WEBSOCK(PATH("test-custom-socket"), _, socket) =>
+      customWebSocket(socket, new DownstreamActor {
+
+        private var mediator: ActorRef = null
+
+        override def onClose(upstream: ActorRef): Unit = if (mediator != null) mediator ! PoisonPill
+
+        override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
+          case TextMessage.Strict("Hello") =>
+            connectKeyValueMediator(regionService, "test", 3) map {
+              case keyValueMediator =>
+                log.info(s"subscribing to $keyValueMediator")
+                this.mediator = keyValueMediator
+                upstream ! TextMessage.Strict("Welcome")
+                upstream ! TextMessage.Strict("Here is your token")
+                keyValueMediator ! RegisterMediatorSubscriber(upstream)
+            }
+          case msg if mediator == null => log.warning(s"IGNORING DOWNSTREAM - MEDIATOR NOT CONNECTED: $msg")
+          case TextMessage.Strict("Write") if mediator != null => mediator ! ID(3)
+
+        }
+
+      }, new UpstreamActor {
+        override def handle: Receive = {
+          case None => push("{}")
+          case Some(base: Envelope) => push(Encoder.json(base))
+          case id: ID => push(Encoder.json(id))
+        }
+      })
+
+  }
+}
+
+
+class WebSocketSpecPartition extends Partition {
+  val data = state[Int, Envelope]("test")
+  import context.dispatcher
+  override def handle: Receive = {
+    case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
+    case ID(s) => data.push(s, ID(s + 1))
+  }
 }

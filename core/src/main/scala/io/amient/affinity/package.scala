@@ -68,7 +68,10 @@ package object affinity {
 
     def apply(config: Config): Config = config.withFallback(defaultConfig)
 
-    def create(name: String, config: Config): ActorSystem = ActorSystem.create(name, apply(config))
+    def create(config: Config): ActorSystem = {
+      val resolvedConfig = apply(config)
+      ActorSystem.create(Conf(resolvedConfig).Affi.SystemName(), resolvedConfig)
+    }
   }
 
   object KeyspaceConf extends KeyspaceConf {
@@ -81,6 +84,8 @@ package object affinity {
 
     val NumPartitions = integer("num.partitions", true)
       .doc("Total number of partitions in the Keyspace")
+
+    val ReplicationFactor = integer("replication.factor", 1).doc("Desired number of online replicas for this keypsace")
 
     val State = group("state", classOf[StateConf], false).doc("Keyspace may have any number of States, each identified by its ID - each state within a Keyspace is co-partitioned identically")
   }

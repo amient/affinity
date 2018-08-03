@@ -59,8 +59,8 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
 
     val key = "6290853012217500191217"
 
-    val system = AffinityActorSystem.create("test",
-      ConfigFactory.parseMap(cfg.map { case (k, v) => ("affinity.avro." + k, v) }))
+    val system = AffinityActorSystem.create(ConfigFactory.parseMap(
+        (cfg.map { case (k, v) => ("affinity.avro." + k, v) }) + ("affinity.system.name" -> "KafkaPartitionerSpec")))
     val akkaSerializedKey = try {
       val serialization = SerializationExtension(system)
       serialization.serialize(key).get

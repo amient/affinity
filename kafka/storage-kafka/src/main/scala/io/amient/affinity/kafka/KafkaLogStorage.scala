@@ -378,5 +378,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     AdminClient.create(adminProps)
   }
 
+  /**
+    *
+    * @return statistics about the underlying log in a human readable format, whatever is available
+    */
+  override def getStats: String = {
+    s"kafka topic `$topic`"
+  }
 }
 

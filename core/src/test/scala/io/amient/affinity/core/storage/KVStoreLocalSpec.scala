@@ -51,7 +51,7 @@ class KVStoreLocalSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll
       HttpInterfaceConf.Port.path -> 0).asJava).asJava
   ).asJava)
 
-  val system = AffinityActorSystem.create("test", cfg)
+  val system = AffinityActorSystem.create(cfg)
 
   override def afterAll: Unit = {
     Await.ready(system.terminate(), 15 seconds)

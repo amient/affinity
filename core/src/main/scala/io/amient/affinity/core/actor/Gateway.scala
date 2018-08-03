@@ -182,8 +182,7 @@ trait Gateway extends ActorHandler {
       if (shouldBeSuspended) suspend else resume
       if (self.path.name == "gateway") {
         //if this is an actual external gateway (as opposed to gateway trait mixed into partition)
-        //publish some messages for synchronizing test utitlities
-        msg.foreach(context.system.eventStream.publish) // this one is for IntegrationTestBase
+        //publish GatewayClusterStatus message for synchronizing test utilities
         context.system.eventStream.publish(GatewayClusterStatus(isSuspended)) //this one for SystemTestBase
       }
     }

@@ -38,7 +38,7 @@ class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
       .withValue(Conf.Affi.Node.path, ConfigValueFactory.fromMap(Map[String, String]().asJava))
       .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
       .withValue(Conf.Affi.Coordinator.Class.path, ConfigValueFactory.fromAnyRef(classOf[CoordinatorEmbedded].getName))
-    val system = AffinityActorSystem.create("test", config)
+    val system = AffinityActorSystem.create(config)
     try {
       val coordinator1 = Coordinator.create(system, "group1")
       val actor1 = system.actorOf(Props(new Actor {

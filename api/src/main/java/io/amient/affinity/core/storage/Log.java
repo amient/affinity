@@ -65,6 +65,10 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         }
     }
 
+    public String getStats() {
+        return "Log: checkpoint=" + checkpoint.toString() + "; storage=" + storage.getStats();
+    }
+
     public POS getCheckpoint() {
         return checkpoint.get();
     }

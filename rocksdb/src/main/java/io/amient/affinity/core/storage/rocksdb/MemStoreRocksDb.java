@@ -103,6 +103,7 @@ public class MemStoreRocksDb extends MemStore {
     private final String identifier;
     private final MetricRegistry metrics;
     private final Long blockCacheSize;
+    private final Statistics statistics;
 
     @Override
     public boolean isPersistent() {
@@ -134,6 +135,7 @@ public class MemStoreRocksDb extends MemStore {
         } else {
             blockTableConfig.noBlockCache();
         }
+
         blockTableConfig.setBlockSize(rocksDbConf.BlockSize.apply());
         if (rocksDbConf.WriteBufferSize.isDefined()) rocksOptions.setWriteBufferSize(rocksDbConf.WriteBufferSize.apply());
         if (rocksDbConf.WriteMaxWriteBufferNumber.isDefined()) rocksOptions.setMaxWriteBufferNumber(rocksDbConf.WriteMaxWriteBufferNumber.apply());
@@ -144,10 +146,13 @@ public class MemStoreRocksDb extends MemStore {
         if (rocksDbConf.OptimizeFiltersForHits.apply()) rocksOptions.optimizeFiltersForHits();
         if (rocksDbConf.OptimizeForPointLookup.apply()) rocksOptions.optimizeForPointLookup(blockCacheSize);
 
+        //TODO rocksOptions.compressionType() //default snappy
         //TODO rocksOptions.setBloomLocality()
         //TODO rocksOptions.setMemtablePrefixBloomSizeRatio()
         //TODO rocksOptions.setLevel0FileNumCompactionTrigger()
 
+        this.statistics = new Statistics();
+        rocksOptions.setStatistics(statistics);
         internal = createOrGetDbInstanceRef(pathToData, rocksOptions, ttlSecs);
         this.metrics = metrics;
         this.identifier = identifier;
@@ -268,6 +273,11 @@ public class MemStoreRocksDb extends MemStore {
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public String getStats() {
+        return statistics.toString();
     }
 
     @Override

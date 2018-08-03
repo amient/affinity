@@ -69,7 +69,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
     , Some(zkConnect), Some(kafkaBootstrap))
 
-  val system = AffinityActorSystem.create("KafkaEcoSystem", config)
+  val system = AffinityActorSystem.create(config)
 
   import system.dispatcher
 

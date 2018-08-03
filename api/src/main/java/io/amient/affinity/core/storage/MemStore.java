@@ -150,4 +150,6 @@ public abstract class MemStore implements Closeable {
         }
     }
 
+    abstract public String getStats();
+
 }
