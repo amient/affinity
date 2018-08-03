@@ -21,10 +21,9 @@ package io.amient.affinity.core.http
 
 import java.io.IOException
 import java.net.URI
-import java.util.UUID
-import java.util.concurrent.{LinkedBlockingQueue, TimeUnit, TimeoutException}
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
-import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.actor.{ActorRef, PoisonPill}
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.model.HttpMethods.GET
 import akka.http.scaladsl.model._
@@ -33,14 +32,13 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.Controller.{CreateContainer, CreateGateway}
 import io.amient.affinity.core.actor.{RegisterMediatorSubscriber, _}
+import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
 import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, JsonMessageHandler, TextMessageHandler}
-import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.apache.avro.generic.GenericData
 import org.codehaus.jackson.JsonNode
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
@@ -49,127 +47,33 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
 import scala.language.postfixOps
 
-class WebSocketSpecPartition extends Partition {
-  val data = state[Int, Envelope]("test")
-  import context.dispatcher
-  override def handle: Receive = {
-    case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
-    case ID(s) => data.push(s, ID(s + 1))
-  }
-}
 
 class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matchers {
 
-  val system: ActorSystem = AffinityActorSystem.create(ConfigFactory.load("websocketsupportspec"))
 
-  import system.dispatcher
+  val node = new Node(ConfigFactory.load("websocketsupportspec"))
 
   val specTimeout = 6 seconds
 
-  private val controller = system.actorOf(Props(new Controller), name = "controller")
-  implicit val timeout = Timeout(specTimeout)
+  val httpPort = Await.result(node.startGateway(), specTimeout).head
 
-  controller ! CreateContainer("region", List(0, 1, 2, 3), Props(new Partition() {
-    val data = state[Int, Envelope]("test")
+  node.startContainers()
 
-    override def handle: Receive = {
-      case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
-      case ID(s) => data.push(s, ID(s+1))
-    }
-  }))
+  import node.system.dispatcher
 
-
-  val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with WebSocketSupport {
-
-    private val log: LoggingAdapter = Logging.getLogger(context.system, this)
-
-    val regionService = keyspace("region")
-
-    override def handle: Receive = {
-
-      case WEBSOCK(PATH("test-avro-socket", INT(x)), _, socket) =>
-        connectKeyValueMediator(regionService, "test", x) map {
-          case keyValueMediator => avroWebSocket(socket, keyValueMediator)
-        }
-
-      case HTTP(HttpMethods.GET, PATH("update-it"), _, response) =>
-        accept(response, regionService ? Envelope(ID(2), Side.RIGHT))
-
-      case WEBSOCK(PATH("test-json-socket"), _, socket) =>
-        connectKeyValueMediator(regionService, "test", 2) map {
-          case keyValueMediator => jsonWebSocket(socket, keyValueMediator)
-        }
-
-      case WEBSOCK(PATH("test-custom-socket"), _, socket) =>
-        customWebSocket(socket, new DownstreamActor {
-
-          private var mediator: ActorRef = null
-
-          override def onClose(upstream: ActorRef): Unit = if (mediator != null) mediator ! PoisonPill
-
-          override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
-            case TextMessage.Strict("Hello") =>
-              connectKeyValueMediator(regionService, "test", 3) map {
-                case keyValueMediator =>
-                  log.info(s"subscribing to $keyValueMediator")
-                  this.mediator = keyValueMediator
-                  upstream ! TextMessage.Strict("Welcome")
-                  upstream ! TextMessage.Strict("Here is your token")
-                  keyValueMediator ! RegisterMediatorSubscriber(upstream)
-              }
-            case msg if mediator == null => log.warning(s"IGNORING DOWNSTREAM - MEDIATOR NOT CONNECTED: $msg")
-            case TextMessage.Strict("Write") if mediator != null => mediator ! ID(3)
-
-          }
-
-        }, new UpstreamActor {
-          override def handle: Receive = {
-            case None => push("{}")
-            case Some(base: Envelope) => push(Encoder.json(base))
-            case id: ID => push(Encoder.json(id))
-          }
-        })
-
-    }
-  })) map {
-    case port :: Nil => port
-  }, timeout.duration)
-
-  private val groupsReady = scala.collection.mutable.Set[String]()
-  system.eventStream.subscribe(system.actorOf(Props(new Actor {
-    override def receive: Receive = {
-      case GroupStatus(g, false) => {
-        groupsReady.synchronized {
-          groupsReady.add(g)
-          groupsReady.notifyAll()
-        }
-      }
-    }
-  })), classOf[GroupStatus])
-
-  def awaitGroupReady(group: String): Unit = {
-    val t = System.currentTimeMillis()
-    groupsReady.synchronized {
-      while (!groupsReady.contains(group)) {
-        if (System.currentTimeMillis() - t > 30000) throw new TimeoutException("Service didn't start within 30 seconds")
-        groupsReady.wait(100)
-      }
-    }
-  }
-
-  implicit val materializer = ActorMaterializer.create(system)
+  implicit val materializer = ActorMaterializer.create(node.system)
 
   def http_get(uri: Uri): String = {
     val promise = Promise[HttpResponse]()
-    system.actorSelection("/user/controller/gateway") ! HttpExchange(HttpRequest(GET, uri), promise)
+    node.system.actorSelection("/user/controller/gateway") ! HttpExchange(HttpRequest(GET, uri), promise)
     val response = Await.result(promise.future flatMap (_.toStrict(2 second)), 2 seconds)
     Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
   }
 
 
-  override def beforeAll(): Unit = awaitGroupReady("region")
+  override def beforeAll(): Unit = node.awaitClusterReady()
 
-  override def afterAll: Unit = system.terminate()
+  override def afterAll: Unit = node.shutdown()
 
   "AvroWebSocket channel" must {
 
@@ -277,4 +181,70 @@ class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matc
     }
   }
 
+}
+
+class WebSocketSpecGateway extends GatewayHttp with WebSocketSupport {
+  private val log: LoggingAdapter = Logging.getLogger(context.system, this)
+
+  val regionService = keyspace("region")
+
+  import context.dispatcher
+
+  override def handle: Receive = {
+
+    case WEBSOCK(PATH("test-avro-socket", INT(x)), _, socket) =>
+      connectKeyValueMediator(regionService, "test", x) map {
+        case keyValueMediator => avroWebSocket(socket, keyValueMediator)
+      }
+
+    case HTTP(HttpMethods.GET, PATH("update-it"), _, response) =>
+      implicit val specTimeout = Timeout(6 seconds)
+      accept(response, regionService ? Envelope(ID(2), Side.RIGHT))
+
+    case WEBSOCK(PATH("test-json-socket"), _, socket) =>
+      connectKeyValueMediator(regionService, "test", 2) map {
+        case keyValueMediator => jsonWebSocket(socket, keyValueMediator)
+      }
+
+    case WEBSOCK(PATH("test-custom-socket"), _, socket) =>
+      customWebSocket(socket, new DownstreamActor {
+
+        private var mediator: ActorRef = null
+
+        override def onClose(upstream: ActorRef): Unit = if (mediator != null) mediator ! PoisonPill
+
+        override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
+          case TextMessage.Strict("Hello") =>
+            connectKeyValueMediator(regionService, "test", 3) map {
+              case keyValueMediator =>
+                log.info(s"subscribing to $keyValueMediator")
+                this.mediator = keyValueMediator
+                upstream ! TextMessage.Strict("Welcome")
+                upstream ! TextMessage.Strict("Here is your token")
+                keyValueMediator ! RegisterMediatorSubscriber(upstream)
+            }
+          case msg if mediator == null => log.warning(s"IGNORING DOWNSTREAM - MEDIATOR NOT CONNECTED: $msg")
+          case TextMessage.Strict("Write") if mediator != null => mediator ! ID(3)
+
+        }
+
+      }, new UpstreamActor {
+        override def handle: Receive = {
+          case None => push("{}")
+          case Some(base: Envelope) => push(Encoder.json(base))
+          case id: ID => push(Encoder.json(id))
+        }
+      })
+
+  }
+}
+
+
+class WebSocketSpecPartition extends Partition {
+  val data = state[Int, Envelope]("test")
+  import context.dispatcher
+  override def handle: Receive = {
+    case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
+    case ID(s) => data.push(s, ID(s + 1))
+  }
 }

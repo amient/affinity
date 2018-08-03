@@ -19,19 +19,16 @@
 
 package io.amient.affinity.core.serde
 
-import java.util.UUID
-
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.{AffinityActorSystem, Conf}
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.IntegrationTestBase
 import io.amient.affinity.core.actor.{CreateKeyValueMediator, Routed}
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.util.Reply
+import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.collection.immutable.Seq
