@@ -31,6 +31,13 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.language.postfixOps
 
+class TlsGateway extends GatewayHttp {
+  override def handle: Receive = {
+    case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
+  }
+}
+
+
 class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAndAfterAll with Matchers {
 
   def config = configure("tlstests")
@@ -40,11 +47,8 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
   val node = new Node(config)
 
   override def beforeAll: Unit = try {
-    node.startGateway(new GatewayHttp {
-      override def handle: Receive = {
-        case HTTP(GET, _, _, response) => response.success(HttpResponse(OK, entity = "Hello World"))
-      }
-    })
+    node.start()
+    node.awaitClusterReady()
   } finally {
     super.beforeAll()
   }

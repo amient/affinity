@@ -23,16 +23,15 @@ import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import io.amient.affinity.core.cluster.CoordinatorEmbedded
-import io.amient.affinity.core.http.HttpInterfaceConf
-import io.amient.affinity.core.state.{KVStoreLocal, KVStoreConf}
+import io.amient.affinity.core.state.{KVStoreConf, KVStoreLocal}
 import io.amient.affinity.core.util.{EventTime, TimeRange}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
-import scala.language.postfixOps
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 
 case class ExampleCompoundKey(@Fixed key1:Long, @Fixed(1) key2: String, subkey: Int) extends AvroRecord
 
@@ -45,17 +44,12 @@ class KVStoreLocalSpec extends FlatSpecLike with Matchers with BeforeAndAfterAll
   val cfg = ConfigFactory.parseMap(Map(
     Conf.Affi.SystemName.path -> "kv-store-local-spec",
     Conf.Affi.Avro.Class.path -> classOf[MemorySchemaRegistry].getName,
-    Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
-    Conf.Affi.Node.Gateway.Listeners.path -> List(Map(
-      HttpInterfaceConf.Host.path -> "127.0.0.1",
-      HttpInterfaceConf.Port.path -> 0).asJava).asJava
+    Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName
   ).asJava)
 
   val system = AffinityActorSystem.create(cfg)
 
-  override def afterAll: Unit = {
-    Await.ready(system.terminate(), 15 seconds)
-  }
+  override def afterAll: Unit = system.terminate()
 
   import scala.concurrent.ExecutionContext.Implicits.global
 

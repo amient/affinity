@@ -56,18 +56,21 @@ trait GatewayHttp extends Gateway {
 
   import context.system
 
+  val rejectSuspendedHttpRequests: Boolean = conf.Affi.Node.Gateway.RejectSuspendedHttpRequests()
+
+  def listenerConfigs: Seq[HttpInterfaceConf] = conf.Affi.Node.Gateway.Listeners().asScala
+
+  val interfaces: List[HttpInterface] = listenerConfigs.map(new HttpInterface(_)).toList
+
+  private val listeners: List[InetSocketAddress] = interfaces.map(_.bind(self))
+
+  private val onlineCounter = metrics.counter("http.gateway." + interfaces.head.port)
+
   private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
-
-  val interfaces: List[HttpInterface] = conf.Affi.Node.Gateway.Listeners().asScala.map(new HttpInterface(_)).toList
-
-  val listeners: List[InetSocketAddress] = interfaces.map(_.bind(self))
-
-  require(interfaces.size >= 1, "At least one interface must be defined for Http Gateway to function")
-
-  val onlineCounter = metrics.counter("http.gateway." + interfaces.head.port)
 
   abstract override def preStart(): Unit = {
     super.preStart()
+    require(interfaces.size >= 1, "At least one interface must be defined for Http Gateway to function")
     log.info("Gateway starting")
     context.parent ! Controller.GatewayCreated(listeners.map(_.getPort))
   }
@@ -99,7 +102,7 @@ trait GatewayHttp extends Gateway {
   }
 
   override def onHold(message: Any, sender: ActorRef): Unit = message match {
-    case exchange: HttpExchange if conf.Affi.Node.Gateway.RejectSuspendedHttpRequests() =>
+    case exchange: HttpExchange if rejectSuspendedHttpRequests =>
       exchange.promise.success(HttpResponse(StatusCodes.ServiceUnavailable))
     case _ => super.onHold(message, sender)
   }

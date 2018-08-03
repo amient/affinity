@@ -19,25 +19,27 @@
 
 package io.amient.affinity.core.cluster
 
+import java.lang
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, Uri, headers}
 import akka.util.Timeout
-import com.typesafe.config.ConfigValueFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.GatewayHttp
 import io.amient.affinity.core.cluster.FailoverTestPartition.{GetValue, PutValue}
-import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.http.{Encoder, HttpInterfaceConf}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.state.KVStoreLocal
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -49,7 +51,7 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   override def numPartitions = 2
 
-  def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
+  def config = configure("failoverspecs", Some(zkConnect), Some(kafkaBootstrap))
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
   val node1 = new Node(config)
@@ -59,6 +61,11 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   node1.startGateway(new GatewayHttp {
 
     implicit val scheduler = context.system.scheduler
+
+    override val rejectSuspendedHttpRequests = false
+
+    override def listenerConfigs: Seq[HttpInterfaceConf] = List(HttpInterfaceConf(
+      ConfigFactory.parseMap(Map("host" -> "127.0.0.1", "port" -> "0").asJava)))
 
     val keyspace1 = keyspace("keyspace1")
 

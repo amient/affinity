@@ -23,7 +23,6 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.storage.LogStorage
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
@@ -34,25 +33,23 @@ import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.reflect.ClassTag
 import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
 
 class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
   override def numPartitions = 4
 
   val config: Config = ConfigFactory.load("example")
-    .withValue(Conf.Affi.Node.Gateway.Listeners.path, ConfigValueFactory.fromIterable(List(Map(
-      HttpInterfaceConf.Host.path -> "127.0.0.1",
-      HttpInterfaceConf.Port.path -> 0
-    ).asJava).asJava))
+    .withValue(Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
+    .withValue(Conf.Affi.Node.Containers("graph").path, ConfigValueFactory.fromIterable(List(0,1,2,3).asJava))
+
 
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
 
   override def beforeAll(): Unit = try {
-    node1.startGateway(new ExampleGateway)
-    node2.startContainer("graph", List(0, 1, 2, 3))
+    node1.start()
     node1.awaitClusterReady
     node1.http_post("/connect/1/2").status should be(SeeOther)
     node1.http_post("/connect/3/4").status should be(SeeOther)

@@ -131,7 +131,14 @@ class Node(config: Config) {
   }
 
   def start(): Unit = try {
-    Await.result(Future.sequence(startGateway() +: startContainers()), startupTimeout)
+    startContainers()
+    val f = if (conf.Affi.Node.Gateway.Class.isDefined) {
+      startGateway(conf.Affi.Node.Gateway.Class().newInstance())
+    } else {
+      httpGatewayPort.success(List())
+      Future.successful(List())
+    }
+    Await.result(f, startupTimeout)
   } catch {
     case e: Throwable =>
       try {
@@ -139,18 +146,6 @@ class Node(config: Config) {
       } finally {
         throw e
       }
-  }
-
-  /**
-    * @return a future with list of ports indexed by the interface id 0-n
-    */
-  def startGateway(): Future[List[Int]] = {
-    if (conf.Affi.Node.Gateway.Class.isDefined) {
-      startGateway(conf.Affi.Node.Gateway.Class().newInstance())
-    } else {
-      httpGatewayPort.success(List())
-      Future.successful(List())
-    }
   }
 
   /**
@@ -166,25 +161,18 @@ class Node(config: Config) {
     result
   }
 
-
   def startContainers(): Seq[Future[Unit]] = {
     if (conf.Affi.Node.Containers.isDefined) {
       conf.Affi.Node.Containers().asScala.toList.map {
         case (group: String, value: CfgIntList) =>
           val partitions = value().asScala.map(_.toInt).toList
-          startContainer(group, partitions)
+          val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
+          implicit val timeout = Timeout(startupTimeout)
+          controller ?? CreateContainer(group, partitions, Props(serviceClass.newInstance()))
       }
     } else {
       List.empty
     }
-  }
-
-  implicit val scheduler = system.scheduler
-
-  def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
-    val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
-    implicit val timeout = Timeout(startupTimeout)
-    controller ?? CreateContainer(group, partitions, Props(serviceClass.newInstance()))
   }
 
   def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
