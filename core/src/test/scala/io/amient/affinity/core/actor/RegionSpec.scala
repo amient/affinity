@@ -47,19 +47,35 @@ class RegionSpec extends WordSpecLike with Matchers with Eventually with Integra
 
   val system: ActorSystem = AffinityActorSystem.create(ConfigFactory.load("regionspec"))
 
+  val testPartition = Props(new Partition {
+    override def preStart(): Unit = {
+      Thread.sleep(100)
+      super.preStart()
+    }
+
+    override def handle: Receive = {
+      case e: IllegalStateException => context.stop(self)
+      case _ =>
+    }
+  })
+
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
-//      val zk = new EmbeddedZookeperServer {}
+      //      val zk = new EmbeddedZookeperServer {}
       try {
-        val coordinator = Coordinator.create(system, "region/online")
+        val coordinator = Coordinator.create(system, "region")
         try {
           val d = 1 second
           implicit val timeout = Timeout(d)
 
-          val region = system.actorOf(Props(new Container("region")), name = "region")
-
-            eventually {
+          val region = system.actorOf(Props(new Container("region") {
+            val partitions = List(0, 1, 2, 3)
+            for (partition <- partitions) {
+              context.actorOf(testPartition, name = partition.toString)
+            }
+          }), name = "region")
+          eventually {
             coordinator.members.size should be(4)
           }
 
@@ -90,7 +106,7 @@ class RegionSpec extends WordSpecLike with Matchers with Eventually with Integra
           coordinator.close
         }
       } finally {
-//        zk.close()
+        //        zk.close()
       }
     }
   }

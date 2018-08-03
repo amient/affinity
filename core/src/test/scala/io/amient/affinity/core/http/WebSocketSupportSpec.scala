@@ -69,6 +69,16 @@ class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matc
   private val controller = system.actorOf(Props(new Controller), name = "controller")
   implicit val timeout = Timeout(specTimeout)
 
+  controller ! CreateContainer("region", List(0, 1, 2, 3), Props(new Partition() {
+    val data = state[Int, Envelope]("test")
+
+    override def handle: Receive = {
+      case query@Envelope(id, _, _) => query(sender) ! data.replace(id.id, query)
+      case ID(s) => data.push(s, ID(s+1))
+    }
+  }))
+
+
   val httpPort = Await.result(controller ? CreateGateway(Props(new GatewayHttp() with WebSocketSupport {
 
     private val log: LoggingAdapter = Logging.getLogger(context.system, this)

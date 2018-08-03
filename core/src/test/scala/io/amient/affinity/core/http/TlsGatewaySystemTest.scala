@@ -35,7 +35,7 @@ class TlsGatewaySystemTest extends FlatSpec with AffinityTestBase with BeforeAnd
 
   def config = configure("tlstests")
 
-  val system = AffinityActorSystem.create("TlsGatewayTest", config)
+  val system = AffinityActorSystem.create(config)
 
   val node = new Node(config)
 

@@ -61,7 +61,7 @@ class Node(config: Config) {
   val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
   val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
-  implicit val system = AffinityActorSystem.create(conf.Affi.SystemName(), config)
+  implicit val system = AffinityActorSystem.create(config)
 
   private val log = LoggerFactory.getLogger(this.getClass) //Logging.getLogger(system, this)
 

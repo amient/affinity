@@ -39,7 +39,7 @@ class ZkCoordinatorSpec extends FlatSpec with AffinityTestBase with EmbeddedZooK
 
   def config = configure("distributedit", zkConnect = Some(zkConnect))
 
-  val system = AffinityActorSystem.create("test", config)
+  val system = AffinityActorSystem.create(config)
 
   val node1 = new Node(config)
   node1.startGateway(new GatewayHttp {
