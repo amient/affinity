@@ -19,46 +19,47 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{ActorPath, PoisonPill, Props}
+import akka.actor.{ActorPath, ActorSystem, PoisonPill, Props}
 import akka.util.Timeout
-import io.amient.affinity.core.IntegrationTestBase
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.core.cluster.Coordinator
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 
-class RegionSpec extends IntegrationTestBase with Eventually with IntegrationPatience {
+class RegionSpecPartition extends Partition {
+  override def preStart(): Unit = {
+    Thread.sleep(100)
+    super.preStart()
+  }
 
-  val testPartition = Props(new Partition {
-    override def preStart(): Unit = {
-      Thread.sleep(100)
-      super.preStart()
-    }
+  override def handle: Receive = {
+    case e: IllegalStateException => context.stop(self)
+    case _ =>
+  }
+}
 
-    override def handle: Receive = {
-      case e: IllegalStateException => context.stop(self)
-      case _ =>
-    }
-  })
+class RegionSpec extends WordSpecLike with Matchers with Eventually with IntegrationPatience {
+
+  val system: ActorSystem = AffinityActorSystem.create(ConfigFactory.load("regionspec"))
+
 
   "A Region Actor" must {
     "must keep Coordinator Updated during partition failure & restart scenario" in {
 //      val zk = new EmbeddedZookeperServer {}
       try {
-        val coordinator = Coordinator.create(system, "region")
+        val coordinator = Coordinator.create(system, "region/online")
         try {
           val d = 1 second
           implicit val timeout = Timeout(d)
 
-          val region = system.actorOf(Props(new Container("region") {
-            val partitions = List(0, 1, 2, 3)
-            for (partition <- partitions) {
-              context.actorOf(testPartition, name = partition.toString)
-            }
-          }), name = "region")
-          eventually {
+          val region = system.actorOf(Props(new Container("region")), name = "region")
+
+            eventually {
             coordinator.members.size should be(4)
           }
 

@@ -183,7 +183,7 @@ trait Gateway extends ActorHandler {
       if (self.path.name == "gateway") {
         //if this is an actual external gateway (as opposed to gateway trait mixed into partition)
         //publish some messages for synchronizing test utitlities
-        msg.foreach(context.system.eventStream.publish) // this one is for IntegrationTestBase
+        msg.foreach(context.system.eventStream.publish) // FIXME this one is for WebSocketSupportSpec only, get rid of it
         context.system.eventStream.publish(GatewayClusterStatus(isSuspended)) //this one for SystemTestBase
       }
     }
