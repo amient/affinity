@@ -103,6 +103,12 @@ public class MemStoreSortedMap extends MemStore {
     }
 
     @Override
+    public String getStats() {
+        return "size = " + internal2.size();
+    }
+
+
+    @Override
     public void close() throws IOException {
         internal2.clear();
     }

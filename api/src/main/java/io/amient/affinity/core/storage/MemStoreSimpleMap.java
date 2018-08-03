@@ -89,6 +89,11 @@ public class MemStoreSimpleMap extends MemStore {
     }
 
     @Override
+    public String getStats() {
+        return "size = " + internal.size();
+    }
+
+    @Override
     public void close() throws IOException {
         internal.clear();
     }

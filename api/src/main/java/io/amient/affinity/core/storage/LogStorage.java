@@ -82,6 +82,12 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
     }
 
     /**
+     *
+     * @return statistics about the underlying log in a human readable format, whatever is available
+     */
+    String getStats();
+
+    /**
      * get number of partitions of the underlying physical log
      * @return number of partitions
      */

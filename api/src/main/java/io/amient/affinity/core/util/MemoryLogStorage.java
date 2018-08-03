@@ -173,4 +173,13 @@ public class MemoryLogStorage implements LogStorage<Long> {
             this.record = record;
         }
     }
+
+    /**
+     *
+     * @return statistics about the underlying log in a human readable format, whatever is available
+     */
+    @Override
+    public String getStats() {
+        return "logEndOffset=" + logEndOffset.get() + "; fetchStopOffset=" + fetchStopOffset.get();
+    }
 }

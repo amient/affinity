@@ -132,4 +132,8 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
 
   override def updateAndGet(key: K, f: Option[V] => Option[V]): Future[Option[V]] = master ?? UpdateAndGet(key, f)
 
+  /**
+    * @return statistics about the memstore and storage, whatever is available
+    */
+  override def getStats: String = underlying.map(_.getStats).mkString("\n")
 }

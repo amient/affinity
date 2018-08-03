@@ -51,6 +51,11 @@ trait KVStore[K, V] extends Closeable {
   def numKeys: Long
 
   /**
+    * @return statistics about the memstore and storage, whatever is available
+    */
+  def getStats: String
+
+  /**
     * replace is a faster operation than update because it doesn't look at the existing value
     * associated with the given key
     *

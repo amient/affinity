@@ -558,4 +558,11 @@ class KVStoreLocal[K, V](val identifier: String,
     }
   }
 
+  /**
+    * @return statistics about the memstore and storage, whatever is available
+    */
+  override def getStats: String = {
+    s"$identifier\n===================================================================\n" +
+    s"${logOption.map(_.getStats).getOrElse("")}\nMemStore[${kvstore.getClass.getSimpleName}]\n${kvstore.getStats}\n\n"
+  }
 }
