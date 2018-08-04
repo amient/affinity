@@ -132,13 +132,11 @@ class Node(config: Config) {
 
   def start(): Unit = try {
     startContainers()
-    val f = if (conf.Affi.Node.Gateway.Class.isDefined) {
-      startGateway(conf.Affi.Node.Gateway.Class().newInstance())
+    if (conf.Affi.Node.Gateway.Class.isDefined) {
+      Await.result(startGateway(conf.Affi.Node.Gateway.Class().newInstance()), startupTimeout)
     } else {
       httpGatewayPort.success(List())
-      Future.successful(List())
     }
-    Await.result(f, startupTimeout)
   } catch {
     case e: Throwable =>
       try {
