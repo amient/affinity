@@ -36,6 +36,8 @@ object Container {
 
   case class AddPartition(p: Int, props: Props) extends Reply[ActorRef]
 
+  case class DropPartition(p: Int) extends Reply[Unit]
+
   case class PartitionOnline(partition: ActorRef)
 
   case class PartitionOffline(partition: ActorRef)
@@ -57,13 +59,19 @@ class Container(group: String) extends Actor {
 
   private val partitions = scala.collection.mutable.Map[ActorRef, String]()
 
+  private val partitionIndex = scala.collection.mutable.Map[Int, ActorRef]()
+
   /**
     * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
     */
   private val coordinator = Coordinator.create(context.system, group)
-  coordinator.watch(self)
 
   private val masters = scala.collection.mutable.Set[ActorRef]()
+
+  override def preStart(): Unit = {
+    super.preStart()
+    coordinator.watch(self)
+  }
 
   override def postStop(): Unit = {
     if (!coordinator.isClosed) {
@@ -82,7 +90,13 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
-    case request@AddPartition(p, props) => request(sender) ! context.actorOf(props, name = p.toString)
+    case request@AddPartition(p, props) => request(sender) ! {
+      val ref = context.actorOf(props, name = p.toString)
+      partitionIndex += p -> ref
+      ref
+    }
+
+    case request@DropPartition(p) => request(sender) ! partitionIndex.remove(p).foreach(context.stop)
 
     case PartitionOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")

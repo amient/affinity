@@ -42,12 +42,14 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     .withValue(Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
     .withValue(Conf.Affi.Node.Containers("graph").path, ConfigValueFactory.fromIterable(List(0,1).asJava))
 
-  val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
-  val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)).withValue(Conf.Affi.Node.DataDir.path, ConfigValueFactory.fromAnyRef(".data/example-graph-node1")))
+  val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)).withValue(Conf.Affi.Node.DataDir.path, ConfigValueFactory.fromAnyRef(".data/example-graph-node2")))
 
   override def beforeAll(): Unit = try {
     node1.start()
+    node2.start()
     node1.awaitClusterReady
+    node2.awaitClusterReady
   } finally {
     super.beforeAll()
   }

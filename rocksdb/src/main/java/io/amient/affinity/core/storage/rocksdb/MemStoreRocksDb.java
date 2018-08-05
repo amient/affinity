@@ -269,7 +269,7 @@ public class MemStoreRocksDb extends MemStore {
     synchronized public void remove(ByteBuffer key) {
         byte[] keyBytes = ByteUtils.bufToArray(key);
         try {
-            internal.remove(keyBytes);
+            internal.delete(keyBytes);
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
