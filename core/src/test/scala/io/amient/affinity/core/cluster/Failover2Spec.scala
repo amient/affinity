@@ -85,12 +85,13 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     }
   })
 
-  val node2 = new Node(config)
-  val node3 = new Node(config)
+  val node2 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
+  val node3 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
 
   override def beforeAll(): Unit = try {
-    node2.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
-    node3.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
+    node2.start()
+    node3.start()
+    node1.awaitClusterReady()
   } finally {
     super.beforeAll()
   }

@@ -55,8 +55,8 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
   val node1 = new Node(config)
-  val node2 = new Node(config)
-  val node3 = new Node(config)
+  val node2 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
+  val node3 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
 
   node1.startGateway(new GatewayHttp {
 
@@ -105,8 +105,8 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
       p1.replace("A", "initialValueA"),
       p1.replace("B", "initialValueB"))), 1 second)
 
-    node2.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
-    node3.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
+    node2.start()
+    node3.start()
 
     node1.awaitClusterReady
   } finally {
