@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import akka.http.scaladsl.model.HttpMethods._
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.Conf
-import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.state.KVStoreLocal
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
@@ -43,9 +42,8 @@ class Failover1Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   override def numPartitions = 2
 
   def config = configure("failoverspecs", Some(zkConnect), Some(kafkaBootstrap))
-    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
-  val node1 = new Node(config)
+  val node1 = new Node(config.withValue(Conf.Affi.Node.Gateway.Class.path, ConfigValueFactory.fromAnyRef(classOf[FailoverTestGateway].getName)))
   val node2 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
   val node3 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
 

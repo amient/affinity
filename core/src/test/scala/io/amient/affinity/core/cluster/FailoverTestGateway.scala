@@ -30,7 +30,7 @@ class FailoverTestGateway extends GatewayHttp {
 
   override def handle: Receive = {
     case HTTP(GET, PATH(key), _, response) => handleWith(response) {
-      implicit val timeout = Timeout(3 seconds)
+      implicit val timeout = Timeout(1 seconds)
       keyspace1 ?! GetValue(key) map {
         _ match {
           case None => HttpResponse(NotFound)
@@ -40,7 +40,7 @@ class FailoverTestGateway extends GatewayHttp {
     }
 
     case HTTP(POST, PATH(key, value), _, response) => handleWith(response) {
-      implicit val timeout = Timeout(3 seconds)
+      implicit val timeout = Timeout(1 seconds)
       keyspace1 ?! PutValue(key, value) map {
         case _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
       }

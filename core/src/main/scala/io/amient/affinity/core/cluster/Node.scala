@@ -130,9 +130,11 @@ class Node(config: Config) {
   }
 
   def start(): Unit = try {
+
     if (conf.Affi.Node.Gateway.Class.isDefined) {
-      Await.result(startGateway(conf.Affi.Node.Gateway.Class().newInstance()), startupTimeout)
+      Await.result(start(conf.Affi.Node.Gateway.Class().newInstance()), startupTimeout)
     } else {
+      controller ! StartRebalance()
       httpGatewayPort.success(List())
     }
   } catch {
@@ -150,18 +152,12 @@ class Node(config: Config) {
     * @tparam T
     * @return a future with list of ports indexed by the interface id 0-n
     */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[List[Int]] = {
+  def start[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[List[Int]] = {
+    controller ! StartRebalance()
     implicit val timeout = Timeout(startupTimeout)
     val result = controller ?? CreateGateway(Props(creator))
     httpGatewayPort.completeWith(result)
     result
   }
-
-  def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
-                                    (implicit tag: ClassTag[T]): Future[Unit] = {
-    implicit val timeout = Timeout(startupTimeout)
-    controller ?? CreateContainer(group, partitions, Props(partitionCreator))
-  }
-
 
 }

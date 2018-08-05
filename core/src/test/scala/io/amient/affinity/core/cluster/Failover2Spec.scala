@@ -27,7 +27,6 @@ import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.Conf
-import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
@@ -46,14 +45,13 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
   override def numPartitions = 2
 
   def config = configure("failoverspecs", Some(zkConnect), Some(kafkaBootstrap))
-    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
 
-  val node1 = new Node(config)
-  node1.start()
+  val node1 = new Node(config.withValue(Conf.Affi.Node.Gateway.Class.path, ConfigValueFactory.fromAnyRef(classOf[FailoverTestGateway].getName)))
   val node2 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
   val node3 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
 
   override def beforeAll(): Unit = try {
+    node1.start()
     node2.start()
     node3.start()
     node1.awaitClusterReady()
@@ -88,7 +86,8 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
           }
           Success(response.status)
       } recover {
-        case e: Throwable => Failure(e)
+        case e: Throwable =>
+          Failure(e)
       }
     }
     requestCount.set(requests.size)

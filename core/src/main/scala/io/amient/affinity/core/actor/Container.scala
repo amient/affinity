@@ -26,7 +26,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
+import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
 import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
@@ -61,7 +61,9 @@ class Container(group: String) extends Actor {
     * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
     */
   private val coordinator = Coordinator.create(context.system, group)
-  coordinator.watch(self, clusterWide = false)
+  coordinator.watch(self)
+
+  private val masters = scala.collection.mutable.Set[ActorRef]()
 
   override def postStop(): Unit = {
     if (!coordinator.isClosed) {
@@ -89,14 +91,21 @@ class Container(group: String) extends Actor {
       partitions += (ref -> handle)
 
     case PartitionOffline(ref) =>
-      log.debug(s"Partition offline: handle=${partitions(ref)}, path=${ref.path}")
+      log.debug(s"Partition offline: handle=${partitions.get(ref)}, path=${ref.path}")
       coordinator.unregister(partitions(ref))
       partitions -= ref
 
-    case request @ MasterUpdates(add, remove) => request(sender) ! {
+    case request: MembershipUpdate => request(sender) ! {
+      //get cluster-wide master delta
+      val (_add, _remove) = request.mastersDelta(masters)
+      //filter out non-local changes and apply
+      val remove = _remove.filter(_.path.address == self.path.address)
+      masters --= remove
+      val add = _add.filter(_.path.address == self.path.address)
+      masters ++= add
       implicit val timeout = Timeout(startupTimeout)
-      remove.toList.foreach(ref => ref ?! BecomeStandby())
-      add.toList.foreach(ref => ref ?! BecomeMaster())
+      remove.foreach(_ ?! BecomeStandby())
+      add.foreach(_ ?! BecomeMaster())
     }
   }
 }

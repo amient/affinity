@@ -30,15 +30,14 @@ import io.amient.affinity.core.actor.Container.AddPartition
 import io.amient.affinity.core.config.CfgIntList
 import io.amient.affinity.core.util.Reply
 
-import scala.concurrent.{Await, Future, Promise}
-import scala.concurrent.duration._
-import scala.language.postfixOps
-import scala.util.control.NonFatal
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, Promise}
+import scala.language.postfixOps
 
 object Controller {
 
-  final case class CreateContainer(group: String, partitions: List[Int], partitionProps: Props) extends Reply[Unit]
+  final case class StartRebalance()
 
   final case class CreateGateway(handlerProps: Props) extends Reply[List[Int]]
 
@@ -90,38 +89,25 @@ class Controller extends Actor {
 
   override def preStart(): Unit = {
     super.preStart()
-    if (conf.Affi.Node.Containers.isDefined) {
-      conf.Affi.Node.Containers().asScala.toList.map {
-        case (group: String, value: CfgIntList) =>
-          val container = getOrCreateContainer(group)
-
-          val partitions = value().asScala.map(_.toInt).toList
-          val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
-          implicit val timeout = Timeout(startupTimeout)
-          Await.result(Future.sequence(partitions.map{ p =>
-            container ?? AddPartition(p, Props(serviceClass.newInstance()))
-          }), startupTimeout)
-      }
-    }
   }
 
   override def receive: Receive = {
 
-    case request@CreateContainer(group, partitions, partitionProps) => request(sender) ! {
-      try {
-        log.debug(s"Creating Container for $group with partitions $partitions")
-        val container = getOrCreateContainer(group)
-        implicit val timeout = Timeout(startupTimeout)
-        Future.sequence(partitions.map { p =>
-          container ?? AddPartition(p, partitionProps)
-        }) map ( _ => ())
-      } catch {
-        case NonFatal(e) =>
-          Future.failed(new RuntimeException(s"Could not create container for $group with partitions $partitions", e))
-      }
-    }
-
     case Terminated(child) if (containers.contains(child.path.name)) => containers.remove(child.path.name)
+
+    case _: StartRebalance =>
+      if (conf.Affi.Node.Containers.isDefined) {
+        conf.Affi.Node.Containers().asScala.toList.map {
+          case (group: String, value: CfgIntList) =>
+            val container = getOrCreateContainer(group)
+            val partitions = value().asScala.map(_.toInt).toList
+            val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
+            implicit val timeout = Timeout(startupTimeout)
+            Await.result(Future.sequence(partitions.map{ p =>
+              container ?? AddPartition(p, Props(serviceClass.newInstance()))
+            }), startupTimeout)
+        }
+      }
 
     case request@CreateGateway(gatewayProps) => try {
       val gatewayRef = context.actorOf(gatewayProps, name = "gateway")
