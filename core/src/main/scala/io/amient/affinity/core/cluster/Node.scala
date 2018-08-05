@@ -131,7 +131,6 @@ class Node(config: Config) {
   }
 
   def start(): Unit = try {
-    startContainers()
     if (conf.Affi.Node.Gateway.Class.isDefined) {
       Await.result(startGateway(conf.Affi.Node.Gateway.Class().newInstance()), startupTimeout)
     } else {
@@ -157,20 +156,6 @@ class Node(config: Config) {
     val result = controller ?? CreateGateway(Props(creator))
     httpGatewayPort.completeWith(result)
     result
-  }
-
-  def startContainers(): Seq[Future[Unit]] = {
-    if (conf.Affi.Node.Containers.isDefined) {
-      conf.Affi.Node.Containers().asScala.toList.map {
-        case (group: String, value: CfgIntList) =>
-          val partitions = value().asScala.map(_.toInt).toList
-          val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
-          implicit val timeout = Timeout(startupTimeout)
-          controller ?? CreateContainer(group, partitions, Props(serviceClass.newInstance()))
-      }
-    } else {
-      List.empty
-    }
   }
 
   def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)

@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, ActorPath, ActorRef}
+import akka.actor.{Actor, ActorPath, ActorRef, Props}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.Conf
@@ -27,11 +27,14 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
+import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object Container {
+
+  case class AddPartition(p: Int, props: Props) extends Reply[ActorRef]
 
   case class PartitionOnline(partition: ActorRef)
 
@@ -60,12 +63,6 @@ class Container(group: String) extends Actor {
   private val coordinator = Coordinator.create(context.system, group)
   coordinator.watch(self, clusterWide = false)
 
-  override def preStart(): Unit = {
-    log.info(s"Starting container `$group` with ${context.children.size} partitions")
-    super.preStart()
-    context.children.foreach(partitions += _ -> null)
-  }
-
   override def postStop(): Unit = {
     if (!coordinator.isClosed) {
       coordinator.unwatch(self)
@@ -82,6 +79,8 @@ class Container(group: String) extends Actor {
   implicit val scheduler = context.system.scheduler
 
   override def receive: Receive = {
+
+    case request@AddPartition(p, props) => request(sender) ! context.actorOf(props, name = p.toString)
 
     case PartitionOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
