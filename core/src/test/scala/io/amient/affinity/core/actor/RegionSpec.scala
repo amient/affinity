@@ -31,18 +31,6 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 
-class RegionSpecPartition extends Partition {
-  override def preStart(): Unit = {
-    Thread.sleep(100)
-    super.preStart()
-  }
-
-  override def handle: Receive = {
-    case e: IllegalStateException => context.stop(self)
-    case _ =>
-  }
-}
-
 class RegionSpec extends WordSpecLike with Matchers with Eventually with IntegrationPatience {
 
   val system: ActorSystem = AffinityActorSystem.create(ConfigFactory.load("regionspec"))
@@ -112,3 +100,17 @@ class RegionSpec extends WordSpecLike with Matchers with Eventually with Integra
   }
 
 }
+
+class RegionSpecPartition extends Partition {
+  override def preStart(): Unit = {
+    Thread.sleep(100)
+    super.preStart()
+  }
+
+  override def handle: Receive = {
+    case e: IllegalStateException => context.stop(self)
+    case _ =>
+  }
+}
+
+

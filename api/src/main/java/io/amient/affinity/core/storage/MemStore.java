@@ -67,10 +67,13 @@ public abstract class MemStore implements Closeable {
     public MemStore(StateConf conf) throws IOException {
         checkpointsEnable = isPersistent();
         ttlSecs = conf.TtlSeconds.apply();
-        if (!checkpointsEnable) {
+        if (!checkpointsEnable || !isPersistent()) {
             dataDir = null;
         } else {
             dataDir = conf.MemStore.DataDir.apply();
+            if (dataDir == null) {
+                throw new IllegalArgumentException("Could not determine memstore data.dir, you need to either specify node.data.dir or state().memstore.data.dir");
+            }
             if (!Files.exists(dataDir)) Files.createDirectories(dataDir);
         }
     }

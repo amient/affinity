@@ -23,7 +23,6 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
-import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.config.CfgStruct
@@ -44,26 +43,25 @@ object CoordinatorZk {
     val ZkRoot = string("zookeeper.root", "/affinity")
       .doc("znode under which coordination data between affinity nodes will be registered")
   }
+
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) extends Coordinator(system, group) {
-
   val conf = CoordinatorZkConf(_conf)
   val zkConf = conf.ZooKeeper()
   val zkRoot = conf.ZkRoot()
-  val groupRoot = s"$zkRoot/${system.name}/$group"
+  val groupRoot = s"$zkRoot/${system.name}/$group/online"
+  val peersRoot = s"$zkRoot/${system.name}/$group/peers"
 
   private val zk = ZkClients.get(zkConf)
 
   if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
 
-  val initialChildren = zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
+  updateChildren(zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
       updateChildren(children)
     }
-  })
-
-  updateChildren(initialChildren)
+  }))
 
   override def register(actorPath: ActorPath): String = {
     zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
@@ -85,6 +83,30 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
       updateGroup(newState)
     }
   }
+
+  override def registerPeer(akkaAddress: String, knownZid: Option[String]): String = {
+
+    if (!zk.exists(peersRoot)) zk.createPersistent(peersRoot, true)
+    val nodes = zk.getChildren(peersRoot).asScala.map(i => (i, zk.readData[String](s"$peersRoot/$i")))
+    val zid: String = knownZid match {
+      case Some(id) => nodes.find(_._1 == id) match {
+        case Some((_, prevAkkaAddress)) if (prevAkkaAddress == akkaAddress) => id
+        case Some(_) => zk.writeData(s"$peersRoot/$id", akkaAddress); id
+        case None => throw new IllegalMonitorStateException(s"zid is invalid for group $group at $akkaAddress")
+      }
+      case None => nodes.find(_._2 == akkaAddress) match {
+        case Some((id, _)) => id
+        case None => zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL).substring(peersRoot.length+1)
+      }
+    }
+    def update(zids: util.List[String]) = updatePeers(zids.asScala.toList)
+    try zid finally update(zk.subscribeChildChanges(peersRoot, new IZkChildListener() {
+      override def handleChildChange(parentPath: String, zids: util.List[String]): Unit = update(zids)
+    }))
+  }
+
+
+
 
 }
 

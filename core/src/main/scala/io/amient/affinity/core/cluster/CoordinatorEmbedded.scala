@@ -80,4 +80,8 @@ class CoordinatorEmbedded(system: ActorSystem, group: String, _conf: Coordinator
   override def unregister(handle: String): Unit = realm.remove(handle)
 
   override def update(o: Observable, arg: scala.Any): Unit = updateGroup(arg.asInstanceOf[Map[String, String]])
+
+  override protected def registerPeer(akkaAddress: String, knownZid: Option[String]): String = {
+    throw new NotImplementedError("It doesn't make sense to use embedded coordinator with advanced cluster features")
+  }
 }
