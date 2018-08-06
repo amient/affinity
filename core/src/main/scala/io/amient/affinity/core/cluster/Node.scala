@@ -20,7 +20,6 @@
 package io.amient.affinity.core.cluster
 
 
-import java.nio.file.Paths
 import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
 
 import akka.actor.{Actor, Props}

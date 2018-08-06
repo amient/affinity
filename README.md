@@ -391,7 +391,7 @@ In all examples and for all tests, logback binding is used.
         affinity.node.container.<ID>.[] [INT] (!)
         affinity.node.data.auto.assign [TRUE|FALSE] (false)                                     Determines whether this node auto-balances data its containers; if set tot false the fixed list of container partitions will be used
         affinity.node.data.auto.delete [TRUE|FALSE] (false)                                     If set to true, any unassigned partitions will be deleted from the local storage
-        affinity.node.data.dir [FILE-PATH] (./.data)                                            Location under which any local state or registers will be kept
+        affinity.node.data.dir [FILE-PATH] (-)                                                  Location under which any local state or registers will be kept
         affinity.node.gateway.class [FQN] (!)                                                   Entry point class for all external requests, both http and stream inputs
         affinity.node.gateway.listeners                                                         list of listener interface configurations
         affinity.node.gateway.listeners.[].host [STRING] (!)                                    host to which the http interface binds to
@@ -527,7 +527,7 @@ In all examples and for all tests, logback binding is used.
         affinity.node.container.<ID>.[] [INT] (!)
         affinity.node.data.auto.assign [TRUE|FALSE] (false)                                     Determines whether this node auto-balances data its containers; if set tot false the fixed list of container partitions will be used
         affinity.node.data.auto.delete [TRUE|FALSE] (false)                                     If set to true, any unassigned partitions will be deleted from the local storage
-        affinity.node.data.dir [FILE-PATH] (./.data)                                            Location under which any local state or registers will be kept
+        affinity.node.data.dir [FILE-PATH] (-)                                                  Location under which any local state or registers will be kept
         affinity.node.gateway.class [FQN] (!)                                                   Entry point class for all external requests, both http and stream inputs
         affinity.node.gateway.listeners                                                         list of listener interface configurations
         affinity.node.gateway.listeners.[].host [STRING] (!)                                    host to which the http interface binds to
