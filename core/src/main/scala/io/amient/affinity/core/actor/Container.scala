@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import java.io.File
+import java.io.{File, PrintWriter}
 import java.nio.file.Files
 
 import akka.actor.{Actor, ActorPath, ActorRef, Props}
@@ -73,9 +73,24 @@ class Container(group: String) extends Actor {
 
   private val masters = scala.collection.mutable.Set[ActorRef]()
 
+  private var zid: Option[String] = None
+
   override def preStart(): Unit = {
     super.preStart()
-    if (conf.Affi.Node.DataAutoAssign()) coordinator.registerAndWatchPeers(akkaAddress, self)
+    if (conf.Affi.Node.DataAutoAssign()) {
+      if (!conf.Affi.Node.DataDir.isDefined) {
+        throw new IllegalArgumentException("node.data.auto.assign is enabled but node.data.dir is not defined")
+      }
+      val dir = conf.Affi.Node.DataDir()
+      val zidFile = dir.resolve(s"$group.zid").toFile
+      if (zidFile.exists()) {
+        val source = scala.io.Source.fromFile(zidFile)
+        zid = Some((try source.mkString finally source.close()))
+      }
+      zid = Some(coordinator.registerAndWatchPeers(akkaAddress, zid, self))
+      coordinator.registerAndWatchPeers(akkaAddress, zid, self)
+      new PrintWriter(zidFile) { write(zid.get.toString); close }
+    }
     //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
     coordinator.watch(self)
   }
@@ -97,9 +112,9 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
-    case UpdatePeers(peers) if conf.Affi.Node.DataAutoAssign() =>
-      peers.zipWithIndex.find(_._1 == akkaAddress).map(_._2) match {
-        case None => logger.error(s"This peer is not registered: $akkaAddress")
+    case UpdatePeers(peers: Seq[String]) if conf.Affi.Node.DataAutoAssign() =>
+      peers.sorted.zipWithIndex.find(_._1 == zid.get).map(_._2) match {
+        case None => throw new IllegalStateException(s"This peer is not registered: $akkaAddress")
         case Some(a) =>
           val ksConf: affinity.KeyspaceConf = conf.Affi.Keyspace(group)
           val serviceClass = ksConf.PartitionClass()
@@ -113,10 +128,10 @@ class Container(group: String) extends Actor {
       }
 
     case request@AssignPartition(p, props) => request(sender) ! {
-      logger.info(s"$akkaAddress: Assigning partition $p")
       partitionIndex.get(p) match {
         case Some(ref) => ref
         case None =>
+          logger.info(s"$akkaAddress: Assigning partition $p")
           val ref = context.actorOf(props, name = p.toString)
           partitionIndex += p -> ref
           ref
@@ -124,9 +139,8 @@ class Container(group: String) extends Actor {
     }
 
     case request@UnassignPartition(p) => request(sender) ! {
-      logger.info(s"$akkaAddress: Unassigning partition $p")
       if (partitionIndex.contains(p)) {
-        logger.info(s"$akkaAddress: Stopping partition $p")
+        logger.info(s"$akkaAddress: Unassigning partition $p")
         partitionIndex.remove(p).foreach(context.stop)
       }
       if (conf.Affi.Node.DataDir.isDefined && conf.Affi.Node.DataAutoDelete()) {

@@ -208,16 +208,15 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     }
   }
 
-  final def registerAndWatchPeers(akkaAddress: String, watcher: ActorRef): Unit = {
+  final def registerAndWatchPeers(akkaAddress: String, zid: Option[String], watcher: ActorRef): String = {
     peerWatcher = watcher
-    registerPeer(akkaAddress)
+    registerPeer(akkaAddress, zid)
   }
 
-  protected def registerPeer(akkaAddress: String): Unit = ()
+  final  protected def updatePeers(peers: List[String]) : Unit = peerWatcher ! UpdatePeers(peers)
 
-  protected def updatePeers(peers: List[String]) = {
-    peerWatcher ! UpdatePeers(peers)
-  }
+  protected def registerPeer( akkaAddress: String, knownZid: Option[String]): String
+
 
 
 

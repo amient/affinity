@@ -43,6 +43,7 @@ object CoordinatorZk {
     val ZkRoot = string("zookeeper.root", "/affinity")
       .doc("znode under which coordination data between affinity nodes will be registered")
   }
+
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) extends Coordinator(system, group) {
@@ -83,24 +84,29 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
     }
   }
 
-  override def registerPeer(akkaAddress: String): Unit = {
+  override def registerPeer(akkaAddress: String, knownZid: Option[String]): String = {
 
     if (!zk.exists(peersRoot)) zk.createPersistent(peersRoot, true)
-    updateContainers(akkaAddress, zk.subscribeChildChanges(peersRoot, new IZkChildListener() {
-      override def handleChildChange(parentPath: String, zids: util.List[String]): Unit = {
-        updateContainers(akkaAddress, zids)
+    val nodes = zk.getChildren(peersRoot).asScala.map(i => (i, zk.readData[String](s"$peersRoot/$i")))
+    val zid: String = knownZid match {
+      case Some(id) => nodes.find(_._1 == id) match {
+        case Some((_, prevAkkaAddress)) if (prevAkkaAddress == akkaAddress) => id
+        case Some(_) => zk.writeData(s"$peersRoot/$id", akkaAddress); id
+        case None => throw new IllegalMonitorStateException(s"zid is invalid for group $group at $akkaAddress")
       }
+      case None => nodes.find(_._2 == akkaAddress) match {
+        case Some((id, _)) => id
+        case None => zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL).substring(peersRoot.length+1)
+      }
+    }
+    def update(zids: util.List[String]) = updatePeers(zids.asScala.toList)
+    try zid finally update(zk.subscribeChildChanges(peersRoot, new IZkChildListener() {
+      override def handleChildChange(parentPath: String, zids: util.List[String]): Unit = update(zids)
     }))
   }
-  private def updateContainers(akkaAddress: String, zids: util.List[String]): Unit = {
-    val containers = zids.asScala.map(i => (i.toLong, zk.readData[String](s"$peersRoot/$i"))).sortBy(_._1)
-    if (!containers.exists(_._2 == akkaAddress)) {
-      zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL)
-    } else {
-      updatePeers(containers.map(_._2).toList)
-    }
 
-  }
+
+
 
 }
 
