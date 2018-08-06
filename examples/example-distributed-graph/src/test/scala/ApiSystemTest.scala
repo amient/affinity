@@ -36,11 +36,9 @@ import scala.language.postfixOps
 
 class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  override def numPartitions = 2
+  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").NumPartitions()
 
   val config = ConfigFactory.load("example")
-    .withValue(Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
-    .withValue(Conf.Affi.Node.Containers("graph").path, ConfigValueFactory.fromIterable(List(0,1).asJava))
 
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)).withValue(Conf.Affi.Node.DataDir.path, ConfigValueFactory.fromAnyRef(".data/example-graph-node1")))
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)).withValue(Conf.Affi.Node.DataDir.path, ConfigValueFactory.fromAnyRef(".data/example-graph-node2")))

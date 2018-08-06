@@ -23,7 +23,6 @@ import java.util
 
 import akka.actor.{ActorPath, ActorSystem}
 import com.typesafe.config.Config
-import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.config.CfgStruct
@@ -47,23 +46,21 @@ object CoordinatorZk {
 }
 
 class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) extends Coordinator(system, group) {
-
   val conf = CoordinatorZkConf(_conf)
   val zkConf = conf.ZooKeeper()
   val zkRoot = conf.ZkRoot()
-  val groupRoot = s"$zkRoot/${system.name}/$group"
+  val groupRoot = s"$zkRoot/${system.name}/$group/online"
+  val peersRoot = s"$zkRoot/${system.name}/$group/peers"
 
   private val zk = ZkClients.get(zkConf)
 
   if (!zk.exists(groupRoot)) zk.createPersistent(groupRoot, true)
 
-  val initialChildren = zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
+  updateChildren(zk.subscribeChildChanges(groupRoot, new IZkChildListener() {
     override def handleChildChange(parentPath: String, children: util.List[String]): Unit = {
       updateChildren(children)
     }
-  })
-
-  updateChildren(initialChildren)
+  }))
 
   override def register(actorPath: ActorPath): String = {
     zk.create(s"$groupRoot/", actorPath.toString(), CreateMode.EPHEMERAL_SEQUENTIAL)
@@ -84,6 +81,25 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
       val newState = newHandles.map(handle => (handle, zk.readData[String](handle))).toMap
       updateGroup(newState)
     }
+  }
+
+  override def registerPeer(akkaAddress: String): Unit = {
+
+    if (!zk.exists(peersRoot)) zk.createPersistent(peersRoot, true)
+    updateContainers(akkaAddress, zk.subscribeChildChanges(peersRoot, new IZkChildListener() {
+      override def handleChildChange(parentPath: String, zids: util.List[String]): Unit = {
+        updateContainers(akkaAddress, zids)
+      }
+    }))
+  }
+  private def updateContainers(akkaAddress: String, zids: util.List[String]): Unit = {
+    val containers = zids.asScala.map(i => (i.toLong, zk.readData[String](s"$peersRoot/$i"))).sortBy(_._1)
+    if (!containers.exists(_._2 == akkaAddress)) {
+      zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL)
+    } else {
+      updatePeers(containers.map(_._2).toList)
+    }
+
   }
 
 }

@@ -26,7 +26,7 @@ import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Container.AddPartition
+import io.amient.affinity.core.actor.Container.AssignPartition
 import io.amient.affinity.core.config.CfgIntList
 import io.amient.affinity.core.util.Reply
 
@@ -96,7 +96,11 @@ class Controller extends Actor {
     case Terminated(child) if (containers.contains(child.path.name)) => containers.remove(child.path.name)
 
     case _: StartRebalance =>
-      if (conf.Affi.Node.Containers.isDefined) {
+      if (conf.Affi.Node.DataAutoAssign()) {
+        conf.Affi.Keyspace().asScala.foreach { case (group, ksConfig) =>
+          getOrCreateContainer(group)
+        }
+      } else if (conf.Affi.Node.Containers.isDefined) {
         conf.Affi.Node.Containers().asScala.toList.map {
           case (group: String, value: CfgIntList) =>
             val container = getOrCreateContainer(group)
@@ -104,7 +108,7 @@ class Controller extends Actor {
             val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
             implicit val timeout = Timeout(startupTimeout)
             Await.result(Future.sequence(partitions.map{ p =>
-              container ?? AddPartition(p, Props(serviceClass.newInstance()))
+              container ?? AssignPartition(p, Props(serviceClass))
             }), startupTimeout)
         }
       }

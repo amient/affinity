@@ -28,6 +28,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Container.UpdatePeers
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ByteUtils, Reply}
 
@@ -112,6 +113,8 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * to the group
     */
   protected val watchers = scala.collection.mutable.ListBuffer[ActorRef]()
+
+  @volatile private var peerWatcher: ActorRef = null
 
   /**
     * @param actorPath of the actor that needs to managed as part of coordinated group
@@ -204,6 +207,18 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
       }
     }
   }
+
+  final def registerAndWatchPeers(akkaAddress: String, watcher: ActorRef): Unit = {
+    peerWatcher = watcher
+    registerPeer(akkaAddress)
+  }
+
+  protected def registerPeer(akkaAddress: String): Unit = ()
+
+  protected def updatePeers(peers: List[String]) = {
+    peerWatcher ! UpdatePeers(peers)
+  }
+
 
 
 }
