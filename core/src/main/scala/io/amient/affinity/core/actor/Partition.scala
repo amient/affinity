@@ -54,6 +54,7 @@ trait Partition extends ActorHandler {
   implicit val partition = self.path.name.toInt
 
   private var started = false
+
   private val declaredStateStores: CopyOnWriteArrayList[(String, KVStoreLocal[_, _])] = new CopyOnWriteArrayList[(String, KVStoreLocal[_, _])]()
   private lazy val stateStores: ParMap[String, KVStoreLocal[_, _]] = declaredStateStores.iterator().asScala.toMap.par
 
@@ -77,7 +78,6 @@ trait Partition extends ActorHandler {
     logger.debug(s"Starting partition $partition of group $group")
     //on start-up every partition is a standby which also requires a blocking bootstrap first
     become(standby = true)
-    resume
     //only after states have caught up we make the partition online and available to cooridnators
     context.parent ! PartitionOnline(self)
     super.preStart()
@@ -131,6 +131,7 @@ trait Partition extends ActorHandler {
   }
 
   private[core] def become(standby: Boolean): Unit = {
+    if (standby) suspend
     stateStores.values.foreach { state =>
       state.boot
       if (state.external || standby) state.tail
@@ -138,6 +139,7 @@ trait Partition extends ActorHandler {
     if (standby) {
       logger.debug(s"${self.path} Became standby for partition $group/$partition")
     } else {
+      resume
       logger.debug(s"${self.path} became master for partition $group/$partition")
     }
   }
