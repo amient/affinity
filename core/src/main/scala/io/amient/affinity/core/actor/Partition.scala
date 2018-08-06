@@ -60,7 +60,7 @@ trait Partition extends ActorHandler {
   def state[K: ClassTag, V: ClassTag](name: String)(implicit group: String, partition: Int): KVStoreLocal[K, V] = {
     if (started) throw new IllegalStateException("Cannot declare state after the actor has started")
     val conf = Conf(context.system.settings.config)
-    val numPartitions = conf.Affi.Keyspace(group).NumPartitions()
+    val numPartitions = conf.Affi.Keyspace(group).Partitions()
     val stateConf = conf.Affi.Keyspace(group).State(name)
     if (stateConf.Partitions.isDefined) throw new IllegalArgumentException("State defined inside a Keyspace cannot override number of partitions")
     state(name, KVStoreLocal.create[K, V](s"$group-$name", partition, stateConf, numPartitions, context.system))

@@ -20,7 +20,6 @@
 package io.amient.affinity.core.cluster
 
 
-import java.nio.file.Paths
 import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
 
 import akka.actor.{Actor, Props}
@@ -48,7 +47,9 @@ object Node {
     val SuspendQueueMaxSize = integer("suspend.queue.max.size", 1000).doc("Size of the queue when the cluster enters suspended mode")
     val StartupTimeoutMs = longint("startup.timeout.ms", Integer.MAX_VALUE).doc("Maximum time a node can take to startup - this number must account for any potential state bootstrap")
     val ShutdownTimeoutMs = longint("shutdown.timeout.ms", 30000).doc("Maximum time a node can take to shutdown gracefully")
-    val DataDir = filepath("data.dir", Paths.get("./.data")).doc("Location under which any local state or registers will be kept")
+    val DataDir = filepath("data.dir", false).doc("Location under which any local state or registers will be kept")
+    val DataAutoAssign = bool("data.auto.assign", true, false).doc("Determines whether this node auto-balances data its containers; if set tot false the fixed list of container partitions will be used")
+    val DataAutoDelete = bool("data.auto.delete", true, false).doc("If set to true, any unassigned partitions will be deleted from the local storage")
   }
 
 }

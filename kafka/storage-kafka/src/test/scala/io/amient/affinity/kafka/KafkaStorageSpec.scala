@@ -88,7 +88,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
   private def createStateStoreForPartition(keyspace: String, partition: Int, store: String): KVStoreLocal[Int, TestRecord] = {
     val conf = Conf(config)
     val stateConf = conf.Affi.Keyspace(keyspace).State(store)
-    val state = KVStoreLocal.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).NumPartitions(), system)
+    val state = KVStoreLocal.create[Int, TestRecord](store, partition, stateConf, conf.Affi.Keyspace(keyspace).Partitions(), system)
     state.boot()
     state
   }

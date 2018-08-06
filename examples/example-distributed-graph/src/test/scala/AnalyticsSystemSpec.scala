@@ -38,12 +38,9 @@ import scala.reflect.ClassTag
 
 class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  override def numPartitions = 4
+  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").Partitions()
 
   val config: Config = ConfigFactory.load("example")
-    .withValue(Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
-    .withValue(Conf.Affi.Node.Containers("graph").path, ConfigValueFactory.fromIterable(List(0,1,2,3).asJava))
-
 
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))

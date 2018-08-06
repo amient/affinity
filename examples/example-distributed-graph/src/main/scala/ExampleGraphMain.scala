@@ -31,16 +31,11 @@ object ExampleGraphMain extends App {
   try {
 
     val config = ConfigFactory.load("example")
-    val node1config = ConfigFactory.parseResources("example-node1.conf").withFallback(config)
-
-    require(node1config.getInt("akka.remote.netty.tcp.port") == 2550)
-    require(node1config.getString("akka.remote.netty.tcp.hostname") == "127.0.0.1")
-
     AffinityMetrics.apply(registry => JmxReporter.forRegistry(registry).inDomain("Affinity").build().start())
 
-    new Node(node1config).start()
-
+    new Node(ConfigFactory.parseResources("example-node1.conf").withFallback(config)).start()
     new Node(ConfigFactory.parseResources("example-node2.conf").withFallback(config)).start()
+    new Node(ConfigFactory.parseResources("example-node3.conf").withFallback(config)).start()
 
   } catch {
     case NonFatal(e) =>

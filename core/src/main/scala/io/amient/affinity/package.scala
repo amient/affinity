@@ -82,7 +82,7 @@ package object affinity {
     val PartitionClass = cls("class", classOf[Partition], true)
       .doc("Implementation of core.actor.Partition of whose instances is the Keyspace composed")
 
-    val NumPartitions = integer("num.partitions", true)
+    val Partitions = integer("partitions", true)
       .doc("Total number of partitions in the Keyspace")
 
     val ReplicationFactor = integer("replication.factor", 1).doc("Desired number of online replicas for this keypsace")

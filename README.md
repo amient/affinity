@@ -370,7 +370,8 @@ In all examples and for all tests, logback binding is used.
         affinity.global.<ID>.write.timeout.ms [LONG] (10000)                                    How long can any of the write operation on a global store take before throwing a TimeoutException
         affinity.keyspace [<ID>] (-)
         affinity.keyspace.<ID>.class [FQN] (!)                                                  Implementation of core.actor.Partition of whose instances is the Keyspace composed
-        affinity.keyspace.<ID>.num.partitions [INT] (!)                                         Total number of partitions in the Keyspace
+        affinity.keyspace.<ID>.partitions [INT] (!)                                             Total number of partitions in the Keyspace
+        affinity.keyspace.<ID>.replication.factor [INT] (1)                                     Desired number of online replicas for this keypsace
         affinity.keyspace.<ID>.state [<ID>] (-)                                                 Keyspace may have any number of States, each identified by its ID - each state within a Keyspace is co-partitioned identically
         affinity.keyspace.<ID>.state.<ID>.external [TRUE|FALSE] (false)                         If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly. Number of partitions will be also detected from the underlying storage log.
         affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms [LONG] (10000)                        How long a lock can be held by a single thread before throwing a TimeoutException
@@ -388,8 +389,10 @@ In all examples and for all tests, logback binding is used.
         affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3]
         affinity.node.container.<ID>
         affinity.node.container.<ID>.[] [INT] (!)
-        affinity.node.data.dir [FILE-PATH] (./.data)                                            Location under which any local state or registers will be kept
-        affinity.node.gateway.class [FQN] (-)                                                   Entry point class for all external requests, both http and stream inputs
+        affinity.node.data.auto.assign [TRUE|FALSE] (false)                                     Determines whether this node auto-balances data its containers; if set tot false the fixed list of container partitions will be used
+        affinity.node.data.auto.delete [TRUE|FALSE] (false)                                     If set to true, any unassigned partitions will be deleted from the local storage
+        affinity.node.data.dir [FILE-PATH] (-)                                                  Location under which any local state or registers will be kept
+        affinity.node.gateway.class [FQN] (!)                                                   Entry point class for all external requests, both http and stream inputs
         affinity.node.gateway.listeners                                                         list of listener interface configurations
         affinity.node.gateway.listeners.[].host [STRING] (!)                                    host to which the http interface binds to
         affinity.node.gateway.listeners.[].port [INT] (!)                                       port to which the http interface binds to
@@ -439,9 +442,6 @@ In all examples and for all tests, logback binding is used.
         affinity.coordinator.zookeeper.timeout.session.ms [INT] (10000)                         Time-out after which any ephemeral nodes will be removed for a lost connection
         affinity.coordinator.zookeeper.root [STRING] (/affinity)                                znode under which coordination data between affinity nodes will be registered
 
-### Coordinator (io.amient.affinity.core.cluster.CoordinatorEmbedded)
-        affinity.coordinator.embedded.id [INT] (!)                                              embedded coordinator instances must have the same id to work together
-
 
 ## Global State
         affinity.global [<ID>] (-)                                                              each global state has an ID and needs to be further configured
@@ -483,7 +483,8 @@ In all examples and for all tests, logback binding is used.
 ## Keyspaces
         affinity.keyspace [<ID>] (-)
         affinity.keyspace.<ID>.class [FQN] (!)                                                  Implementation of core.actor.Partition of whose instances is the Keyspace composed
-        affinity.keyspace.<ID>.num.partitions [INT] (!)                                         Total number of partitions in the Keyspace
+        affinity.keyspace.<ID>.partitions [INT] (!)                                             Total number of partitions in the Keyspace
+        affinity.keyspace.<ID>.replication.factor [INT] (1)                                     Desired number of online replicas for this keypsace
         affinity.keyspace.<ID>.state [<ID>] (-)                                                 Keyspace may have any number of States, each identified by its ID - each state within a Keyspace is co-partitioned identically
         affinity.keyspace.<ID>.state.<ID>.external [TRUE|FALSE] (false)                         If the state is attached to a data stream which is populated and partitioned by an external process - external state becomes readonly. Number of partitions will be also detected from the underlying storage log.
         affinity.keyspace.<ID>.state.<ID>.lock.timeout.ms [LONG] (10000)                        How long a lock can be held by a single thread before throwing a TimeoutException
@@ -524,8 +525,10 @@ In all examples and for all tests, logback binding is used.
         affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3]
         affinity.node.container.<ID>
         affinity.node.container.<ID>.[] [INT] (!)
-        affinity.node.data.dir [FILE-PATH] (./.data)                                            Location under which any local state or registers will be kept
-        affinity.node.gateway.class [FQN] (-)                                                   Entry point class for all external requests, both http and stream inputs
+        affinity.node.data.auto.assign [TRUE|FALSE] (false)                                     Determines whether this node auto-balances data its containers; if set tot false the fixed list of container partitions will be used
+        affinity.node.data.auto.delete [TRUE|FALSE] (false)                                     If set to true, any unassigned partitions will be deleted from the local storage
+        affinity.node.data.dir [FILE-PATH] (-)                                                  Location under which any local state or registers will be kept
+        affinity.node.gateway.class [FQN] (!)                                                   Entry point class for all external requests, both http and stream inputs
         affinity.node.gateway.listeners                                                         list of listener interface configurations
         affinity.node.gateway.listeners.[].host [STRING] (!)                                    host to which the http interface binds to
         affinity.node.gateway.listeners.[].port [INT] (!)                                       port to which the http interface binds to

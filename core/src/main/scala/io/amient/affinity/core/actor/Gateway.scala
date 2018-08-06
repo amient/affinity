@@ -94,7 +94,7 @@ trait Gateway extends ActorHandler {
         val serviceConf = conf.Affi.Keyspace(identifier)
         if (!serviceConf.isDefined()) throw new IllegalArgumentException(s"Keypsace $identifier is not defined")
         val partitioner = new Murmur2Partitioner
-        val ks = context.actorOf(Props(new Group(identifier, serviceConf.NumPartitions(), partitioner)), name = identifier)
+        val ks = context.actorOf(Props(new Group(identifier, serviceConf.Partitions(), partitioner)), name = identifier)
         declaredKeyspaces += (identifier -> ((ks, new AtomicBoolean(true))))
         ks
     }
