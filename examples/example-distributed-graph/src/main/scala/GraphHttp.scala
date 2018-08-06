@@ -41,6 +41,8 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
 
   abstract override def handle: Receive = super.handle orElse {
 
+    case HTTP(GET, PATH("status"), _, response) => handleAsJson(response, describeKeyspaces)
+
     /**
       * WebSocket GET /vertex?id=<vid>
       */

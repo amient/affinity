@@ -28,7 +28,6 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Controller.FatalErrorShutdown
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ByteUtils, Reply}
 
@@ -53,18 +52,38 @@ object Coordinator {
     override protected def specializations(): util.Set[String] = Set("zookeeper", "embedded").asJava
   }
 
-  final case class MasterUpdates(add: Set[ActorRef], remove: Set[ActorRef]) extends Reply[Unit] {
-    def localTo(actor: ActorRef): MasterUpdates = {
-      MasterUpdates(
-        add.filter(_.path.address == actor.path.address),
-        remove.filter(_.path.address == actor.path.address)
-      )
+  final case class MembershipUpdate(members: Map[String, ActorRef]) extends Reply[Unit] {
+
+    /**
+      * a deterministic method which resolves which one of the replicas is the master for each partition
+      * applying a murmur2 hash to the replica's unique handle and selecting the one with the smallest hash
+      * @return a set of all masters for each partition within the group this coordinator is managing
+      */
+    def masters: Set[ActorRef] = {
+      members.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
+        members.filter(_._2.path.toStringWithoutAddress == relPath)
+          .minBy { case (handle, _) => ByteUtils.murmur2(handle.getBytes) }._2
+      }
     }
+
+    /**
+      * mastersDelta splits the current members of this update message into additions and removals
+      * with respect to the provided known state
+      * @param knownMasters a set of actors to which if the result is applied will be the same as the members of this update
+      * @return (list of additions, list of removals)
+      */
+    def mastersDelta(knownMasters: Set[ActorRef]): (List[ActorRef], List[ActorRef]) = {
+      val newMasters = masters
+      val add = newMasters.toList.filter(!knownMasters.contains(_))
+      val remove = knownMasters.toList.filter(!newMasters.contains(_))
+      (add, remove)
+    }
+
   }
 
   def create(system: ActorSystem, group: String): Coordinator = {
     val config = system.settings.config
-    val conf: CoordinatorConf =  Conf(config).Affi.Coordinator
+    val conf: CoordinatorConf = Conf(config).Affi.Coordinator
     val constructor = conf.Class().getConstructor(classOf[ActorSystem], classOf[String], classOf[CoordinatorConf])
     constructor.newInstance(system, group, conf)
   }
@@ -89,12 +108,10 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   protected val closed = new AtomicBoolean(false)
 
   /**
-    * wacthers - a list of all actors that will receive AddMaster and RemoveMaster messages
-    * when there are changes in the cluster. The value is global flag - `true` means that the
-    * watcher is interested for changes at the global/cluster level, `false` means that the
-    * watcher is only intereseted in changes in the local system.
+    * wacthers - a list of all actors that will receive MembershipUpdate messages when members are added or removed
+    * to the group
     */
-  protected val watchers = scala.collection.mutable.Map[ActorRef, Boolean]()
+  protected val watchers = scala.collection.mutable.ListBuffer[ActorRef]()
 
   /**
     * @param actorPath of the actor that needs to managed as part of coordinated group
@@ -114,25 +131,11 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     * watch changes in the coordinate group of routees in the whole cluster.
     *
     * @param watcher     actor which will receive the messages
-    * @param clusterWide if true, the watcher will be notified of master status changes in the entire cluster
-    *                    if false, the watcher will be notified of master status changes local to that watcher
     */
-  def watch(watcher: ActorRef, clusterWide: Boolean): Unit = {
+  def watch(watcher: ActorRef): Unit = {
     synchronized {
-      watchers += watcher -> clusterWide
-
-      val currentMasters = getCurrentMasters.filter(clusterWide || _.path.address.hasLocalScope)
-      val update = MasterUpdates(currentMasters, Set())
-      implicit val timeout = Timeout(30 seconds)
-      val informed = watcher ?! (if (clusterWide) update else update.localTo(watcher))
-      informed.failed.foreach {
-        case e: Throwable => if (!closed.get) {
-          system.eventStream.publish(
-            FatalErrorShutdown(new RuntimeException(
-              "Could not send initial master status to watcher. This is could lead to inconsistent view of the cluster, " +
-                "terminating the system.", e)))
-        }
-      }
+      watchers += watcher
+      updateWatcher(watcher)
     }
   }
 
@@ -152,70 +155,52 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   def isClosed = closed.get
 
-  final protected def updateGroup(newState: Map[String, String]): Unit = {
-    if (!closed.get) {
+  final protected def updateGroup(newState: Map[String, String]): Unit = if (!closed.get) {
+    val attempts = Future.sequence(newState.map { case (handle, actorPath) =>
+      handles.get(handle) match {
+        case Some(knownActor) if knownActor.path == actorPath => Future.successful(Success((handle, knownActor)))
+        case _ =>
+          val selection = system.actorSelection(actorPath)
+          implicit val timeout = new Timeout(30 seconds)
+          selection.resolveOne() map (a => Success((handle, a))) recover {
+            case NonFatal(e) =>
+              logger.warning(s"$handle: ${e.getMessage}")
+              Failure(e)
+          }
+      }
+    })
 
-      val attempts = Future.sequence(newState.map { case (handle, actorPath) =>
-        val selection = system.actorSelection(actorPath)
-        implicit val timeout = new Timeout(30 seconds)
-        selection.resolveOne() map (a => Success((handle, a))) recover {
-          case NonFatal(e) =>
-            logger.warning(s"$handle: ${e.getMessage}")
-            Failure(e)
-        }
-      })
+    val actorRefs: Future[Iterable[(String, ActorRef)]] = attempts.map(_.collect {
+      case Success((handle, actor)) => (handle, actor)
+    })
 
-      val actorRefs: Future[Iterable[(String, ActorRef)]] = attempts.map(_.collect {
-        case Success((handle, actor)) => (handle, actor)
-      })
+    val newMembers = Await.result(actorRefs, 1 minute)
 
-      val actors = Await.result(actorRefs, 1 minute)
+    synchronized {
+      handles.clear()
+      handles ++= newMembers
+      updateWatchers()
+    }
 
-      synchronized {
-        val prevMasters: Set[ActorRef] = getCurrentMasters
-        handles.clear()
+  }
 
-        actors.foreach { case (handle, actor) =>
-          handles.put(handle, actor)
-        }
+  private def updateWatchers(): Unit = if (!closed.get) {
+    val update = MembershipUpdate(handles.toMap)
+    watchers.foreach(updateWatcher(_, Some(update)))
+  }
 
-        val currentMasters: Set[ActorRef] = getCurrentMasters
-
-        val add = currentMasters.filter(!prevMasters.contains(_))
-        val remove = prevMasters.filter(!currentMasters.contains(_))
-        if (!add.isEmpty || !remove.isEmpty) {
-          val update = MasterUpdates(add, remove)
-          notifyWatchers(update)
+  private def updateWatcher(watcher: ActorRef, _update: Option[MembershipUpdate] = None): Unit = if (!closed.get) {
+    val update = _update.getOrElse(MembershipUpdate(handles.toMap))
+    implicit val timeout = Timeout(30 seconds)
+    try {
+      (watcher ?! update).failed foreach {
+        case e: Throwable => if (!closed.get) {
+          logger.error(e, s"Could not notify watcher: $watcher")
         }
       }
-    }
-
-  }
-
-  //this is the method that is deterministic across all nodes. it resolves which one of the
-  //replicas is the master for each partition applying a murmur2 hash on the actor handle
-  //selecting the actor with the smallest hash
-  private def getCurrentMasters: Set[ActorRef] = {
-    handles.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
-      handles.filter(_._2.path.toStringWithoutAddress == relPath).minBy(x => ByteUtils.murmur2(x._1.getBytes))._2
-    }
-  }
-
-
-  private def notifyWatchers(fullUpdate: MasterUpdates) = {
-    if (!closed.get) watchers.foreach { case (watcher, global) =>
-      implicit val timeout = Timeout(30 seconds)
-      try {
-        val informed = watcher ?! (if (global) fullUpdate else fullUpdate.localTo(watcher))
-        informed.failed.foreach {
-          case e: Throwable => if (!closed.get) {
-            logger.error(e, s"Could not notify watcher: $watcher(global = $global)")
-          }
-        }
-      } catch {
-        case e: Throwable => if (!closed.get) {
-          logger.error(e, s"Could not notify watcher: $watcher(global = $global)")
-        }
+    } catch {
+      case e: Throwable => if (!closed.get) {
+        logger.error(e, s"Could not notify watcher: $watcher")
       }
     }
   }

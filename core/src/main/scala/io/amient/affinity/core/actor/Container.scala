@@ -19,19 +19,24 @@
 
 package io.amient.affinity.core.actor
 
-import akka.actor.{Actor, ActorPath, ActorRef}
+import akka.actor.{Actor, ActorPath, ActorRef, Props}
 import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
+import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
+import io.amient.affinity.core.util.Reply
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object Container {
+
+  case class AddPartition(p: Int, props: Props) extends Reply[ActorRef]
+
+  case class DropPartition(p: Int) extends Reply[Unit]
 
   case class PartitionOnline(partition: ActorRef)
 
@@ -54,16 +59,16 @@ class Container(group: String) extends Actor {
 
   private val partitions = scala.collection.mutable.Map[ActorRef, String]()
 
-  /**
-    * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
-    */
+  private val partitionIndex = scala.collection.mutable.Map[Int, ActorRef]()
+
   private val coordinator = Coordinator.create(context.system, group)
-  coordinator.watch(self, clusterWide = false)
+
+  private val masters = scala.collection.mutable.Set[ActorRef]()
 
   override def preStart(): Unit = {
-    log.info(s"Starting container `$group` with ${context.children.size} partitions")
     super.preStart()
-    context.children.foreach(partitions += _ -> null)
+    //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
+    coordinator.watch(self)
   }
 
   override def postStop(): Unit = {
@@ -83,6 +88,14 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
+    case request@AddPartition(p, props) => request(sender) ! {
+      val ref = context.actorOf(props, name = p.toString)
+      partitionIndex += p -> ref
+      ref
+    }
+
+    case request@DropPartition(p) => request(sender) ! partitionIndex.remove(p).foreach(context.stop)
+
     case PartitionOnline(ref) =>
       val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
       val handle = coordinator.register(partitionActorPath)
@@ -90,14 +103,21 @@ class Container(group: String) extends Actor {
       partitions += (ref -> handle)
 
     case PartitionOffline(ref) =>
-      log.debug(s"Partition offline: handle=${partitions(ref)}, path=${ref.path}")
+      log.debug(s"Partition offline: handle=${partitions.get(ref)}, path=${ref.path}")
       coordinator.unregister(partitions(ref))
       partitions -= ref
 
-    case request @ MasterUpdates(add, remove) => request(sender) ! {
+    case request: MembershipUpdate => request(sender) ! {
+      //get cluster-wide master delta
+      val (_add, _remove) = request.mastersDelta(masters)
+      //filter out non-local changes and apply
+      val remove = _remove.filter(_.path.address == self.path.address)
+      masters --= remove
+      val add = _add.filter(_.path.address == self.path.address)
+      masters ++= add
       implicit val timeout = Timeout(startupTimeout)
-      remove.toList.foreach(ref => ref ?! BecomeStandby())
-      add.toList.foreach(ref => ref ?! BecomeMaster())
+      remove.foreach(_ ?! BecomeStandby())
+      add.foreach(_ ?! BecomeMaster())
     }
   }
 }

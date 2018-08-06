@@ -21,18 +21,23 @@ package io.amient.affinity.core.actor
 
 import akka.AkkaException
 import akka.actor.SupervisorStrategy.{Escalate, Restart, Resume}
-import akka.actor.{Actor, InvalidActorNameException, OneForOneStrategy, Props, Terminated}
+import akka.actor.{Actor, ActorRef, InvalidActorNameException, OneForOneStrategy, Props, Terminated}
 import akka.event.Logging
+import akka.util.Timeout
+import io.amient.affinity.Conf
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.Container.AddPartition
+import io.amient.affinity.core.config.CfgIntList
 import io.amient.affinity.core.util.Reply
 
-import scala.concurrent.{Future, Promise}
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 object Controller {
 
-  final case class CreateContainer(group: String, partitions: List[Int], partitionProps: Props) extends Reply[Unit]
+  final case class StartRebalance()
 
   final case class CreateGateway(handlerProps: Props) extends Reply[List[Int]]
 
@@ -50,11 +55,15 @@ class Controller extends Actor {
 
   val system = context.system
 
+  val conf = Conf(system.settings.config)
+
+  val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
+
   private var gatewayPromise: Promise[List[Int]] = null
 
-  private val containers = scala.collection.mutable.Map[String, Promise[Unit]]()
+  private val containers = scala.collection.mutable.Map[String, ActorRef]()
 
-  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
+  import context.dispatcher
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1 minute) {
     case _: IllegalArgumentException ⇒ Resume
@@ -69,27 +78,36 @@ class Controller extends Actor {
     case _: Throwable ⇒ Escalate
   }
 
+  private def getOrCreateContainer(group: String): ActorRef = {
+    if (!containers.contains(group)) {
+      log.info(s"Starting container `$group`")
+      val container = context.actorOf(Props(new Container(group)), name = group)
+      containers.put(group, container)
+    }
+    containers(group)
+  }
+
+  override def preStart(): Unit = {
+    super.preStart()
+  }
+
   override def receive: Receive = {
 
-    case request@CreateContainer(group, partitions, partitionProps) => request(sender) ! {
-      try {
-        log.debug(s"Creating Container for $group with partitions $partitions")
-        context.actorOf(Props(new Container(group) {
-          for (partition <- partitions) {
-            context.actorOf(partitionProps, name = partition.toString)
-          }
-        }), name = group)
-        Future.successful(())
-      } catch {
-        case NonFatal(e) =>
-          log.error(e, s"Could not create container for $group with partitions $partitions")
-          throw e
-      }
-    }
+    case Terminated(child) if (containers.contains(child.path.name)) => containers.remove(child.path.name)
 
-    case Terminated(child) if (containers.contains(child.path.name)) =>
-      val promise = containers(child.path.name)
-      if (!promise.isCompleted) promise.failure(new AkkaException("Container initialisation failed"))
+    case _: StartRebalance =>
+      if (conf.Affi.Node.Containers.isDefined) {
+        conf.Affi.Node.Containers().asScala.toList.map {
+          case (group: String, value: CfgIntList) =>
+            val container = getOrCreateContainer(group)
+            val partitions = value().asScala.map(_.toInt).toList
+            val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
+            implicit val timeout = Timeout(startupTimeout)
+            Await.result(Future.sequence(partitions.map{ p =>
+              container ?? AddPartition(p, Props(serviceClass.newInstance()))
+            }), startupTimeout)
+        }
+      }
 
     case request@CreateGateway(gatewayProps) => try {
       val gatewayRef = context.actorOf(gatewayProps, name = "gateway")

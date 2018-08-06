@@ -23,17 +23,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.StatusCodes.{OK, SeeOther}
-import akka.http.scaladsl.model.{HttpResponse, StatusCode, Uri, headers}
-import akka.util.Timeout
+import akka.http.scaladsl.model.StatusCode
+import akka.http.scaladsl.model.StatusCodes.SeeOther
 import com.typesafe.config.ConfigValueFactory
 import io.amient.affinity.Conf
-import io.amient.affinity.avro.MemorySchemaRegistry
-import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.GatewayHttp
-import io.amient.affinity.core.cluster.FailoverTestPartition.{GetValue, PutValue}
-import io.amient.affinity.core.http.Encoder
-import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import org.scalatest.{FlatSpec, Matchers}
@@ -51,41 +44,17 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   override def numPartitions = 2
 
-  def config = configure("systemtests", Some(zkConnect), Some(kafkaBootstrap))
-    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName))
+  def config = configure("failoverspecs", Some(zkConnect), Some(kafkaBootstrap))
 
-  val node1 = new Node(config)
-  node1.startGateway(new GatewayHttp {
-
-    implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
-
-    implicit val scheduler = context.system.scheduler
-
-    val keyspace1 = keyspace("keyspace1")
-
-    override def handle: Receive = {
-      case HTTP(GET, PATH(key), _, response) => handleWith(response) {
-        implicit val timeout = Timeout(specTimeout / 5)
-        keyspace1 ?! GetValue(key) map {
-          case valueOption => Encoder.json(OK, valueOption, gzip = false)
-        }
-      }
-
-      case HTTP(POST, PATH(key, value), _, response) => handleWith(response) {
-        implicit val timeout = Timeout(specTimeout / 5)
-        keyspace1 ?! PutValue(key, value) map {
-          _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/$key"))))
-        }
-      }
-    }
-  })
-
-  val node2 = new Node(config)
-  val node3 = new Node(config)
+  val node1 = new Node(config.withValue(Conf.Affi.Node.Gateway.Class.path, ConfigValueFactory.fromAnyRef(classOf[FailoverTestGateway].getName)))
+  val node2 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
+  val node3 = new Node(config.withValue(Conf.Affi.Node.Containers("keyspace1").path, ConfigValueFactory.fromIterable(List(0,1).asJava)))
 
   override def beforeAll(): Unit = try {
-    node2.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
-    node3.startContainer("keyspace1", List(0, 1), new FailoverTestPartition("consistency-test"))
+    node1.start()
+    node2.start()
+    node3.start()
+    node1.awaitClusterReady()
   } finally {
     super.beforeAll()
   }
@@ -117,7 +86,8 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
           }
           Success(response.status)
       } recover {
-        case e: Throwable => Failure(e)
+        case e: Throwable =>
+          Failure(e)
       }
     }
     requestCount.set(requests.size)

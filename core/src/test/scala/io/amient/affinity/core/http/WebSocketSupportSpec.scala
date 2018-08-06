@@ -55,13 +55,11 @@ class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matc
 
   val specTimeout = 6 seconds
 
-  val httpPort = Await.result(node.startGateway(), specTimeout).head
-
-  node.startContainers()
-
   import node.system.dispatcher
 
   implicit val materializer = ActorMaterializer.create(node.system)
+
+  def httpPort = node.getHttpPort(0)
 
   def http_get(uri: Uri): String = {
     val promise = Promise[HttpResponse]()
@@ -71,7 +69,10 @@ class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matc
   }
 
 
-  override def beforeAll(): Unit = node.awaitClusterReady()
+  override def beforeAll(): Unit = {
+    node.start()
+    node.awaitClusterReady()
+  }
 
   override def afterAll: Unit = node.shutdown()
 

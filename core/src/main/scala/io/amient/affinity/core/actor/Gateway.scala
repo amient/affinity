@@ -43,7 +43,7 @@ import scala.util.control.NonFatal
 object Gateway {
 
   class GatewayConf extends CfgStruct[GatewayConf] {
-    val Class = cls("class", classOf[Gateway], false).doc("Entry point class for all external requests, both http and stream inputs")
+    val Class = cls("class", classOf[Gateway], true).doc("Entry point class for all external requests, both http and stream inputs")
     val MaxWebSocketQueueSize = integer("max.websocket.queue.size", 100).doc("number of messages that can be queued for delivery before blocking")
     val Listeners: CfgList[HttpInterfaceConf] = list("listeners", classOf[HttpInterfaceConf], false).doc("list of listener interface configurations")
     val RejectSuspendedHttpRequests = bool("suspended.reject", true, true).doc("controls how http requests are treated in suspended state: true - immediately rejected with 503 Service Unavailable; false - enqueued for reprocessing on resumption")
@@ -71,7 +71,7 @@ trait Gateway extends ActorHandler {
   private var stopping = false
 
   /**
-    * internal map of all declared keyspaces (keyspace: String -> (Coordinator, KeyspaceActorRef, SuspendedFlag)
+    * internal map of all declared keyspaces (keyspace: String -> (KeyspaceActorRef, SuspendedFlag)
     */
   private val declaredKeyspaces = mutable.Map[String, (ActorRef, AtomicBoolean)]()
   private lazy val keyspaces: Map[String, (ActorRef, AtomicBoolean)] = declaredKeyspaces.toMap

@@ -37,58 +37,16 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import scala.concurrent.duration._
 import scala.language.{existentials, implicitConversions, postfixOps}
 
-case class ClusterPing() extends Scatter[String] {
-  override def gather(r1: String, r2: String) = r2
-}
-
 class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAfterAll with Matchers {
 
-  def config = configure("pingpong")
-
-  val node1 = new Node(config)
-  node1.startGateway(new GatewayHttp {
-
-    import context.dispatcher
-
-    implicit val materializer = ActorMaterializer.create(context.system)
-
-    implicit val scheduler = context.system.scheduler
-
-    val ks = keyspace("region")
-
-    object ERROR {
-      def unapply(http: HttpExchange): Option[HttpExchange] = {
-        throw new IllegalArgumentException(s"Simulated resumable exception ${http.request.method}")
-      }
-    }
-
-    override def handle: Receive = {
-      case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
-      case http@HTTP(GET, PATH("timeout"), _, _) if http.timeout(200 millis) =>
-      case HTTP(GET, PATH("clusterping"), _, response) => handleWith(response) {
-        implicit val timeout = Timeout(1 second)
-        ks ??? ClusterPing() map {
-          case pong => Encoder.json(OK, pong, gzip = false)
-        }
-      }
-      case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
-        response.success(Encoder.json(OK, Decoder.json(entity), gzip = true))
-
-      case HTTP(GET, PATH("restartable"), _, _) => throw new Exception("Simulated restartable exception")
-
-      case ERROR(HTTP(GET, PATH("resumable"), _, response)) => response.success(HttpResponse(OK))
-    }
-  })
-
-  val node2 = new Node(config)
+  val node1 = new Node(configure("pingpong"))
+  val node2 = new Node(configure("pingpong"))
 
   override protected def beforeAll(): Unit = try {
-    node2.startContainer("region", List(0, 1), new Partition {
-      override def handle: Receive = {
-        case req@ClusterPing() => req(sender) ! "pong"
-      }
-    })
+    node1.start()
+    node2.start()
     node1.awaitClusterReady()
+    node2.awaitClusterReady()
   } finally {
     super.beforeAll()
   }
@@ -132,3 +90,49 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
   }
   
 }
+
+case class ClusterPing() extends Scatter[String] {
+  override def gather(r1: String, r2: String) = r2
+}
+
+class PingPongGateway extends GatewayHttp {
+
+  import context.dispatcher
+
+  implicit val materializer = ActorMaterializer.create(context.system)
+
+  implicit val scheduler = context.system.scheduler
+
+  val ks = keyspace("region")
+
+  object ERROR {
+    def unapply(http: HttpExchange): Option[HttpExchange] = {
+      throw new IllegalArgumentException(s"Simulated resumable exception ${http.request.method}")
+    }
+  }
+
+  override def handle: Receive = {
+    case HTTP(GET, PATH("ping"), _, response) => response.success(Encoder.json(OK, "pong", gzip = false))
+    case http@HTTP(GET, PATH("timeout"), _, _) if http.timeout(200 millis) =>
+    case HTTP(GET, PATH("clusterping"), _, response) => handleWith(response) {
+      implicit val timeout = Timeout(1 second)
+      ks ??? ClusterPing() map {
+        case pong => Encoder.json(OK, pong, gzip = false)
+      }
+    }
+    case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
+      response.success(Encoder.json(OK, Decoder.json(entity), gzip = true))
+
+    case HTTP(GET, PATH("restartable"), _, _) => throw new Exception("Simulated restartable exception")
+
+    case ERROR(HTTP(GET, PATH("resumable"), _, response)) => response.success(HttpResponse(OK))
+  }
+}
+
+
+class PingPongPartition extends Partition {
+  override def handle: Receive = {
+    case req@ClusterPing() => req(sender) ! "pong"
+  }
+}
+

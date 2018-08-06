@@ -23,7 +23,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.{Observable, Observer}
 
 import akka.actor.{Actor, ActorRef, Status}
-import akka.event.Logging
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
 import io.amient.affinity.core.state.KVStoreLocal

@@ -2,13 +2,14 @@ package io.amient.affinity.core.cluster
 
 import io.amient.affinity.core.actor.{Partition, Routed}
 import io.amient.affinity.core.util.Reply
+import scala.collection.JavaConverters._
 
-class FailoverTestPartition(store: String) extends Partition {
+class FailoverTestPartition extends Partition {
 
   import FailoverTestPartition._
   import context.dispatcher
 
-  val data = state[String, String](store)
+  val data = state[String, String]("consistency-test")
 
   override def handle: Receive = {
     case request@GetValue(key) => request(sender) ! data(key)

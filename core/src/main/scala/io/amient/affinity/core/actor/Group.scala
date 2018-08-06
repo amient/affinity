@@ -4,7 +4,7 @@ import akka.actor.Status.Failure
 import akka.routing.{ActorRefRoutee, GetRoutees, Routees}
 import akka.serialization.SerializationExtension
 import io.amient.affinity.core.cluster.Coordinator
-import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
+import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
 import io.amient.affinity.core.util.{Reply, ScatterGather}
 import io.amient.affinity.core.{Partitioner, ack, any2ref}
 
@@ -20,7 +20,7 @@ final case class GroupStatus(identifier: String, suspended: Boolean)
 
 class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) extends ActorHandler {
 
-  private val routes = mutable.Map[Int, ActorRefRoutee]()
+  private val routees = mutable.Map[Int, ActorRefRoutee]()
 
   val serialization = SerializationExtension(context.system)
 
@@ -31,9 +31,9 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
   override def preStart(): Unit = {
     super.preStart()
     // set up a watch for each referenced group coordinator
-    // coordinator will be sending MasterUpdates(..) messages for this group whenever a master actor
+    // coordinator will be sending MembershipUpdate(..) messages for this group whenever members go online or offline
     // is added or removed to/from the routing tables
-    coordinator.watch(self, clusterWide = true)
+    coordinator.watch(self)
   }
 
   override def postStop(): Unit = try {
@@ -49,24 +49,23 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
 
   override def manage: Receive = super.manage orElse {
 
-    case GetRoutees => sender ! Routees(routes.values.toIndexedSeq)
+    case GetRoutees => sender ! Routees(routees.values.toIndexedSeq)
 
-    case request@MasterUpdates(add, remove) => request(sender) ! {
+    case request: MembershipUpdate => request(sender) ! {
+      val (add, remove) = request.mastersDelta(routees.map(_._2.ref).toSet)
       remove.foreach { routee =>
         val partition = routee.path.name.toInt
-        routes.remove(partition) foreach { removed =>
-          if (removed != routee) routes.put(partition, removed)
+        routees.remove(partition) foreach { removed =>
+          if (removed != routee) routees.put(partition, removed)
         }
       }
       add.foreach { routee =>
         val partition = routee.path.name.toInt
-        routes.put(partition, ActorRefRoutee(routee))
-        routes.size == numPartitions
-        evaluateSuspensionStatus()
+        routees.put(partition, ActorRefRoutee(routee))
+        routees.size == numPartitions
       }
       evaluateSuspensionStatus()
     }
-
   }
 
   override def handle: Receive = {
@@ -78,7 +77,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
     }
 
     case req@ScatterGather(message: Reply[Any], t) => req(sender) ! {
-      val recipients = routes.values
+      val recipients = routees.values
       implicit val timeout = t
       implicit val scheduler = context.system.scheduler
       Future.sequence(recipients.map(x => x.ref ?! message))
@@ -89,7 +88,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
   }
 
   private def evaluateSuspensionStatus() = {
-    val shouldBeSuspended = routes.size != numPartitions
+    val shouldBeSuspended = routees.size != numPartitions
     if (shouldBeSuspended != isSuspended) {
       if (shouldBeSuspended) suspend else resume
       //parent will be a gateway which needs to collate all suspension states to a single flag
@@ -104,7 +103,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
 
     //log.trace(serializedKey.mkString(".") + " over " + numPartitions + " to " + partition)
 
-    routes.get(partition) match {
+    routees.get(partition) match {
       case Some(routee) => routee
       case None =>
         throw new IllegalStateException(s"Partition $partition is not represented in the cluster")

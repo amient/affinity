@@ -21,10 +21,10 @@ package io.amient.affinity.core.cluster
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.MemorySchemaRegistry
-import io.amient.affinity.core.cluster.Coordinator.MasterUpdates
+import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -47,27 +47,27 @@ class CoordinatorEmbeddedSpec extends FlatSpec with Matchers {
         }
       }), "actor1")
       coordinator1.register(actor1.path)
-      val update1 = new AtomicReference[String]("")
+      val update1 = new AtomicReference[scala.collection.Set[ActorRef]](Set.empty)
       update1 synchronized {
         coordinator1.watch(system.actorOf(Props(new Actor {
           override def receive: Receive = {
-            case MasterUpdates(add, del) => update1 synchronized update1.set(s"${add.size}, ${del.size}")
+            case MembershipUpdate(masters) => update1 synchronized update1.set(masters.values.toSet)
           }
-        }), "subscriber1"), false)
+        }), "subscriber1"))
       }
       coordinator1.close()
 
       val coordinator2 = Coordinator.create(system, "group1")
-      val update2 = new AtomicReference[String]("")
+      val update2 = new AtomicReference[scala.collection.Set[ActorRef]](Set.empty)
       update2 synchronized {
         coordinator2.watch(system.actorOf(Props(new Actor {
           override def receive: Receive = {
-            case MasterUpdates(add, del) => update2 synchronized update2.set(s"${add.size}, ${del.size}")
+            case MembershipUpdate(masters) => update2 synchronized update2.set(masters.values.toSet)
           }
-        }), "subscriber2"), true)
+        }), "subscriber2"))
         update2.wait(1000)
-        update2.get should be("1, 0")
-        update1.get should be("1, 0")
+        update2.get.map(_.path.toString) should be(Set("akka://101/user/actor1"))
+        update1.get.map(_.path.toString) should be(Set("akka://101/user/actor1"))
       }
       coordinator2.close()
 

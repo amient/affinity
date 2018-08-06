@@ -34,7 +34,6 @@ import io.amient.affinity.core.config._
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
@@ -131,7 +130,13 @@ class Node(config: Config) {
   }
 
   def start(): Unit = try {
-    Await.result(Future.sequence(startGateway() +: startContainers()), startupTimeout)
+
+    if (conf.Affi.Node.Gateway.Class.isDefined) {
+      Await.result(start(conf.Affi.Node.Gateway.Class().newInstance()), startupTimeout)
+    } else {
+      controller ! StartRebalance()
+      httpGatewayPort.success(List())
+    }
   } catch {
     case e: Throwable =>
       try {
@@ -142,56 +147,17 @@ class Node(config: Config) {
   }
 
   /**
-    * @return a future with list of ports indexed by the interface id 0-n
-    */
-  def startGateway(): Future[List[Int]] = {
-    if (conf.Affi.Node.Gateway.Class.isDefined) {
-      startGateway(conf.Affi.Node.Gateway.Class().newInstance())
-    } else {
-      httpGatewayPort.success(List())
-      Future.successful(List())
-    }
-  }
-
-  /**
     * @param creator
     * @param tag
     * @tparam T
     * @return a future with list of ports indexed by the interface id 0-n
     */
-  def startGateway[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[List[Int]] = {
+  def start[T <: Gateway](creator: => T)(implicit tag: ClassTag[T]): Future[List[Int]] = {
+    controller ! StartRebalance()
     implicit val timeout = Timeout(startupTimeout)
     val result = controller ?? CreateGateway(Props(creator))
     httpGatewayPort.completeWith(result)
     result
   }
-
-
-  def startContainers(): Seq[Future[Unit]] = {
-    if (conf.Affi.Node.Containers.isDefined) {
-      conf.Affi.Node.Containers().asScala.toList.map {
-        case (group: String, value: CfgIntList) =>
-          val partitions = value().asScala.map(_.toInt).toList
-          startContainer(group, partitions)
-      }
-    } else {
-      List.empty
-    }
-  }
-
-  implicit val scheduler = system.scheduler
-
-  def startContainer(group: String, partitions: List[Int]): Future[Unit] = {
-    val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
-    implicit val timeout = Timeout(startupTimeout)
-    controller ?? CreateContainer(group, partitions, Props(serviceClass.newInstance()))
-  }
-
-  def startContainer[T <: Partition](group: String, partitions: List[Int], partitionCreator: => T)
-                                    (implicit tag: ClassTag[T]): Future[Unit] = {
-    implicit val timeout = Timeout(startupTimeout)
-    controller ?? CreateContainer(group, partitions, Props(partitionCreator))
-  }
-
 
 }

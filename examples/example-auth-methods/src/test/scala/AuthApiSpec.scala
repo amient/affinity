@@ -40,6 +40,7 @@ class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with Befo
     Conf.Affi.Coordinator.Class.path -> classOf[CoordinatorEmbedded].getName,
     Conf.Affi.Global("settings").MemStore.Class.path -> classOf[MemStoreSimpleMap].getName,
     Conf.Affi.Global("settings").Partitions.path -> "1",
+    Conf.Affi.Node.Gateway.Class.path -> classOf[AuthGateway].getName,
     Conf.Affi.Node.Gateway.Listeners.path -> List(Map(
       HttpInterfaceConf.Host.path -> "127.0.0.1",
       HttpInterfaceConf.Port.path -> 0
@@ -57,7 +58,7 @@ class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with Befo
   })
 
   override def beforeAll(): Unit = try {
-    node1.startGateway(new GatewayHttp with PrivateApi with PublicApi)
+    node1.start()
     node1.awaitClusterReady
   } finally {
     super.beforeAll()

@@ -20,7 +20,7 @@
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.http.scaladsl.model.StatusCodes._
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigRenderOptions, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.HttpInterfaceConf
@@ -40,19 +40,16 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
 
   val config = ConfigFactory.load("example")
     .withValue(Conf.Affi.Keyspace("graph").NumPartitions.path, ConfigValueFactory.fromAnyRef(numPartitions))
-    .withValue(Conf.Affi.Node.Gateway.Listeners.path, ConfigValueFactory.fromIterable(List(Map(
-      HttpInterfaceConf.Host.path -> "127.0.0.1",
-      HttpInterfaceConf.Port.path -> 0
-    ).asJava).asJava))
+    .withValue(Conf.Affi.Node.Containers("graph").path, ConfigValueFactory.fromIterable(List(0,1).asJava))
 
-  val nodeConfig = configure(config, Some(zkConnect), Some(kafkaBootstrap))
-  val node2 = new Node(nodeConfig)
-  val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
+  val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)).withValue(Conf.Affi.Node.DataDir.path, ConfigValueFactory.fromAnyRef(".data/example-graph-node1")))
+  val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)).withValue(Conf.Affi.Node.DataDir.path, ConfigValueFactory.fromAnyRef(".data/example-graph-node2")))
 
   override def beforeAll(): Unit = try {
-    node1.startGateway(new ExampleGateway)
-    node2.startContainer("graph", List(0, 1))
+    node1.start()
+    node2.start()
     node1.awaitClusterReady
+    node2.awaitClusterReady
   } finally {
     super.beforeAll()
   }
