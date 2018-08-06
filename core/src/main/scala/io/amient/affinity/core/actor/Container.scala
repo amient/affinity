@@ -20,7 +20,7 @@
 package io.amient.affinity.core.actor
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Files
 
 import akka.actor.{Actor, ActorPath, ActorRef, Props}
 import akka.event.Logging
@@ -33,8 +33,8 @@ import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
 import io.amient.affinity.core.util.Reply
 
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object Container {
@@ -75,7 +75,7 @@ class Container(group: String) extends Actor {
 
   override def preStart(): Unit = {
     super.preStart()
-    coordinator.registerAndWatchPeers(akkaAddress, self)
+    if (conf.Affi.Node.DataAutoAssign()) coordinator.registerAndWatchPeers(akkaAddress, self)
     //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
     coordinator.watch(self)
   }
@@ -97,14 +97,14 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
-    case UpdatePeers(peers) =>
+    case UpdatePeers(peers) if conf.Affi.Node.DataAutoAssign() =>
       peers.zipWithIndex.find(_._1 == akkaAddress).map(_._2) match {
         case None => logger.error(s"This peer is not registered: $akkaAddress")
         case Some(a) =>
           val ksConf: affinity.KeyspaceConf = conf.Affi.Keyspace(group)
           val serviceClass = ksConf.PartitionClass()
           val n = peers.size
-          val np = ksConf.NumPartitions()
+          val np = ksConf.Partitions()
           val nr = np * ksConf.ReplicationFactor()
           val assigned = (0 until nr).filter(_ % n == a).map(_ % np).toSet
           val unassigned = (0 until np).toSet -- assigned

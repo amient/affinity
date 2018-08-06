@@ -38,7 +38,7 @@ import scala.reflect.ClassTag
 
 class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").NumPartitions()
+  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").Partitions()
 
   val config: Config = ConfigFactory.load("example")
 

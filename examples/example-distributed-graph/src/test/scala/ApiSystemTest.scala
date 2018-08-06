@@ -36,7 +36,7 @@ import scala.language.postfixOps
 
 class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").NumPartitions()
+  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").Partitions()
 
   val config = ConfigFactory.load("example")
 
