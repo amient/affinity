@@ -61,7 +61,7 @@ object KVStoreLocal {
       if (nodeConf.DataDir.isDefined) {
         stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
       } else {
-        throw new IllegalArgumentException(stateConf.MemStore.DataDir.path + " could not be derived for state: " + identifier)
+        stateConf.MemStore.DataDir.setValue(null)
       }
     }
     if (classOf[AvroRecord].isAssignableFrom(keyClass)) {

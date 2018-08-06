@@ -79,20 +79,23 @@ class Container(group: String) extends Actor {
     super.preStart()
     if (conf.Affi.Node.DataAutoAssign()) {
       if (!conf.Affi.Node.DataDir.isDefined) {
-        throw new IllegalArgumentException("node.data.auto.assign is enabled but node.data.dir is not defined")
-      }
-      val dir = conf.Affi.Node.DataDir()
-      val zidFile = dir.resolve(s"$group.zid").toFile
-      if (!zidFile.exists()) {
-        zidFile.getParentFile.mkdirs()
-        zidFile.createNewFile()
+        logger.warning("node.data.auto.assign is enabled but node.data.dir is not defined - system's affinity to existing state will be minimal")
+        zid = Some(coordinator.registerAndWatchPeers(akkaAddress, None, self))
       } else {
-        val source = scala.io.Source.fromFile(zidFile)
-        zid = Some((try source.mkString finally source.close()))
+        val dir = conf.Affi.Node.DataDir()
+        val zidFile = dir.resolve(s"$group.zid").toFile
+        if (!zidFile.exists()) {
+          zidFile.getParentFile.mkdirs()
+          zidFile.createNewFile()
+        } else {
+          val source = scala.io.Source.fromFile(zidFile)
+          zid = Some((try source.mkString finally source.close()))
+        }
+        zid = Some(coordinator.registerAndWatchPeers(akkaAddress, zid, self))
+        new PrintWriter(zidFile) {
+          write(zid.get.toString); close
+        }
       }
-      zid = Some(coordinator.registerAndWatchPeers(akkaAddress, zid, self))
-      coordinator.registerAndWatchPeers(akkaAddress, zid, self)
-      new PrintWriter(zidFile) { write(zid.get.toString); close }
     }
     //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
     coordinator.watch(self)
@@ -115,7 +118,7 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
-    case UpdatePeers(peers: Seq[String]) if conf.Affi.Node.DataAutoAssign() =>
+    case UpdatePeers(peers: Seq[String]) if conf.Affi.Node.DataAutoAssign() && conf.Affi.Keyspace(group).isDefined =>
       peers.sorted.zipWithIndex.find(_._1 == zid.get).map(_._2) match {
         case None => throw new IllegalStateException(s"This peer is not registered: $akkaAddress")
         case Some(a) =>
@@ -134,7 +137,7 @@ class Container(group: String) extends Actor {
       partitionIndex.get(p) match {
         case Some(ref) => ref
         case None =>
-          logger.info(s"$akkaAddress: Assigning partition $p")
+          logger.debug(s"$akkaAddress: Assigning partition $p")
           val ref = context.actorOf(props, name = p.toString)
           partitionIndex += p -> ref
           ref
@@ -143,7 +146,7 @@ class Container(group: String) extends Actor {
 
     case request@UnassignPartition(p) => request(sender) ! {
       if (partitionIndex.contains(p)) {
-        logger.info(s"$akkaAddress: Unassigning partition $p")
+        logger.debug(s"$akkaAddress: Unassigning partition $p")
         partitionIndex.remove(p).foreach(context.stop)
       }
       if (conf.Affi.Node.DataDir.isDefined && conf.Affi.Node.DataAutoDelete()) {
