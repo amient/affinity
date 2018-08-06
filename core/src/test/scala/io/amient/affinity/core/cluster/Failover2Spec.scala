@@ -92,6 +92,7 @@ class Failover2Spec extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     }
     requestCount.set(requests.size)
     Await.result(Future.sequence(requests), specTimeout).foreach(_ should be(Success(SeeOther)))
+    println(s"${requests.size} successful requests")
 
     expected.asScala.foreach { case (key, value) =>
       val actualEntity = Await.result(node1.http(GET, s"/$key").map { response => response.entity }, specTimeout / 3)
