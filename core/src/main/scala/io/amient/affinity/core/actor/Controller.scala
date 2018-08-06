@@ -63,7 +63,7 @@ class Controller extends Actor {
 
   private val containers = scala.collection.mutable.Map[String, ActorRef]()
 
-  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
+  import context.dispatcher
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1 minute) {
     case _: IllegalArgumentException ⇒ Resume

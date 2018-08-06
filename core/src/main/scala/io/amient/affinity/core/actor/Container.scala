@@ -61,15 +61,13 @@ class Container(group: String) extends Actor {
 
   private val partitionIndex = scala.collection.mutable.Map[Int, ActorRef]()
 
-  /**
-    * This watch will result in localised MasterStatusUpdate messages to be send from the Cooridinator to this Container
-    */
   private val coordinator = Coordinator.create(context.system, group)
 
   private val masters = scala.collection.mutable.Set[ActorRef]()
 
   override def preStart(): Unit = {
     super.preStart()
+    //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
     coordinator.watch(self)
   }
 
