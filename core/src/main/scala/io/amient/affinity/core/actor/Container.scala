@@ -83,7 +83,10 @@ class Container(group: String) extends Actor {
       }
       val dir = conf.Affi.Node.DataDir()
       val zidFile = dir.resolve(s"$group.zid").toFile
-      if (zidFile.exists()) {
+      if (!zidFile.exists()) {
+        zidFile.getParentFile.mkdirs()
+        zidFile.createNewFile()
+      } else {
         val source = scala.io.Source.fromFile(zidFile)
         zid = Some((try source.mkString finally source.close()))
       }
