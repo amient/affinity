@@ -53,9 +53,12 @@ object Coordinator {
   }
 
   final case class MembershipUpdate(members: Map[String, ActorRef]) extends Reply[Unit] {
-    //a deterministic method which resolves which one of the
-    //replicas is the master for each partition applying a murmur2 hash to the actor path and selecting the
-    //ones with the smallest hash
+
+    /**
+      * a deterministic method which resolves which one of the replicas is the master for each partition
+      * applying a murmur2 hash to the replica's unique handle and selecting the one with the smallest hash
+      * @return a set of all masters for each partition within the group this coordinator is managing
+      */
     def masters: Set[ActorRef] = {
       members.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
         members.filter(_._2.path.toStringWithoutAddress == relPath)
@@ -63,6 +66,12 @@ object Coordinator {
       }
     }
 
+    /**
+      * mastersDelta splits the current members of this update message into additions and removals
+      * with respect to the provided known state
+      * @param knownMasters a set of actors to which if the result is applied will be the same as the members of this update
+      * @return (list of additions, list of removals)
+      */
     def mastersDelta(knownMasters: Set[ActorRef]): (List[ActorRef], List[ActorRef]) = {
       val newMasters = masters
       val add = newMasters.toList.filter(!knownMasters.contains(_))

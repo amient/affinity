@@ -51,7 +51,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
 
     case GetRoutees => sender ! Routees(routees.values.toIndexedSeq)
 
-    case request: MembershipUpdate =>
+    case request: MembershipUpdate => request(sender) ! {
       val (add, remove) = request.mastersDelta(routees.map(_._2.ref).toSet)
       remove.foreach { routee =>
         val partition = routee.path.name.toInt
@@ -65,6 +65,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
         routees.size == numPartitions
       }
       evaluateSuspensionStatus()
+    }
   }
 
   override def handle: Receive = {
