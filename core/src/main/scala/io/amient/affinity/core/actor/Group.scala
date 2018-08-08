@@ -3,20 +3,23 @@ package io.amient.affinity.core.actor
 import akka.actor.Status.Failure
 import akka.routing.{ActorRefRoutee, GetRoutees, Routees}
 import akka.serialization.SerializationExtension
+import akka.util.Timeout
 import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
 import io.amient.affinity.core.util.{Reply, ScatterGather}
 import io.amient.affinity.core.{Partitioner, ack, any2ref}
 
 import scala.collection.mutable
-import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 trait Routed {
   def key: Any
 }
 
-final case class GroupStatus(identifier: String, suspended: Boolean)
+final case class GroupStatus(identifier: String, suspended: Boolean) extends Reply[Unit]
 
 class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) extends ActorHandler {
 
@@ -24,9 +27,11 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
 
   val serialization = SerializationExtension(context.system)
 
-  implicit val executor = context.dispatcher
+  private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
-  val coordinator = Coordinator.create(context.system, identifier)
+  private val coordinator = Coordinator.create(context.system, identifier)
+
+  private implicit val scheduler = context.system.scheduler
 
   override def preStart(): Unit = {
     super.preStart()
@@ -79,7 +84,6 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
     case req@ScatterGather(message: Reply[Any], t) => req(sender) ! {
       val recipients = routees.values
       implicit val timeout = t
-      implicit val scheduler = context.system.scheduler
       Future.sequence(recipients.map(x => x.ref ?! message))
     }
 
@@ -87,12 +91,14 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
 
   }
 
-  private def evaluateSuspensionStatus() = {
+  private def evaluateSuspensionStatus(): Unit = {
     val shouldBeSuspended = routees.size != numPartitions
     if (shouldBeSuspended != isSuspended) {
       if (shouldBeSuspended) suspend else resume
       //parent will be a gateway which needs to collate all suspension states to a single flag
-      context.parent ! GroupStatus(identifier, isSuspended)
+      val t = 1 seconds
+      implicit val timeout = Timeout(t)
+      Await.result(context.parent ?! GroupStatus(identifier, isSuspended), t)
     }
   }
 
