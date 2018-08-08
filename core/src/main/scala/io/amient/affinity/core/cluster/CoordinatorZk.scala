@@ -88,25 +88,24 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
 
     if (!zk.exists(peersRoot)) zk.createPersistent(peersRoot, true)
     val nodes = zk.getChildren(peersRoot).asScala.map(i => (i, zk.readData[String](s"$peersRoot/$i")))
-    val zid: String = knownZid match {
-      case Some(id) => nodes.find(_._1 == id) match {
-        case Some((_, prevAkkaAddress)) if (prevAkkaAddress == akkaAddress) => id
-        case Some(_) => zk.writeData(s"$peersRoot/$id", akkaAddress); id
-        case None => zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL).substring(peersRoot.length+1)
+    val zid: String = knownZid.flatMap { id =>
+      nodes.find(_._1 == id) match {
+        case Some((_, prevAkkaAddress)) if (prevAkkaAddress == akkaAddress) => Some(id)
+        case Some(_) => zk.writeData(s"$peersRoot/$id", akkaAddress); Some(id)
+        case None => None
       }
-      case None => nodes.find(_._2 == akkaAddress) match {
+    } getOrElse {
+      nodes.find(_._2 == akkaAddress) match {
         case Some((id, _)) => id
         case None => zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL).substring(peersRoot.length+1)
       }
     }
+
     def update(zids: util.List[String]) = updatePeers(zids.asScala.toList)
     try zid finally update(zk.subscribeChildChanges(peersRoot, new IZkChildListener() {
       override def handleChildChange(parentPath: String, zids: util.List[String]): Unit = update(zids)
     }))
   }
-
-
-
 
 }
 
