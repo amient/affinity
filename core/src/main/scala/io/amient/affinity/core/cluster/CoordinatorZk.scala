@@ -92,7 +92,7 @@ class CoordinatorZk(system: ActorSystem, group: String, _conf: CoordinatorConf) 
       case Some(id) => nodes.find(_._1 == id) match {
         case Some((_, prevAkkaAddress)) if (prevAkkaAddress == akkaAddress) => id
         case Some(_) => zk.writeData(s"$peersRoot/$id", akkaAddress); id
-        case None => throw new IllegalMonitorStateException(s"zid is invalid for group $group at $akkaAddress")
+        case None => zk.create(s"$peersRoot/", akkaAddress, CreateMode.PERSISTENT_SEQUENTIAL).substring(peersRoot.length+1)
       }
       case None => nodes.find(_._2 == akkaAddress) match {
         case Some((id, _)) => id

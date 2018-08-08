@@ -96,6 +96,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
     if (shouldBeSuspended != isSuspended) {
       if (shouldBeSuspended) suspend else resume
       //parent will be a gateway which needs to collate all suspension states to a single flag
+      //updating group status is blocking because it's failure must be escalated as fatal before other processing happens
       val t = 1 seconds
       implicit val timeout = Timeout(t)
       Await.result(context.parent ?! GroupStatus(identifier, isSuspended), t)

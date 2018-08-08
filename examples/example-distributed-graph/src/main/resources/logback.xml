@@ -8,12 +8,12 @@
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="STDOUT" />
     </root>
 
+    <logger name="kafka" level="OFF" />
     <logger name="org.I0Itec.zkclient" level="ERROR" />
-    <logger name="kafka" level="ERROR" />
     <logger name="org.apache.kafka" level="ERROR" />
     <logger name="org.apache.spark" level="ERROR" />
     <logger name="org.apache.zookeeper" level="OFF"/>
