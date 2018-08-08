@@ -137,7 +137,7 @@ class Container(group: String) extends Actor {
       partitionIndex.get(p) match {
         case Some(ref) => ref
         case None =>
-          logger.debug(s"$akkaAddress: Assigning partition $p")
+          logger.debug(s"$akkaAddress: Assigning partition $group/$p")
           val ref = context.actorOf(props, name = p.toString)
           partitionIndex += p -> ref
           ref
@@ -146,7 +146,7 @@ class Container(group: String) extends Actor {
 
     case request@UnassignPartition(p) => request(sender) ! {
       if (partitionIndex.contains(p)) {
-        logger.debug(s"$akkaAddress: Unassigning partition $p")
+        logger.debug(s"$akkaAddress: Unassigning partition $group/$p")
         partitionIndex.remove(p).foreach(context.stop)
       }
       if (conf.Affi.Node.DataDir.isDefined && conf.Affi.Node.DataAutoDelete()) {

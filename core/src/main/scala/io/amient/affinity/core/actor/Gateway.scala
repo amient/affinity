@@ -139,9 +139,6 @@ trait Gateway extends ActorHandler {
   abstract override def postStop(): Unit = try {
     logger.debug("Closing global state stores")
     stopping = true
-    if (offlineGroups.size > 0) {
-      logger.warning(s"Offline groups: ${offlineGroups.mkString(", ")}; in ${self.path}")
-    }
     globals.foreach { case (identifier, (store, _)) => try {
       store.close()
     } catch {
@@ -160,17 +157,21 @@ trait Gateway extends ActorHandler {
         logger.warning("affinity.gateway has listeners configured but the node is trying " +
           s"to instantiate a non-http gateway ${this.getClass}. This may lead to uncertainity in the Controller.")
       }
-    case msg@GroupStatus(group, suspended) if keyspaces.contains(group) =>
+    case msg@GroupStatus(group, suspended) if keyspaces.contains(group) => msg(sender) ! {
       if (keyspaces(group)._2.get != suspended) {
+        logger.debug(s"keyspace ${msg}")
         keyspaces(group)._2.set(suspended)
         evaluateSuspensionStatus(Some(msg))
       }
+    }
 
-    case msg@GroupStatus(group, suspended) if globals.contains(group) =>
+    case msg@GroupStatus(group, suspended) if globals.contains(group) => msg(sender) ! {
       if (globals(group)._2.get != suspended) {
+        logger.debug(s"global ${msg}")
         globals(group)._2.set(suspended)
         evaluateSuspensionStatus(Some(msg))
       }
+    }
 
     case GroupStatus(group, _) => logger.warning(s"GroupStatus for unrecognized group type: $group")
 
@@ -188,6 +189,10 @@ trait Gateway extends ActorHandler {
     }
     if (started && isSuspended && !stopping) {
       offlineGroups = (keyspaces.filter(_._2._2.get) ++ globals.filter(_._2._2.get)).map(_._1).toList
+      if (offlineGroups.size > 0) {
+        logger.debug(s"Offline groups: ${offlineGroups.mkString(", ")}; in ${self.path}")
+      }
+
     }
   }
 
