@@ -27,7 +27,7 @@ object DocTool extends Tool {
   def apply(config: Config): Unit = {
 
     println("\n\n## HOCON Configuration Files Structure")
-    apply(affinity.Conf.Affi)
+    apply(affinity.Conf.Affi.SystemName)
 
     println("\n\n## Avro")
     apply(affinity.Conf.Affi.Avro)
