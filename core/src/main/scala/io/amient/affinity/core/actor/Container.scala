@@ -29,7 +29,7 @@ import io.amient.affinity
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
-import io.amient.affinity.core.cluster.Coordinator
+import io.amient.affinity.core.cluster.{Balancer, Coordinator}
 import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
 import io.amient.affinity.core.util.Reply
 
@@ -119,25 +119,25 @@ class Container(group: String) extends Actor {
   override def receive: Receive = {
 
     case UpdatePeers(peers: Seq[String]) if conf.Affi.Node.DataAutoAssign() && conf.Affi.Keyspace(group).isDefined =>
+      logger.debug(s"$akkaAddress: peers in group $group= $peers")
       peers.sorted.zipWithIndex.find(_._1 == zid.get).map(_._2) match {
         case None => throw new IllegalStateException(s"This peer is not registered: $akkaAddress")
         case Some(a) =>
           val ksConf: affinity.KeyspaceConf = conf.Affi.Keyspace(group)
           val serviceClass = ksConf.PartitionClass()
-          val n = peers.size
-          val np = ksConf.Partitions()
-          val nr = np * ksConf.ReplicationFactor()
-          val assigned = (0 until nr).filter(_ % n == a).map(_ % np).toSet
-          val unassigned = (0 until np).toSet -- assigned
+          val assignment = Balancer.generateAssignment(ksConf.Partitions(), ksConf.ReplicationFactor(), peers.size)
+          logger.debug(s"$akkaAddress: new assignment in group $group = $assignment")
+          val assigned = assignment(a).toSet
+          val unassigned = (0 until ksConf.Partitions()).toSet -- assigned
           assigned.foreach(partition => self ! AssignPartition(partition, Props(serviceClass)))
           unassigned.foreach(partition => self ! UnassignPartition(partition))
       }
 
     case request@AssignPartition(p, props) => request(sender) ! {
+      logger.debug(s"$akkaAddress: Assigning partition $group/$p")
       partitionIndex.get(p) match {
         case Some(ref) => ref
         case None =>
-          logger.debug(s"$akkaAddress: Assigning partition $group/$p")
           val ref = context.actorOf(props, name = p.toString)
           partitionIndex += p -> ref
           ref

@@ -56,14 +56,14 @@ object Coordinator {
   final case class MembershipUpdate(members: Map[String, ActorRef]) extends Reply[Unit] {
 
     /**
-      * a deterministic method which resolves which one of the replicas is the master for each partition
-      * applying a murmur2 hash to the replica's unique handle and selecting the one with the smallest hash
+      * a method which is deterministic across multiple nodes that resolves which one of the replicas is the master for
+      * each partition applying a murmur2 hash to the replica's unique handle and selecting the one with the largest hash
       * @return a set of all masters for each partition within the group this coordinator is managing
       */
     def masters: Set[ActorRef] = {
       members.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
         members.filter(_._2.path.toStringWithoutAddress == relPath)
-          .minBy { case (handle, _) => ByteUtils.murmur2(handle.getBytes) }._2
+          .maxBy { case (handle, _) => ByteUtils.murmur2(handle.getBytes) }._2
       }
     }
 
