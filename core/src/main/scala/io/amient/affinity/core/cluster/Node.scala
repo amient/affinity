@@ -41,6 +41,7 @@ import scala.reflect.ClassTag
 object Node {
 
   class NodeConf extends CfgStruct[NodeConf] {
+    val AdvertisedAddress = string("advertised.address", false).doc("<host>:<port> use this to advertise this node's address if it is running behind a proxy or inside a container")
     val Containers: CfgGroup[CfgIntList] = group("container", classOf[CfgIntList], false)
       .doc("Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3] ")
     val Gateway: GatewayConf = struct("gateway", new GatewayConf, false)
