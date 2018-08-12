@@ -60,10 +60,8 @@ class Container(group: String) extends Actor {
   private val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
 
   final private val akkaAddress = if (conf.Akka.Hostname() > "") {
-    if (conf.Affi.Node.AdvertisedAddress.isDefined) {
-      s"akka.tcp://${context.system.name}@${conf.Affi.Node.AdvertisedAddress()}"
-    } else if (conf.Akka.Hostname().trim == "0.0.0.0") {
-      throw new IllegalArgumentException("When binding akka to all interfaces (0.0.0.0), the configuration must include affinity.node.advertised.address")
+    if (conf.Akka.Hostname().trim == "0.0.0.0") {
+      throw new IllegalArgumentException("Hostname cannot be non-specific (0.0.0.0), use different hostname and bind-hostname settings")
     } else {
       s"akka.tcp://${context.system.name}@${conf.Akka.Hostname()}:${conf.Akka.Port()}"
     }
