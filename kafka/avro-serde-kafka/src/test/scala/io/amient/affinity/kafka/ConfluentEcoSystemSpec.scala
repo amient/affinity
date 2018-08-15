@@ -121,8 +121,6 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 
-    println(consumerProps)
-
     val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
 
     consumer.subscribe(List(topic))

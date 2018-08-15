@@ -20,7 +20,7 @@
 package io.amient
 
 import akka.actor.ActorSystem
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
