@@ -35,6 +35,8 @@ import scala.collection.immutable.Seq
 
 case class Key(key: Int) extends AvroRecord with Routed with Reply[Option[TestValue]]
 
+case class NonAvroCase(key: Int)
+
 case class TestValue(items: List[Int]) extends AvroRecord {
   def withAddedItem(item: Int) = TestValue(items :+ item)
   def withRemovedItem(item: Int) = TestValue(items.filter(_ != item))
@@ -144,6 +146,14 @@ class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Mat
       Serde.of[List[Long]](ConfigFactory.empty.withValue(
         Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName)))
         .isInstanceOf[SeqSerde] should be(true)
+    }
+
+    "serialize correctly when elements are simple case classes" in {
+      assert(classOf[java.io.Serializable].isAssignableFrom(classOf[NonAvroCase]))
+      val x: List[NonAvroCase] = NonAvroCase(3) :: List(NonAvroCase(1), NonAvroCase(2))
+      val y: Array[Byte] = SerializationExtension(system).serialize(x).get
+      val z: Seq[Key] = SerializationExtension(system).deserialize(y, classOf[List[Key]]).get
+      z should be(x)
     }
   }
 
