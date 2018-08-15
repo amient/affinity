@@ -63,13 +63,15 @@ package object affinity {
   }
 
   object AffinityActorSystem {
-    val defaultConfig = ConfigFactory.parseResources(getClass.getClassLoader, "affinity.conf")
-    require(defaultConfig.hasPath("akka.actor.serializers.avro"))
+    val serdeConfig = ConfigFactory.parseResources(getClass.getClassLoader, "affinity-serdes.conf")
+    val defaultConfig = ConfigFactory.parseResources(getClass.getClassLoader, "affinity-defaults.conf")
+    require(serdeConfig.hasPath("akka.actor.serializers.avro"))
 
-    def apply(config: Config): Config = config.withFallback(defaultConfig)
+    def configure(config: Config) = serdeConfig.withFallback(config).withFallback(defaultConfig)
+      .withFallback(ConfigFactory.defaultReference())
 
     def create(config: Config): ActorSystem = {
-      val resolvedConfig = apply(config)
+      val resolvedConfig = configure(config)
       ActorSystem.create(Conf(resolvedConfig).Affi.SystemName(), resolvedConfig)
     }
   }

@@ -67,9 +67,7 @@ object Serde {
   def tools(config: Config): Serdes = {
     _tools.get(config) match {
       case null => {
-        val s = new Serdes(config
-          .withFallback(AffinityActorSystem.defaultConfig)
-          .withFallback(ConfigFactory.defaultReference))
+        val s = new Serdes(AffinityActorSystem.configure(config))
         _tools.putIfAbsent(config, s) match {
           case null => s
           case some => some
