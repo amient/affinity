@@ -50,7 +50,7 @@ class LocalSchemaRegistry(dataPath: Path) extends AvroSerde with AvroSchemaRegis
   def this(_conf: AvroConf) = this(LocalAvroConf(_conf).DataPath())
 
   def checkDataPath(): Unit = {
-    require(dataPath != null)
+    require(dataPath != null, s"${LocalAvroConf.DataPath.path} is not defined")
     if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
   }
 

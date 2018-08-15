@@ -142,7 +142,7 @@ trait AvroExtractors {
             Some(new GenericData.Fixed(schema, result))
           case schema if f.isInstanceOf[Array[Byte]] =>
             val result: Array[Byte] = f.asInstanceOf[Array[Byte]]
-            require(result.length == schema.getFixedSize)
+            require(result.length == schema.getFixedSize, s"fixed binary bytes must have exactly ${schema.getFixedSize} length")
             Some(new GenericData.Fixed(schema, result))
           case _ => None
         }
