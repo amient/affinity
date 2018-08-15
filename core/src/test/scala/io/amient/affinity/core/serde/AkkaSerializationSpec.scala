@@ -27,7 +27,7 @@ import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.{CreateKeyValueMediator, Routed}
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
-import io.amient.affinity.core.util.Reply
+import io.amient.affinity.core.util.{Reply, Scatter}
 import io.amient.affinity.{AffinityActorSystem, Conf}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
@@ -40,6 +40,10 @@ case class NonAvroCase(key: Int)
 case class TestValue(items: List[Int]) extends AvroRecord {
   def withAddedItem(item: Int) = TestValue(items :+ item)
   def withRemovedItem(item: Int) = TestValue(items.filter(_ != item))
+}
+
+case class CountMsgAvro() extends AvroRecord  with Scatter[Long] {
+  override def gather(r1: Long, r2: Long): Long = r1 + r2
 }
 
 class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Matchers {
@@ -163,6 +167,15 @@ class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Mat
       val x: Set[Key] = Set(Key(1), Key(2), Key(3))
       val y: Array[Byte] = SerializationExtension(system).serialize(x).get
       val z: Set[Key] = SerializationExtension(system).deserialize(y, classOf[Set[Key]]).get
+      z should be(x)
+    }
+  }
+
+  "Parameterless Scatter message with AvroRecord" must {
+    "be serializable" in {
+      val x = CountMsgAvro()
+      val y: Array[Byte] = SerializationExtension(system).serialize(x).get
+      val z = SerializationExtension(system).deserialize(y, classOf[CountMsgAvro]).get
       z should be(x)
     }
   }

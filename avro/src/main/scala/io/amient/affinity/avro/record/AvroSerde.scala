@@ -121,7 +121,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
   }
 
   def write(value: Any, schema: Schema, schemaId: Int): Array[Byte] = {
-    require(schemaId >= 0)
+    require(schemaId >= 0, "avro schema id cannot be negative")
     value match {
       case null => null
       case any: Any =>
@@ -157,10 +157,10 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     */
   def read(bytes: Array[Byte]): Any = {
     if (bytes == null) null else {
-      require(bytes.length > 5)
-      require(bytes(0) == AvroSerde.MAGIC)
+      require(bytes.length >= 5, "binary representation of avro message must consist of at least 5 bytes")
+      require(bytes(0) == AvroSerde.MAGIC, "binary representation of avro message doesn't start with the correct magic byte")
       val schemaId = ByteUtils.asIntValue(bytes, 1)
-      require(schemaId >= 0)
+      require(schemaId >= 0, "avro schema id cannot be negative")
       val writerSchema = try {
         getSchema(schemaId)
       } catch {
@@ -181,9 +181,9 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     *         null if bytes are null
     */
   def read(bytesIn: InputStream): Any = {
-    require(bytesIn.read() == AvroSerde.MAGIC)
+    require(bytesIn.read() == AvroSerde.MAGIC, "avro binary doesn't start with magic byte")
     val schemaId = ByteUtils.readIntValue(bytesIn)
-    require(schemaId >= 0)
+    require(schemaId >= 0, "avro schema id cannot be negative")
     val writerSchema = getSchema(schemaId)
     val (_, readerSchema) = getRuntimeSchema(writerSchema)
     AvroRecord.read(bytesIn, writerSchema, readerSchema)
