@@ -21,11 +21,12 @@ package io.amient.affinity.core.serde.primitive
 
 import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.{Serde, Serdes}
+import io.amient.affinity.core.serde.{AbstractWrapSerde, Serde, Serdes}
 
-class OptionSerde(tools: Serdes) extends AbstractWrapSerde(tools) with Serde[Option[Any]] {
-  def this (config: Config) = this(Serde.tools(config))
-  def this(system: ExtendedActorSystem) = this(system.settings.config)
+class OptionSerde(serdes: Serdes) extends AbstractWrapSerde(serdes) with Serde[Option[Any]] {
+
+  def this(system: ExtendedActorSystem) = this(Serde.tools(system))
+  def this(config: Config) = this(Serde.tools(config))
 
   override protected def fromBytes(bytes: Array[Byte]): Option[Any] = {
     if (bytes.length == 0) None else Some(fromBinaryWrapped(bytes))

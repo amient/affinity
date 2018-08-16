@@ -6,6 +6,7 @@ import akka.actor.{ActorContext, Props}
 import akka.serialization.SerializationExtension
 import akka.util.Timeout
 import io.amient.affinity.core.actor._
+import io.amient.affinity.core.serde.primitive.InternalMessage
 import io.amient.affinity.core.storage.{LogStorage, Record}
 import io.amient.affinity.core.util.{CloseableIterator, Reply, TimeRange}
 import io.amient.affinity.core.{Murmur2Partitioner, ack, any2ref}
@@ -14,6 +15,13 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.reflect.ClassTag
+
+//TODO instead of typed messages use these internal ones or find a way how to serialize typed inner case classes
+case class KVGReplace(key: Any, value: Any) extends Routed with Reply[Option[Any]] with InternalMessage
+case class KVGDelete(key: Any) extends Routed with Reply[Option[Any]] with InternalMessage
+case class KVGInsert(key: Any, value: Any) extends Routed with Reply[Any] with InternalMessage
+case class KVGGetAndUpdate(key: Any, f: Option[Any] => Option[Any]) extends Routed with Reply[Option[Any]] with InternalMessage
+case class KVGUpdateAndGet(key: Any, f: Option[Any] => Option[Any]) extends Routed with Reply[Option[Any]] with InternalMessage
 
 
 /**
@@ -30,7 +38,6 @@ import scala.reflect.ClassTag
   */
 class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateConf, context: ActorContext) extends KVStore[K, V] {
 
-  //TODO #122 for the following messages as well
   case class Replace(key: K, value: V) extends Routed with Reply[Option[V]]
 
   case class Delete(key: K) extends Routed with Reply[Option[V]]

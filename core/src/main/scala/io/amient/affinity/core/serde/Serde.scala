@@ -22,8 +22,9 @@ package io.amient.affinity.core.serde
 import java.io.NotSerializableException
 import java.util.concurrent.ConcurrentHashMap
 
+import akka.actor.ExtendedActorSystem
 import akka.serialization._
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import io.amient.affinity.AffinityActorSystem
 import io.amient.affinity.core.serde.primitive.ByteArraySerde
 
@@ -32,13 +33,13 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.existentials
 import scala.reflect.ClassTag
 
-trait Serde[T] extends JSerializer with AbstractSerde[T] {
+trait Serde[T] extends Serializer with AbstractSerde[T] {
 
   override def includeManifest: Boolean = false
 
   override def toBinary(obj: AnyRef): Array[Byte] = toBytes(obj.asInstanceOf[T])
 
-  override protected def fromBinaryJava(bytes: Array[Byte], manifest: Class[_]): AnyRef = fromBytes(bytes) match {
+  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef = fromBytes(bytes) match {
     case null => null
     case ref: AnyRef => ref
     case u: Unit => u.asInstanceOf[AnyRef]
@@ -64,10 +65,24 @@ object Serde {
 
   private val _tools = new ConcurrentHashMap[Config, Serdes]()
 
+  def tools(system: ExtendedActorSystem): Serdes = {
+    val config = system.settings.config
+    _tools.get(config) match {
+      case null => {
+        val s = new Serdes(AffinityActorSystem.configure(config), Some(system))
+        _tools.putIfAbsent(config, s) match {
+          case null => s
+          case some => some
+        }
+      }
+      case some => some
+    }
+  }
+
   def tools(config: Config): Serdes = {
     _tools.get(config) match {
       case null => {
-        val s = new Serdes(AffinityActorSystem.configure(config))
+        val s = new Serdes(AffinityActorSystem.configure(config), None)
         _tools.putIfAbsent(config, s) match {
           case null => s
           case some => some
@@ -79,7 +94,7 @@ object Serde {
 
 }
 
-class Serdes(val config: Config) {
+class Serdes(val config: Config, val system: Option[ExtendedActorSystem]) {
 
   type ClassSerde = (Class[_], Serde[_])
 
@@ -114,36 +129,13 @@ class Serdes(val config: Config) {
 
   private val settings = new Serialization.Settings(config)
 
-  private def serdeInstance(fqn: String): Option[Serde[_]] = {
-    val cls = Class.forName(fqn)
-    if (!(classOf[Serde[_]]).isAssignableFrom(cls))  {
-      None
-    } else {
-      val clazz = cls.asSubclass(classOf[Serde[_]])
-      try {
-        Some(clazz.getConstructor(classOf[Serdes]).newInstance(this))
-      } catch {
-        case _: NoSuchMethodException =>
-          try {
-            Some(clazz.getConstructor().newInstance())
-          } catch {
-            case _: NoSuchMethodException => None
-          }
-      }
-    }
-  }
-
-  private val serializers: Map[String, Serde[_]] = {
+  lazy private val serializers: Map[String, Serde[_]] = {
     (for ((k: String, v: String) ← settings.Serializers) yield {
       serdeInstance(v).map(x => k → x)
     }).flatten.toMap
   }
 
-  def by(identifier: Int): Serde[_] = serializers.map(_._2).find(_.identifier == identifier)
-    .getOrElse(throw new IllegalArgumentException(s"Serde not found, identifier: $identifier"))
-
-  val bindings: immutable.Seq[ClassSerde] = {
-
+  lazy val bindings: immutable.Seq[ClassSerde] = {
     val fromConfig = for {
       (className: String, alias: String) ← settings.SerializationBindings
       if alias != "none" && checkGoogleProtobuf(className)
@@ -152,8 +144,10 @@ class Serdes(val config: Config) {
 
     val result = sort(fromConfig)
     result
-
   }
+
+  def by(identifier: Int): Serde[_] = serializers.map(_._2).find(_.identifier == identifier)
+    .getOrElse(throw new IllegalArgumentException(s"Serde not found, identifier: $identifier"))
 
   def find(wrapped: AnyRef): Serde[_] = forClass(wrapped.getClass)
 
@@ -175,7 +169,8 @@ class Serdes(val config: Config) {
     }
   }
 
-  private val serializerMap = new ConcurrentHashMap[Class[_], Serde[_]]()
+  private val serializerMap =
+    new ConcurrentHashMap[Class[_], Serde[_]]()
 
   def of[S: ClassTag]: Serde[S] = {
     val runtimeClass = implicitly[ClassTag[S]].runtimeClass
@@ -195,4 +190,27 @@ class Serdes(val config: Config) {
     }
     ser.asInstanceOf[Serde[S]]
   }
+
+  private def serdeInstance(fqn: String): Option[Serde[_]] = {
+    val cls = Class.forName(fqn)
+    if (!(classOf[Serde[_]]).isAssignableFrom(cls)) {
+      None
+    } else {
+      val clazz = cls.asSubclass(classOf[Serde[_]])
+      try {
+        system match {
+          case Some(ext) => Some(clazz.getConstructor(classOf[ExtendedActorSystem]).newInstance(ext))
+          case None => Some(clazz.getConstructor(classOf[Serdes]).newInstance(this))
+        }
+      } catch {
+        case _: NoSuchMethodException =>
+          try {
+            Some(clazz.getConstructor().newInstance())
+          } catch {
+            case _: NoSuchMethodException => None
+          }
+      }
+    }
+  }
+
 }
