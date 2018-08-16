@@ -18,6 +18,7 @@
     <logger name="org.apache.kafka" level="ERROR" />
     <logger name="org.apache.spark" level="ERROR" />
     <logger name="org.apache.zookeeper" level="OFF"/>
+    <logger name="org.spark_project" level="OFF"/>
     <logger name="zookeeper.server" level="OFF"/>
 
 
