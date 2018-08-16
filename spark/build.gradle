@@ -7,7 +7,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 ext {
-    sparkVersion = '2.2.1'
+    sparkVersion = '2.3.1'
     baseSparkVersion = sparkVersion.split("\\.")[0] + '.' + sparkVersion.split("\\.")[1]
     artefact = 'spark_' + baseSparkVersion + '-scala_' + baseScalaVersion
 }
