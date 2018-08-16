@@ -136,7 +136,7 @@ After importing `io.amient.affinity.core.ack` there are several additional patte
 
 - **?! Ack with Retry** is same as ?? Ack but certain errors are retried up to 3 times using the timeout implicit as a delay between retries
 
-- **??? Scatter-Gather** messages of `Scatter[T]` can be sent to multiple actors and the response will be `T` which is combined from
+- **??? Scatter-Gather** messages of `Scatter[T]` can be sent to multiple actors and the response will be `T` which is combined by a combinator function
  
 
 ## Http Layer
@@ -242,7 +242,7 @@ replica takes over, the delivery will fail and the sender will get a timeout aft
 Redelivery will not be attempted.
 
     implicit val timeout = Timeout(1 second)
-    keyspace ack message
+    keyspace ?! message
     
 The above is an ack pattern which also entails retries in case of timeout. 2 retries are attempted
  by default. With this pattern the fail-over will be completely transparent if the standby replica

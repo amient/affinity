@@ -17,13 +17,17 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.serde.primitive
+package io.amient.affinity.core.serde
 
-import akka.serialization.JSerializer
-import io.amient.affinity.core.serde.Serdes
+import akka.actor.ExtendedActorSystem
+import akka.serialization.Serializer
+import com.typesafe.config.Config
 import io.amient.affinity.core.util.ByteUtils
 
-abstract class AbstractWrapSerde(serdes: Serdes) extends JSerializer {
+abstract class AbstractWrapSerde(serdes: Serdes) extends Serializer {
+
+  def this(system: ExtendedActorSystem) = this(Serde.tools(system))
+  def this(config: Config) = this(Serde.tools(config))
 
   def fromBinaryWrapped(bytes: Array[Byte]): Any = {
     val serializerIdentifier = ByteUtils.asIntValue(bytes)
@@ -33,9 +37,22 @@ abstract class AbstractWrapSerde(serdes: Serdes) extends JSerializer {
     wrappedSerde.fromBytes(data)
   }
 
-  def toBinaryWrapped(wrapped: AnyRef, offset: Int = 0): Array[Byte] = {
-    val delegate = serdes.find(wrapped)
-    val bytes = delegate.toBinary(wrapped)
+  def toBinaryWrapped(wrapped: Any, offset: Int = 0): Array[Byte] = {
+    val w: AnyRef = wrapped match {
+      case null => null
+      case ref: AnyRef => ref
+      case u: Unit => u.asInstanceOf[AnyRef]
+      case z: Boolean => z.asInstanceOf[AnyRef]
+      case b: Byte => b.asInstanceOf[AnyRef]
+      case c: Char => c.asInstanceOf[AnyRef]
+      case s: Short => s.asInstanceOf[AnyRef]
+      case i: Int => i.asInstanceOf[AnyRef]
+      case l: Long => l.asInstanceOf[AnyRef]
+      case f: Float => f.asInstanceOf[AnyRef]
+      case d: Double => d.asInstanceOf[AnyRef]
+    }
+    val delegate = serdes.find(w)
+    val bytes: Array[Byte] = delegate.toBinary(w)
     val result = new Array[Byte](bytes.length + 4 + offset)
     ByteUtils.putIntValue(delegate.identifier, result, 0)
     Array.copy(bytes, 0, result, 4 + offset, bytes.length)

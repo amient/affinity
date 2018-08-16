@@ -19,12 +19,12 @@
 
 package io.amient.affinity.core.serde
 
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.{CreateKeyValueMediator, Routed}
+import io.amient.affinity.core.actor.{CreateKeyValueMediator, KeyValueMediatorCreated, RegisterMediatorSubscriber, Routed}
 import io.amient.affinity.core.serde.collection.SeqSerde
 import io.amient.affinity.core.serde.primitive.OptionSerde
 import io.amient.affinity.core.util.{Reply, Scatter}
@@ -46,11 +46,19 @@ case class CountMsgAvro() extends AvroRecord  with Scatter[Long] {
   override def gather(r1: Long, r2: Long): Long = r1 + r2
 }
 
+class RefActor extends Actor {
+  override def receive: Receive = {
+    case _ => ()
+  }
+}
+
 class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Matchers {
 
   val registry = new MemorySchemaRegistry()
 
   val system: ActorSystem = AffinityActorSystem.create(ConfigFactory.load("akkaserializationspec"))
+
+  val ref = system.actorOf(Props[RefActor])
 
   override protected def afterAll(): Unit = system.terminate()
 
@@ -84,25 +92,9 @@ class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Mat
 
   "Java serializer" must {
     "work with internal messages" in {
-      val in = CreateKeyValueMediator("state", TestValue(List(1,2,3)))
+      val in = NonAvroCase(123)
       val bytes = SerializationExtension(system).serialize(in).get
-      bytes.mkString(".") should be("-84.-19.0.5.115.114.0.52.105.111.46.97.109.105.101.110.116.46.97.102.102.105.110." +
-        "105.116.121.46.99.111.114.101.46.97.99.116.111.114.46.67.114.101.97.116.101.75.101.121.86.97.108.117.101.77.101" +
-        ".100.105.97.116.111.114.70.-112.7.63.-12.-16.-81.66.2.0.2.76.0.3.107.101.121.116.0.18.76.106.97.118.97.47.108" +
-        ".97.110.103.47.79.98.106.101.99.116.59.76.0.10.115.116.97.116.101.83.116.111.114.101.116.0.18.76.106.97.118.97" +
-        ".47.108.97.110.103.47.83.116.114.105.110.103.59.120.112.115.114.0.39.105.111.46.97.109.105.101.110.116.46.97" +
-        ".102.102.105.110.105.116.121.46.99.111.114.101.46.115.101.114.100.101.46.84.101.115.116.86.97.108.117.101.3.31" +
-        ".6.-127.18.123.50.26.2.0.1.76.0.5.105.116.101.109.115.116.0.33.76.115.99.97.108.97.47.99.111.108.108.101.99.116" +
-        ".105.111.110.47.105.109.109.117.116.97.98.108.101.47.76.105.115.116.59.120.114.0.41.105.111.46.97.109.105.101" +
-        ".110.116.46.97.102.102.105.110.105.116.121.46.97.118.114.111.46.114.101.99.111.114.100.46.65.118.114.111.82.101" +
-        ".99.111.114.100.63.-18.16.47.32.-56.-52.-34.2.0.0.120.112.115.114.0.50.115.99.97.108.97.46.99.111.108.108.101" +
-        ".99.116.105.111.110.46.105.109.109.117.116.97.98.108.101.46.76.105.115.116.36.83.101.114.105.97.108.105.122.97" +
-        ".116.105.111.110.80.114.111.120.121.0.0.0.0.0.0.0.1.3.0.0.120.112.115.114.0.17.106.97.118.97.46.108.97.110.103" +
-        ".46.73.110.116.101.103.101.114.18.-30.-96.-92.-9.-127.-121.56.2.0.1.73.0.5.118.97.108.117.101.120.114.0.16.106" +
-        ".97.118.97.46.108.97.110.103.46.78.117.109.98.101.114.-122.-84.-107.29.11.-108.-32.-117.2.0.0.120.112.0.0.0.1" +
-        ".115.113.0.126.0.10.0.0.0.2.115.113.0.126.0.10.0.0.0.3.115.114.0.44.115.99.97.108.97.46.99.111.108.108.101.99" +
-        ".116.105.111.110.46.105.109.109.117.116.97.98.108.101.46.76.105.115.116.83.101.114.105.97.108.105.122.101.69" +
-        ".110.100.36.-118.92.99.91.-9.83.11.109.2.0.0.120.112.120.116.0.5.115.116.97.116.101")
+      SerializationExtension(system).deserialize(bytes, classOf[NonAvroCase]).get should be (in)
     }
   }
 
@@ -146,7 +138,7 @@ class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Mat
       z should be(x)
     }
 
-    "be constructible from a simple Config" in {
+    "can be constructed without actor system context" in {
       Serde.of[List[Long]](ConfigFactory.empty.withValue(
         Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[MemorySchemaRegistry].getName)))
         .isInstanceOf[SeqSerde] should be(true)
@@ -178,5 +170,32 @@ class AkkaSerializationSpec extends WordSpecLike with BeforeAndAfterAll with Mat
       val z = SerializationExtension(system).deserialize(y, classOf[CountMsgAvro]).get
       z should be(x)
     }
+  }
+
+  "Internal message" must {
+    "serialize efficiently CreateKeyValueMediator message" in {
+      val x = CreateKeyValueMediator("hello", 1000)
+      val y: Array[Byte] = SerializationExtension(system).serialize(x).get
+      y.mkString(".") should be ("1.0.5.104.101.108.108.111.0.11.0.0.0.-56.0.0.0.0.2.-48.15")
+      val z = SerializationExtension(system).deserialize(y, classOf[CreateKeyValueMediator]).get
+      z should be(x)
+    }
+
+    "serialize efficiently KeyValueMediatorCreated message" in {
+      val x = KeyValueMediatorCreated(ref)
+      val y: Array[Byte] = SerializationExtension(system).serialize(x).get
+      y.mkString(".") should startWith ("2.")
+      val z = SerializationExtension(system).deserialize(y, classOf[KeyValueMediatorCreated]).get
+      z should be(x)
+    }
+
+    "serialize efficiently RegisterMediatorSubscriber message" in {
+      val x = RegisterMediatorSubscriber(ref)
+      val y: Array[Byte] = SerializationExtension(system).serialize(x).get
+      y.mkString(".") should startWith ("3.")
+      val z = SerializationExtension(system).deserialize(y, classOf[RegisterMediatorSubscriber]).get
+      z should be(x)
+    }
+
   }
 }

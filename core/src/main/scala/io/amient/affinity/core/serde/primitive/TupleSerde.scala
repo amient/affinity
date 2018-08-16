@@ -21,13 +21,13 @@ package io.amient.affinity.core.serde.primitive
 
 import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.{Serde, Serdes}
+import io.amient.affinity.core.serde.{AbstractWrapSerde, Serde, Serdes}
 import io.amient.affinity.core.util.ByteUtils
 
-class TupleSerde(tools: Serdes) extends AbstractWrapSerde(tools) with Serde[Product] {
+class TupleSerde(serdes: Serdes) extends AbstractWrapSerde(serdes) with Serde[Product] {
 
-  def this (config: Config) = this(Serde.tools(config))
-  def this(system: ExtendedActorSystem) = this(system.settings.config)
+  def this(system: ExtendedActorSystem) = this(Serde.tools(system))
+  def this(config: Config) = this(Serde.tools(config))
 
   override def identifier: Int = 132
 

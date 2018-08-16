@@ -23,13 +23,12 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, Da
 
 import akka.actor.ExtendedActorSystem
 import com.typesafe.config.Config
-import io.amient.affinity.core.serde.{Serde, Serdes}
-import io.amient.affinity.core.serde.primitive.AbstractWrapSerde
+import io.amient.affinity.core.serde.{AbstractWrapSerde, Serde, Serdes}
 
-class SeqSerde(tools: Serdes) extends AbstractWrapSerde(tools) with Serde[Seq[Any]] {
+class SeqSerde(serdes: Serdes) extends AbstractWrapSerde(serdes) with Serde[Seq[Any]] {
 
-  def this (config: Config) = this(Serde.tools(config))
-  def this (system: ExtendedActorSystem) = this(system.settings.config)
+  def this(system: ExtendedActorSystem) = this(Serde.tools(system))
+  def this(config: Config) = this(Serde.tools(config))
 
   override def identifier: Int = 141
 

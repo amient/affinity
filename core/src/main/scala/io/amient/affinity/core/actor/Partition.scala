@@ -25,6 +25,7 @@ import java.util.{Observable, Observer}
 import akka.actor.{Actor, ActorRef, Status}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
+import io.amient.affinity.core.serde.primitive.InternalMessage
 import io.amient.affinity.core.state.KVStoreLocal
 import io.amient.affinity.core.util.Reply
 
@@ -33,10 +34,9 @@ import scala.collection.parallel.ParMap
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-//FIXME #122 make special serializer for mediation messages - currently this is java and the footprint is huge
-case class CreateKeyValueMediator(stateStore: String, key: Any) extends Routed
-case class KeyValueMediatorCreated(mediator: ActorRef)
-case class RegisterMediatorSubscriber(subscriber: ActorRef)
+case class CreateKeyValueMediator(stateStore: String, key: Any) extends InternalMessage with Routed
+case class KeyValueMediatorCreated(mediator: ActorRef) extends InternalMessage
+case class RegisterMediatorSubscriber(subscriber: ActorRef) extends InternalMessage
 
 case class BecomeStandby() extends Reply[Unit]
 case class BecomeMaster() extends Reply[Unit]

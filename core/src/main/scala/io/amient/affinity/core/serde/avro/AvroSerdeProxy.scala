@@ -24,13 +24,12 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.serde.{Serde, Serdes}
 
-final class AvroSerdeProxy(tools: Serdes) extends Serde[Any] {
-
-  def this(config: Config) = this(Serde.tools(config))
+final class AvroSerdeProxy(config: Config) extends Serde[Any] {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
+  def this(serdes: Serdes) = this(serdes.config)
 
-  val internal = AvroSerde.create(tools.config)
+  val internal = AvroSerde.create(config)
 
   override def fromBytes(bytes: Array[Byte]): Any = internal.fromBytes(bytes)
 
