@@ -181,7 +181,7 @@ allprojects {
         scalaCompileOptions.additionalParameters = [
                                                    "-feature",
                                                     "-target:jvm-" + javaVersion,
-                                                    "-encoding", rootProject.encoding,
+                                                    "-encoding", "UTF-8",
                                                     "-unchecked",
                                                     "-deprecation",
                                                     "-Xfuture",
