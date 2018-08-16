@@ -2,7 +2,6 @@ group = rootProject.group
 version = rootProject.version
 
 apply plugin: 'scala'
-apply plugin: "com.github.maiflai.scalatest"
 
 dependencies {
     compile project(':core')
