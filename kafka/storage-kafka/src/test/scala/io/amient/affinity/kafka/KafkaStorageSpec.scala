@@ -168,7 +168,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
       var read = 0
       val numReads = numWrites.get
       while (read < numReads) {
-        val records = consumer.poll(specTimeout.toMillis)
+        val records = consumer.poll(java.time.Duration.ofMillis(specTimeout.toMillis))
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1

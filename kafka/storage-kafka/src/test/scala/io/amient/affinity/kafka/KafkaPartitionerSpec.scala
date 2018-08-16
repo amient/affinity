@@ -73,9 +73,9 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
     akkaSerializedKey.mkString(".") should equal(kafkaSerialized.mkString("."))
     new Murmur2Partitioner().partition(akkaSerializedKey, 9) should be(4)
     new Murmur2Partitioner().partition(kafkaSerialized, 9) should be(4)
-    val streamsPartitioner = new DefaultStreamPartitioner[Any, Any](kafkaSerde.serializer(), mockCluster(9), "test")
-    streamsPartitioner.partition(key, null, 9) should be(4)
-    streamsPartitioner.partition(key, "irrelevant", 9) should be(4)
+    val streamsPartitioner = new DefaultStreamPartitioner[Any, Any](kafkaSerde.serializer(), mockCluster(9))
+    streamsPartitioner.partition("test", key, null, 9) should be(4)
+    streamsPartitioner.partition("test", key, "irrelevant", 9) should be(4)
   }
 
 }
