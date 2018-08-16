@@ -17,6 +17,7 @@
     <logger name="org.I0Itec.zkclient" level="ERROR" />
     <logger name="org.apache.kafka" level="ERROR" />
     <logger name="org.apache.spark" level="ERROR" />
+    <logger name="org.spark-project" level="ERROR" />
     <logger name="org.apache.zookeeper" level="OFF"/>
     <logger name="org.spark_project" level="OFF"/>
     <logger name="zookeeper.server" level="OFF"/>
