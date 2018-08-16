@@ -4,9 +4,7 @@ buildscript {
         maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
-        classpath "gradle.plugin.com.github.maiflai:gradle-scalatest:0.19"
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
-//        classpath "com.avast.gradle:gradle-docker-compose-plugin:0.7.1"
     }
 }
 
@@ -163,7 +161,7 @@ allprojects {
 
         task scalaTest(dependsOn: ['testClasses'], type: JavaExec) {
             main = 'org.scalatest.tools.Runner'
-            args = ['-R', "${project.buildDir}/classes/scala/integrationTest", '-o', '-h', "${project.buildDir}/test-results", '-u', "${project.buildDir}/ittest-results"]
+            args = ['-R', "${project.buildDir}/classes/scala/test", '-o', '-u', "${project.buildDir}/test-results"]
             classpath = sourceSets.test.runtimeClasspath
             inputs.files(sourceSets.test.compileClasspath)
             outputs.dir(file("${project.buildDir}/test-results"))
@@ -173,11 +171,6 @@ allprojects {
         dependencies {
             testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
             testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
-        }
-    }
-
-    plugins.withType(com.github.maiflai.ScalaTestPlugin).whenPluginAdded {
-        dependencies {
             testRuntime 'org.pegdown:pegdown:1.6.0'
         }
     }

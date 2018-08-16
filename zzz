@@ -152,6 +152,10 @@ case "$2" in
     publish)
         publish "$ROOT" "uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-spark_2.0"  ":spark:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.1" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.1" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.1" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
+        publish "$ROOT-kafka_1.1" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_1.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_1.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_1.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
@@ -182,6 +186,7 @@ fi
 
 #excute on the variant branches
 if [ "$RUN_ON_VARIANTS" == "true" ]; then
+    variant "kafka_1.1" "$SETS" $C
     variant "kafka_1.0" "$SETS" $C
     variant "kafka_0.11" "$SETS" $C
     variant "spark_2.0" "$SETS" $C
