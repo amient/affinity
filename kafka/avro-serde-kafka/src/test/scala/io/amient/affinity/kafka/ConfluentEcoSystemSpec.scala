@@ -129,7 +129,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       var read = 0
       val numReads = numWrites.get
       while (read < numReads) {
-        val records = consumer.poll(10000)
+        val records = consumer.poll(java.time.Duration.ofMillis(10000))
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1

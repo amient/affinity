@@ -85,7 +85,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
     try {
       var read = 0
       while (read < numWrites.get) {
-        val records = consumer.poll(10000)
+        val records = consumer.poll(java.time.Duration.ofMillis(10000))
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1
@@ -136,7 +136,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
 
       var read = 0
       while (read < numWrites.get) {
-        val records = consumer.poll(10000)
+        val records = consumer.poll(java.time.Duration.ofMillis(10000))
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
         for (record <- records) {
           read += 1

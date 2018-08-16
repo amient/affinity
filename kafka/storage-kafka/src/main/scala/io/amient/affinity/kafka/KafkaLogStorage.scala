@@ -199,7 +199,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
 
     val kafkaRecords = try {
-      kafkaConsumer.poll(500)
+      kafkaConsumer.poll(java.time.Duration.ofMillis(500))
     } catch {
       case _: WakeupException => return null
     }
