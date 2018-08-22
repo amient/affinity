@@ -40,7 +40,9 @@ public class Record<K, V> implements Serializable {
 
     @Override
     public String toString() {
-        return key.toString() + " " + value.toString() + " @ " + EventTime.local(timestamp);
+        return (key == null ? "null" : key.toString())
+                + " " + (value == null ? "null" : value.toString())
+                + " @ " + EventTime.local(timestamp);
     }
 
 }
