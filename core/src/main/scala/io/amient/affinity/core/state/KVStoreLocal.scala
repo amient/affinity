@@ -133,7 +133,7 @@ class KVStoreLocal[K, V](val identifier: String,
                          valueSerde: AbstractSerde[V],
                          val ttlMs: Long = -1,
                          val lockTimeoutMs: Long = 10000,
-                         val external: Boolean = false) extends ObservableState[K] with KVStore[K,V] {
+                         val external: Boolean = false) extends ObservableState[K] with KVStore[K, V] {
 
   self =>
 
@@ -274,19 +274,19 @@ class KVStoreLocal[K, V](val identifier: String,
     *         Failure(ex) if the operation failed due to exception
     */
   def replace(key: K, value: V): Future[Option[V]] = {
-    val l = lock(key)
+    lock(key)
     try {
       put(keySerde.toBytes(key), value).transform(w => {
-        unlock(key, l)
+        unlock(key)
         push(key, w)
         w
       }, f => {
-        unlock(key, l)
+        unlock(key)
         f
       })
     } catch {
       case e: Throwable =>
-        unlock(key, l)
+        unlock(key)
         throw e
     }
   }
@@ -300,20 +300,20 @@ class KVStoreLocal[K, V](val identifier: String,
     *         Failure(ex) if the operation failed due to exception
     */
   def delete(key: K): Future[Option[V]] = {
-    val l = lock(key)
+    lock(key)
     try {
       delete(keySerde.toBytes(key)).transform(w => {
-        unlock(key, l)
+        unlock(key)
         push(key, w);
         w
       }, f => {
-        unlock(key, l)
+        unlock(key)
         f
       })
     } catch {
-    case e: Throwable =>
-      unlock(key, l)
-      throw e
+      case e: Throwable =>
+        unlock(key)
+        throw e
     }
   }
 
@@ -340,26 +340,26 @@ class KVStoreLocal[K, V](val identifier: String,
     */
   def getAndUpdate(key: K, f: Option[V] => Option[V]): Future[Option[V]] = try {
     val k = keySerde.toBytes(key)
-    val l = lock(key)
+    lock(key)
     try {
       val currentValue = apply(ByteBuffer.wrap(k))
       val updatedValue = f(currentValue)
       if (currentValue == updatedValue) {
-        unlock(key, l)
+        unlock(key)
         Future.successful(currentValue)
       } else {
         val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
         f.transform({
-          s => unlock(key, l); s
+          s => unlock(key); s
         }, {
-          e => unlock(key, l); e
+          e => unlock(key); e
         }) andThen {
           case _ => push(key, updatedValue)
         } map (_ => currentValue)
       }
     } catch {
       case e: Throwable =>
-        unlock(key, l)
+        unlock(key)
         throw e
     }
   } catch {
@@ -378,26 +378,26 @@ class KVStoreLocal[K, V](val identifier: String,
   def updateAndGet(key: K, f: Option[V] => Option[V]): Future[Option[V]] = {
     try {
       val k = keySerde.toBytes(key)
-      val l = lock(key)
+      lock(key)
       try {
         val currentValue = apply(ByteBuffer.wrap(k))
         val updatedValue = f(currentValue)
         if (currentValue == updatedValue) {
-          unlock(key, l)
+          unlock(key)
           Future.successful(updatedValue)
         } else {
           val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
           f.transform({
-            s => unlock(key, l); s
+            s => unlock(key); s
           }, {
-            e => unlock(key, l); e
+            e => unlock(key); e
           }) andThen {
             case _ => push(key, updatedValue)
           } map (_ => updatedValue)
         }
       } catch {
         case e: Throwable =>
-          unlock(key, l)
+          unlock(key)
           throw e
       }
     } catch {
@@ -530,32 +530,55 @@ class KVStoreLocal[K, V](val identifier: String,
     */
   private class RowLock extends AnyRef
 
-  private val locks = new ConcurrentHashMap[K, RowLock]
+  private val locks = new ConcurrentHashMap[Any, RowLock]
 
-  private def lock(key: K): RowLock = {
+  def lockAsync[T](scope: Any)(body: => Future[T]): Future[T] = {
+    lock(scope)
+    try {
+      body.transform(
+        (s) => {
+          unlock(scope)
+          s
+        },
+        (f) => {
+          unlock(scope)
+          f
+        }
+      )
+    } catch {
+      case NonFatal(e) =>
+        unlock(scope)
+        throw e
+    }
+  }
+
+  def lock(scope: Any): Unit = {
     val lock = new RowLock()
     breakable {
       val start = System.currentTimeMillis
       do {
-        val existingLock = locks.putIfAbsent(key, lock)
+        val existingLock = locks.putIfAbsent(scope, lock)
         if (existingLock == null) break else existingLock.synchronized {
           existingLock.wait(lockTimeoutMs)
           val waitedMs = System.currentTimeMillis - start
           if (waitedMs >= lockTimeoutMs) {
-            throw new TimeoutException(s"Could not acquire lock for $key in $lockTimeoutMs ms")
+            throw new TimeoutException(s"Could not acquire lock for $scope in $lockTimeoutMs ms")
           }
         }
       } while (true)
     }
-    return lock
   }
 
-  private def unlock(key: K, lock: RowLock): Unit = {
-    if (!locks.remove(key, lock)) {
-      throw new IllegalMonitorStateException(s"$key is locked by another operation")
-    } else lock.synchronized {
+  def unlock(scope: Any): Unit = {
+    val lock = locks.remove(scope)
+    lock.synchronized {
       lock.notifyAll()
     }
+    //    if (!locks.remove(key, lock)) {
+    //      throw new IllegalMonitorStateException(s"$key is locked by another operation")
+    //    } else lock.synchronized {
+    //      lock.notifyAll()
+    //    }
   }
 
   /**
@@ -563,6 +586,6 @@ class KVStoreLocal[K, V](val identifier: String,
     */
   override def getStats: String = {
     s"$identifier\n===================================================================\n" +
-    s"${logOption.map(_.getStats).getOrElse("")}\nMemStore[${kvstore.getClass.getSimpleName}]\n${kvstore.getStats}\n\n"
+      s"${logOption.map(_.getStats).getOrElse("")}\nMemStore[${kvstore.getClass.getSimpleName}]\n${kvstore.getStats}\n\n"
   }
 }
