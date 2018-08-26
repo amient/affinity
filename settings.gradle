@@ -17,4 +17,6 @@ include ':api',
         ':examples:example-auth-methods',
         ':examples:example-stateful-stream-process',
         ':examples:example-external-state',
-        ':examples:example-range-lookups'
+        ':examples:example-range-lookups',
+        ':examples:example-secondary-index'
+
