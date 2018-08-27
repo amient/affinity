@@ -21,6 +21,7 @@ package io.amient.affinity.kafka
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ConfluentSchemaRegistry
@@ -155,7 +156,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
     val kvstore = new MemStoreSimpleMap("test", stateConf, null)
-    KVStoreLocal.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, new AffinityMetrics)
+    KVStoreLocal.create(topic, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, ActorSystem.create)
   }
 
   "Confluent KafkaAvroSerializer" should "be intercepted and given affinity subject" in {

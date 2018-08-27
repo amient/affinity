@@ -26,14 +26,13 @@ public abstract class ObservableState<K> extends Observable {
     class ObservableKeyValue extends Observable {
         @Override
         public void notifyObservers(Object arg) {
-            //TODO with atomic cell versioning we could cancel out redundant updates
             setChanged();
             super.notifyObservers(arg);
         }
     }
 
     /**
-     * Observables are attached to individual keys in this State
+     * Observables are attached to individual keys
      */
     private Map<K, ObservableKeyValue> observables = new HashMap<>();
 

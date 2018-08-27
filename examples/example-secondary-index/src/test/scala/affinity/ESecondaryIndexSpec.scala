@@ -67,11 +67,11 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
 
   //08am 26 June 2018
   val a1 = Article(title = "Green Buildings", timestamp = 1530000000000L)
-  val a2 = Article(title = "Liquied-Cooled Microchips", timestamp = 1530000000000L) //08am 26 June 2018
-  val a3 = Article(title = "Electric Self-Driving Cars", timestamp = 1530086400000L) //08am 27 June 2018
+  val a2 = Article(title = "Liquid-Cooled Microchips", timestamp = 1530000000000L) //08am 26 June 2018
+  val a3 = Article(title = "Green Self-Driving Cars", timestamp = 1530086400000L) //08am 27 June 2018
   val a4 = Article(title = "Quantum Machines", timestamp = 1530090000000L) //09am 27 June 2018
-  val a5 = Article(title = "Supermaterials", timestamp = 1530172800000L) //08am 28 June 2018
-  val a6 = Article(title = "Mechanical CVT Bicyceles", timestamp = 1530172800000L) //08am 28 June 2018
+  val a5 = Article(title = "Green materials", timestamp = 1530172800000L) //08am 28 June 2018
+  val a6 = Article(title = "Green CVT Bicycles", timestamp = 1530172800000L) //08am 28 June 2018
 
 
   override def beforeAll(): Unit = {
@@ -121,6 +121,10 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
   "Articles Store" should "should able to retrieve all transactions for the first account" in {
     val articles = node.get_json(node.http_get("/articles/mtjames")).getElements.asScala
     articles.size should be(2)
+    Thread.sleep(5000)
+    val words = node.get_json(node.http_get("/words/green")).getElements.asScala.toList
+    words.foreach(println)
+    words.size should be(4)
   }
 
 }

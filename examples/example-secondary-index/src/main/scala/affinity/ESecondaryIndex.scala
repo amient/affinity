@@ -26,13 +26,12 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Routed}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.storage.Record
-import io.amient.affinity.core.util.{EventTime, Reply, TimeRange}
+import io.amient.affinity.core.state.{KVStore, KVStoreLocal}
+import io.amient.affinity.core.util._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 case class Author(username: String) extends AvroRecord {
   val id = username.hashCode
@@ -59,9 +58,13 @@ class ESecondaryIndex extends GatewayStream with GatewayHttp {
     case HTTP(HttpMethods.GET, PATH("articles", username), _, response) =>
       ks ?! GetAuthorArticles(Author(username), 0L) map (handleAsJson(response, _))
 
+    case HTTP(HttpMethods.GET, PATH("words", word), _, response) =>
+      ks ??? GetWordIndex(word) map (handleAsJson(response, _))
   }
 
 }
+
+case class GetWordIndex(word: String) extends ScatterIterable[StorageKey]
 
 sealed trait Authored extends Routed {
   val author: Author
@@ -79,11 +82,19 @@ class ArticlesPartition extends Partition {
 
   val articles = state[StorageKey, Article]("articles")
 
-//  val i1 = articles.index[String, Long]("words")
+  val i1 = articles.index("words") {
+    case (_, article: Article) => article.title.split("\\s").toList.map(_.trim.toLowerCase)
+  }
 
   implicit val executor = context.dispatcher
 
   override def handle: Receive = {
+
+    case request@GetAuthorArticles(author, since) =>
+      request(sender) ! articles.range(TimeRange.since(since), author.id).values.toList
+
+    case request@GetWordIndex(word) =>
+      request(sender) ! i1.apply(word).getOrElse(List.empty)
 
     case request@StoreArticle(author, article) => request(sender) ! {
       articles.lockAsync(author) {
@@ -102,9 +113,6 @@ class ArticlesPartition extends Partition {
         }
       }
     }
-
-    case request@GetAuthorArticles(author, since) =>
-      request(sender) ! articles.range(TimeRange.since(since), author.id).values.toList
 
   }
 }

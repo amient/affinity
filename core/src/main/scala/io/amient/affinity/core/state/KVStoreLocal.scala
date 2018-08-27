@@ -26,13 +26,13 @@ import java.util.{Observable, Observer, Optional}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.codahale.metrics.{Gauge, MetricRegistry}
-import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
+import io.amient.affinity.core.state.KVStoreLocal.createMemStore
 import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util.{AffinityMetrics, CloseableIterator, EventTime, TimeRange}
 
@@ -45,6 +45,21 @@ import scala.util.control.NonFatal
 
 object KVStoreLocal {
 
+
+  def createMemStore(identifier: String, stateConf: StateConf, system: ActorSystem, metrics: AffinityMetrics) = {
+    val memstoreClass = stateConf.MemStore.Class()
+    val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
+    if (!stateConf.MemStore.DataDir.isDefined) {
+      val nodeConf = Conf(system.settings.config).Affi.Node
+      if (nodeConf.DataDir.isDefined) {
+        stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
+      } else {
+        stateConf.MemStore.DataDir.setValue(null)
+      }
+    }
+    memstoreConstructor.newInstance(identifier, stateConf, metrics)
+  }
+
   def create[K: ClassTag, V: ClassTag](name: String,
                                        partition: Int,
                                        stateConf: StateConf,
@@ -54,24 +69,14 @@ object KVStoreLocal {
     val keySerde = Serde.of[K](system.settings.config)
     val valueSerde = Serde.of[V](system.settings.config)
     val keyClass = implicitly[ClassTag[K]].runtimeClass
-    val kvstoreClass = stateConf.MemStore.Class()
-    val kvstoreConstructor = kvstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
-    if (!stateConf.MemStore.DataDir.isDefined) {
-      val nodeConf = Conf(system.settings.config).Affi.Node
-      if (nodeConf.DataDir.isDefined) {
-        stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
-      } else {
-        stateConf.MemStore.DataDir.setValue(null)
-      }
-    }
     if (classOf[AvroRecord].isAssignableFrom(keyClass)) {
       val prefixLen = AvroSerde.binaryPrefixLength(keyClass.asSubclass(classOf[AvroRecord]))
       if (prefixLen.isDefined) stateConf.MemStore.KeyPrefixSize.setValue(prefixLen.get)
     }
     val metrics = AffinityMetrics.forActorSystem(system)
-    val kvstore = kvstoreConstructor.newInstance(identifier, stateConf, metrics)
+    val memstore = createMemStore(identifier, stateConf, system, metrics)
     try {
-      create(identifier, partition, stateConf, numPartitions, kvstore, keySerde, valueSerde, metrics)
+      create(identifier, partition, stateConf, numPartitions, memstore, keySerde, valueSerde, system)
     } catch {
       case NonFatal(e) => throw new RuntimeException(s"Failed to Configure State $identifier", e)
     }
@@ -81,10 +86,10 @@ object KVStoreLocal {
                                        partition: Int,
                                        stateConf: StateConf,
                                        numPartitions: Int,
-                                       kvstore: MemStore,
+                                       memstore: MemStore,
                                        keySerde: AbstractSerde[K],
                                        valueSerde: AbstractSerde[V],
-                                       metrics: AffinityMetrics): KVStoreLocal[K, V] = {
+                                       system: ActorSystem): KVStoreLocal[K, V] = {
     val ttlMs = if (stateConf.TtlSeconds() < 0) -1L else stateConf.TtlSeconds() * 1000L
     val lockTimeoutMs: lang.Long = stateConf.LockTimeoutMs()
     val minTimestamp = Math.max(stateConf.MinTimestampUnixMs(), if (ttlMs < 0) 0L else EventTime.unix - ttlMs)
@@ -102,13 +107,26 @@ object KVStoreLocal {
         }
       }
       storage.reset(partition, TimeRange.since(minTimestamp))
-      val checkpointFile = if (!kvstore.isPersistent) null else {
-        stateConf.MemStore.DataDir().resolve(kvstore.getClass().getSimpleName() + ".checkpoint")
+      val checkpointFile = if (!memstore.isPersistent) null else {
+        stateConf.MemStore.DataDir().resolve(memstore.getClass().getSimpleName() + ".checkpoint")
       }
       storage.open(checkpointFile)
     }
     val keyClass: Class[K] = implicitly[ClassTag[K]].runtimeClass.asInstanceOf[Class[K]]
-    new KVStoreLocal(identifier, metrics, kvstore, logOption, partition, keyClass, keySerde, valueSerde, ttlMs, lockTimeoutMs, external)
+    new KVStoreLocal(
+      identifier,
+      stateConf,
+      memstore,
+      logOption,
+      partition,
+      keyClass,
+      keySerde,
+      valueSerde,
+      ttlMs,
+      lockTimeoutMs,
+      external,
+      system
+    )
   }
 
 
@@ -124,8 +142,8 @@ object KVStoreLocal {
 
 
 class KVStoreLocal[K, V](val identifier: String,
-                         val metrics: AffinityMetrics,
-                         kvstore: MemStore,
+                         stateConf: StateConf,
+                         memstore: MemStore,
                          logOption: Option[Log[_]],
                          partition: Int,
                          keyClass: Class[K],
@@ -133,11 +151,15 @@ class KVStoreLocal[K, V](val identifier: String,
                          valueSerde: AbstractSerde[V],
                          val ttlMs: Long = -1,
                          val lockTimeoutMs: Long = 10000,
-                         val external: Boolean = false) extends ObservableState[K] with KVStore[K, V] {
+                         val external: Boolean = false,
+                         system: ActorSystem
+                        ) extends ObservableState[K] with KVStore[K, V] {
 
   self =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
+
+  val metrics = AffinityMetrics.forActorSystem(system)
 
   def optional[T](opt: T): Optional[T] = if (opt != null) Optional.of(opt) else Optional.empty[T]
 
@@ -158,10 +180,43 @@ class KVStoreLocal[K, V](val identifier: String,
   }
 
   private[affinity] def boot(): Unit = logOption.foreach(_
-    .bootstrap(identifier, kvstore, partition, optional[ObservableState[K]](if (external) this else null)))
+    .bootstrap(identifier, memstore, partition, optional[ObservableState[K]](if (external) this else null)))
 
   private[affinity] def tail(): Unit = logOption.foreach(_
-    .tail(kvstore, optional[ObservableState[K]](this)))
+    .tail(memstore, optional[ObservableState[K]](this)))
+
+  def index[IK: ClassTag](indexName: String)(indexFunction: (K, V) => List[IK]): KVStoreIndex[IK, List[K]] = {
+    val indexIdentifier = s"$identifier-$indexName"
+    val indexValueSerde = Serde.of[List[K]](system.settings.config)
+    val indexKeySerde = Serde.of[IK](system.settings.config)
+    val conf = logOption match {
+      case None => //create KVStoreLocal with ephemeral memstore which simply tracks this store's memstore
+        val conf = new StateConf().apply(stateConf)
+        conf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
+        conf
+      case Some(log) => //create persistent index which is external to this store's log
+        val conf = new StateConf().apply(stateConf)
+        conf.External.setValue(true)
+        conf
+      //TODO #228 this index store needs it's own bootstrap for rebuilding
+    }
+
+    val indexMemStore = createMemStore(indexIdentifier, conf, system, metrics)
+    val indexStore = new KVStoreIndex[IK, List[K]](indexIdentifier, indexMemStore, indexKeySerde, indexValueSerde, ttlMs, lockTimeoutMs)
+    this.listen {
+      case (_, None) => //TODO #228 index deletions cannot be done without knowing what was deleted so listen has to have richer input than just Option
+      case (k: K, Some(v: V)) =>
+        indexFunction(k, v).foreach { case ik =>
+          indexStore.update(ik) {
+            case None => List(k)
+            case Some(indexValue) => indexValue :+ k
+          }
+        }
+    }
+
+    indexStore
+
+  }
 
 
   /**
@@ -183,9 +238,9 @@ class KVStoreLocal[K, V](val identifier: String,
     val bytePrefix: ByteBuffer = if (javaPrefix.isEmpty) null else {
       ByteBuffer.wrap(keySerde.prefix(keyClass, javaPrefix: _*))
     }
-    val underlying = kvstore.iterator(bytePrefix)
+    val underlying = memstore.iterator(bytePrefix)
     val mapped = underlying.asScala.flatMap { entry =>
-      option(kvstore.unwrap(entry.getKey(), entry.getValue, ttlMs))
+      option(memstore.unwrap(entry.getKey(), entry.getValue, ttlMs))
         .filter(byteRecord => range.contains(byteRecord.timestamp))
         .map { byteRecord =>
           val key = keySerde.fromBytes(byteRecord.key)
@@ -215,8 +270,8 @@ class KVStoreLocal[K, V](val identifier: String,
     val timerContext = readsMeter.markStart()
     try {
       for (
-        cell: ByteBuffer <- option(kvstore(key));
-        byteRecord: Record[Array[Byte], Array[Byte]] <- option(kvstore.unwrap(key, cell, ttlMs))
+        cell: ByteBuffer <- option(memstore(key));
+        byteRecord: Record[Array[Byte], Array[Byte]] <- option(memstore.unwrap(key, cell, ttlMs))
       ) yield {
         val result = valueSerde.fromBytes(byteRecord.value)
         readsMeter.markSuccess(timerContext)
@@ -260,7 +315,7 @@ class KVStoreLocal[K, V](val identifier: String,
   /**
     * @return numKeys hint - this may or may not be accurate, depending on the underlying backend's features
     */
-  def numKeys: Long = kvstore.numKeys()
+  def numKeys: Long = memstore.numKeys()
 
   /**
     * replace is a faster operation than update because it doesn't look at the existing value
@@ -291,6 +346,11 @@ class KVStoreLocal[K, V](val identifier: String,
     }
   }
 
+  def insert(key: K, value: V): Future[V] = updateAndGet(key, x => x match {
+    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
+    case None => Some(value)
+  }).map(_.get)
+
   /**
     * delete the given key
     *
@@ -316,18 +376,6 @@ class KVStoreLocal[K, V](val identifier: String,
         throw e
     }
   }
-
-  /**
-    * insert is a syntactic sugar for update which is only executed if the key doesn't exist yet
-    *
-    * @param key   to insert
-    * @param value new value to be associated with the key
-    * @return Future value newly inserted if the key did not exist and operation succeeded, failed future otherwise
-    */
-  def insert(key: K, value: V): Future[V] = updateAndGet(key, x => x match {
-    case Some(_) => throw new IllegalArgumentException(s"$key already exists in state store")
-    case None => Some(value)
-  }).map(_.get)
 
   /**
     * atomic get-and-update if the current and updated value are the same the no modifications are made to
@@ -431,11 +479,11 @@ class KVStoreLocal[K, V](val identifier: String,
         val valueBytes = valueSerde.toBytes(value)
         logOption match {
           case None =>
-            kvstore.put(ByteBuffer.wrap(key), kvstore.wrap(valueBytes, recordTimestamp))
+            memstore.put(ByteBuffer.wrap(key), memstore.wrap(valueBytes, recordTimestamp))
             writesMeter.markSuccess(timerContext)
             Future.successful(Some(value))
           case Some(log) =>
-            log.append(kvstore, key, valueBytes, recordTimestamp) transform(
+            log.append(memstore, key, valueBytes, recordTimestamp) transform(
               pos => { //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
                 writesMeter.markSuccess(timerContext)
                 Some(value)
@@ -470,11 +518,11 @@ class KVStoreLocal[K, V](val identifier: String,
     try {
       logOption match {
         case None =>
-          kvstore.remove(ByteBuffer.wrap(key))
+          memstore.remove(ByteBuffer.wrap(key))
           writesMeter.markSuccess(timerContext)
           Future.successful(None)
         case Some(log) =>
-          log.delete(kvstore, key) transform(
+          log.delete(memstore, key) transform(
             _ => {
               writesMeter.markSuccess(timerContext)
               None
@@ -498,6 +546,7 @@ class KVStoreLocal[K, V](val identifier: String,
   /**
     * State listeners can be instantiated at the partition level and are notified for any change in this State.
     */
+  //TODO #246 listen should become strongly type [K, Option[V], but first ObservableState must be moved back to Scala
   def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
@@ -520,7 +569,7 @@ class KVStoreLocal[K, V](val identifier: String,
     try {
       logOption.foreach(_.close())
     } finally {
-      kvstore.close()
+      memstore.close()
       metrics.remove(s"state.$identifier.keys")
     }
   }
@@ -574,11 +623,6 @@ class KVStoreLocal[K, V](val identifier: String,
     lock.synchronized {
       lock.notifyAll()
     }
-    //    if (!locks.remove(key, lock)) {
-    //      throw new IllegalMonitorStateException(s"$key is locked by another operation")
-    //    } else lock.synchronized {
-    //      lock.notifyAll()
-    //    }
   }
 
   /**
@@ -586,6 +630,6 @@ class KVStoreLocal[K, V](val identifier: String,
     */
   override def getStats: String = {
     s"$identifier\n===================================================================\n" +
-      s"${logOption.map(_.getStats).getOrElse("")}\nMemStore[${kvstore.getClass.getSimpleName}]\n${kvstore.getStats}\n\n"
+      s"${logOption.map(_.getStats).getOrElse("")}\nMemStore[${memstore.getClass.getSimpleName}]\n${memstore.getStats}\n\n"
   }
 }

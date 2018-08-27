@@ -81,6 +81,11 @@ trait Scatter[T] extends Reply[T] {
   def gather(r1: T, r2: T): T
 }
 
+trait ScatterIterable[T] extends Reply[Iterable[T]] with Scatter[Iterable[T]] {
+  def gather(r1: Iterable[T], r2: Iterable[T]): Iterable[T] = r1 ++ r2
+}
+
+//TODO ScatterGather should also be internally serialized but same problem is with KVGlobalStore - it's generic
 case class ScatterGather[T](msg: Scatter[T], timeout: Timeout) extends Reply[Iterable[T]]
 
 final class AckableActorRef(val target: ActorRef) extends AnyRef {
