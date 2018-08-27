@@ -34,7 +34,7 @@ import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.state.KVStoreLocal.createMemStore
 import io.amient.affinity.core.storage._
-import io.amient.affinity.core.util.{AffinityMetrics, CloseableIterator, EventTime, TimeRange}
+import io.amient.affinity.core.util._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -185,38 +185,27 @@ class KVStoreLocal[K, V](val identifier: String,
   private[affinity] def tail(): Unit = logOption.foreach(_
     .tail(memstore, optional[ObservableState[K]](this)))
 
-  def index[IK: ClassTag](indexName: String)(indexFunction: Record[K, V] => List[IK]): KVStoreIndex[IK, List[K]] = {
+  def index[IK: ClassTag](indexName: String)(indexFunction: Record[K, V] => List[IK]): KVStoreIndex[IK, K] = {
     val indexIdentifier = s"$identifier-$indexName"
-    val indexValueSerde = Serde.of[List[K]](system.settings.config)
     val indexKeySerde = Serde.of[IK](system.settings.config)
-    val conf = logOption match {
-      case None => //create KVStoreLocal with ephemeral memstore which simply tracks this store's memstore
-        val conf = new StateConf().apply(stateConf)
-        conf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
-        conf
-      case Some(log) => //create persistent index which is external to this store's log
-        val conf = new StateConf().apply(stateConf)
-        conf.External.setValue(true)
-        conf
-      //TODO #228 this index store needs it's own bootstrap for rebuilding
+    val conf = new StateConf().apply(stateConf)
+    logOption match {
+      case None => conf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
+      case Some(log) => conf.External.setValue(true)
     }
-
+    conf.MemStore.KeyPrefixSize.setValue(4)
     val indexMemStore = createMemStore(indexIdentifier, conf, system, metrics)
-    val indexStore = new KVStoreIndex[IK, List[K]](indexIdentifier, indexMemStore, indexKeySerde, indexValueSerde, ttlMs, lockTimeoutMs)
+    val indexStore = new KVStoreIndex[IK, K](indexIdentifier, indexMemStore, indexKeySerde, keySerde, ttlMs)
     this.listen {
       case record: Record[K,V]  =>
-        //TODO #228 index deletions cannot be done without knowing what was deleted so listen has to have richer input than just Option
+        //TODO #228 deleted records must be deindexed which means listen must provider richer semantics
         indexFunction(record).distinct.foreach { case ik =>
-          //TODO #228 index key should be written as a [hash-prefix(ik)|ik|k] -> record.timestamp
-          indexStore.update(ik) {
-            case None => List(record.key)
-            case Some(indexValue) => indexValue :+ record.key
-          }
+          indexStore.put(ik, record.key, record.timestamp)
         }
     }
-
+    //TODO #228 bootstrap from the memstore when initializing the index first time
+    //TODO #228 all indicies must be closed when this kvstore is closed
     indexStore
-
   }
 
 

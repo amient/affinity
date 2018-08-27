@@ -26,7 +26,6 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Routed}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
-import io.amient.affinity.core.state.{KVStore, KVStoreLocal}
 import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util._
 
@@ -60,12 +59,16 @@ class ESecondaryIndex extends GatewayStream with GatewayHttp {
       ks ?! GetAuthorArticles(Author(username), 0L) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("words", word), _, response) =>
-      ks ??? GetWordIndex(word) map (handleAsJson(response, _))
+      ks ??? GetWordIndex(word, 0L) map (handleAsJson(response, _))
+
+    case HTTP(HttpMethods.GET, PATH("words-since", word), _, response) =>
+      ks ??? GetWordIndex(word, 1530086400000L) map (handleAsJson(response, _))
+
   }
 
 }
 
-case class GetWordIndex(word: String) extends ScatterIterable[StorageKey]
+case class GetWordIndex(word: String, since: Long) extends ScatterIterable[Article]
 
 sealed trait Authored extends Routed {
   val author: Author
@@ -94,8 +97,8 @@ class ArticlesPartition extends Partition {
     case request@GetAuthorArticles(author, since) =>
       request(sender) ! articles.range(TimeRange.since(since), author.id).values.toList
 
-    case request@GetWordIndex(word) =>
-      request(sender) ! wordindex.apply(word).getOrElse(List.empty)
+    case request@GetWordIndex(word, since) =>
+      request(sender) ! wordindex(word, TimeRange.since(since)).asScala.map(articles.apply).flatten.toList
 
     case request@StoreArticle(author, article) => request(sender) ! {
       articles.lockAsync(author) {
