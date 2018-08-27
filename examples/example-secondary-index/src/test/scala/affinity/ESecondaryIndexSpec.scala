@@ -121,7 +121,6 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
   "Articles Store" should "should able to retrieve all transactions for the first account" in {
     val articles = node.get_json(node.http_get("/articles/mtjames")).getElements.asScala
     articles.size should be(2)
-    Thread.sleep(5000)
     val words = node.get_json(node.http_get("/words/green")).getElements.asScala.toList
     words.foreach(println)
     words.size should be(4)

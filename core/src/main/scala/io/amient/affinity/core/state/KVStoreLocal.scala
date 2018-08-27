@@ -205,8 +205,8 @@ class KVStoreLocal[K, V](val identifier: String,
     val indexStore = new KVStoreIndex[IK, List[K]](indexIdentifier, indexMemStore, indexKeySerde, indexValueSerde, ttlMs, lockTimeoutMs)
     this.listen {
       case (_, None) => //TODO #228 index deletions cannot be done without knowing what was deleted so listen has to have richer input than just Option
-      case (k: K, Some(v: V)) =>
-        indexFunction(k, v).foreach { case ik =>
+      case (k, Some(v)) if v.isInstanceOf[V] => //TODO #246 listen to be strongly typed as Option[V]
+        indexFunction(k, v.asInstanceOf[V]).distinct.foreach { case ik =>
           indexStore.update(ik) {
             case None => List(k)
             case Some(indexValue) => indexValue :+ k

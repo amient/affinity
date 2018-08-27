@@ -82,7 +82,7 @@ class ArticlesPartition extends Partition {
 
   val articles = state[StorageKey, Article]("articles")
 
-  val i1 = articles.index("words") {
+  val wordindex = articles.index("words") {
     case (_, article: Article) => article.title.split("\\s").toList.map(_.trim.toLowerCase)
   }
 
@@ -94,7 +94,7 @@ class ArticlesPartition extends Partition {
       request(sender) ! articles.range(TimeRange.since(since), author.id).values.toList
 
     case request@GetWordIndex(word) =>
-      request(sender) ! i1.apply(word).getOrElse(List.empty)
+      request(sender) ! wordindex.apply(word).getOrElse(List.empty)
 
     case request@StoreArticle(author, article) => request(sender) ! {
       articles.lockAsync(author) {
