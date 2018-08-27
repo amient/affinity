@@ -360,6 +360,7 @@ class KVStoreLocal[K, V](val identifier: String,
     *         Failure(ex) if the operation failed due to exception
     */
   def delete(key: K): Future[Option[V]] = {
+    if (external) throw new IllegalStateException("delete() called on a read-only state")
     lockAsync(key) {
       val keyBytes = keySerde.toBytes(key)
       apply(ByteBuffer.wrap(keyBytes)) match {
