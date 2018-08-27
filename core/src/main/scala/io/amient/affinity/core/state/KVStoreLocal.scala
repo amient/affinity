@@ -32,7 +32,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.KeyValueMediator
 import io.amient.affinity.core.serde.avro.AvroSerdeProxy
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.state.KVStoreLocal.createMemStore
+import io.amient.affinity.core.state.KVStoreLocal.configureMemStoreDataDir
 import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util._
 
@@ -46,9 +46,7 @@ import scala.util.control.NonFatal
 object KVStoreLocal {
 
 
-  def createMemStore(identifier: String, stateConf: StateConf, system: ActorSystem, metrics: AffinityMetrics) = {
-    val memstoreClass = stateConf.MemStore.Class()
-    val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
+  def configureMemStoreDataDir(identifier: String, stateConf: StateConf, system: ActorSystem, metrics: AffinityMetrics) = {
     if (!stateConf.MemStore.DataDir.isDefined) {
       val nodeConf = Conf(system.settings.config).Affi.Node
       if (nodeConf.DataDir.isDefined) {
@@ -57,7 +55,6 @@ object KVStoreLocal {
         stateConf.MemStore.DataDir.setValue(null)
       }
     }
-    memstoreConstructor.newInstance(identifier, stateConf, metrics)
   }
 
   def create[K: ClassTag, V: ClassTag](name: String,
@@ -74,7 +71,10 @@ object KVStoreLocal {
       if (prefixLen.isDefined) stateConf.MemStore.KeyPrefixSize.setValue(prefixLen.get)
     }
     val metrics = AffinityMetrics.forActorSystem(system)
-    val memstore = createMemStore(identifier, stateConf, system, metrics)
+    configureMemStoreDataDir(identifier, stateConf, system, metrics)
+    val memstoreClass = stateConf.MemStore.Class()
+    val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
+    val memstore = memstoreConstructor.newInstance(identifier, stateConf, metrics)
     try {
       create(identifier, partition, stateConf, numPartitions, memstore, keySerde, valueSerde, system)
     } catch {
@@ -193,17 +193,35 @@ class KVStoreLocal[K, V](val identifier: String,
       case None => conf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
       case Some(log) => conf.External.setValue(true)
     }
+    configureMemStoreDataDir(identifier, conf, system, metrics)
     conf.MemStore.KeyPrefixSize.setValue(4)
-    val indexMemStore = createMemStore(indexIdentifier, conf, system, metrics)
+    val needsInitializing = !stateConf.MemStore.DataDir.isDefined || !stateConf.MemStore.DataDir().toFile.exists()
+    val memstoreClass = stateConf.MemStore.Class()
+    val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
+    val indexMemStore = memstoreConstructor.newInstance(indexIdentifier, stateConf, metrics)
     val indexStore = new KVStoreIndex[IK, K](indexIdentifier, indexMemStore, indexKeySerde, keySerde, ttlMs)
-    this.listen {
-      case record: Record[K,V]  =>
-        //TODO #228 deleted records must be deindexed which means listen must provider richer semantics
-        indexFunction(record).distinct.foreach { case ik =>
-          indexStore.put(ik, record.key, record.timestamp)
-        }
+
+    def doIndexRecord(record: Record[K, V]): Unit = {
+      indexFunction(record).distinct.foreach { case ik =>
+        //TODO #228 deleted records must be deindexed which means listen (and Record) must provider richer semantics
+        indexStore.put(ik, record.key, record.timestamp)
+      }
     }
-    //TODO #228 bootstrap from the memstore when initializing the index first time
+
+    //rebuild the index from this kvstore fully when initializing the index first time
+    if (needsInitializing) {
+      val allIterator = iterator
+      try {
+        allIterator.asScala.foreach(doIndexRecord)
+      } finally {
+        allIterator.close()
+      }
+    }
+
+    //start tailing the kvstore for changes that need to be applied on the index
+    this.listen {
+      case record: Record[K, V] => doIndexRecord(record)
+    }
     //TODO #228 all indicies must be closed when this kvstore is closed
     indexStore
   }
@@ -354,7 +372,7 @@ class KVStoreLocal[K, V](val identifier: String,
     try {
       delete(keySerde.toBytes(key)).transform(w => {
         unlock(key)
-        push(new Record(key, null));
+        push(new Record(key, null))
         w
       }, f => {
         unlock(key)
