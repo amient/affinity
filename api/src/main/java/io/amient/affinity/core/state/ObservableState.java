@@ -19,6 +19,8 @@
 
 package io.amient.affinity.core.state;
 
+import io.amient.affinity.core.storage.Record;
+
 import java.util.*;
 
 public abstract class ObservableState<K> extends Observable {
@@ -66,18 +68,18 @@ public abstract class ObservableState<K> extends Observable {
         }
     }
 
-    public void push(K key, Object event) {
+    public void push(Record<K, ?> record) {
         try {
-            ObservableKeyValue observable = observables.get(key);
+            ObservableKeyValue observable = observables.get(record.key);
             if (observable != null) {
-                observable.notifyObservers(event);
+                observable.notifyObservers(record);
             }
         } finally {
             setChanged();
-            notifyObservers(new AbstractMap.SimpleEntry(key, event));
+            notifyObservers(record);
         }
     }
 
-    public abstract void internalPush(byte[] key, Optional<byte[]> value);
+    public abstract void internalPush(Record<byte[], byte[]> value);
 
 }

@@ -27,6 +27,7 @@ import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Rou
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.state.{KVStore, KVStoreLocal}
+import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util._
 
 import scala.collection.JavaConverters._
@@ -82,8 +83,8 @@ class ArticlesPartition extends Partition {
 
   val articles = state[StorageKey, Article]("articles")
 
-  val wordindex = articles.index("words") {
-    case (_, article: Article) => article.title.split("\\s").toList.map(_.trim.toLowerCase)
+  val wordindex = articles.index("words") { record: Record[_, Article] =>
+    record.value.title.split("\\s").toList.map(_.trim.toLowerCase)
   }
 
   implicit val executor = context.dispatcher

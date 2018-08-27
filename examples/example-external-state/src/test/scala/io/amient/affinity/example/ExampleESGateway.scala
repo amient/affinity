@@ -63,8 +63,8 @@ class ExampleESPartition extends Partition {
   val latest = new ConcurrentLinkedQueue[(String, String)]()
 
   state[String, String]("news").listen {
-    case (k: String, Some(v: String)) =>
-      latest.add((k, v))
+    case record if record.value != null =>
+      latest.add((record.key, record.value))
       while (latest.size() > 3) latest.poll()
   }
 

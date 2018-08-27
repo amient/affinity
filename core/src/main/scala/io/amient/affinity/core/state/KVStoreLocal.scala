@@ -185,7 +185,7 @@ class KVStoreLocal[K, V](val identifier: String,
   private[affinity] def tail(): Unit = logOption.foreach(_
     .tail(memstore, optional[ObservableState[K]](this)))
 
-  def index[IK: ClassTag](indexName: String)(indexFunction: (K, V) => List[IK]): KVStoreIndex[IK, List[K]] = {
+  def index[IK: ClassTag](indexName: String)(indexFunction: Record[K, V] => List[IK]): KVStoreIndex[IK, List[K]] = {
     val indexIdentifier = s"$identifier-$indexName"
     val indexValueSerde = Serde.of[List[K]](system.settings.config)
     val indexKeySerde = Serde.of[IK](system.settings.config)
@@ -204,12 +204,13 @@ class KVStoreLocal[K, V](val identifier: String,
     val indexMemStore = createMemStore(indexIdentifier, conf, system, metrics)
     val indexStore = new KVStoreIndex[IK, List[K]](indexIdentifier, indexMemStore, indexKeySerde, indexValueSerde, ttlMs, lockTimeoutMs)
     this.listen {
-      case (_, None) => //TODO #228 index deletions cannot be done without knowing what was deleted so listen has to have richer input than just Option
-      case (k, Some(v)) if v.isInstanceOf[V] => //TODO #246 listen to be strongly typed as Option[V]
-        indexFunction(k, v.asInstanceOf[V]).distinct.foreach { case ik =>
+      case record: Record[K,V]  =>
+        //TODO #228 index deletions cannot be done without knowing what was deleted so listen has to have richer input than just Option
+        indexFunction(record).distinct.foreach { case ik =>
+          //TODO #228 index key should be written as a [hash-prefix(ik)|ik|k] -> record.timestamp
           indexStore.update(ik) {
-            case None => List(k)
-            case Some(indexValue) => indexValue :+ k
+            case None => List(record.key)
+            case Some(indexValue) => indexValue :+ record.key
           }
         }
     }
@@ -333,7 +334,7 @@ class KVStoreLocal[K, V](val identifier: String,
     try {
       put(keySerde.toBytes(key), value).transform(w => {
         unlock(key)
-        push(key, w)
+        push(new Record(key, value))
         w
       }, f => {
         unlock(key)
@@ -364,7 +365,7 @@ class KVStoreLocal[K, V](val identifier: String,
     try {
       delete(keySerde.toBytes(key)).transform(w => {
         unlock(key)
-        push(key, w);
+        push(new Record(key, null));
         w
       }, f => {
         unlock(key)
@@ -402,7 +403,7 @@ class KVStoreLocal[K, V](val identifier: String,
         }, {
           e => unlock(key); e
         }) andThen {
-          case _ => push(key, updatedValue)
+          case _ => push(new Record(key, updatedValue))
         } map (_ => currentValue)
       }
     } catch {
@@ -440,7 +441,7 @@ class KVStoreLocal[K, V](val identifier: String,
           }, {
             e => unlock(key); e
           }) andThen {
-            case _ => push(key, updatedValue)
+            case _ => push(new Record(key, updatedValue))
           } map (_ => updatedValue)
         }
       } catch {
@@ -546,23 +547,17 @@ class KVStoreLocal[K, V](val identifier: String,
   /**
     * State listeners can be instantiated at the partition level and are notified for any change in this State.
     */
-  //TODO #246 listen should become strongly type [K, Option[V], but first ObservableState must be moved back to Scala
-  def listen(pf: PartialFunction[(K, Any), Unit]): Unit = {
+  def listen(pf: PartialFunction[Record[K, V], Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
-        case entry: java.util.Map.Entry[K, _] => pf.lift((entry.getKey, entry.getValue))
-        case (key: Any, event: Any) => pf.lift((key.asInstanceOf[K], event))
+        case entry: Record[K, V] => pf.lift(entry)
         case illegal => throw new RuntimeException(s"Can't send $illegal to observers")
       }
     })
   }
 
-  override def internalPush(key: Array[Byte], value: Optional[Array[Byte]]) = {
-    if (value.isPresent) {
-      push(keySerde.fromBytes(key), Some(valueSerde.fromBytes(value.get)))
-    } else {
-      push(keySerde.fromBytes(key), None)
-    }
+  override def internalPush(record: Record[Array[Byte], Array[Byte]]) = {
+    push(new Record(keySerde.fromBytes(record.key), valueSerde.fromBytes(record.value), record.timestamp))
   }
 
   override def close() = {
