@@ -54,10 +54,10 @@ class ExampleBank extends GatewayStream with GatewayHttp {
       defaultKeyspace ?! GetAccountTransactions(Account(sortcode, number)) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), QUERY(("before", before)), response) =>
-      defaultKeyspace ??? GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
+      defaultKeyspace ?? GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), _, response) =>
-      defaultKeyspace ??? GetBranchTransactions(sortcode) map (handleAsJson(response, _))
+      defaultKeyspace ?? GetBranchTransactions(sortcode) map (handleAsJson(response, _))
   }
 
 }

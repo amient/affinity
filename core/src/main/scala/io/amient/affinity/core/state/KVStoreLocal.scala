@@ -202,9 +202,9 @@ class KVStoreLocal[K, V](val identifier: String,
     val indexStore = new KVStoreIndex[IK, K](indexIdentifier, indexMemStore, indexKeySerde, keySerde, ttlMs)
 
     def doIndexRecord(record: Record[K, V]): Unit = {
-      indexFunction(record).distinct.foreach { case ik =>
-        //TODO #228 deleted records must be deindexed which means listen (and Record) must provider richer semantics
-        indexStore.put(ik, record.key, record.timestamp)
+      indexFunction(record).distinct.foreach {
+        case ik if record.tombstone => indexStore.put(ik, record.key, record.timestamp, tombstone = true)
+        case ik => indexStore.put(ik, record.key, record.timestamp)
       }
     }
 
@@ -337,20 +337,11 @@ class KVStoreLocal[K, V](val identifier: String,
     *         Failure(ex) if the operation failed due to exception
     */
   def replace(key: K, value: V): Future[Option[V]] = {
-    lock(key)
-    try {
-      put(keySerde.toBytes(key), value).transform(w => {
-        unlock(key)
+    lockAsync(key) {
+      put(keySerde.toBytes(key), value).map { w =>
         push(new Record(key, value))
         w
-      }, f => {
-        unlock(key)
-        f
-      })
-    } catch {
-      case e: Throwable =>
-        unlock(key)
-        throw e
+      }
     }
   }
 
@@ -360,28 +351,24 @@ class KVStoreLocal[K, V](val identifier: String,
   }).map(_.get)
 
   /**
-    * delete the given key
+    * remove the key
     *
     * @param key to delete
     * @return Future which may be either:
-    *         Success(None) if the key was deleted
+    *         Success(Some(removedValue)) if the key existed and was deleted
+    *         Success(None) if the key didn't exist
     *         Failure(ex) if the operation failed due to exception
     */
   def delete(key: K): Future[Option[V]] = {
-    lock(key)
-    try {
-      delete(keySerde.toBytes(key)).transform(w => {
-        unlock(key)
-        push(new Record(key, null))
-        w
-      }, f => {
-        unlock(key)
-        f
-      })
-    } catch {
-      case e: Throwable =>
-        unlock(key)
-        throw e
+    lockAsync(key) {
+      val keyBytes = keySerde.toBytes(key)
+      apply(ByteBuffer.wrap(keyBytes)) match {
+        case None => Future.successful(None)
+        case Some(removedValue) =>
+          delete(keyBytes)
+            .map ( _ =>  push(new Record(key, removedValue, EventTime.unix, true)))
+            .map ( _ => Some(removedValue))
+      }
     }
   }
 
@@ -396,27 +383,20 @@ class KVStoreLocal[K, V](val identifier: String,
     */
   def getAndUpdate(key: K, f: Option[V] => Option[V]): Future[Option[V]] = try {
     val k = keySerde.toBytes(key)
-    lock(key)
-    try {
-      val currentValue = apply(ByteBuffer.wrap(k))
-      val updatedValue = f(currentValue)
+    lockAsync(key) {
+      val currentValue: Option[V] = apply(ByteBuffer.wrap(k))
+      val updatedValue: Option[V] = f(currentValue)
       if (currentValue == updatedValue) {
-        unlock(key)
         Future.successful(currentValue)
       } else {
         val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
-        f.transform({
-          s => unlock(key); s
-        }, {
-          e => unlock(key); e
-        }) andThen {
-          case _ => push(new Record(key, updatedValue))
+        f.andThen {
+          case _ => updatedValue match {
+            case Some(value) => push(new Record[K, V](key, value))
+            case None => currentValue.foreach(c => push(new Record[K, V](key, c, true)))
+          }
         } map (_ => currentValue)
       }
-    } catch {
-      case e: Throwable =>
-        unlock(key)
-        throw e
     }
   } catch {
     case NonFatal(e) => Future.failed(e)
@@ -434,27 +414,20 @@ class KVStoreLocal[K, V](val identifier: String,
   def updateAndGet(key: K, f: Option[V] => Option[V]): Future[Option[V]] = {
     try {
       val k = keySerde.toBytes(key)
-      lock(key)
-      try {
+      lockAsync(key) {
         val currentValue = apply(ByteBuffer.wrap(k))
-        val updatedValue = f(currentValue)
+        val updatedValue: Option[V] = f(currentValue)
         if (currentValue == updatedValue) {
-          unlock(key)
           Future.successful(updatedValue)
         } else {
           val f = if (updatedValue.isDefined) put(k, updatedValue.get) else delete(k)
-          f.transform({
-            s => unlock(key); s
-          }, {
-            e => unlock(key); e
-          }) andThen {
-            case _ => push(new Record(key, updatedValue))
+          f andThen {
+            case _ => updatedValue match {
+              case Some(value) => push(new Record[K, V](key, value))
+              case None => currentValue.foreach(c => push(new Record[K, V](key, c, true)))
+            }
           } map (_ => updatedValue)
         }
-      } catch {
-        case e: Throwable =>
-          unlock(key)
-          throw e
       }
     } catch {
       case NonFatal(e) => Future.failed(e)
@@ -480,7 +453,7 @@ class KVStoreLocal[K, V](val identifier: String,
       case _ => nowMs
     }
     if (ttlMs > 0 && recordTimestamp + ttlMs < nowMs) {
-      delete(key)
+      delete(key) map (_ => None)
     } else {
       val timerContext = writesMeter.markStart()
       try {
@@ -518,9 +491,9 @@ class KVStoreLocal[K, V](val identifier: String,
     * the result future.
     *
     * @param key serialized key to delete
-    * @return future of the checkpoint that will represent the consistency information after the operation completes
+    * @return future of unt which completes when the delete was persisted in both memstore and the log
     */
-  private def delete(key: Array[Byte]): Future[Option[V]] = {
+  private def delete(key: Array[Byte]): Future[Unit] = {
     if (external) throw new IllegalStateException("delete() called on a read-only state")
     val timerContext = writesMeter.markStart()
     try {
@@ -533,7 +506,6 @@ class KVStoreLocal[K, V](val identifier: String,
           log.delete(memstore, key) transform(
             _ => {
               writesMeter.markSuccess(timerContext)
-              None
             }, error => {
             writesMeter.markFailure(timerContext)
             error
@@ -564,7 +536,11 @@ class KVStoreLocal[K, V](val identifier: String,
   }
 
   override def internalPush(record: Record[Array[Byte], Array[Byte]]) = {
-    push(new Record(keySerde.fromBytes(record.key), valueSerde.fromBytes(record.value), record.timestamp))
+    push(new Record(
+      keySerde.fromBytes(record.key),
+      valueSerde.fromBytes(record.value),
+      record.timestamp,
+      record.tombstone))
   }
 
   override def close() = {

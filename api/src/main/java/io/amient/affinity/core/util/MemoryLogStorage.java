@@ -101,10 +101,10 @@ public class MemoryLogStorage implements LogStorage<Long> {
         return Collections.singletonList(result).iterator();
     }
 
-    @Override
-    public boolean isTombstone(LogEntry<Long> entry) {
-        return entry.value == null;
-    }
+//    @Override
+//    public boolean isTombstone(LogEntry<Long> entry) {
+//        return entry.value == null;
+//    }
 
     @Override
     public void cancel() {
@@ -137,7 +137,7 @@ public class MemoryLogStorage implements LogStorage<Long> {
             WritePromise write = unflushedWrites.poll();
             logEndOffset.updateAndGet((long pos) -> {
                 long newPos = pos + 1;
-                LogEntry entry = new LogEntry(newPos, write.record.key, write.record.value, write.record.timestamp);
+                LogEntry entry = new LogEntry(newPos, write.record.key, write.record.value, write.record.timestamp, write.record.value == null);
                 internal.put(newPos, entry);
                 write.success(newPos);
                 return newPos;

@@ -27,6 +27,7 @@ public class Record<K, V> implements Serializable {
     public final K key;
     public final V value;
     public final long timestamp;
+    public final boolean tombstone;
 
     public Record(K key, V value) {
         this (key, value, value instanceof EventTime ? ((EventTime)value).eventTimeUnix() : EventTime.unix());
@@ -36,6 +37,18 @@ public class Record<K, V> implements Serializable {
         this.key = key;
         this.value = value;
         this.timestamp = timestamp;
+        this.tombstone = false;
+    }
+
+    public Record(K key, V value, boolean tombstone) {
+        this (key, value, value instanceof EventTime ? ((EventTime)value).eventTimeUnix() : EventTime.unix(), tombstone);
+    }
+
+    public Record(K key, V value, long timestamp, boolean tombstone) {
+        this.key = key;
+        this.value = value;
+        this.timestamp = timestamp;
+        this.tombstone = tombstone;
     }
 
     @Override

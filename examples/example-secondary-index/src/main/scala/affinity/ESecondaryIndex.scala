@@ -30,6 +30,7 @@ import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util._
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -59,16 +60,22 @@ class ESecondaryIndex extends GatewayStream with GatewayHttp {
       ks ?! GetAuthorArticles(Author(username), 0L) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("words", word), _, response) =>
-      ks ??? GetWordIndex(word, 0L) map (handleAsJson(response, _))
+      ks ?? GetWordIndex(word, 0L) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("words-since", word), _, response) =>
-      ks ??? GetWordIndex(word, 1530086400000L) map (handleAsJson(response, _))
+      ks ?? GetWordIndex(word, 1530086400000L) map (handleAsJson(response, _))
+
+    case HTTP(HttpMethods.GET, PATH("delete-articles-containing", word), _, response) =>
+      ks ?? DeleteArticles(word) map (accept(response, _))
 
   }
 
 }
 
 case class GetWordIndex(word: String, since: Long) extends ScatterIterable[Article]
+
+case class DeleteArticles(word: String) extends ScatterUnit
+
 
 sealed trait Authored extends Routed {
   val author: Author
@@ -98,7 +105,12 @@ class ArticlesPartition extends Partition {
       request(sender) ! articles.range(TimeRange.since(since), author.id).values.toList
 
     case request@GetWordIndex(word, since) =>
-      request(sender) ! wordindex(word, TimeRange.since(since)).asScala.map(articles.apply).flatten.toList
+      val list = wordindex(word.trim.toLowerCase, TimeRange.since(since))(_.toList)
+      request(sender) ! list.map(articles.apply).flatten
+
+    case request@DeleteArticles(word) =>
+      val deleted = Future.sequence(wordindex(word.trim.toLowerCase, TimeRange.UNBOUNDED)(_.map(articles.delete)))
+      request(sender) ! deleted.map(_ => ())
 
     case request@StoreArticle(author, article) => request(sender) ! {
       articles.lockAsync(author) {

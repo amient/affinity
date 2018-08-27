@@ -233,7 +233,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     }
 
     private <K> void modifyState(MemStore kvstore, LogEntry<POS> entry, Optional<ObservableState<K>> observableState) {
-        if (storage.isTombstone(entry)) {
+        if (entry.tombstone) {
             kvstore.remove(ByteBuffer.wrap(entry.key));
         } else {
             kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));

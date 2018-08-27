@@ -214,7 +214,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {
-      case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)
+      case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp, r.value == null)
     }
   }.asJava
 
@@ -270,8 +270,6 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   override def close(): Unit = if (!closed) {
     try kafkaConsumer.close() finally try if (producerActive) producer.close() finally closed = true
   }
-
-  override def isTombstone(entry: LogEntry[lang.Long]) = entry.value == null
 
   override def ensureExists(): Unit = {
     if (kafkaStorageConf.Partitions.isDefined) {

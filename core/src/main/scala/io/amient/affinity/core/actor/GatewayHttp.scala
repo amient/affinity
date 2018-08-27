@@ -125,8 +125,8 @@ trait GatewayHttp extends Gateway {
           case _ => HttpResponse(Accepted)
         }
       }
-      case None => HttpResponse(NotFound)
-      case _ => HttpResponse(Accepted)
+      case None => response.success(HttpResponse(NotFound))
+      case _ => response.success(HttpResponse(Accepted))
     }
   } catch {
     case e: Throwable => response.success(handleException(headers)(e))

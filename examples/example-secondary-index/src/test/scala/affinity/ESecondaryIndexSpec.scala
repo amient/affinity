@@ -23,6 +23,7 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 import java.util.{Properties, UUID}
 
 import akka.actor.{Actor, Props}
+import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.core.cluster.Node
@@ -71,7 +72,7 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
   val a3 = Article(title = "Green Self-Driving Cars", timestamp = 1530086400000L) //08am 27 June 2018
   val a4 = Article(title = "Quantum Machines", timestamp = 1530090000000L) //09am 27 June 2018
   val a5 = Article(title = "Green materials", timestamp = 1530172800000L) //08am 28 June 2018
-  val a6 = Article(title = "Green CVT Bicycles", timestamp = 1530172800000L) //08am 28 June 2018
+  val a6 = Article(title = "Green CVT Cars", timestamp = 1530172800000L) //08am 28 June 2018
 
 
   override def beforeAll(): Unit = {
@@ -134,4 +135,10 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
     wordsSince.size should be(3)
   }
 
+  "Articles Store" should "deindex removed articles entries" in {
+    node.get_json(node.http_get("/words/machines")).getElements.asScala.toList.size should be(1)
+    node.http_get("/delete-articles-containing/machines").status should be (StatusCodes.Accepted)
+    node.get_json(node.http_get("/words/quantum")).getElements.asScala.toList.size should be (0)
+    node.get_json(node.http_get("/words/machines")).getElements.asScala.toList.size should be (0)
+  }
 }
