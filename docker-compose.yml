@@ -43,3 +43,14 @@ services:
       SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081'
       SCHEMA_REGISTRY_AVRO_COMPATIBILITY_LEVEL: full_transitive
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:9090'
+      SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_ORIGIN: '*'
+
+  schema_registry_ui:
+    image: landoop/schema-registry-ui:latest
+    depends_on:
+        - schema_registry
+    hostname: schema_registry_ui
+    ports:
+      - "8000:8000"
+    environment:
+      SCHEMAREGISTRY_URL: 'http://localhost:8082'
