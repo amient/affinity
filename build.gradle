@@ -173,7 +173,6 @@ allprojects {
         dependencies {
             testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
             testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: '1.12.5'
-            testRuntime 'org.pegdown:pegdown:1.6.0'
         }
     }
 
