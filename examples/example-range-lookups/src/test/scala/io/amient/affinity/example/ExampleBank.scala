@@ -26,7 +26,8 @@ import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, GatewayStream, Partition, Routed}
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, INT, PATH, QUERY}
 import io.amient.affinity.core.storage.Record
-import io.amient.affinity.core.util.{EventTime, Reply, Scatter, TimeRange}
+import io.amient.affinity.core.util._
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -53,10 +54,10 @@ class ExampleBank extends GatewayStream with GatewayHttp {
       defaultKeyspace ?! GetAccountTransactions(Account(sortcode, number)) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), QUERY(("before", before)), response) =>
-      defaultKeyspace ??? GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
+      defaultKeyspace ?? GetBranchTransactions(sortcode, EventTime.unix(before+"T00:00:00+00:00")) map (handleAsJson(response, _))
 
     case HTTP(HttpMethods.GET, PATH("transactions", sortcode), _, response) =>
-      defaultKeyspace ??? GetBranchTransactions(sortcode) map (handleAsJson(response, _))
+      defaultKeyspace ?? GetBranchTransactions(sortcode) map (handleAsJson(response, _))
   }
 
 }
@@ -65,9 +66,7 @@ class ExampleBank extends GatewayStream with GatewayHttp {
 case class StoreTransaction(key: Account, t: Transaction) extends AvroRecord with Routed with Reply[Option[Transaction]]
 case class StorageKey(@Fixed(8) sortcode: String, @Fixed account: Int, txn: Long) extends AvroRecord
 case class GetAccountTransactions(key: Account) extends AvroRecord with Routed with Reply[Seq[Transaction]]
-case class GetBranchTransactions(sortcode: String, beforeUnixTs: Long = Long.MaxValue) extends AvroRecord with Scatter[Seq[Transaction]] {
-  override def gather(r1: Seq[Transaction], r2: Seq[Transaction]) = r1 ++ r2
-}
+case class GetBranchTransactions(sortcode: String, beforeUnixTs: Long = Long.MaxValue) extends AvroRecord with ScatterIterable[Transaction]
 
 class DefaultPartition extends Partition {
 

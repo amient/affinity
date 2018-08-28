@@ -23,15 +23,15 @@ package io.amient.affinity.core.cluster
 import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
 
 import akka.actor.{Actor, Props}
+import akka.event.Logging
 import akka.util.Timeout
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Controller._
 import io.amient.affinity.core.actor.Gateway.{GatewayClusterStatus, GatewayConf}
 import io.amient.affinity.core.actor._
 import io.amient.affinity.core.config._
 import io.amient.affinity.{AffinityActorSystem, Conf}
-import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
@@ -56,14 +56,16 @@ object Node {
 
 class Node(config: Config) {
 
+  def this(configResource: String) = this(ConfigFactory.parseResources(configResource).resolve)
+
   val conf = Conf(config)
-  
+
   val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
   val shutdownTimeout = conf.Affi.Node.ShutdownTimeoutMs().toLong milliseconds
 
   implicit val system = AffinityActorSystem.create(config)
 
-  private val log = LoggerFactory.getLogger(this.getClass) //Logging.getLogger(system, this)
+  private val log = Logging.getLogger(system, this)
 
   private val controller = system.actorOf(Props(new Controller), name = "controller")
 

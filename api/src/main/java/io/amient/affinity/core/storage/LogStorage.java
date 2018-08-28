@@ -161,13 +161,6 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
      */
     Iterator<LogEntry<POS>> fetch(boolean unbounded) throws InterruptedException;
 
-    /**
-     * check if an entry is a delete marker/tombstone
-     * @param entry to check
-     * @return true if the given entry represents a delete mark/tombstone
-     */
-    boolean isTombstone(LogEntry<POS> entry);
-
 
     /**
      * Cancel any ongoing blocking operation, whether fetch or iterator.hasNext etc.

@@ -59,7 +59,7 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
     if (!compacted) logRecords else {
       val spillMap = new ExternalAppendOnlyMap[ByteKey, LogEntry[POS], LogEntry[POS]]((v) => v, compactor, compactor)
       spillMap.insertAll(logRecords)
-      spillMap.iterator.filter { case (_, entry) => !storage.isTombstone(entry) }
+      spillMap.iterator.filter { case (_, entry) => !entry.tombstone }
     }
   }
 
