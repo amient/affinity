@@ -182,11 +182,7 @@ class KVStoreLocal[K, V](val identifier: String,
     Props(new KeyValueMediator(partition, this, key.asInstanceOf[K]))
   }
 
-  private[affinity] def boot(): Unit = logOption.foreach(_
-    .bootstrap(identifier, memstore, partition, optional[ObservableState[K]](if (external) this else null)))
-
-  private[affinity] def tail(): Unit = logOption.foreach(_
-    .tail(memstore, optional[ObservableState[K]](this)))
+  private val indicies = scala.collection.mutable.ArrayBuffer[KVStoreIndex[_, _]]()
 
   def index[IK: ClassTag](indexName: String)(indexFunction: Record[K, V] => List[IK]): KVStoreIndex[IK, K] = {
     val indexIdentifier = s"$identifier-$indexName"
@@ -204,7 +200,7 @@ class KVStoreLocal[K, V](val identifier: String,
     val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
     val indexMemStore = memstoreConstructor.newInstance(indexIdentifier, indexConf, metrics)
     val indexStore = new KVStoreIndex[IK, K](indexIdentifier, indexMemStore, indexKeySerde, keySerde, ttlMs)
-
+    indicies += indexStore
     def doIndexRecord(record: Record[K, V]): Unit = {
       indexFunction(record).distinct.foreach {
         case ik if record.tombstone => indexStore.put(ik, record.key, record.timestamp, tombstone = true)
@@ -240,6 +236,13 @@ class KVStoreLocal[K, V](val identifier: String,
     //TODO #228 all indicies must be closed when this kvstore is closed
     indexStore
   }
+
+
+  private[affinity] def boot(): Unit = logOption.foreach(_
+    .bootstrap(identifier, memstore, partition, optional[ObservableState[K]](if (external) this else null)))
+
+  private[affinity] def tail(): Unit = logOption.foreach(_
+    .tail(memstore, optional[ObservableState[K]](this)))
 
 
   /**
@@ -565,6 +568,7 @@ class KVStoreLocal[K, V](val identifier: String,
     } finally {
       memstore.close()
       metrics.remove(s"state.$identifier.keys")
+      indicies.foreach(_.close)
     }
   }
 

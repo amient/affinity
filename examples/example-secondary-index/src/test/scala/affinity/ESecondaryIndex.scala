@@ -118,8 +118,7 @@ class ArticlesPartition extends Partition {
       request(sender) ! articles.range(TimeRange.since(since), author.id).values.toList
 
     case request@GetWordIndex(word, since) =>
-      val list = wordindex(word.trim.toLowerCase, TimeRange.since(since))(_.toList)
-      request(sender) ! list.map(articles.apply).flatten
+      request(sender) ! wordindex(word.trim.toLowerCase, TimeRange.since(since))(_.toList).map(articles.apply).flatten
 
     case request@DeleteArticles(word) =>
       val deleted = Future.sequence(wordindex(word.trim.toLowerCase, TimeRange.UNBOUNDED)(_.map(articles.delete)))
