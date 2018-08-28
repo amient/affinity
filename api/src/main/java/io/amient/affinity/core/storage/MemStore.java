@@ -155,4 +155,6 @@ public abstract class MemStore implements Closeable {
 
     abstract public String getStats();
 
+    abstract public void erase();
+
 }

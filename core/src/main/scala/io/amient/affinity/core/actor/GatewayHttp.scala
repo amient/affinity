@@ -42,6 +42,7 @@ import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.http._
+import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util.ByteUtils
 
 import scala.collection.JavaConverters._
@@ -124,8 +125,8 @@ trait GatewayHttp extends Gateway {
           case _ => HttpResponse(Accepted)
         }
       }
-      case None => HttpResponse(NotFound)
-      case _ => HttpResponse(Accepted)
+      case None => response.success(HttpResponse(NotFound))
+      case _ => response.success(HttpResponse(Accepted))
     }
   } catch {
     case e: Throwable => response.success(handleException(headers)(e))
@@ -275,6 +276,8 @@ trait WebSocketSupport extends GatewayHttp {
 
     }, new UpstreamActor {
       override def handle: Receive = {
+        case rec: Record[_, _] if rec.value == null => push(TextMessage.Strict("{}"))
+        case rec: Record[_, _] => push(TextMessage.Strict(Encoder.json(rec.value)))
         case None => push(TextMessage.Strict("{}"))
         case Some(value) => push(TextMessage.Strict(Encoder.json(value)))
         case opt: Optional[_] if !opt.isPresent => push(TextMessage.Strict("{}"))
@@ -366,6 +369,8 @@ trait WebSocketSupport extends GatewayHttp {
         case direct: ByteString => push(BinaryMessage.Strict(direct)) //ByteString as the direct response from above downstream handler
         case None => push(BinaryMessage.Strict(ByteString())) //non-existent or delete key-value from the mediator
         case Some(value: AvroRecord) => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
+        case rec: Record[_, _] if rec.value == null => push(BinaryMessage.Strict(ByteString()))
+        case rec: Record[_, _]  => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(rec.value))))
         case value: AvroRecord => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
         case opt: Optional[_] if !opt.isPresent => push(BinaryMessage.Strict(ByteString()))
         case opt: Optional[_] if opt.get.isInstanceOf[AvroRecord] => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(opt.get))))

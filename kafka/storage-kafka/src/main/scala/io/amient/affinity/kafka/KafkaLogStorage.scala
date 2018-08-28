@@ -136,13 +136,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   }
 
   override def reset(partition: Int, range: TimeRange): Unit = {
-    log.debug(s"Resetting $topic/$partition to $range")
+    log.debug(s"Resetting $topic/$partition to time range: $range")
     val tp = new TopicPartition(topic, partition)
     this.range = range
     kafkaConsumer.assign(List(tp).asJava)
     val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp)
     val startOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start)).asJava).get(tp)).map(_.offset).getOrElse(beginOffset)
-    log.debug(s"Reset partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}")
     reset(tp.partition, startOffset)
   }
 
@@ -214,7 +213,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         record.timestamp >= range.start && record.timestamp <= range.end
       }
     }.map {
-      case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp)
+      case r => new LogEntry(new java.lang.Long(r.offset), r.key, r.value, r.timestamp, r.value == null)
     }
   }.asJava
 
@@ -252,7 +251,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def delete(key: Array[Byte]): Future[java.lang.Long] = {
     //kafka uses null value as a delete tombstone
-    append(new Record[Array[Byte], Array[Byte]](key, null, EventTime.unix));
+    append(new Record[Array[Byte], Array[Byte]](key, null, EventTime.unix, true))
   }
 
   override def onCompletion(metadata: RecordMetadata, exception: Exception) = {
@@ -270,8 +269,6 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   override def close(): Unit = if (!closed) {
     try kafkaConsumer.close() finally try if (producerActive) producer.close() finally closed = true
   }
-
-  override def isTombstone(entry: LogEntry[lang.Long]) = entry.value == null
 
   override def ensureExists(): Unit = {
     if (kafkaStorageConf.Partitions.isDefined) {

@@ -26,7 +26,7 @@ import akka.actor.{Actor, ActorRef, Status}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
 import io.amient.affinity.core.serde.primitive.InternalMessage
-import io.amient.affinity.core.state.KVStoreLocal
+import io.amient.affinity.core.state.{KVStore, KVStoreLocal}
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
@@ -71,7 +71,6 @@ trait Partition extends ActorHandler {
     declaredStateStores.add((name, state))
     state
   }
-
 
   override def preStart(): Unit = {
     started = true

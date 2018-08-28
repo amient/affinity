@@ -72,7 +72,6 @@ public class MemStoreRocksDb extends MemStore {
         } else {
 
             try {
-                log.info("Opening RocksDb with TTL=" + ttlSecs);
                 RocksDB instance = ttlSecs > 0 ? TtlDB.open(rocksOptions, pathToData.toString(), ttlSecs, false)
                         : TtlDB.open(rocksOptions, pathToData.toString());
                 //RocksDB instance = RocksDB.open(rocksOptions, pathToData.toString());
@@ -113,7 +112,7 @@ public class MemStoreRocksDb extends MemStore {
     public MemStoreRocksDb(String identifier, StateConf conf, MetricRegistry metrics) throws IOException {
         super(conf);
         pathToData = dataDir.resolve(this.getClass().getSimpleName());
-        log.info("Opening RocksDb MemStore: " + pathToData);
+        log.info("Opening RocksDb MemStore (TTL=" + ttlSecs + " ): " + pathToData);
         Files.createDirectories(pathToData);
         MemStoreRocksDbConf rocksDbConf = new MemStoreRocksDbConf().apply(conf.MemStore);
 
@@ -278,6 +277,11 @@ public class MemStoreRocksDb extends MemStore {
     @Override
     public String getStats() {
         return statistics.toString();
+    }
+
+    @Override
+    public void erase() {
+        //TODO delete all data efficiently, e.g. close delete files and re-open
     }
 
     @Override

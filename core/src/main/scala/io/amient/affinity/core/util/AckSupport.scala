@@ -58,10 +58,23 @@ trait AckSupport {
 }
 
 trait Reply[+T] {
-
   def apply[S >: T](sender: ActorRef): ReplyTo[S] = new ReplyTo[S](sender)
-
 }
+
+trait Scatter[T] extends Reply[T] {
+  def gather(r1: T, r2: T): T
+}
+
+trait ScatterUnit extends Reply[Unit] with Scatter[Unit] {
+  override def gather(r1: Unit, r2: Unit): Unit = ()
+}
+
+trait ScatterIterable[T] extends Reply[Iterable[T]] with Scatter[Iterable[T]] {
+  def gather(r1: Iterable[T], r2: Iterable[T]): Iterable[T] = r1 ++ r2
+}
+
+//TODO ScatterGather should also be internally serialized but same problem is with KVGlobalStore - it's generic
+case class ScatterGather[T](msg: Scatter[T], timeout: Timeout) extends Reply[Iterable[T]]
 
 class ReplyTo[T](sender: ActorRef) {
   def !(response: => T): Unit = {
@@ -77,41 +90,24 @@ class ReplyTo[T](sender: ActorRef) {
   }
 }
 
-trait Scatter[T] extends Reply[T] {
-  def gather(r1: T, r2: T): T
-}
-
-case class ScatterGather[T](msg: Scatter[T], timeout: Timeout) extends Reply[Iterable[T]]
-
 final class AckableActorRef(val target: ActorRef) extends AnyRef {
 
   private val log = LoggerFactory.getLogger(this.getClass)
 
-
   /**
-    * Typed Scatter Gather
+    * Typed Ask / Typed Scatter Gather
     *
-    * @param scatter
-    * @param timeout
-    * @param scheduler
-    * @param context
-    * @tparam T
-    * @return gathered and aggregated result T
-    */
-  def ???[T](scatter: Scatter[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = {
-    ??(ScatterGather(scatter, timeout)).map(_.reduce(scatter.gather))
-  }
-
-  /**
-    * Typed Ask
-    * @param message message ask to send this actor target
+    * @param message to send to the group represented by this actor
     * @param timeout after which the response is considered failed
     * @param context
     * @tparam T response type
     * @return
     */
   def ??[T](message: Reply[T])(implicit timeout: Timeout, context: ExecutionContext): Future[T] = {
-    target ? message map (result => (if (result.isInstanceOf[BoxedUnit]) () else result).asInstanceOf[T])
+    message match {
+      case scatter: Scatter[T] => ??(ScatterGather(scatter, timeout)).map(_.reduce(scatter.gather))
+      case other => target ? message map (result => (if (result.isInstanceOf[BoxedUnit]) () else result).asInstanceOf[T])
+    }
   }
 
   /**
@@ -124,6 +120,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
     * @return Future response of type T
     */
   def ?![T](message: Reply[T])(implicit timeout: Timeout, scheduler: Scheduler, context: ExecutionContext): Future[T] = {
+
     val promise = Promise[T]()
 
     def attempt(retry: Int, delay: FiniteDuration = 0 seconds): Unit = {

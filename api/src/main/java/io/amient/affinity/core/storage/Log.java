@@ -61,7 +61,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 log.warn("Invalid checkpoint file: " + checkpointFile + ", going to rewind fully.", e);
                 checkpoint.set(null);
             }
-            log.info("Initialized " + checkpoint + " from " + checkpointFile);
+            log.info("Initial Position " + checkpoint + " from " + checkpointFile);
         }
     }
 
@@ -233,13 +233,12 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     }
 
     private <K> void modifyState(MemStore kvstore, LogEntry<POS> entry, Optional<ObservableState<K>> observableState) {
-        if (storage.isTombstone(entry)) {
+        if (entry.tombstone) {
             kvstore.remove(ByteBuffer.wrap(entry.key));
-            observableState.ifPresent((state) -> state.internalPush(entry.key, Optional.empty()));
         } else {
             kvstore.put(ByteBuffer.wrap(entry.key), kvstore.wrap(entry.value, entry.timestamp));
-            observableState.ifPresent((state) -> state.internalPush(entry.key, Optional.of(entry.value)));
         }
+        observableState.ifPresent((state) -> state.internalPush(entry));
         updateCheckpoint(entry.position);
     }
 
