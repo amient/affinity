@@ -201,8 +201,10 @@ class KVStoreLocal[K, V](val identifier: String,
     val indexMemStore = memstoreConstructor.newInstance(indexIdentifier, indexConf, metrics)
     val indexStore = new KVStoreIndex[IK, K](indexIdentifier, indexMemStore, indexKeySerde, keySerde, ttlMs)
     indicies += indexStore
+
     def doIndexRecord(record: Record[K, V]): Unit = {
-      indexFunction(record).distinct.foreach {
+      //TODO #242 / #248 rocksdb writing asynchronously indicies needs to participate in the pipeline guarantees
+      indexFunction(record).distinct.map {
         case ik if record.tombstone => indexStore.put(ik, record.key, record.timestamp, tombstone = true)
         case ik => indexStore.put(ik, record.key, record.timestamp)
       }
@@ -230,10 +232,10 @@ class KVStoreLocal[K, V](val identifier: String,
 
     //start tailing the kvstore for changes that need to be applied on the index
     this.listen {
-      //TODO #228  what kind of guarantees does this have
+      //TODO #242 / #248 what kind of guarantees does this have
       case record: Record[K, V] => doIndexRecord(record)
     }
-    //TODO #228 all indicies must be closed when this kvstore is closed
+
     indexStore
   }
 
