@@ -251,7 +251,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def delete(key: Array[Byte]): Future[java.lang.Long] = {
     //kafka uses null value as a delete tombstone
-    append(new Record[Array[Byte], Array[Byte]](key, null, EventTime.unix));
+    append(new Record[Array[Byte], Array[Byte]](key, null, EventTime.unix, true))
   }
 
   override def onCompletion(metadata: RecordMetadata, exception: Exception) = {

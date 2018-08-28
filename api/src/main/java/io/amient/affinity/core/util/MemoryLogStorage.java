@@ -101,11 +101,6 @@ public class MemoryLogStorage implements LogStorage<Long> {
         return Collections.singletonList(result).iterator();
     }
 
-//    @Override
-//    public boolean isTombstone(LogEntry<Long> entry) {
-//        return entry.value == null;
-//    }
-
     @Override
     public void cancel() {
         cancelled.set(true);
