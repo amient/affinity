@@ -126,6 +126,8 @@ allprojects {
 
         sourceCompatibility = rootProject.ext.javaVersion
 
+        compileJava.options.encoding = 'UTF-8'
+
         libsDirName = 'lib' //gradle's default is libs but CreateStartScripts needs this to be lib
 
         compile.dependsOn compileJava
@@ -179,7 +181,7 @@ allprojects {
         scalaCompileOptions.additionalParameters = [
                                                    "-feature",
                                                     "-target:jvm-" + javaVersion,
-                                                    "-encoding", rootProject.encoding,
+                                                    "-encoding", "UTF-8",
                                                     "-unchecked",
                                                     "-deprecation",
                                                     "-Xfuture",
