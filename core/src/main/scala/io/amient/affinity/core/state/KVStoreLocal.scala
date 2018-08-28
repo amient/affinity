@@ -35,6 +35,7 @@ import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.state.KVStoreLocal.configureMemStoreDataDir
 import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util._
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -161,6 +162,8 @@ class KVStoreLocal[K, V](val identifier: String,
 
   val metrics = AffinityMetrics.forActorSystem(system)
 
+  private val logger = LoggerFactory.getLogger(this.getClass)
+
   def optional[T](opt: T): Optional[T] = if (opt != null) Optional.of(opt) else Optional.empty[T]
 
   def option[T](opt: Optional[T]): Option[T] = if (opt.isPresent) Some(opt.get()) else None
@@ -187,18 +190,19 @@ class KVStoreLocal[K, V](val identifier: String,
 
   def index[IK: ClassTag](indexName: String)(indexFunction: Record[K, V] => List[IK]): KVStoreIndex[IK, K] = {
     val indexIdentifier = s"$identifier-$indexName"
+    logger.info(s"Opening index: $indexIdentifier")
     val indexKeySerde = Serde.of[IK](system.settings.config)
-    val conf = new StateConf().apply(stateConf)
+    val indexConf = new StateConf().apply(stateConf)
     logOption match {
-      case None => conf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
-      case Some(log) => conf.External.setValue(true)
+      case None => indexConf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
+      case Some(log) => indexConf.External.setValue(true)
     }
-    configureMemStoreDataDir(identifier, conf, system, metrics)
-    conf.MemStore.KeyPrefixSize.setValue(4)
-    val needsInitializing = !stateConf.MemStore.DataDir.isDefined || !stateConf.MemStore.DataDir().toFile.exists()
-    val memstoreClass = stateConf.MemStore.Class()
+    configureMemStoreDataDir(indexIdentifier, indexConf, system, metrics)
+    indexConf.MemStore.KeyPrefixSize.setValue(4)
+    val mustRebuild = !indexConf.MemStore.DataDir.isDefined || !indexConf.MemStore.DataDir().resolve("initialized").toFile.exists()
+    val memstoreClass = indexConf.MemStore.Class()
     val memstoreConstructor = memstoreClass.getConstructor(classOf[String], classOf[StateConf], classOf[MetricRegistry])
-    val indexMemStore = memstoreConstructor.newInstance(indexIdentifier, stateConf, metrics)
+    val indexMemStore = memstoreConstructor.newInstance(indexIdentifier, indexConf, metrics)
     val indexStore = new KVStoreIndex[IK, K](indexIdentifier, indexMemStore, indexKeySerde, keySerde, ttlMs)
 
     def doIndexRecord(record: Record[K, V]): Unit = {
@@ -208,11 +212,21 @@ class KVStoreLocal[K, V](val identifier: String,
       }
     }
 
-    //rebuild the index from this kvstore fully when initializing the index first time
-    if (needsInitializing) {
+    if (mustRebuild) {
+      //rebuilding index is done not from the underlying long but from the state store iterator which is being indexed
+      //in terms of consistency it seems it would be better to have it initialized from the underyling log
+      //and simply continue tailing but there are several reasons why to use state store iterator
+      //1. it performs better (assuming truly local storage)
+      //2. in principle indicies should live as close to the data they indexing as possible
+      //3. deindexing wouldn't work because the previous value is not known for tombstones at the log-level
       val allIterator = iterator
       try {
+        logger.info(s"Rebuilding index: $indexIdentifier ...")
+        memstore.erase()
         allIterator.asScala.foreach(doIndexRecord)
+        if (indexConf.MemStore.DataDir.isDefined) {
+          indexConf.MemStore.DataDir().resolve("initialized").toFile.createNewFile()
+        }
       } finally {
         allIterator.close()
       }
@@ -220,6 +234,7 @@ class KVStoreLocal[K, V](val identifier: String,
 
     //start tailing the kvstore for changes that need to be applied on the index
     this.listen {
+      //TODO #228  what kind of guarantees does this have
       case record: Record[K, V] => doIndexRecord(record)
     }
     //TODO #228 all indicies must be closed when this kvstore is closed

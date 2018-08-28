@@ -94,6 +94,11 @@ public class MemStoreSimpleMap extends MemStore {
     }
 
     @Override
+    public void erase() {
+        internal.clear();
+    }
+
+    @Override
     public void close() throws IOException {
         internal.clear();
     }

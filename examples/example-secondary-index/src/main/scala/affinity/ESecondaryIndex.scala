@@ -34,6 +34,14 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
+
+
+object ESecondaryIndexMain extends App {
+  new Node("example.conf").start()
+}
+
+
+
 case class Author(username: String) extends AvroRecord {
   val id = username.hashCode
 }
@@ -41,6 +49,7 @@ case class Author(username: String) extends AvroRecord {
 case class Article(title: String, timestamp: Long) extends AvroRecord with EventTime {
   override def eventTimeUnix() = timestamp
 }
+
 
 
 class ESecondaryIndex extends GatewayStream with GatewayHttp {
@@ -72,10 +81,11 @@ class ESecondaryIndex extends GatewayStream with GatewayHttp {
 
 }
 
+
+
 case class GetWordIndex(word: String, since: Long) extends ScatterIterable[Article]
 
 case class DeleteArticles(word: String) extends ScatterUnit
-
 
 sealed trait Authored extends Routed {
   val author: Author
@@ -88,6 +98,9 @@ case class StoreArticle(author: Author, article: Article) extends AvroRecord wit
 case class StorageKey(@Fixed authorId: Int, auto: Int) extends AvroRecord
 
 case class GetAuthorArticles(author: Author, since: Long) extends AvroRecord with Authored with Reply[Seq[Article]]
+
+
+
 
 class ArticlesPartition extends Partition {
 
@@ -131,8 +144,4 @@ class ArticlesPartition extends Partition {
     }
 
   }
-}
-
-object ESecondaryIndexMain extends App {
-  new Node("example.conf").start()
 }

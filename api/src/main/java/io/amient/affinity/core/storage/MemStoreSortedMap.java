@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class MemStoreSortedMap extends MemStore {
 
-    final private ConcurrentSkipListMap<ByteBuffer, ByteBuffer> internal2 = new ConcurrentSkipListMap<>();
+    final private ConcurrentSkipListMap<ByteBuffer, ByteBuffer> internal = new ConcurrentSkipListMap<>();
 
     public MemStoreSortedMap(String identifier, StateConf conf, MetricRegistry metrics) throws IOException {
         super(conf);
@@ -45,13 +45,13 @@ public class MemStoreSortedMap extends MemStore {
     @Override
     public CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator(ByteBuffer prefix) {
         if (prefix == null) {
-            return CloseableIterator.apply(internal2.entrySet().iterator());
+            return CloseableIterator.apply(internal.entrySet().iterator());
         } else {
-            ByteBuffer startKey = internal2.higherKey(prefix);
+            ByteBuffer startKey = internal.higherKey(prefix);
             if (startKey == null) {
                 return CloseableIterator.empty();
             } else {
-                Iterator<Map.Entry<ByteBuffer, ByteBuffer>> tailEntries = internal2.tailMap(startKey).entrySet().iterator();
+                Iterator<Map.Entry<ByteBuffer, ByteBuffer>> tailEntries = internal.tailMap(startKey).entrySet().iterator();
                 return new CloseableIterator<Map.Entry<ByteBuffer, ByteBuffer>>() {
                     Map.Entry<ByteBuffer, ByteBuffer> head = null;
                     @Override
@@ -84,32 +84,36 @@ public class MemStoreSortedMap extends MemStore {
 
     @Override
     public Optional<ByteBuffer> apply(ByteBuffer key) {
-        return Optional.ofNullable(internal2.get(key));
+        return Optional.ofNullable(internal.get(key));
     }
 
     @Override
     public long numKeys() {
-        return internal2.size();
+        return internal.size();
     }
 
     @Override
     public void put(ByteBuffer key, ByteBuffer value) {
-        internal2.put(key, value);
+        internal.put(key, value);
     }
 
     @Override
     public void remove(ByteBuffer key) {
-        internal2.remove(key);
+        internal.remove(key);
     }
 
     @Override
     public String getStats() {
-        return "size = " + internal2.size();
+        return "size = " + internal.size();
     }
 
+    @Override
+    public void erase() {
+        internal.clear();
+    }
 
     @Override
     public void close() throws IOException {
-        internal2.clear();
+        internal.clear();
     }
 }

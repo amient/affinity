@@ -61,7 +61,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 log.warn("Invalid checkpoint file: " + checkpointFile + ", going to rewind fully.", e);
                 checkpoint.set(null);
             }
-            log.info("Initialized " + checkpoint + " from " + checkpointFile);
+            log.info("Initial Position " + checkpoint + " from " + checkpointFile);
         }
     }
 
