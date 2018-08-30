@@ -22,7 +22,7 @@ package io.amient.affinity.avro
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.UUID
 
-import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
+import io.amient.affinity.avro.record.{AvroJsonConverter, AvroRecord, AvroSerde}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
@@ -154,7 +154,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "AvroRecord" should "use old fields when Alias annotation is used" in {
     val schema = AvroRecord.inferSchema[AliasedAvro]
-    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":\"string\",\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
+    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":{\"type\":\"string\",\"description\":\"Really cool string that was once renamed!\"},\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
   }
 
   it should "have minimum read/write throughput" in {
@@ -218,7 +218,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     val prefix = newSerde.prefix(classOf[LongCompoundKey], new java.lang.Long(100L), "UK", "C001")
     assert(ByteUtils.startsWith(bytes, prefix))
     newSerde.fromBytes(bytes) should be(key)
-
+    AvroJsonConverter.toJson(key) should be ("{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":99.9}")
   }
 
   "AvroRecord" should "be serializable by java serializer" in {
