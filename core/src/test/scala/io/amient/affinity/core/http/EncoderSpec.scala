@@ -19,10 +19,12 @@
 
 package io.amient.affinity.core.http
 
-import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.avro.record.{AvroRecord, Fixed}
 import org.scalatest.{FlatSpec, Matchers}
 
 case class TestRecord(a: String, b: Int) extends AvroRecord
+
+case class LongCompoundKey(@Fixed version: Long, @Fixed(2) country: String, @Fixed(4) city: String, value: Double) extends AvroRecord
 
 class EncoderSpec extends FlatSpec with Matchers {
 
@@ -49,6 +51,13 @@ class EncoderSpec extends FlatSpec with Matchers {
 
   "Encoder" should "unwarp options of records recursively " in {
     Encoder.json(Some(TestRecord("hello", 777))) should be ("{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"hello\",\"b\":777}}")
+  }
+
+  "Enocder" should "correctly translate collections of avro records with fixed fields" in {
+    val list = List(LongCompoundKey(100L, "UK", "C001", 9.9))
+    val sameJson = "[{\"type\":\"io.amient.affinity.core.http.LongCompoundKey\",\"data\":{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":9.9}}]"
+    list.toString should be (sameJson)
+    Encoder.json(list) should be(sameJson)
   }
 
 }
