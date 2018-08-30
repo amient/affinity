@@ -43,6 +43,8 @@ final class Alias(aliases: String*) extends StaticAnnotation
 
 final class Fixed(len: Int = -1) extends StaticAnnotation
 
+final class Doc(text: String) extends StaticAnnotation
+
 abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
   @transient lazy val schema: Schema = AvroRecord.inferSchema(getClass)
@@ -437,6 +439,9 @@ object AvroRecord extends AvroExtractors {
               val builder = assembler.name(fieldName)
               symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
                 a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
+              }
+              symbol.annotations.find(_.tree.tpe =:= typeOf[Doc]).foreach {
+                a => fieldSchema.addProp("description", a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n").asInstanceOf[Object])
               }
               val field = builder.`type`(fieldSchema)
               val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))

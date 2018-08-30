@@ -217,6 +217,7 @@ you can work with type-safe case classes instead of generic avro records.**
 - try to avoid null as a default value if the field has a natrual or empty representation
 - if you think null is a natural default value, then use Option
 - try to use primitives where possible
+- @Doc(<string>) annotation can be used on AvroRecord fields to generate schema descriptions
 - if an exsting field needs to be renamed and at the same time should inherit the values the @Alias needs to be applied
     - e.g. case class Example(@Alias(<old-field1>[, <old-field2>, [...]]) <new-field> <TYPE>
 - it's possbile and perfectly ok to use camel case or other cases containing capital leters
