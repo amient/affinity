@@ -5,8 +5,8 @@ import com.yammer.metrics.core.*;
 import com.yammer.metrics.reporting.AbstractPollingReporter;
 import kafka.utils.VerifiableProperties;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.ConsumerGroupListing;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+//import org.apache.kafka.clients.admin.ConsumerGroupListing;
+//import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,7 +141,9 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    Collection<ConsumerGroupListing> consumerGroups = admin.listConsumerGroups().all().get(pollingIntervalSeconds, TimeUnit.SECONDS);
+                    //FIXME Kafka 1.1 admin client doesn't support this so we'll have to use KafkaConsumer instead of AdminClient
+                    /*
+                    Collection<ConsumerGroupListing> consumerGroups = admin. listConsumerGroups().all().get(pollingIntervalSeconds, TimeUnit.SECONDS);
 
                     consumerGroups.parallelStream().
                             filter(group -> !group.groupId().startsWith("console-consumer")).
@@ -165,6 +167,7 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
                                     log.error("error while fetching offsets for group " + group, e);
                                 }
                             });
+                            */
                 }
             } catch (Exception e) {
                 log.error("error while processing conusmer offsets", e);
