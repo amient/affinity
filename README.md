@@ -100,12 +100,9 @@ the data partition - each Keyspace is therefore a dynamic Akka Router which
 maintains a copy of the active Partition Actors using internal instance of Coordinator
 (see distributed coordination section below).
 
-The system doesn't have any dynamic partition assignment algorithm implemented but there
-are some options being considered - all partitions are assigned by configuration. Because
-the partitions often leave a sizable footprint in the form of indexes on a local disk
-It is therefore not desirable to implement a naive partition assignment but the manual static
-assignment is not good either so there are some discussions around a kind of
-resonance with the previous state until certain thershold of inbalance is created
+The system is capable of simple partition assignment driven only by R=replication factor and N=number 
+of nodes but it would be nice to in future to add a kind of resonance with the previous state 
+which would be preserved across shutdowns/startups until certain thershold of inbalance is created
 by adding or removing nodes, increasing replication factor, etc. - the ground work
 for this has been already done at the MemStore level, see State Management section below.
 
