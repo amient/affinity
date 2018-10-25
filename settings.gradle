@@ -10,6 +10,7 @@ include ':api',
         ':kafka:storage-kafka',
         ':kafka:avro-serde-kafka',
         ':kafka:avro-formatter-kafka',
+        ':kafka:metrics-reporter-kafka',
         ':kafka:test-util-kafka',
 
         ':examples:example-distributed-graph',
