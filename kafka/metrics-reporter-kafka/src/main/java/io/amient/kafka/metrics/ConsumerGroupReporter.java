@@ -26,7 +26,7 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
     private long pollingIntervalSeconds;
     private int brokerId;
     private boolean running;
-    private X underlying;
+    private Reporter underlying;
 
     @Override
     public String getMBeanName() {
@@ -56,7 +56,7 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
                 }
             }
             initialized = true;
-            this.underlying = new X(Metrics.defaultRegistry());
+            this.underlying = new Reporter(Metrics.defaultRegistry());
             startReporter(pollingIntervalSeconds);
 
         }
@@ -76,21 +76,19 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
             running = false;
             underlying.shutdown();
             log.info("Stopped TopicReporter instance");
-            underlying = new X(Metrics.defaultRegistry());
+            underlying = new Reporter(Metrics.defaultRegistry());
         }
     }
 
 
-    private class X extends AbstractPollingReporter {
+    private class Reporter extends AbstractPollingReporter {
 
         final GroupMetrics<ConsumerGauge> consumerOffsets = new GroupMetrics("ConsumerOffset", ConsumerGauge.class, getMetricsRegistry());
         final GroupMetrics<ConsumerGauge> consumerLags = new GroupMetrics("ConsumerLag", ConsumerGauge.class, getMetricsRegistry());
         private final AdminClient admin;
-        private Clock clock;
 
-        protected X(MetricsRegistry registry) {
+        protected Reporter(MetricsRegistry registry) {
             super(registry, "consumer-groups-reporter");
-            this.clock = Clock.defaultClock();
             this.admin = AdminClient.create(props);
         }
 
@@ -105,8 +103,6 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
 
         @Override
         public void run() {
-            final Long timestamp = clock.time();
-            //process extra consumer metrics
             try {
                 int controllerId = admin.describeCluster().controller().get(pollingIntervalSeconds, TimeUnit.SECONDS).id();
                 if (brokerId == controllerId) {
@@ -126,9 +122,13 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
                                 for (int s = 0; s < scope.length; s += 2) {
                                     String field = scope[s];
                                     String value = scope[s + 1];
-                                    switch(field) {
-                                        case "topic": topic = value; break;
-                                        case "partition": partition = Integer.parseInt(value); break;
+                                    switch (field) {
+                                        case "topic":
+                                            topic = value;
+                                            break;
+                                        case "partition":
+                                            partition = Integer.parseInt(value);
+                                            break;
                                     }
                                 }
                                 if (topic != null && partition != null) {
@@ -185,8 +185,6 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
             return value.get();
         }
     }
-
-
 
 
 }
