@@ -28,11 +28,13 @@ case class LongCompoundKey(@Fixed version: Long, @Fixed(2) country: String, @Fix
 
 class EncoderSpec extends FlatSpec with Matchers {
 
-  "Encoder" should "decorate AvroRecord with type and data fields" in {
+  behavior of "Encoder"
+
+  it should "decorate AvroRecord with type and data fields" in {
     Encoder.json(TestRecord("hello", 123)) should be ("{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"hello\",\"b\":123}}")
   }
 
-  "Encoder" should "automatically format Maps and unwrap neted records recursively" in {
+  it should "automatically format Maps and unwrap neted records recursively" in {
     Encoder.json(Map(
       "a" -> "hello",
       "b" -> 123,
@@ -40,7 +42,7 @@ class EncoderSpec extends FlatSpec with Matchers {
     )) should be ("{\"a\":\"hello\",\"b\":123,\"c\":{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"nested\",\"b\":777}}}")
   }
 
-  "Encoder" should "automatically format primitives and options of primitives" in {
+  it should "automatically format primitives and options of primitives" in {
     Encoder.json(null) should be ("null")
     Encoder.json(100) should be ("100")
     Encoder.json(1000L) should be ("1000")
@@ -49,14 +51,14 @@ class EncoderSpec extends FlatSpec with Matchers {
     Encoder.json(Some(100)) should be ("100")
   }
 
-  "Encoder" should "unwarp options of records recursively " in {
+  it should "unwarp options of records recursively" in {
     Encoder.json(Some(TestRecord("hello", 777))) should be ("{\"type\":\"io.amient.affinity.core.http.TestRecord\",\"data\":{\"a\":\"hello\",\"b\":777}}")
   }
 
-  "Enocder" should "correctly translate collections of avro records with fixed fields" in {
+  it should "correctly translate collections of avro records with fixed fields" in {
     val list = List(LongCompoundKey(100L, "UK", "C001", 9.9))
+    list.toString should be ("List(LongCompoundKey(100,UK,C001,9.9))")
     val sameJson = "[{\"type\":\"io.amient.affinity.core.http.LongCompoundKey\",\"data\":{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":9.9}}]"
-    list.toString should be (sameJson)
     Encoder.json(list) should be(sameJson)
   }
 
