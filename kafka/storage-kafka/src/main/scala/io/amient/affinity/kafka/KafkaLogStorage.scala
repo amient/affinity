@@ -147,8 +147,13 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def reset(partition: Int, startPosition: java.lang.Long): java.lang.Long = {
     val tp = new TopicPartition(topic, partition)
-    val startOffset = if (startPosition == null || startPosition < 0) kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp) else startPosition
+    val startOffset: Long = if (startPosition != null && startPosition >= 0) startPosition else {
+      val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp)
+      Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start)).asJava).get(tp)).map(_.offset).getOrElse(beginOffset)
+    }
+
     if (startOffset < 0) {
+      //empty partition
       return null
     } else {
       kafkaConsumer.seek(tp, startOffset)
