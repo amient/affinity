@@ -3,13 +3,13 @@ package io.amient.kafka.metrics;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.*;
 import com.yammer.metrics.reporting.AbstractPollingReporter;
+import kafka.coordinator.group.GroupOverview;
 import kafka.utils.VerifiableProperties;
 import org.apache.kafka.clients.admin.AdminClient;
-//import org.apache.kafka.clients.admin.ConsumerGroupListing;
-//import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.collection.JavaConverters;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -86,10 +86,12 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
         final GroupMetrics<ConsumerGauge> consumerOffsets = new GroupMetrics("ConsumerOffset", ConsumerGauge.class, getMetricsRegistry());
         final GroupMetrics<ConsumerGauge> consumerLags = new GroupMetrics("ConsumerLag", ConsumerGauge.class, getMetricsRegistry());
         private final AdminClient admin;
+        private final kafka.admin.AdminClient groupAdmin;
 
         protected Reporter(MetricsRegistry registry) {
             super(registry, "consumer-groups-reporter");
             this.admin = AdminClient.create(props);
+            this.groupAdmin = kafka.admin.AdminClient.create(props);
         }
 
         @Override
@@ -141,21 +143,22 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    //FIXME Kafka 1.1 admin client doesn't support this so we'll have to use KafkaConsumer instead of AdminClient
-                    /*
-                    Collection<ConsumerGroupListing> consumerGroups = admin. listConsumerGroups().all().get(pollingIntervalSeconds, TimeUnit.SECONDS);
+                    //exported admin client prior to kafka 2.0 doesn't support consumer groups
+                    List<GroupOverview> consumerGroups = JavaConverters.seqAsJavaListConverter(groupAdmin.listAllGroupsFlattened()).asJava();
 
                     consumerGroups.parallelStream().
                             filter(group -> !group.groupId().startsWith("console-consumer")).
                             forEach(group -> {
                                 try {
-                                    Map<TopicPartition, OffsetAndMetadata> offsets = admin.listConsumerGroupOffsets(group.groupId()).partitionsToOffsetAndMetadata().get(pollingIntervalSeconds, TimeUnit.SECONDS);
-                                    for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
+                                    Map<TopicPartition, Object> offsets = JavaConverters.mapAsJavaMapConverter(groupAdmin.listGroupOffsets(group.groupId())).asJava();
+
+
+                                    for (Map.Entry<TopicPartition, Object> entry : offsets.entrySet()) {
                                         TopicPartition tp = entry.getKey();
                                         if (logEndOffsets.containsKey(tp)) {
                                             long logEndOffset = logEndOffsets.get(tp);
 
-                                            long consumerOffset = entry.getValue().offset();
+                                            long consumerOffset = (long)entry.getValue();
                                             ConsumerGauge offsetGauge = consumerOffsets.get(group.groupId(), tp);
                                             offsetGauge.value.set(consumerOffset);
 
@@ -167,7 +170,7 @@ public class ConsumerGroupReporter implements kafka.metrics.KafkaMetricsReporter
                                     log.error("error while fetching offsets for group " + group, e);
                                 }
                             });
-                            */
+
                 }
             } catch (Exception e) {
                 log.error("error while processing conusmer offsets", e);
