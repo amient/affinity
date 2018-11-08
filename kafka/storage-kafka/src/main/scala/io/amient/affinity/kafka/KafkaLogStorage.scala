@@ -330,6 +330,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     def _create(): Unit = {
       val start = System.currentTimeMillis
       while (System.currentTimeMillis < start + adminTimeoutMs) {
+        log.debug(s"Attempting to create topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor")
         if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.MILLISECONDS).contains(topic)) {
           return
         } else {
@@ -368,12 +369,15 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   private def getAdminClient: AdminClient = {
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
+      log.debug("Configuring Admin Client: " + AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG + " = " + kafkaStorageConf.BootstrapServers())
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
       if (kafkaStorageConf.Consumer.isDefined) {
         val consumerConfig = kafkaStorageConf.Consumer.toMap()
         val allowedAdminConfigs = AdminClientConfig.configNames
         consumerConfig.entrySet.asScala.filter(_.getValue.isDefined).filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
-          case (entry) => put(entry.getKey, entry.getValue.apply.toString)
+          case (entry) =>
+            log.debug("Configuring Admin Client: " + entry.getKey + " = " + entry.getValue.apply.toString)
+            put(entry.getKey, entry.getValue.apply.toString)
         }
       }
     }
