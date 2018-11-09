@@ -38,7 +38,7 @@ trait AvroExtractors {
 
     def typeIsAllowed(t: Schema.Type) = schemas.find(_.getType == t)
 
-    object AvroBoolean  {
+    object AvroBoolean {
       def unapply(b: Boolean): Option[java.lang.Boolean] = {
         typeIsAllowed(Schema.Type.BOOLEAN) map (_ => new java.lang.Boolean(b))
       }
@@ -113,10 +113,23 @@ trait AvroExtractors {
     object AvroUnion {
       def unapply(u: Any): Option[AnyRef] = {
         schemas.map(_.getType) match {
-          case Schema.Type.UNION :: Nil => u match {
-            case None => Some(null.asInstanceOf[AnyRef])
-            case Some(w) => Some(extract(w, schemas(0).getTypes.asScala.toList))
-          }
+          case Schema.Type.UNION :: Nil =>
+            val us = schemas(0).getTypes
+            if (us.size == 2 && us.get(0).getType == Schema.Type.NULL) {
+              //mapping option[T] to a (null, T) union
+              u match {
+                case None => Some(null.asInstanceOf[AnyRef])
+                case Some(w) => Some(extract(w, schemas(0).getTypes.asScala.toList))
+              }
+            } else {
+              val n = u.getClass.getSimpleName
+              for (s: Schema <- us.asScala) {
+                if (s.getName == n) {
+                  return Some(extract(u, List(s)))
+                }
+              }
+              throw new IllegalArgumentException("Union doesn't have any type mapped to: " + u)
+            }
           case _ => None
         }
       }
@@ -166,7 +179,9 @@ trait AvroExtractors {
       case AvroUnion(u) => u
       case AvroFixed(b: GenericData.Fixed) => b
       case AvroMap(m) => m
+      case ref: AnyRef if typeIsAllowed(Schema.Type.RECORD).isDefined => AvroRecord.toAvroGeneric(ref)
       case x => throw new IllegalArgumentException(s"Unsupported avro extraction for ${x.getClass} and the following schemas: { ${schemas.mkString(",")} }")
     }
   }
+
 }

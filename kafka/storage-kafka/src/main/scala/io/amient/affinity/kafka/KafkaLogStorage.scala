@@ -85,7 +85,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   val keySubject: String = s"${topic}-key"
   val valueSubject: String = s"${topic}-value"
 
-  private val adminTimeoutMs: Long = 30000
+  private val adminTimeoutMs: Long = 60000
 
   private val producerConfig = new Properties() {
     put("retries", Int.MaxValue.toString)
@@ -106,6 +106,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
     put("value.serializer", classOf[ByteArraySerializer].getName)
     put("key.serializer", classOf[ByteArraySerializer].getName)
+    put("default.api.timeout.ms", adminTimeoutMs)
   }
 
   private val consumerProps = new Properties() {
