@@ -106,7 +106,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
     put("value.serializer", classOf[ByteArraySerializer].getName)
     put("key.serializer", classOf[ByteArraySerializer].getName)
-    put("default.api.timeout.ms", adminTimeoutMs)
+    put("default.api.timeout.ms", adminTimeoutMs.toString)
   }
 
   private val consumerProps = new Properties() {
