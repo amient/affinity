@@ -57,6 +57,7 @@ Below is the table of all supported types, all which support default values.
     Iterable[T]      †              array(T)             List[T], Seq[T], Set[T], etc.
     Enumeration      †              enum                 only scala enums are suppored
     Option[T]        †              union(null,T)        
+    sealed trait {T1,T2,T3}         union(T1,T2,T3)      sealed trait's direct concrete types form a union type 
     case class                      record               nested schemas are allowed
     ----------------------------------------------------------------------------------------------------    
     † Generic types cannot be top-level schemas, they can be nested in a case class record - this is because
