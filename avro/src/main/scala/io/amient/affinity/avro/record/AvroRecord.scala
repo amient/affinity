@@ -65,6 +65,22 @@ abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 
 object AvroRecord extends AvroExtractors {
 
+  def toAvroGeneric(ref: AnyRef): IndexedRecord = {
+    val schema: Schema = AvroRecord.inferSchema(ref)
+    val fields: Map[Int, Field] = AvroRecord.classFieldsCache.getOrInitialize(ref.getClass, schema)
+    return new IndexedRecord {
+      override def put(i: Int, o: scala.Any): Unit = {
+        throw new AvroRuntimeException("Scala AvroRecord is immutable")
+      }
+
+      override def get(i: Int): AnyRef = {
+        AvroRecord.extract(fields(i).get(ref), List(schema.getFields.get(i).schema))
+      }
+
+      override def getSchema: Schema = schema
+    }
+  }
+
   def stringToFixed(value: String, getFixedSize: Int): Array[Byte] = {
     val bytes = value.getBytes()
     val result: Array[Byte] = Array.fill[Byte](getFixedSize)(0)
@@ -215,7 +231,13 @@ object AvroRecord extends AvroExtractors {
                 case some => Some(readField(some, schema.getTypes.get(1), tpe.typeArgs(0)))
               }
           } else {
-            throw new NotImplementedError(s"Only Option-like Avro Unions are supported, e.g. union(null, X), got: $schema")
+            (datum) =>
+              datum match {
+                case r: IndexedRecord =>
+                  readField(datum, r.getSchema, fqnTypeCache.getOrInitialize(r.getSchema.getFullName()))
+                case _ =>
+                  throw new NotImplementedError(s"Only Sealed Traits and Options are supported for Avro Unions, got: $datum")
+              }
           }
         }
       })
@@ -308,7 +330,7 @@ object AvroRecord extends AvroExtractors {
         val arguments = record.getSchema.getFields.asScala.map { field =>
           readField(record.get(field.pos), field.schema, params(field.pos))
         }
-        constructorMirror(arguments: _*).asInstanceOf[AvroRecord]
+        constructorMirror(arguments: _*)
       case BOOLEAN => datum.asInstanceOf[Boolean]
       case INT => datum.asInstanceOf[Int]
       case NULL => null
@@ -373,90 +395,101 @@ object AvroRecord extends AvroExtractors {
   def inferSchema(tpe: Type): Schema = {
     typeSchemaCache.getOrInitialize(tpe, new Supplier[Schema] {
       override def get(): Schema = {
-        if (tpe =:= definitions.IntTpe) {
-          SchemaBuilder.builder().intType()
-        } else if (tpe =:= definitions.LongTpe) {
-          SchemaBuilder.builder().longType()
-        } else if (tpe =:= definitions.BooleanTpe) {
-          SchemaBuilder.builder().booleanType()
-        } else if (tpe =:= definitions.FloatTpe) {
-          SchemaBuilder.builder().floatType()
-        } else if (tpe =:= definitions.DoubleTpe) {
-          SchemaBuilder.builder().doubleType()
-        } else if (tpe =:= typeOf[Array[Byte]]) {
-          SchemaBuilder.builder().bytesType()
-        } else if (tpe =:= typeOf[String]) {
-          SchemaBuilder.builder().stringType()
-        } else if (tpe =:= typeOf[Null]) {
-          SchemaBuilder.builder().nullType()
-        } else if (tpe <:< typeOf[Map[String, Any]]) {
-          SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
-        } else if (tpe <:< typeOf[Iterable[Any]]) {
-          SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
-        } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
-          tpe match {
-            case TypeRef(enumType, _, _) =>
-              val typeMirror = universe.runtimeMirror(Class.forName(enumType.typeSymbol.asClass.fullName).getClassLoader)
-              val moduleMirror = typeMirror.reflectModule(enumType.termSymbol.asModule)
-              val instanceMirror = typeMirror.reflect(moduleMirror.instance)
-              val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
-              val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
-              val args = enumSymbols.toSeq.map(_.toString)
-              SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
-          }
-        } else if (tpe <:< typeOf[Option[Any]]) {
-          SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
-        } else if (tpe <:< typeOf[AvroRecord]) {
-          val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
-          val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
-          val companionMirror = typeMirror.reflect(moduleMirror.instance)
-          val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
-          val params = constructor.asMethod.paramLists(0)
-          val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).fields()) {
-            case (assembler, (symbol: Symbol, i)) =>
-              val fieldName = symbol.name.toString
-              val fieldType = symbol.typeSignature
-              val fieldSchema = symbol.annotations.find(_.tree.tpe =:= typeOf[Fixed]).map { a =>
-                val fixedSize = a.tree.children.tail.collect { case Literal(Constant(size: Int)) => size }.headOption
-                fixedSize match {
-                  case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
-                  case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
-                  case None if fieldType =:= typeOf[UUID] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
-                  case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "string").size(size)
-                  case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
-                  case Some(size) if fieldType =:= typeOf[Array[Byte]] => SchemaBuilder.builder().fixed(fieldName).size(size)
-                  case None if fieldType =:= typeOf[Array[Byte]] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
-                  case Some(_) => throw new IllegalArgumentException(s"Only fixed string fields can have custom fixed size: @Fixed $fieldName: $fieldType")
-                  case None => throw new IllegalArgumentException(s"Only int, long and string can be used as fixed fields")
-                }
-              }.getOrElse {
-                if (fieldType =:= typeOf[UUID]) {
-                  SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
-                } else {
-                  inferSchema(symbol.typeSignature)
-                }
-              }
-              val builder = assembler.name(fieldName)
-              symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
-                a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
-              }
-              symbol.annotations.find(_.tree.tpe =:= typeOf[Doc]).foreach {
-                a => fieldSchema.addProp("description", a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n").asInstanceOf[Object])
-              }
-              val field = builder.`type`(fieldSchema)
-              val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
-              if (defaultDef == NoSymbol) {
-                field.noDefault()
-              } else {
-                val fieldDefaultValue = companionMirror.reflectMethod(defaultDef.asMethod)()
-                field.withDefault(extract(fieldDefaultValue, List(fieldSchema)))
-              }
-          }
-          assembler.endRecord()
-        } else {
-          throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
-        }
+        inferSchemaWithoutCache(tpe)
       }
     })
+  }
+
+  private def inferSchemaWithoutCache(tpe: Type): Schema = {
+
+    if (tpe =:= definitions.IntTpe) {
+      SchemaBuilder.builder().intType()
+    } else if (tpe =:= definitions.LongTpe) {
+      SchemaBuilder.builder().longType()
+    } else if (tpe =:= definitions.BooleanTpe) {
+      SchemaBuilder.builder().booleanType()
+    } else if (tpe =:= definitions.FloatTpe) {
+      SchemaBuilder.builder().floatType()
+    } else if (tpe =:= definitions.DoubleTpe) {
+      SchemaBuilder.builder().doubleType()
+    } else if (tpe =:= typeOf[Array[Byte]]) {
+      SchemaBuilder.builder().bytesType()
+    } else if (tpe =:= typeOf[String]) {
+      SchemaBuilder.builder().stringType()
+    } else if (tpe =:= typeOf[Null]) {
+      SchemaBuilder.builder().nullType()
+    } else if (tpe <:< typeOf[Map[String, Any]]) {
+      SchemaBuilder.builder().map().values().`type`(inferSchema(tpe.typeArgs(1)))
+    } else if (tpe <:< typeOf[Iterable[Any]]) {
+      SchemaBuilder.builder().array().items().`type`(inferSchema(tpe.typeArgs(0)))
+    } else if (tpe <:< typeOf[scala.Enumeration#Value]) {
+      tpe match {
+        case TypeRef(enumType, _, _) =>
+          val typeMirror = universe.runtimeMirror(Class.forName(enumType.typeSymbol.asClass.fullName).getClassLoader)
+          val moduleMirror = typeMirror.reflectModule(enumType.termSymbol.asModule)
+          val instanceMirror = typeMirror.reflect(moduleMirror.instance)
+          val methodMirror = instanceMirror.reflectMethod(enumType.member(TermName("values")).asMethod)
+          val enumSymbols = methodMirror().asInstanceOf[Enumeration#ValueSet]
+          val args = enumSymbols.toSeq.map(_.toString)
+          SchemaBuilder.builder().enumeration(enumType.toString.dropRight(5)).symbols(args: _*)
+      }
+    } else if (tpe <:< typeOf[Option[Any]]) {
+      SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
+    } else if (tpe <:< typeOf[AvroRecord] || tpe.typeSymbol.asClass.isCaseClass) {
+      val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
+      val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
+      val companionMirror = typeMirror.reflect(moduleMirror.instance)
+      val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
+      val params = constructor.asMethod.paramLists(0)
+      val namespace = tpe.typeSymbol.asClass.fullName.split("\\.").dropRight(1).mkString(".")
+      val assembler = params.zipWithIndex.foldLeft(SchemaBuilder.record(tpe.toString).namespace(namespace).fields()) {
+        case (assembler, (symbol: Symbol, i)) =>
+          val fieldName = symbol.name.toString
+          val fieldType = symbol.typeSignature
+          val fieldSchema = symbol.annotations.find(_.tree.tpe =:= typeOf[Fixed]).map { a =>
+            val fixedSize = a.tree.children.tail.collect { case Literal(Constant(size: Int)) => size }.headOption
+            fixedSize match {
+              case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
+              case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
+              case None if fieldType =:= typeOf[UUID] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+              case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "string").size(size)
+              case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
+              case Some(size) if fieldType =:= typeOf[Array[Byte]] => SchemaBuilder.builder().fixed(fieldName).size(size)
+              case None if fieldType =:= typeOf[Array[Byte]] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
+              case Some(_) => throw new IllegalArgumentException(s"Only fixed string fields can have custom fixed size: @Fixed $fieldName: $fieldType")
+              case None => throw new IllegalArgumentException(s"Only int, long and string can be used as fixed fields")
+            }
+          }.getOrElse {
+            if (fieldType =:= typeOf[UUID]) {
+              SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+            } else {
+              inferSchemaWithoutCache(symbol.typeSignature)
+            }
+          }
+          val builder = assembler.name(fieldName)
+          symbol.annotations.find(_.tree.tpe =:= typeOf[Alias]).foreach {
+            a => builder.aliases(a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString): _*)
+          }
+          symbol.annotations.find(_.tree.tpe =:= typeOf[Doc]).foreach {
+            a =>
+              val desc = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n").asInstanceOf[Object]
+              fieldSchema.addProp("description", desc)
+          }
+          val field = builder.`type`(fieldSchema)
+          val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
+          if (defaultDef == NoSymbol) {
+            field.noDefault()
+          } else {
+            val fieldDefaultValue = companionMirror.reflectMethod(defaultDef.asMethod)()
+            field.withDefault(extract(fieldDefaultValue, List(fieldSchema)))
+          }
+      }
+      assembler.endRecord()
+    } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isTrait && tpe.typeSymbol.asClass.isSealed) {
+      val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
+      schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
+    } else {
+      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
+    }
   }
 }
