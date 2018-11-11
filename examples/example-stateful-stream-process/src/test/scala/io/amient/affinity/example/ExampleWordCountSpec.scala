@@ -19,6 +19,7 @@
 
 package io.amient.affinity.example
 
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 import java.util.{Properties, UUID}
 
@@ -50,7 +51,9 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
   val outputTopic = config.getString("affinity.node.gateway.stream.output-stream.kafka.topic")
 
   val producer = new KafkaProducer[Array[Byte], Array[Byte]](new Properties() {
+
     import ProducerConfig._
+
     put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap)
     put(ACKS_CONFIG, "1")
     put(KEY_SERIALIZER_CLASS_CONFIG, classOf[ByteArraySerializer].getName)
@@ -59,7 +62,9 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
   })
 
   val consumerConfig = new Properties() {
+
     import ConsumerConfig._
+
     put(BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap)
     put(KEY_DESERIALIZER_CLASS_CONFIG, classOf[KafkaAvroDeserializer].getName)
     put(VALUE_DESERIALIZER_CLASS_CONFIG, classOf[KafkaAvroDeserializer].getName)
@@ -79,8 +84,12 @@ class ExampleWordCountSpec extends FlatSpec with AffinityTestBase with EmbeddedK
     val consumer = new KafkaConsumer[String, Long](consumerConfig)
     consumer.subscribe(List(outputTopic).asJava)
     val outputQueue = new LinkedBlockingQueue[ConsumerRecord[String, Long]]()
+
     def poll(): (String, Long) = {
-      if (outputQueue.isEmpty) outputQueue.addAll(consumer.poll(10000).records(outputTopic).asScala.toList.asJava)
+      if (outputQueue.isEmpty) {
+        outputQueue.addAll(consumer.poll(
+          java.time.Duration.of(10, ChronoUnit.SECONDS)).records(outputTopic).asScala.toList.asJava)
+      }
       val record = outputQueue.poll(3000, TimeUnit.MILLISECONDS)
       if (record == null) null else (record.key, record.value)
     }
