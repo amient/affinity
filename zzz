@@ -24,26 +24,26 @@ variant() {
 
     echo ""
     if [ "$VARIANT" == "$ROOT" ]; then
-        git checkout master
+        LANG=en_GB git checkout master
         continue $? "master/checkout"
-        git pull
+        LANG=en_GB git pull
         continue $? "master/pull"
         BRANCH="$ROOT"
         if [ "$BRANCH" != "master" ]; then
-            git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH
+            LANG=en_GB git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH
             continue $? "$BRANCH/checkout"
         fi
     else
-        git checkout "master-$VARIANT"
+        LANG=en_GB git checkout "master-$VARIANT"
         continue $? "master-$VARIANT/checkout"
-        git pull
+        LANG=en_GB git pull
         continue $? "master-$VARIANT/pull"
         BRANCH="$ROOT-$VARIANT"
         if [ "$BRANCH" != "master-$VARIANT" ]; then
-            git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH
+            LANG=en_GB git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH
             continue $? "$BRANCH/checkout"
         fi
-        git merge $ROOT --no-edit
+        LANG=en_GB git merge $ROOT --no-edit
         continue $? "$BRANCH/merge $ROOT"
     fi
 
@@ -87,9 +87,9 @@ variant() {
 publish() {
     BRANCH=$1
     COMMAND=$2
-    git checkout $BRANCH
+    LANG=en_GB git checkout $BRANCH
     continue $? "$BRANCH/checkout"
-    git pull
+    LANG=en_GB git pull
     continue $? "$BRANCH/pull"
     ./gradlew $COMMAND
     continue $? "$BRANCH/publish"
@@ -172,7 +172,7 @@ case "$2" in
         publish "$ROOT-kafka_0.11" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_0.11" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_0.11" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
-        git checkout "$ROOT"
+        LANG=EN_GB git checkout "$ROOT"
         exit 0;
         ;;
     *)
@@ -202,5 +202,5 @@ if [ "$RUN_ON_VARIANTS" == "true" ]; then
     variant "scala_2.12" "$SETS" $C
 fi
 
-git checkout "$ROOT"
+LANG=en_GB git checkout "$ROOT"
 continue $? "Checkout back to root branch"
