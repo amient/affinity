@@ -191,18 +191,19 @@ trait GatewayStream extends Gateway {
             if (!unitOfWork.isCompleted) work += unitOfWork
           }
           /*  At-least-once guarantee processing input messages
-           *  Every <commitInterval> all outputs and work is flushed and then consumer is commited()
+           *  Every <commitInterval> all work is completed and then consumer is commited()
            */
           val now = System.currentTimeMillis()
           if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval) try {
-            //flush all outputs in parallel - these are all outputs declared in this gateway
-            outputStreams.foreach(_.flush())
             //flush all pending work accumulated in this processor only
             val uncommittedWork = work.result
-            if (uncommittedWork.size > 0) Await.result(Future.sequence(uncommittedWork), commitTimeout millis)
-            //commit the records processed by this processor only since the last commit
-            lastCommit = consumer.commit() //trigger new commit
-            //clear the work accumulator for the next commit
+            if (uncommittedWork.size > 0) {
+              //await uncommitted work completion
+              Await.result(Future.sequence(uncommittedWork), commitTimeout millis)
+              //commit the records processed by this processor only since the last commit
+              lastCommit = consumer.commit() //trigger new commit
+              //clear the work accumulator for the next commit
+            }
             work.clear
             lastCommitTimestamp = now
             if (closed) finalized = true
