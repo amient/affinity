@@ -30,7 +30,7 @@ import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecordBu
 import org.apache.avro.util.Utf8
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
-
+import scala.reflect.runtime.universe.TypeTag
 import scala.collection.JavaConverters._
 import scala.util.Try
 
@@ -52,6 +52,10 @@ object AvroJsonConverter {
   }
 
   private val mapper = new ObjectMapper()
+
+  def toAvro[T: TypeTag](json: String): T = {
+    return toAvro(json, AvroRecord.inferSchema[T]).asInstanceOf[T]
+  }
 
   def toAvro(json: String, schema: Schema): Any = {
 
