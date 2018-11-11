@@ -120,7 +120,7 @@ class Node(config: Config) {
   final def shutdown(): Unit = if (!shuttingDown) {
     shuttingDown = true
     Await.result(fatalError.map { e =>
-      log.error("Affinity Fatal Error", e)
+      log.error(e, "Affinity Fatal Error")
       Future.successful(System.exit(1))
     }.getOrElse {
       system.terminate()
