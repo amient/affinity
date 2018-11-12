@@ -7,7 +7,7 @@ import io.amient.affinity.core.util.{CloseableIterator, TimeRange}
 
 import scala.concurrent.Future
 
-trait KVStore[K, V] extends Closeable {
+trait KVStore[K, V] extends Closeable with ObservableKVStore[K] {
 
   /**
     * get an iterator for all records that are strictly not expired
