@@ -23,15 +23,7 @@ import io.amient.affinity.core.storage.Record;
 
 import java.util.*;
 
-public abstract class ObservableState<K> extends Observable {
-
-    class ObservableKeyValue extends Observable {
-        @Override
-        public void notifyObservers(Object arg) {
-            setChanged();
-            super.notifyObservers(arg);
-        }
-    }
+public abstract class ObservableState<K> extends Observable implements ObservableKVStore<K> {
 
     /**
      * Observables are attached to individual keys
@@ -47,12 +39,14 @@ public abstract class ObservableState<K> extends Observable {
         return observable;
     }
 
+    @Override
     public ObservableKeyValue addKeyValueObserver(K key, Observer observer) {
         ObservableKeyValue observable = getOrCreate(key);
         observable.addObserver(observer);
         return observable;
     }
 
+    @Override
     public Observer addKeyValueObserver(K key, Object initEvent, Observer observer) {
         ObservableKeyValue observable = getOrCreate(key);
         observable.addObserver(observer);
@@ -60,6 +54,7 @@ public abstract class ObservableState<K> extends Observable {
         return observer;
     }
 
+    @Override
     public void removeKeyValueObserver(K key, Observer observer) {
         ObservableKeyValue observable = observables.get(key);
         if (observable != null) {
