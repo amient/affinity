@@ -62,9 +62,7 @@ public class MemStoreSimpleMap extends MemStore {
             }
 
             @Override
-            public void close() throws IOException {
-                MemStoreSimpleMap.this.close();
-            }
+            public void close() throws IOException { }
         };
     }
 
