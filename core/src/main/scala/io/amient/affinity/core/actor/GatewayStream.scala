@@ -171,6 +171,7 @@ trait GatewayStream extends Gateway {
         logger.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
         var lastCommitTimestamp = System.currentTimeMillis()
         var finalized = false
+        var uncommittedInput = false
         logger.info(s"Starting input stream processor: $identifier")
         while ((!closed && !finalized) || !lastCommit.isDone) {
           //clusterSuspended is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
@@ -189,6 +190,7 @@ trait GatewayStream extends Gateway {
             val value: V = valSerde.fromBytes(entry.value)
             val unitOfWork = processor(new Record(key, value, entry.timestamp))
             if (!unitOfWork.isCompleted) work += unitOfWork
+            uncommittedInput = true
           }
           /*  At-least-once guarantee processing input messages
            *  Every <commitInterval> all work is completed and then consumer is commited()
@@ -197,14 +199,17 @@ trait GatewayStream extends Gateway {
           if ((closed && !finalized) || now - lastCommitTimestamp > commitInterval) try {
             //flush all pending work accumulated in this processor only
             val uncommittedWork = work.result
-            if (uncommittedWork.size > 0) {
-              //await uncommitted work completion
-              Await.result(Future.sequence(uncommittedWork), commitTimeout millis)
-              //commit the records processed by this processor only since the last commit
-              lastCommit = consumer.commit() //trigger new commit
-              //clear the work accumulator for the next commit
-            }
             work.clear
+            if (uncommittedInput) {
+              if (uncommittedWork.size > 0) {
+                //await uncommitted work completion
+                Await.result(Future.sequence(uncommittedWork), commitTimeout millis)
+                //commit the records processed by this processor only since the last commit
+              }
+              lastCommit = consumer.commit() //trigger new commit
+              //clear the uncommittedInput accumulator for the next commit
+              uncommittedInput = false
+            }
             lastCommitTimestamp = now
             if (closed) finalized = true
           } catch {
