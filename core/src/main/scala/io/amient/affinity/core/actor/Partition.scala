@@ -26,7 +26,7 @@ import akka.actor.{Actor, ActorRef, Status}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
 import io.amient.affinity.core.serde.primitive.InternalMessage
-import io.amient.affinity.core.state.{KVStore, KVStoreLocal}
+import io.amient.affinity.core.state.{KVStore, KVStoreLocal, ObservableKVStore}
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
@@ -151,7 +151,7 @@ trait Partition extends ActorHandler {
 
 }
 
-class KeyValueMediator[K](partition: ActorRef, state: KVStoreLocal[K, _], key: K) extends Actor {
+class KeyValueMediator[K](partition: ActorRef, state: KVStore[K, _], key: K) extends Actor {
 
   private var observer: Option[Observer] = None
 

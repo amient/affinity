@@ -1,5 +1,6 @@
 package io.amient.affinity.core.state
 
+import java.util.Observer
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorContext, Props}
@@ -18,9 +19,13 @@ import scala.reflect.ClassTag
 
 //TODO instead of typed messages use these internal ones or find a way how to serialize typed inner case classes
 case class KVGReplace(key: Any, value: Any) extends Routed with Reply[Option[Any]] with InternalMessage
+
 case class KVGDelete(key: Any) extends Routed with Reply[Option[Any]] with InternalMessage
+
 case class KVGInsert(key: Any, value: Any) extends Routed with Reply[Any] with InternalMessage
+
 case class KVGGetAndUpdate(key: Any, f: Option[Any] => Option[Any]) extends Routed with Reply[Option[Any]] with InternalMessage
+
 case class KVGUpdateAndGet(key: Any, f: Option[Any] => Option[Any]) extends Routed with Reply[Option[Any]] with InternalMessage
 
 
@@ -143,4 +148,17 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
     * @return statistics about the memstore and storage, whatever is available
     */
   override def getStats: String = underlying.map(_.getStats).mkString("\n")
+
+  override def addKeyValueObserver(key: K, observer: Observer): ObservableKeyValue = {
+    underlying(partitioner.partition(serialization.serialize(any2ref(key)).get, partitions)).addKeyValueObserver(key, observer)
+  }
+
+  override def addKeyValueObserver(key: K, init: Object, observer: Observer): Observer = {
+    underlying(partitioner.partition(serialization.serialize(any2ref(key)).get, partitions)).addKeyValueObserver(key, init, observer)
+  }
+
+  override def removeKeyValueObserver(key: K, observer: Observer): Unit = {
+    underlying(partitioner.partition(serialization.serialize(any2ref(key)).get, partitions)).removeKeyValueObserver(key, observer)
+  }
+
 }
