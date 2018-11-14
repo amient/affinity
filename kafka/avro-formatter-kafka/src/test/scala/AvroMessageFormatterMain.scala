@@ -24,7 +24,7 @@ object AvroMessageFormatterMain extends App {
   val formatter = new AvroMessageFormatter()
   formatter.init(consumerProps)
   while (true) {
-    c.poll(java.time.Duration.of(1, ChronoUnit.SECONDS)).asScala.foreach {
+    c.poll(1000).asScala.foreach {
       record => formatter.writeTo(record, System.out)
     }
   }
