@@ -20,7 +20,7 @@ object AvroMessageFormatterMain extends App {
   consumerProps.put("sasl.jaas.config", "org.apache.kafka.common.security.plain.PlainLoginModule required username='" + args(1) + "' password='" + args(2) + "';")
   consumerProps.put("schema.registry.url", args(3))
   val c = new KafkaConsumer[Array[Byte], Array[Byte]](consumerProps)
-  c.subscribe(List("__k2_users").asJava)
+  c.subscribe(List(args(4)).asJava)
   val formatter = new AvroMessageFormatter()
   formatter.init(consumerProps)
   while (true) {
