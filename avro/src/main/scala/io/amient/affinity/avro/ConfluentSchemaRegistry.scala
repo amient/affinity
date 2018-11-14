@@ -21,6 +21,7 @@ package io.amient.affinity.avro
 
 import java.io.DataOutputStream
 import java.net.{HttpURLConnection, URL}
+import java.util.Base64
 
 import com.typesafe.config.Config
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
@@ -136,10 +137,15 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
   }
 
   private def http(path: String)(init: HttpURLConnection => Unit ): String = {
+
     val url = new URL(baseUrl.toString + path)
     val connection = url.openConnection.asInstanceOf[HttpURLConnection]
     connection.setConnectTimeout(5000)
     connection.setReadTimeout(5000)
+
+    if (url.getUserInfo != null && url.getUserInfo != "") {
+      connection.setRequestProperty("Authorization", "Basic " + new String(Base64.getEncoder.encode(url.getUserInfo.getBytes)))
+    }
 
     init(connection)
 
