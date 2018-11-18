@@ -7,7 +7,7 @@ sealed trait Pet {
   def name: String
 }
 
-case class Cat(name: String) extends Pet
+case class Cat(name: String, opt: Option[Int] = Some(1)) extends Pet
 
 case class Dog(name: String) extends Pet
 
@@ -31,8 +31,8 @@ class AvroUnionSpec extends FlatSpec with Matchers {
   final val schemaThey = AvroRecord.inferSchema[They]
 
   it should "infer schema of union of all concrete types of a sealed trait" in {
-    schemaMe.toString should be ("{\"type\":\"record\",\"name\":\"Me\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"myPet\",\"type\":[{\"type\":\"record\",\"name\":\"Cat\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Dog\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]}]}]}")
-    schemaThey.toString should be ("{\"type\":\"record\",\"name\":\"They\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"theirPets\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Cat\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Dog\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]}]}}]}")
+    schemaMe.toString should be ("{\"type\":\"record\",\"name\":\"Me\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"myPet\",\"type\":[{\"type\":\"record\",\"name\":\"Cat\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"opt\",\"type\":[\"int\",\"null\"],\"default\":1}]},{\"type\":\"record\",\"name\":\"Dog\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]}]}]}")
+    schemaThey.toString should be ("{\"type\":\"record\",\"name\":\"They\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"theirPets\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Cat\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"opt\",\"type\":[\"int\",\"null\"],\"default\":1}]},{\"type\":\"record\",\"name\":\"Dog\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]}]}}]}")
   }
 
   it should "serialize and deserialize to and from binary" in {
@@ -47,7 +47,7 @@ class AvroUnionSpec extends FlatSpec with Matchers {
     json1 should be("{\"myPet\":{\"io.amient.affinity.avro.Dog\":{\"name\":\"Finn\"}}}")
     AvroJsonConverter.toAvro(json1, schemaMe) should equal(me1)
     val json2 = AvroJsonConverter.toJson(they1)
-    json2 should be("{\"theirPets\":[{\"io.amient.affinity.avro.Dog\":{\"name\":\"Finn\"}},{\"io.amient.affinity.avro.Cat\":{\"name\":\"Fionna\"}}]}")
+    json2 should be("{\"theirPets\":[{\"io.amient.affinity.avro.Dog\":{\"name\":\"Finn\"}},{\"io.amient.affinity.avro.Cat\":{\"name\":\"Fionna\",\"opt\":1}}]}")
     AvroJsonConverter.toAvro(json2, schemaThey) should equal(they1)
   }
 

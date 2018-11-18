@@ -115,11 +115,13 @@ trait AvroExtractors {
         schemas.map(_.getType) match {
           case Schema.Type.UNION :: Nil =>
             val us = schemas(0).getTypes
-            if (us.size == 2 && us.get(0).getType == Schema.Type.NULL) {
+            if (us.size == 2 && (us.get(0).getType == Schema.Type.NULL || us.get(1).getType == Schema.Type.NULL)) {
               //mapping option[T] to a (null, T) union
               u match {
+                case null => Some(null.asInstanceOf[AnyRef])
                 case None => Some(null.asInstanceOf[AnyRef])
-                case Some(w) => Some(extract(w, schemas(0).getTypes.asScala.toList))
+                case Some(w) => Some(extract(w, us.asScala.toList))
+                case w => Some(extract(w, us.asScala.toList))
               }
             } else {
               val n = u.getClass.getSimpleName
@@ -166,6 +168,8 @@ trait AvroExtractors {
       case r: IndexedRecord if typeIsAllowed(Schema.Type.RECORD).isDefined => r
       case null if typeIsAllowed(Schema.Type.NULL).isDefined => null
       case null => throw new IllegalArgumentException("Illegal null value for schemas: " + schemas.map(_.getType).mkString(","))
+      case None if typeIsAllowed(Schema.Type.NULL).isDefined => null
+      case Some(x) => extract(x, schemas)
       case AvroEnum(e: EnumSymbol) => e
       case AvroBoolean(b: lang.Boolean) => b
       case AvroByte(b: Integer) => b

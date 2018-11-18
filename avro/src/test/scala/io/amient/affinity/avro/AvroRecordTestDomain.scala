@@ -43,6 +43,9 @@ case class CompoundKey(@Fixed(2) country: String, @Fixed(10) city: String, id2: 
 
 case class LongCompoundKey(@Fixed version: Long, @Fixed(2) country: String, @Fixed(4) city: String, value: Double) extends AvroRecord
 
+case class SimpleMap(map: Map[String, SimpleKey]) extends AvroRecord
+
+case class OptionalMap(map: Option[Map[String, SimpleKey]]) extends AvroRecord
 
 case class SimpleRecord(val id: SimpleKey = SimpleKey(0),
                         val side: SimpleEnum.Value = SimpleEnum.A,
