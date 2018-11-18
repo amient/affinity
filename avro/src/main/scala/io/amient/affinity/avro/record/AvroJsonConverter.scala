@@ -69,16 +69,16 @@ object AvroJsonConverter {
         case Schema.Type.DOUBLE if json.isNumber => json.getDoubleValue
         case Schema.Type.STRING if json == null => new Utf8()
         case Schema.Type.STRING if json.isTextual => new Utf8(json.getTextValue)
-        case Schema.Type.UNION if schema.getTypes.size == 2 && schema.getTypes.get(0).getType == Schema.Type.NULL =>
-          schema.getTypes.asScala.map(s => Try(to(json, s))).find(_.isSuccess).map(_.get).get
+        case Schema.Type.UNION if schema.getTypes.size == 2 && (schema.getTypes.get(0).getType == Schema.Type.NULL || schema.getTypes.get(1).getType == Schema.Type.NULL) =>
+          schema.getTypes.asScala.map { s => Try(to(json, s)) }.find(_.isSuccess).map(_.get).get
         case Schema.Type.UNION =>
           val utype = json.getFieldNames.next
           schema.getTypes.asScala.filter(_.getFullName == utype).map(s => Try(to(json.get(utype), s))).find(_.isSuccess).map(_.get).get
         case Schema.Type.ARRAY if json.isArray => json.getElements.asScala.map(x => to(x, schema.getElementType)).toList.asJava
         case Schema.Type.MAP if json.isObject =>
-          val builder = Map.newBuilder[String, Any]
-          schema.getFields.asScala foreach { field =>
-            builder += field.name -> to(json.get(field.name), field.schema)
+          val builder = Map.newBuilder[Utf8, Any]
+          json.getFields.asScala foreach { entry =>
+            builder += new Utf8(entry.getKey) -> to(entry.getValue, schema.getValueType)
           }
           builder.result.asJava
         case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.getTextValue)
@@ -91,14 +91,14 @@ object AvroJsonConverter {
               val d = json.get(field.name)
               builder.set(field, to(d, field.schema()))
             } catch {
-              case e: Throwable => throw new RuntimeException(s"Can't convert json field `$field` with value ${json.get(field.name)} using schema: ${field.schema}",e)
+              case e: Throwable => throw new RuntimeException(s"Can't convert json field `$field` with value ${json.get(field.name)} using schema: ${field.schema}", e)
             }
           }
           builder.build()
         case x => throw new IllegalArgumentException(s"Unsupported schema type `$x`")
       }
     } catch {
-      case e: Throwable => throw new RuntimeException(s"Can't convert ${json} using schema: $schema",e)
+      case e: Throwable => throw new RuntimeException(s"Can't convert ${json} using schema: $schema", e)
     }
 
     AvroRecord.read(to(mapper.readTree(json), schema), schema)

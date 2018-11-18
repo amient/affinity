@@ -64,5 +64,16 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
     AvroJsonConverter.toAvro(avroJson, msg.getSchema()) should be (msg)
   }
 
+  it should "handle maps as structs" in {
+    val a = SimpleMap(Map("key1" -> SimpleKey(1)))
+    val j = AvroJsonConverter.toJson(a)
+    AvroJsonConverter.toAvro[SimpleMap](j) should equal(a)
+  }
+
+  it should "handle optional maps as nested structs" in {
+    val a = OptionalMap(Some(Map("key1" -> SimpleKey(1))))
+    val j = AvroJsonConverter.toJson(a)
+    AvroJsonConverter.toAvro[OptionalMap](j) should equal(a)
+  }
 
 }

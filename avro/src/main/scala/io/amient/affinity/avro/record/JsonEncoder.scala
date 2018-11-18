@@ -229,7 +229,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
     val symbol: Symbol = top.getSymbol(unionIndex)
     if (symbol ne Symbol.NULL) {
       //union that represents an option is a union of [null, X] - in that case we don't write the label
-      if ((top.size() != 2) || (top.getSymbol(0) ne Symbol.NULL)) {
+      if ((top.size() != 2) || ((top.getSymbol(0) ne Symbol.NULL) && (top.getSymbol(1) ne Symbol.NULL))) {
         out.writeStartObject()
         out.writeFieldName(top.getLabel(unionIndex))
         parser.pushSymbol(Symbol.UNION_END)

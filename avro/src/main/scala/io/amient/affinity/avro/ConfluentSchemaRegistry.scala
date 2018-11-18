@@ -140,8 +140,8 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
 
     val url = new URL(baseUrl.toString + path)
     val connection = url.openConnection.asInstanceOf[HttpURLConnection]
-    connection.setConnectTimeout(5000)
-    connection.setReadTimeout(5000)
+    connection.setConnectTimeout(30000)
+    connection.setReadTimeout(15000)
 
     if (url.getUserInfo != null && url.getUserInfo != "") {
       connection.setRequestProperty("Authorization", "Basic " + new String(Base64.getEncoder.encode(url.getUserInfo.getBytes)))
