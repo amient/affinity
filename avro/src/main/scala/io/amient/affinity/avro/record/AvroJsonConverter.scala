@@ -69,7 +69,7 @@ object AvroJsonConverter {
         case Schema.Type.DOUBLE if json.isNumber => json.getDoubleValue
         case Schema.Type.STRING if json == null => new Utf8()
         case Schema.Type.STRING if json.isTextual => new Utf8(json.getTextValue)
-        case Schema.Type.UNION if schema.getTypes.size == 2 && schema.getTypes.get(0).getType == Schema.Type.NULL =>
+        case Schema.Type.UNION if schema.getTypes.size == 2 && (schema.getTypes.get(0).getType == Schema.Type.NULL || schema.getTypes.get(1).getType == Schema.Type.NULL) =>
           schema.getTypes.asScala.map { s => Try(to(json, s)) }.find(_.isSuccess).map(_.get).get
         case Schema.Type.UNION =>
           val utype = json.getFieldNames.next
