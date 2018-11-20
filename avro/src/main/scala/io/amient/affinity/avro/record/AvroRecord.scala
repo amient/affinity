@@ -224,6 +224,7 @@ object AvroRecord extends AvroExtractors {
     def getOrInitialize(tpe: universe.Type, schema: Schema, readField: (Any, Schema, universe.Type) => Any): (Any) => Any = {
       getOrInitialize(tpe, new Supplier[Any => Any] {
         val someSchema = if (schema.getTypes.get(0).getType == Schema.Type.NULL) schema.getTypes.get(1) else schema.getTypes.get(0)
+
         override def get(): Any => Any = {
           if (tpe <:< typeOf[Option[Any]]) {
             (datum) =>
@@ -482,22 +483,12 @@ object AvroRecord extends AvroExtractors {
             builder.`type`(fieldSchema).noDefault()
           } else {
             val fieldDefaultValue = companionMirror.reflectMethod(defaultDef.asMethod)()
-            if (fieldSchema.getType == Schema.Type.UNION) {
-              val extracted = extract(fieldDefaultValue, fieldSchema.getTypes.asScala.toList)
-              val dValSchema = inferSchema(extracted)
-              val unionFieldSchema = if (fieldSchema.getTypes.get(0) == dValSchema) {
-                fieldSchema
-              } else {
-                //reorder the fieldSchema such that the schema of the default value is first (this is required by the avro specification regarding union default types)
-                fieldSchema.getTypes.asScala
-                  .filter(_ != dValSchema)
-                  .foldLeft(SchemaBuilder.builder().unionOf().`type`(dValSchema)) { case (b, st) =>  b.and().`type`(st)}
-                  .endUnion()
-              }
-              builder.`type`(unionFieldSchema).withDefault(extracted)
-            } else {
-              builder.`type`(fieldSchema).withDefault(extract(fieldDefaultValue, List(fieldSchema)))
+            val extracted = fieldSchema.getType match {
+              case Schema.Type.UNION => extract(fieldDefaultValue, fieldSchema.getTypes.asScala.toList)
+              case _ => extract(fieldDefaultValue, List(fieldSchema))
             }
+            val adaptedFieldSchema = adaptFieldSchema(fieldSchema, extracted)
+            builder.`type`(adaptedFieldSchema).withDefault(extracted)
           }
       }
       assembler.endRecord()
@@ -505,7 +496,46 @@ object AvroRecord extends AvroExtractors {
       val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
       schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
     } else {
-      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
+      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString + " " + tpe.typeArgs(0) + " " + tpe.typeArgs(1))
     }
   }
+
+  private def adaptFieldSchema(fieldSchema: Schema, value: AnyRef): Schema = {
+    if (fieldSchema.getType == Schema.Type.MAP) {
+      if (value == java.util.Collections.emptyMap[String, AnyRef]) {
+        fieldSchema
+      } else {
+        SchemaBuilder.builder().map()
+          .values(adaptFieldSchema(fieldSchema.getElementType(), value.asInstanceOf[java.util.Map[String, AnyRef]].values.iterator.next))
+      }
+    } else if (fieldSchema.getType == Schema.Type.ARRAY) {
+      if (value == java.util.Collections.emptyList[AnyRef]) {
+        fieldSchema
+      } else {
+        SchemaBuilder.builder().array()
+          .items(adaptFieldSchema(fieldSchema.getElementType(), value.asInstanceOf[java.util.List[AnyRef]].get(0)))
+      }
+    } else if (fieldSchema.getType == Schema.Type.UNION) {
+      val dValSchema = if (value == java.util.Collections.emptyMap[String, AnyRef]) {
+        fieldSchema.getTypes.asScala.find(_.getType == Schema.Type.MAP).get
+      } else if (value == java.util.Collections.emptyList[AnyRef]) {
+        fieldSchema.getTypes.asScala.find(_.getType == Schema.Type.ARRAY).get
+      } else {
+        inferSchema(value)
+      }
+      val unionFieldSchema = if (fieldSchema.getTypes.get(0) == dValSchema) {
+        fieldSchema
+      } else {
+        //reorder the fieldSchema such that the schema of the default value is first (this is required by the avro specification regarding union default types)
+        fieldSchema.getTypes.asScala
+          .filter(_ != dValSchema)
+          .foldLeft(SchemaBuilder.builder().unionOf().`type`(dValSchema)) { case (b, st) => b.and().`type`(st) }
+          .endUnion()
+      }
+      unionFieldSchema
+    } else {
+      fieldSchema
+    }
+  }
+
 }
