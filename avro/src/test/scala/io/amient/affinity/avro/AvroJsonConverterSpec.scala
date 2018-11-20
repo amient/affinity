@@ -76,4 +76,14 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
     AvroJsonConverter.toAvro[OptionalMap](j) should equal(a)
   }
 
+  it should "handle defaults when converting toAvro empty json structures" in {
+    AvroJsonConverter.toAvro[ListSet]("{}") should equal(ListSet())
+    AvroJsonConverter.toAvro[ListSet]("{\"l\": []}") should equal(ListSet())
+    AvroJsonConverter.toAvro[OptionalMapWithDefaultItem]("{}") should equal(OptionalMapWithDefaultItem(Some(Map())))
+    AvroJsonConverter.toAvro[OptionalMapWithDefaultItem]("{\"map\":{}}") should equal(OptionalMapWithDefaultItem(Some(Map())))
+    AvroJsonConverter.toAvro[OptionalMapWithDefaultItem]("{\"map\":{\"empty\": {}}}") should equal(OptionalMapWithDefaultItem(Some(Map("empty" -> ListSet()))))
+    AvroJsonConverter.toAvro[AvroPrmitives]("{}") should equal(AvroPrmitives())
+    AvroJsonConverter.toAvro[AvroEnums]("{}") should equal(AvroEnums())
+  }
+
 }

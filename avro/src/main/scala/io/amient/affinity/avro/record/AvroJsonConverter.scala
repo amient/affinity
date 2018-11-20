@@ -74,13 +74,18 @@ object AvroJsonConverter {
         case Schema.Type.UNION =>
           val utype = json.getFieldNames.next
           schema.getTypes.asScala.filter(_.getFullName == utype).map(s => Try(to(json.get(utype), s))).find(_.isSuccess).map(_.get).get
-        case Schema.Type.ARRAY if json.isArray => json.getElements.asScala.map(x => to(x, schema.getElementType)).toList.asJava
+        case Schema.Type.ARRAY if json == null => java.util.Collections.emptyList[AnyRef]()
+        case Schema.Type.ARRAY if json.isArray =>
+          val javaList = new java.util.LinkedList[Any]()
+          json.getElements.asScala.foreach(x => javaList.add(to(x, schema.getElementType)))
+          javaList
+        case Schema.Type.MAP if json == null => java.util.Collections.emptyMap[Utf8, AnyRef]()
         case Schema.Type.MAP if json.isObject =>
-          val builder = Map.newBuilder[Utf8, Any]
+          val javaMap = new java.util.HashMap[Utf8, Any]()
           json.getFields.asScala foreach { entry =>
-            builder += new Utf8(entry.getKey) -> to(entry.getValue, schema.getValueType)
+            javaMap.put(new Utf8(entry.getKey), to(entry.getValue, schema.getValueType))
           }
-          builder.result.asJava
+          javaMap
         case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.getTextValue)
         case Schema.Type.BYTES => ByteBuffer.wrap(json.getTextValue.getBytes(StandardCharsets.UTF_8))
         case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getTextValue.getBytes(StandardCharsets.UTF_8))
@@ -88,13 +93,19 @@ object AvroJsonConverter {
           val builder = new GenericRecordBuilder(schema)
           schema.getFields.asScala foreach { field =>
             try {
-              val d = json.get(field.name)
-              builder.set(field, to(d, field.schema()))
+              if (json.has(field.name)) {
+                val d = json.get(field.name)
+                builder.set(field, to(d, field.schema()))
+              }
             } catch {
               case e: Throwable => throw new RuntimeException(s"Can't convert json field `$field` with value ${json.get(field.name)} using schema: ${field.schema}", e)
             }
           }
-          builder.build()
+          try {
+            builder.build()
+          } catch {
+            case e: Throwable => throw new RuntimeException(s"Could not build ${schema}", e)
+          }
         case x => throw new IllegalArgumentException(s"Unsupported schema type `$x`")
       }
     } catch {
