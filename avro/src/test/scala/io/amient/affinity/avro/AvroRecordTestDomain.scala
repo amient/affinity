@@ -47,6 +47,9 @@ case class SimpleMap(map: Map[String, SimpleKey]) extends AvroRecord
 
 case class OptionalMap(map: Option[Map[String, SimpleKey]]) extends AvroRecord
 
+case class ListSet(l: List[SimpleKey] = List())
+case class OptionalMapWithDefaultItem(map: Option[Map[String, ListSet]] = Some(Map())) extends AvroRecord
+
 case class SimpleRecord(val id: SimpleKey = SimpleKey(0),
                         val side: SimpleEnum.Value = SimpleEnum.A,
                         val seq: Seq[SimpleKey] = Seq(),

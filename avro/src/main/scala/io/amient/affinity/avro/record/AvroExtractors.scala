@@ -36,7 +36,7 @@ trait AvroExtractors {
 
   def extract(datum: Any, schemas: List[Schema]): AnyRef = {
 
-    def typeIsAllowed(t: Schema.Type) = schemas.find(_.getType == t)
+    def typeIsAllowed(t: Schema.Type): Option[Schema] = schemas.find(_.getType == t)
 
     object AvroBoolean {
       def unapply(b: Boolean): Option[java.lang.Boolean] = {
@@ -94,7 +94,10 @@ trait AvroExtractors {
     object AvroArray {
       def unapply(i: Iterable[Any]): Option[(java.lang.Iterable[AnyRef])] = {
         typeIsAllowed(Schema.Type.ARRAY) map {
-          schema => i.map(el => extract(el, List(schema.getElementType))).asJava
+          schema =>
+            val javaList = new java.util.LinkedList[AnyRef]
+            i.foreach(el => javaList.add(extract(el, List(schema.getElementType))))
+            javaList
         }
       }
     }
@@ -102,10 +105,12 @@ trait AvroExtractors {
     object AvroMap {
       def unapply(m: Map[_, _]): Option[(java.util.Map[String, AnyRef])] = {
         typeIsAllowed(Schema.Type.MAP) map { schema =>
-          m.map {
-            case (k: String, v) => (k, extract(v, List(schema.getValueType)))
-            case (k, v) => (k.toString, extract(v, List(schema.getValueType)))
-          }.asJava
+          val javaMap = new java.util.HashMap[String, AnyRef]()
+          m.foreach {
+            case (k: String, v) => javaMap.put(k, extract(v, List(schema.getValueType)))
+            case (k, v) => javaMap.put(k.toString, extract(v, List(schema.getValueType)))
+          }
+          javaMap
         }
       }
     }
