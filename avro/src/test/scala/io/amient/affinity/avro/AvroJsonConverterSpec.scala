@@ -86,4 +86,11 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
     AvroJsonConverter.toAvro[AvroEnums]("{}") should equal(AvroEnums())
   }
 
+  it should "not allow passing unknown json fields" in {
+    val thrown = intercept[RuntimeException] {
+      AvroJsonConverter.toAvro[ListSet]("{\"hello\": \"there\"}")
+    }
+    thrown.getCause.isInstanceOf[IllegalArgumentException] should be (true)
+  }
+
 }

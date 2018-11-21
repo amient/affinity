@@ -90,6 +90,11 @@ object AvroJsonConverter {
         case Schema.Type.BYTES => ByteBuffer.wrap(json.getTextValue.getBytes(StandardCharsets.UTF_8))
         case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getTextValue.getBytes(StandardCharsets.UTF_8))
         case Schema.Type.RECORD if json.isObject =>
+          json.getFieldNames.asScala.foreach { fn =>
+            if (schema.getField(fn) == null) {
+              throw new IllegalArgumentException(s"No such field '$fn' in ${schema.getFullName}")
+            }
+          }
           val builder = new GenericRecordBuilder(schema)
           schema.getFields.asScala foreach { field =>
             try {
