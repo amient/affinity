@@ -15,7 +15,7 @@
 		{
 			"id": "2043a112-0265-939e-2f48-2246c33db33f",
 			"headers": "",
-			"url": "http://localhost:8881/store/1",
+			"url": "http://localhost:18881/store/1",
 			"pathVariables": {},
 			"preRequestScript": null,
 			"method": "GET",
@@ -35,7 +35,7 @@
 		{
 			"id": "53b821a4-74d3-684c-1b3c-d86910b295b8",
 			"headers": "",
-			"url": "http://localhost:8881/ping",
+			"url": "http://localhost:18881/ping",
 			"pathVariables": {},
 			"preRequestScript": null,
 			"method": "GET",
@@ -55,7 +55,7 @@
 		{
 			"id": "bb39b234-6e07-d78d-053e-bc665c24cc89",
 			"headers": "",
-			"url": "http://localhost:8881/store/1?value=abc",
+			"url": "http://localhost:18881/store/1?value=abc",
 			"pathVariables": {},
 			"preRequestScript": null,
 			"method": "PUT",
