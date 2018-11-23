@@ -63,9 +63,9 @@ trait GatewayHttp extends Gateway {
 
   val interfaces: List[HttpInterface] = listenerConfigs.map(new HttpInterface(_)).toList
 
-  private val listeners: List[InetSocketAddress] = interfaces.map(_.bind(self))
-
   private val onlineCounter = metrics.counter("http.gateway." + interfaces.head.port)
+
+  private lazy val listeners: List[InetSocketAddress] = interfaces.map(_.bind(self))
 
   private implicit val executor = scala.concurrent.ExecutionContext.Implicits.global
 
