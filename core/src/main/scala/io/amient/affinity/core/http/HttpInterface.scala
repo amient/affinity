@@ -62,6 +62,7 @@ class TlsConf extends CfgStruct[TlsConf] {
 
 class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
 
+
   implicit val materializer = ActorMaterializer.create(system)
 
   val logger = Logging.getLogger(system, this)
