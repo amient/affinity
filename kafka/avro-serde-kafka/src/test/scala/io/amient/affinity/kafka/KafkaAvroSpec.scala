@@ -33,7 +33,7 @@ import org.scalatest.{FlatSpec, Matchers, Suite}
 
 import scala.collection.JavaConversions._
 
-case class TestRecord(key: Int, ts: Long = 0L, text: String = "") extends AvroRecord {
+case class TestRecord(key: Int, ts: Long = 0L, text: String = "", keyOpt: Option[KEY] = None) extends AvroRecord {
   override def hashCode(): Int = key.hashCode()
 }
 
@@ -73,7 +73,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
     val numWrites = new AtomicInteger(0)
     for (i <- (1 to 10)) {
       producer.send(new ProducerRecord[Int, TestRecord](
-        topic, i, TestRecord(i, System.currentTimeMillis(), s"test value $i"))).get
+        topic, i, TestRecord(i, System.currentTimeMillis(), s"test value $i", Some(KEY(i))))).get
       numWrites.incrementAndGet
     }
     numWrites.get should be > (0)
@@ -91,6 +91,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
           read += 1
           record.value.get("key") should equal(record.key)
           record.value.get("text").asInstanceOf[Utf8].toString should equal(s"test value ${record.key}")
+          record.value.get("keyOpt").asInstanceOf[GenericRecord].get("id") should be(record.key)
         }
       }
     } finally {
