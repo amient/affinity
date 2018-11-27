@@ -578,13 +578,13 @@ To generate final affinity.js for borwsers:
 When working on this script the browser script affinity.js can
 be generated then by:
 
-    browserify core/src/main/resources/affinity_node.js -o core/src/main/resources/affinity.js
+    browserify avro/src/main/resources/affinity_node.js -o avro/src/main/resources/affinity.js
     
 When doing a lot of work on the javascript watchify can be used
   to automatically generate the new affinity.js when the affinity_node.js
   is modified:
 
     npm install -g watchify
-    watchify core/src/main/resources/affinity_node.js -v -o core/src/main/resources/affinity.js -d
+    watchify avro/src/main/resources/affinity_node.js -v -o avro/src/main/resources/affinity.js -d
 
 
