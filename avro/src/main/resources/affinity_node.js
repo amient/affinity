@@ -9,8 +9,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
     var schemas = new Map();
 
     function notifyReceiver(view, type) {
-        var bytes = new Uint8Array(view.buffer).subarray(5);
-        var record = type.fromBuffer(bytes);
+        var record = type.fromBuffer(Buffer.from(view.buffer.slice(5)));
         var _name = type.name.split(".");
         record._type = type.id
         record._namespace = type.namespace
