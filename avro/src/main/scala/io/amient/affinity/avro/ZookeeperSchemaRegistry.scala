@@ -72,7 +72,7 @@ class ZookeeperSchemaRegistry(zkRoot: String, zk: ZkClient) extends AvroSerde wi
     */
   override protected def loadSchema(id: Int): Schema = {
     val zkSchema = s"$zkRoot/schemas/${id.toString.reverse.padTo(10, '0').reverse}"
-    if (!zk.exists(zkSchema)) throw new NoSuchElementException else
+    if (!zk.exists(zkSchema)) throw new NoSuchElementException(zkSchema) else
     new Schema.Parser().parse(zk.readData[String](zkSchema))
   }
 

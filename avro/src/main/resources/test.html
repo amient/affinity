@@ -8,15 +8,19 @@
     <script type="text/javascript" src="affinity.js"></script>
     <script type="text/javascript">
 
-        var ws = AvroWebSocket("ws://localhost:8881/vertex?id=1", function(msg) {
-            console.log(msg);
-            messages.innerHTML = msg + "<br/>" + messages.innerHTML;
+        var ws = AvroWebSocket("ws://localhost:18881/vertex?id=1", function(msg) {
+            // console.log(msg);
             if (msg == null) {
                 console.log("[doesn't exist]");
             } else {
-                console.log(msg._type);
-                console.log(msg._namespace);
-                console.log(msg.ts);
+                // console.log(msg.edges[1].headers)
+                console.log(typeof (Object.keys(msg.edges[0].headers)[0]))
+                console.log(msg.toString())
+                console.log(msg.edges[0].headers["104,101,108,108,111"])
+                messages.innerHTML = msg.toString() + "<br/>" + messages.innerHTML;
+                // console.log(msg._type);
+                // console.log(msg._namespace);
+                // console.log(msg.ts);
             }
         });
 

@@ -9,9 +9,8 @@ window.AvroWebSocket = function (wsAddress, receiver) {
     var schemas = new Map();
 
     function notifyReceiver(view, type) {
-        var bytes = new Uint8Array(view.buffer).subarray(5);
-        var record = type.fromBuffer(bytes);
-        var _name = type._name.split(".");
+        var record = type.fromBuffer(Buffer.from(view.buffer.slice(5)));
+        var _name = type.name.split(".");
         record._type = type.id
         record._namespace = type.namespace
         while((n=_name.pop()) != null) {
@@ -49,12 +48,12 @@ window.AvroWebSocket = function (wsAddress, receiver) {
         var schema = String.fromCharCode.apply(null, new Int8Array(event.data).subarray(5));
         console.log(schema);
         var type = avro.parse(schema);
-        var _name = type._name.split(".");
+        var _name = type.name.split(".");
         type.id = _name.pop();
         type.namespace = _name.pop();
         type.schemaId = schemaId;
         schemas.set(schemaId, type);
-        avro.types.set(type._name, type);
+        avro.types.set(type.name, type);
 
         //process pending receive avro data for this schema
         var tmpQueue = new Array();
@@ -69,7 +68,7 @@ window.AvroWebSocket = function (wsAddress, receiver) {
         //process pending send avro data for this schema
         tmpQueue2 = new Array();
         while((sendData=sendQueue.pop()) != null){
-            if (sendData.type == type._name) {
+            if (sendData.type == type.name) {
                 sendAvroMessage(type, sendData.data);
             } else {
                 tmpQueue2.push(sendData);

@@ -48,7 +48,8 @@ trait GraphApi extends Gateway {
   protected def connect(v1: Int, v2: Int): Future[Set[Int]] = {
     implicit val timeout = Timeout(5 seconds)
     val ts = System.currentTimeMillis
-    graphService ?! ModifyGraph(v1, Edge(v2, ts), GOP.ADD) flatMap {
+    graphService ?! ModifyGraph(v1, Edge(v2, ts, Map(
+      "hello" -> "world", "time" -> System.currentTimeMillis().toString)), GOP.ADD) flatMap {
       case props1 => graphService ?! ModifyGraph(v2, Edge(v1, ts), GOP.ADD) flatMap {
         case props2 => collectComponent(v2) flatMap {
           case mergedComponent =>
