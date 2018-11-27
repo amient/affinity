@@ -14,8 +14,9 @@
                 console.log("[doesn't exist]");
             } else {
                 // console.log(msg.edges[1].headers)
-                console.log(typeof (Object.keys(msg.edges[1].headers)[0]))
-                // console.log(msg.edges[1].headers["116,105,109,101"])
+                console.log(typeof (Object.keys(msg.edges[0].headers)[0]))
+                console.log(msg.toString())
+                console.log(msg.edges[0].headers["104,101,108,108,111"])
                 messages.innerHTML = msg.toString() + "<br/>" + messages.innerHTML;
                 // console.log(msg._type);
                 // console.log(msg._namespace);

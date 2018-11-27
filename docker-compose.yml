@@ -37,7 +37,7 @@ services:
       - kafka
     hostname: schema_registry
     ports:
-      - "8182:8081"
+      - "8181:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema_registry
       SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081'
@@ -53,4 +53,4 @@ services:
     ports:
       - "8000:8000"
     environment:
-      SCHEMAREGISTRY_URL: 'http://localhost:8182'
+      SCHEMAREGISTRY_URL: 'http://localhost:8181'
