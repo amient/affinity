@@ -21,7 +21,7 @@ package message
 
 import io.amient.affinity.avro.record.AvroRecord
 
-final case class Edge(target: Int, timestamp: Long = 0L) extends AvroRecord
+final case class Edge(target: Int, timestamp: Long = 0L, headers: Map[String, String] = Map()) extends AvroRecord
 
 object Edges {
   def unapply(edges: Set[Edge]): Option[Set[Int]] = Some(edges.map(_.target))

@@ -6,4 +6,5 @@
 build/
 out/
 node_modules/
-core/src/main/resources/affinity.js
+package-lock.json
+avro/src/main/resources/affinity.js

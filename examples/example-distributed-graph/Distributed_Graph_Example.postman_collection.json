@@ -1,162 +1,216 @@
 {
-	"id": "35343dd4-aa99-090c-1e0c-9275654297a6",
-	"name": "Distributed_Graph_Example",
-	"description": "",
-	"order": [
-		"dae4776a-6402-d081-4d96-5549ae48792b",
-		"3753986b-b974-7f64-170f-3ded21e3f07b",
-		"c7fcaea0-e0de-c7f4-b43f-ea5c0e8e12ff",
-		"8c767113-0d4f-f318-7052-94ee8c4eb798",
-		"72c735e2-0e8e-61a2-672f-a1c4cc41fb7c",
-		"266f267f-e295-8cd3-e137-569b07ce8c49",
-		"c27f66f4-2c74-e720-d13d-96188b866c20"
-	],
-	"folders": [],
-	"timestamp": 1476441239775,
-	"owner": 0,
-	"public": false,
-	"requests": [
+	"info": {
+		"_postman_id": "09f56170-c927-4adb-9bf1-016057d861a9",
+		"name": "Distributed_Graph_Example",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
 		{
-			"id": "266f267f-e295-8cd3-e137-569b07ce8c49",
-			"headers": "",
-			"url": "http://localhost:8881/connect/1/3",
-			"preRequestScript": null,
-			"pathVariables": {},
-			"method": "POST",
-			"data": null,
-			"dataMode": "params",
-			"version": 2,
-			"tests": null,
-			"currentHelper": "normal",
-			"helperAttributes": {},
-			"time": 1477158002865,
-			"name": "http://localhost:8881/connect/1/3",
-			"description": "",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"responses": []
-		},
-		{
-			"id": "3753986b-b974-7f64-170f-3ded21e3f07b",
-			"headers": "",
-			"url": "http://localhost:8881/down/3",
-			"pathVariables": {},
-			"preRequestScript": null,
-			"method": "POST",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"data": null,
-			"dataMode": "params",
-			"name": "http://localhost:8881/down/3",
-			"description": "",
-			"descriptionFormat": "html",
-			"time": 1476792416653,
-			"version": 2,
-			"responses": [],
-			"tests": null,
-			"currentHelper": "normal",
-			"helperAttributes": {}
-		},
-		{
-			"id": "72c735e2-0e8e-61a2-672f-a1c4cc41fb7c",
-			"headers": "",
-			"url": "http://localhost:8881/component/1",
-			"preRequestScript": null,
-			"pathVariables": {},
-			"method": "GET",
-			"data": null,
-			"dataMode": "params",
-			"tests": null,
-			"currentHelper": "normal",
-			"helperAttributes": {},
-			"time": 1476441681916,
-			"name": "http://localhost:8881/component/1",
-			"description": "",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"responses": []
-		},
-		{
-			"id": "8c767113-0d4f-f318-7052-94ee8c4eb798",
-			"headers": "",
-			"url": "http://localhost:8881/vertex/3",
-			"preRequestScript": null,
-			"pathVariables": {},
-			"method": "GET",
-			"data": null,
-			"dataMode": "params",
-			"tests": null,
-			"currentHelper": "normal",
-			"helperAttributes": {},
-			"time": 1477139939372,
-			"name": "http://localhost:8881/vertex/1",
-			"description": "",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"responses": []
-		},
-		{
-			"id": "c27f66f4-2c74-e720-d13d-96188b866c20",
-			"headers": "",
-			"url": "http://localhost:8881/disconnect/1/3",
-			"preRequestScript": null,
-			"pathVariables": {},
-			"method": "POST",
-			"data": null,
-			"dataMode": "params",
-			"tests": null,
-			"currentHelper": "normal",
-			"helperAttributes": {},
-			"time": 1477139931984,
-			"name": "http://localhost:8881/disconnect/3/1",
-			"description": "",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"responses": []
-		},
-		{
-			"id": "c7fcaea0-e0de-c7f4-b43f-ea5c0e8e12ff",
-			"headers": "Authorization: Basic YWRtaW46MTIzNA==\n",
-			"url": "http://localhost:8881/settings",
-			"pathVariables": {},
-			"preRequestScript": null,
-			"method": "GET",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"data": null,
-			"dataMode": "params",
-			"name": "http://localhost:8881/settings",
-			"description": "",
-			"descriptionFormat": "html",
-			"time": 1476441600214,
-			"version": 2,
-			"responses": [],
-			"tests": null,
-			"currentHelper": "basicAuth",
-			"helperAttributes": {
-				"id": "basic",
-				"username": "admin",
-				"password": "1234",
-				"saveToRequest": true
-			}
-		},
-		{
-			"id": "dae4776a-6402-d081-4d96-5549ae48792b",
-			"headers": "Authorization: Basic YWRtaW46MTIzNA==\n",
-			"url": "http://localhost:8881/status",
-			"preRequestScript": null,
-			"pathVariables": {},
-			"method": "GET",
-			"data": null,
-			"dataMode": "params",
-			"version": 2,
-			"tests": null,
-			"currentHelper": "basicAuth",
-			"helperAttributes": {
-				"id": "basic",
-				"username": "admin",
-				"password": "1234",
-				"saveToRequest": true
+			"name": "/status",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "string"
+						},
+						{
+							"key": "password",
+							"value": "1234",
+							"type": "string"
+						},
+						{
+							"key": "saveHelperData",
+							"value": true,
+							"type": "boolean"
+						},
+						{
+							"key": "showPassword",
+							"value": false,
+							"type": "boolean"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic YWRtaW46MTIzNA=="
+					}
+				],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"status"
+					]
+				}
 			},
-			"time": 1476792426245,
-			"name": "http://localhost:8881/status",
-			"description": "",
-			"collectionId": "35343dd4-aa99-090c-1e0c-9275654297a6",
-			"responses": []
+			"response": []
+		},
+		{
+			"name": "/down/3",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/down/3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"down",
+						"3"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/settings",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "string"
+						},
+						{
+							"key": "password",
+							"value": "1234",
+							"type": "string"
+						},
+						{
+							"key": "saveHelperData",
+							"value": true,
+							"type": "boolean"
+						},
+						{
+							"key": "showPassword",
+							"value": false,
+							"type": "boolean"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic YWRtaW46MTIzNA=="
+					}
+				],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/settings",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"settings"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/vertex/1",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/vertex/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"vertex",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/component/1",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/component/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"component",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/connect/1/3",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/connect/1/3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"connect",
+						"1",
+						"3"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/disconnect/3/1",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {},
+				"url": {
+					"raw": "http://localhost:18881/disconnect/1/3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "18881",
+					"path": [
+						"disconnect",
+						"1",
+						"3"
+					]
+				}
+			},
+			"response": []
 		}
 	]
 }
