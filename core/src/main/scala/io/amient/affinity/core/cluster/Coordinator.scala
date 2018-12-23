@@ -61,8 +61,8 @@ object Coordinator {
       * @return a set of all masters for each partition within the group this coordinator is managing
       */
     def masters: Set[ActorRef] = {
-      members.map(_._2.path.toStringWithoutAddress).toSet[String].map { relPath =>
-        members.filter(_._2.path.toStringWithoutAddress == relPath)
+      members.map(_._2.path.elements.takeRight(2).mkString("/")).toSet[String].map { relPath =>
+        members.filter(_._2.path.elements.takeRight(2).mkString("/") == relPath)
           .maxBy { case (handle, _) => ByteUtils.murmur2(handle.getBytes) }._2
       }
     }
