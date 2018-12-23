@@ -170,9 +170,16 @@ class KVStoreLocal[K, V](val identifier: String,
 
   implicit def javaToScalaFuture[T](jf: java.util.concurrent.Future[T]): Future[T] = Future(jf.get)
 
-  val numKeysMeter = metrics.register(s"state.$identifier.keys", new Gauge[Long] {
-    override def getValue = numKeys
-  })
+  try {
+    metrics.register(s"state.$identifier.keys", new Gauge[Long] {
+      override def getValue = numKeys
+    })
+  } catch {
+    case e: IllegalArgumentException =>
+      //TODO this only stops creating of the same metric on an individual host, but we need the same behaviour also across the cluster
+      //becuase each replica will register the same set of metrics which, though can be mitigated when aggregating metrics, may lead to confusion and is a pointless overhead
+      logger.warn(e.getMessage)
+  }
 
   val writesMeter = metrics.meterAndHistogram(s"state.$identifier.writes")
 
