@@ -31,7 +31,7 @@ import org.apache.avro.generic._
 import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.util.Utf8
-import org.apache.avro.{AvroRuntimeException, Schema, SchemaBuilder}
+import org.apache.avro.{AvroRuntimeException, LogicalTypes, Schema, SchemaBuilder}
 
 import scala.annotation.StaticAnnotation
 import scala.collection.JavaConverters._
@@ -453,7 +453,10 @@ object AvroRecord extends AvroExtractors {
             fixedSize match {
               case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
               case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
-              case None if fieldType =:= typeOf[UUID] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+              case None if fieldType =:= typeOf[UUID] =>
+                val s = SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+                LogicalTypes.uuid().addToSchema(s)
+                s
               case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "string").size(size)
               case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
               case Some(size) if fieldType =:= typeOf[Array[Byte]] => SchemaBuilder.builder().fixed(fieldName).size(size)
@@ -463,7 +466,9 @@ object AvroRecord extends AvroExtractors {
             }
           }.getOrElse {
             if (fieldType =:= typeOf[UUID]) {
-              SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+              val s = SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+              LogicalTypes.uuid().addToSchema(s)
+              s
             } else {
               inferSchemaWithoutCache(symbol.typeSignature)
             }

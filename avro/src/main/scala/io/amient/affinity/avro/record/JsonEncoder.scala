@@ -5,9 +5,10 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util
+import java.util.UUID
 
-import org.apache.avro.AvroTypeException
-import org.apache.avro.Schema
+import io.amient.affinity.core.util.ByteUtils
+import org.apache.avro.{AvroTypeException, LogicalType, LogicalTypes, Schema}
 import org.apache.avro.io.ParsingEncoder
 import org.apache.avro.io.parsing.JsonGrammarGenerator
 import org.apache.avro.io.parsing.Parser
@@ -58,7 +59,8 @@ object JsonEncoder {
 
 class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends ParsingEncoder with Parser.ActionHandler {
 
-  private val parser = new Parser(new JsonGrammarGenerator().generate(sc), this)
+  private val generator = new JsonGrammarGenerator().generate(sc)
+  private val parser = new Parser(generator, this)
 
   /**
     * Has anything been written into the collections?
@@ -164,7 +166,14 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
     if (len != top.size) {
       throw new AvroTypeException("Incorrect length for fixed binary: expected " + top.size + " but received " + len + " bytes.")
     }
-    writeByteArray(bytes, start, len)
+    logicalType match {
+      case null => writeByteArray(bytes, start, len)
+      case AvroJsonConverter.UUID_TYPE =>
+        val uuid = ByteUtils.uuid(bytes, start).toString.getBytes
+        writeByteArray(uuid, 0, uuid.length)
+      case _ => writeByteArray(bytes, start, len)
+    }
+
   }
 
   @throws[IOException]
@@ -238,10 +247,13 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
     parser.pushSymbol(symbol)
   }
 
+  private var logicalType: LogicalType = null
+
   @throws[IOException]
   override def doAction(input: Symbol, top: Symbol): Symbol = {
     if (top.isInstanceOf[Symbol.FieldAdjustAction]) {
       val fa: Symbol.FieldAdjustAction = top.asInstanceOf[Symbol.FieldAdjustAction]
+      this.logicalType = sc.getFields.get(fa.rindex).schema.getLogicalType
       out.writeFieldName(fa.fname)
     } else if (top eq Symbol.RECORD_START) {
       out.writeStartObject()

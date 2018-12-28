@@ -19,6 +19,8 @@
 
 package io.amient.affinity.avro
 
+import java.util.UUID
+
 import io.amient.affinity.avro.record.AvroJsonConverter
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -93,4 +95,14 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
     thrown.getCause.isInstanceOf[IllegalArgumentException] should be (true)
   }
 
+  it should "format UUID in as json readable" in {
+    val u = UUID.fromString("01010101-0202-0202-0303-030304040404")
+    val a = UuidCompoundKey(Array(65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65), u, 1L)
+    val j = AvroJsonConverter.toJson(a)
+    j should include("AAAAAAAAAAAAAAAA")
+    j should include("01010101-0202-0202-0303-030304040404")
+    val a2 = AvroJsonConverter.toAvro[UuidCompoundKey](j)
+    a2.uuid2 should equal(a.uuid2)
+    a.uuid2 should equal(u)
+  }
 }
