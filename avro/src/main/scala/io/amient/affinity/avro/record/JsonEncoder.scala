@@ -21,6 +21,7 @@ import org.codehaus.jackson.util.DefaultPrettyPrinter
 import org.codehaus.jackson.util.MinimalPrettyPrinter
 
 import scala.collection.mutable
+import scala.collection.JavaConverters._
 
 
 /** An {@link Encoder} for Avro's JSON data encoding.
@@ -235,6 +236,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
 
   @throws[IOException]
   override def writeIndex(unionIndex: Int): Unit = {
+    this.unionIndex = unionIndex
     parser.advance(Symbol.UNION)
     val top: Symbol.Alternative = parser.popSymbol.asInstanceOf[Symbol.Alternative]
     val symbol: Symbol = top.getSymbol(unionIndex)
@@ -250,6 +252,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
   }
 
   private var logicalType: LogicalType = null
+  private var unionIndex = -1
   private var nextSchema = sc
   private val schemaStack = new mutable.Stack[Schema]
 
@@ -257,15 +260,22 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
   override def doAction(input: Symbol, top: Symbol): Symbol = {
     if (top.isInstanceOf[Symbol.FieldAdjustAction]) {
       val fa: Symbol.FieldAdjustAction = top.asInstanceOf[Symbol.FieldAdjustAction]
-      val f = schemaStack.head.getFields
-      this.nextSchema =  f.get(fa.rindex).schema
+      val wrappingSchema = schemaStack.head
+      this.nextSchema = wrappingSchema.getType match {
+        case Schema.Type.RECORD =>
+          wrappingSchema.getFields.get(fa.rindex).schema
+        case Schema.Type.UNION => wrappingSchema.getTypes.get(unionIndex)
+        case _ => wrappingSchema
+      }
       this.logicalType = nextSchema.getLogicalType
       out.writeFieldName(fa.fname)
     } else if (top eq Symbol.RECORD_START) {
       schemaStack.push(nextSchema)
       out.writeStartObject()
-    } else if ((top eq Symbol.RECORD_END) || (top eq Symbol.UNION_END)) {
+    } else if (top eq Symbol.RECORD_END) {
       schemaStack.pop()
+      out.writeEndObject()
+    } else if (top eq Symbol.UNION_END) {
       out.writeEndObject()
     } else if (top ne Symbol.FIELD_END) {
       throw new AvroTypeException("Unknown action symbol " + top)
