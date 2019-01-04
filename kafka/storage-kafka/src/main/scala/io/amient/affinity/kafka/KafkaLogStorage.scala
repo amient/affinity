@@ -376,9 +376,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         val consumerConfig = kafkaStorageConf.Consumer.toMap()
         val allowedAdminConfigs = AdminClientConfig.configNames
         consumerConfig.entrySet.asScala.filter(_.getValue.isDefined).filter(c => allowedAdminConfigs.contains(c.getKey)).foreach {
-          case (entry) =>
-            log.debug("Configuring Admin Client: " + entry.getKey + " = " + entry.getValue.apply.toString)
-            put(entry.getKey, entry.getValue.apply.toString)
+          case (entry) => put(entry.getKey, entry.getValue.apply.toString)
         }
       }
     }
