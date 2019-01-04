@@ -20,6 +20,8 @@ import org.codehaus.jackson.JsonGenerator
 import org.codehaus.jackson.util.DefaultPrettyPrinter
 import org.codehaus.jackson.util.MinimalPrettyPrinter
 
+import scala.collection.mutable
+
 
 /** An {@link Encoder} for Avro's JSON data encoding.
   * </p>
@@ -248,16 +250,22 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
   }
 
   private var logicalType: LogicalType = null
+  private var nextSchema = sc
+  private val schemaStack = new mutable.Stack[Schema]
 
   @throws[IOException]
   override def doAction(input: Symbol, top: Symbol): Symbol = {
     if (top.isInstanceOf[Symbol.FieldAdjustAction]) {
       val fa: Symbol.FieldAdjustAction = top.asInstanceOf[Symbol.FieldAdjustAction]
-      this.logicalType = sc.getFields.get(fa.rindex).schema.getLogicalType
+      val f = schemaStack.head.getFields
+      this.nextSchema =  f.get(fa.rindex).schema
+      this.logicalType = nextSchema.getLogicalType
       out.writeFieldName(fa.fname)
     } else if (top eq Symbol.RECORD_START) {
+      schemaStack.push(nextSchema)
       out.writeStartObject()
     } else if ((top eq Symbol.RECORD_END) || (top eq Symbol.UNION_END)) {
+      schemaStack.pop()
       out.writeEndObject()
     } else if (top ne Symbol.FIELD_END) {
       throw new AvroTypeException("Unknown action symbol " + top)

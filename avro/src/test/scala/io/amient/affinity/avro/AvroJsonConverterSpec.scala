@@ -104,5 +104,12 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
     val a2 = AvroJsonConverter.toAvro[UuidCompoundKey](j)
     a2.uuid2 should equal(a.uuid2)
     a.uuid2 should equal(u)
+    val n = NestedLogicalType(a)
+    val jn = AvroJsonConverter.toJson(n)
+    jn should include("AAAAAAAAAAAAAAAA")
+    jn should include("01010101-0202-0202-0303-030304040404")
+    val n2 = AvroJsonConverter.toAvro[NestedLogicalType](jn)
+    n2.u.uuid2 should equal(a.uuid2)
+    n2.u.uuid2 should equal(u)
   }
 }
