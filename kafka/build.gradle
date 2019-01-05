@@ -3,7 +3,7 @@ version = rootProject.version
 
 ext {
     kafkaVersion = '2.1.0'
-    confluentVersion = '5.0.0'
+    confluentVersion = '5.1.0'
     //
     baseKafkaVersion = kafkaVersion.split("\\.")[0] + '.' + kafkaVersion.split("\\.")[1]
 }
