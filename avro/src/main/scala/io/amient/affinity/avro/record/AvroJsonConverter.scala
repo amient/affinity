@@ -22,19 +22,24 @@ package io.amient.affinity.avro.record
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 import io.amient.affinity.avro.record.AvroRecord.extract
-import org.apache.avro.Schema
+import io.amient.affinity.core.util.ByteUtils
+import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
+
 import scala.reflect.runtime.universe.TypeTag
 import scala.collection.JavaConverters._
 import scala.util.Try
 
 object AvroJsonConverter {
+
+  val UUID_TYPE = LogicalTypes.uuid()
 
   def toJson(data: Any, pretty: Boolean = false): String = {
     val out = new ByteArrayOutputStream()
@@ -88,6 +93,8 @@ object AvroJsonConverter {
           javaMap
         case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.getTextValue)
         case Schema.Type.BYTES => ByteBuffer.wrap(json.getTextValue.getBytes(StandardCharsets.UTF_8))
+        case Schema.Type.FIXED if schema.getLogicalType == UUID_TYPE =>
+          new GenericData.Fixed(schema, ByteUtils.parseUUID(json.getTextValue))
         case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getTextValue.getBytes(StandardCharsets.UTF_8))
         case Schema.Type.RECORD if json.isObject =>
           json.getFieldNames.asScala.foreach { fn =>

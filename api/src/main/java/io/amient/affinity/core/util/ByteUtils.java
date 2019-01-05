@@ -565,7 +565,17 @@ public class ByteUtils {
      * @return java.util.UUID
      */
     public static UUID uuid(byte[] uuid) {
-        return new UUID(asLongValue(uuid, 0), asLongValue(uuid, 8));
+        return uuid(uuid, 0);
+    }
+
+    /**
+     * convert 128-bit representation into a java.util.UUID
+     * @param uuid input byte array
+     * @param start offset into the uuid byte array
+     * @return java.util.UUID
+     */
+    public static UUID uuid(byte[] uuid, int start) {
+        return new UUID(asLongValue(uuid, start), asLongValue(uuid, start +8));
     }
 
     /**

@@ -128,4 +128,10 @@ trait KVStore[K, V] extends Closeable with ObservableKVStore[K] {
     */
   def updateAndGet(key: K, f: Option[V] => Option[V]): Future[Option[V]]
 
+  /**
+    * State listeners can be instantiated at the partition level and are notified for any change in this State, whether
+    * the change was triggered by local modification or via replication.
+    */
+  def listen(pf: PartialFunction[Record[K, V], Unit]): Unit
+
 }

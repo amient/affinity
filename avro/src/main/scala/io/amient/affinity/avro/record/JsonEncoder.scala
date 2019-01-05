@@ -5,9 +5,10 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util
+import java.util.UUID
 
-import org.apache.avro.AvroTypeException
-import org.apache.avro.Schema
+import io.amient.affinity.core.util.ByteUtils
+import org.apache.avro.{AvroTypeException, LogicalType, LogicalTypes, Schema}
 import org.apache.avro.io.ParsingEncoder
 import org.apache.avro.io.parsing.JsonGrammarGenerator
 import org.apache.avro.io.parsing.Parser
@@ -18,6 +19,9 @@ import org.codehaus.jackson.JsonFactory
 import org.codehaus.jackson.JsonGenerator
 import org.codehaus.jackson.util.DefaultPrettyPrinter
 import org.codehaus.jackson.util.MinimalPrettyPrinter
+
+import scala.collection.mutable
+import scala.collection.JavaConverters._
 
 
 /** An {@link Encoder} for Avro's JSON data encoding.
@@ -58,7 +62,8 @@ object JsonEncoder {
 
 class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends ParsingEncoder with Parser.ActionHandler {
 
-  private val parser = new Parser(new JsonGrammarGenerator().generate(sc), this)
+  private val generator = new JsonGrammarGenerator().generate(sc)
+  private val parser = new Parser(generator, this)
 
   /**
     * Has anything been written into the collections?
@@ -164,7 +169,14 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
     if (len != top.size) {
       throw new AvroTypeException("Incorrect length for fixed binary: expected " + top.size + " but received " + len + " bytes.")
     }
-    writeByteArray(bytes, start, len)
+    logicalType match {
+      case null => writeByteArray(bytes, start, len)
+      case AvroJsonConverter.UUID_TYPE =>
+        val uuid = ByteUtils.uuid(bytes, start).toString.getBytes
+        writeByteArray(uuid, 0, uuid.length)
+      case _ => writeByteArray(bytes, start, len)
+    }
+
   }
 
   @throws[IOException]
@@ -224,6 +236,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
 
   @throws[IOException]
   override def writeIndex(unionIndex: Int): Unit = {
+    this.unionIndex = unionIndex
     parser.advance(Symbol.UNION)
     val top: Symbol.Alternative = parser.popSymbol.asInstanceOf[Symbol.Alternative]
     val symbol: Symbol = top.getSymbol(unionIndex)
@@ -238,14 +251,31 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
     parser.pushSymbol(symbol)
   }
 
+  private var logicalType: LogicalType = null
+  private var unionIndex = -1
+  private var nextSchema = sc
+  private val schemaStack = new mutable.Stack[Schema]
+
   @throws[IOException]
   override def doAction(input: Symbol, top: Symbol): Symbol = {
     if (top.isInstanceOf[Symbol.FieldAdjustAction]) {
       val fa: Symbol.FieldAdjustAction = top.asInstanceOf[Symbol.FieldAdjustAction]
+      val wrappingSchema = schemaStack.head
+      this.nextSchema = wrappingSchema.getType match {
+        case Schema.Type.RECORD =>
+          wrappingSchema.getFields.get(fa.rindex).schema
+        case Schema.Type.UNION => wrappingSchema.getTypes.get(unionIndex)
+        case _ => wrappingSchema
+      }
+      this.logicalType = nextSchema.getLogicalType
       out.writeFieldName(fa.fname)
     } else if (top eq Symbol.RECORD_START) {
+      schemaStack.push(nextSchema)
       out.writeStartObject()
-    } else if ((top eq Symbol.RECORD_END) || (top eq Symbol.UNION_END)) {
+    } else if (top eq Symbol.RECORD_END) {
+      schemaStack.pop()
+      out.writeEndObject()
+    } else if (top eq Symbol.UNION_END) {
       out.writeEndObject()
     } else if (top ne Symbol.FIELD_END) {
       throw new AvroTypeException("Unknown action symbol " + top)
