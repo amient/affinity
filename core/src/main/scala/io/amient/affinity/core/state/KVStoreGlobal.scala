@@ -1,6 +1,6 @@
 package io.amient.affinity.core.state
 
-import java.util.Observer
+import java.util.{Observable, Observer}
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorContext, Props}
@@ -124,11 +124,11 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
 
   override def numKeys: Long = underlying.map(_.numKeys).sum
 
-  override def replace(key: K, value: V): Future[Option[V]] = master ?? KVGReplace(key, value) map(_.map(_.asInstanceOf[V]))
+  override def replace(key: K, value: V): Future[Option[V]] = master ?? KVGReplace(key, value) map (_.map(_.asInstanceOf[V]))
 
-  override def delete(key: K): Future[Option[V]] = master ?? KVGDelete(key) map(_.map(_.asInstanceOf[V]))
+  override def delete(key: K): Future[Option[V]] = master ?? KVGDelete(key) map (_.map(_.asInstanceOf[V]))
 
-  override def insert(key: K, value: V): Future[V] = master ?? KVGInsert(key, value) map(_.asInstanceOf[V])
+  override def insert(key: K, value: V): Future[V] = master ?? KVGInsert(key, value) map (_.asInstanceOf[V])
 
   override def getAndUpdate(key: K, f: Option[V] => Option[V]): Future[Option[V]] = {
     master ?? KVGGetAndUpdate(key, (prev: Option[Any]) => f(prev.map(_.asInstanceOf[V]))) map (_.map(_.asInstanceOf[V]))
@@ -153,6 +153,10 @@ class KVStoreGlobal[K: ClassTag, V: ClassTag](identifier: String, conf: StateCon
 
   override def removeKeyValueObserver(key: K, observer: Observer): Unit = {
     underlying(partitioner.partition(serialization.serialize(any2ref(key)).get, partitions)).removeKeyValueObserver(key, observer)
+  }
+
+  override def listen(pf: PartialFunction[Record[K, V], Unit]): Unit = underlying.foreach {
+    p => p.listen(pf)
   }
 
 }
