@@ -547,14 +547,7 @@ class KVStoreLocal[K, V](val identifier: String,
 
   }
 
-  /*
-   * Observable State Support
-   */
-
-  /**
-    * State listeners can be instantiated at the partition level and are notified for any change in this State.
-    */
-  def listen(pf: PartialFunction[Record[K, V], Unit]): Unit = {
+  override def listen(pf: PartialFunction[Record[K, V], Unit]): Unit = {
     addObserver(new Observer {
       override def update(o: Observable, arg: scala.Any) = arg match {
         case entry: Record[K, V] => pf.lift(entry)
@@ -562,6 +555,10 @@ class KVStoreLocal[K, V](val identifier: String,
       }
     })
   }
+
+  /*
+   * Observable State Support
+   */
 
   override def internalPush(record: Record[Array[Byte], Array[Byte]]) = {
     push(new Record(

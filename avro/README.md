@@ -208,6 +208,11 @@ you can work with type-safe case classes instead of generic avro records.**
     AvroJsonConverter.toJson(avro: Any): String
     AvroJsonConverter.toJson(writer: Writer, avro: Any): Unit
     AvroJsonConverter.toAvro(json: String, schema: Schema): Any
+    
+    
+AvroJsonConverter supports logical types. For example java.util.UUID field will have a schema
+of Fixed(16) with logical type 'uuid'. AvroJsonConverter will render values of this type 
+as a standard dash-separated hexadecimal UUID string even though the underlying byte array is fixed. 
 
 ## Best Practices
 
