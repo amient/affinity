@@ -19,8 +19,6 @@
 
 package io.amient.affinity.core.actor
 
-import java.net.InetSocketAddress
-import java.util
 import java.util.Optional
 import java.util.concurrent.ExecutionException
 
@@ -31,12 +29,10 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.pattern.ask
-import akka.stream.ActorMaterializer
-import akka.stream.actor.ActorPublisher
-import akka.stream.actor.ActorPublisherMessage.{Cancel, Request}
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.util.{ByteString, Timeout}
+import akka.stream._
+import akka.stream.scaladsl.Flow
+import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
+import akka.util.ByteString
 import com.typesafe.config.Config
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
 import io.amient.affinity.core.actor.Controller.CreateGateway
@@ -46,9 +42,7 @@ import io.amient.affinity.core.storage.Record
 import io.amient.affinity.core.util.ByteUtils
 
 import scala.collection.JavaConverters._
-import scala.collection.immutable
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.util.control.NonFatal
 
@@ -243,67 +237,76 @@ trait WebSocketSupport extends GatewayHttp {
     case HTTP(GET, PATH("affinity.js"), _, response) if afjs.isDefined => response.success(Encoder.text(OK, afjs.get, gzip = true))
   }
 
+
   /**
     * jsonWebSocket:
-    * +
-    * |
-    * |                           send:TEXT   +----------+  send:JSON
-    * |                 +------+  send:BIN    |DOWNSTREAM+---------------+
-    * |                 |      +------------> |ACTOR     |  close   +-----------------------------+
-    * |                 |      |    close     +-----+----+          |    |                        |
-    * |                 | WEB  |                    |               | +--v------+     +---------+ |
-    * |     CLIENT <---->SOCKET|                push|close          | |MEDIATOR +----->KEY|VALUE| |
-    * |                 |      |                    |               | +--+------+     +---------+ |
-    * |                 |      |     push     +-----v----+          |    |  STATE PARTITION       |
-    * |                 |      | <------------+UPSTREAM  |   push   +-----------------------------+
-    * |                 +------+     TEXT     |ACTOR     +---------------+
-    * |                                       +----------+   JSON
-    * +
+    * +                                        +---------------+
+    * |                                        |  GraphStage   |
+    * |                           send:TEXT    |               |  send:VALUE
+    * |                 +------+  send:BIN    +-+ receive(JSON)+---------------+
+    * |                 |      +------------> |-|              |  close   +-----------------------------+
+    * |                 |      |    close     +-+              |          |    |                        |
+    * |                 | WEB  |               |               |          | +--v------+     +---------+ |
+    * |     CLIENT <---->SOCKET|               |               |          | |MEDIATOR +----->KEY|VALUE| |
+    * |                 |      |               |               |          | +--+------+     +---------+ |
+    * |                 |      |     push     +-+              |          |    |  STATE PARTITION       |
+    * |                 |      | <--------------| send()       |   push   +-----------------------------+
+    * |                 +------+     TEXT     +-+ +--------+ <-----------------+
+    * |                                        |  | ...... |   |   JSON
+    * |                                        |  +--------+   |
+    * +                                        +---------------+
     *
     * @param exchange web socket echange as captured in the http interface
     * @param mediator key-value mediator create using connectKeyValueMediator()
     */
   def jsonWebSocket(exchange: WebSocketExchange, mediator: ActorRef): Unit = {
-    customWebSocket(exchange, new DownstreamActor {
-      override def onOpen(upstream: ActorRef): Unit = mediator ! RegisterMediatorSubscriber(upstream)
+    webSocket(exchange, new WSHandler {
+      context.actorOf(Props(new Actor {
+        override def preStart(): Unit = {
+          super.preStart()
+          mediator ! RegisterMediatorSubscriber(self)
+        }
 
-      override def onClose(upstream: ActorRef): Unit = mediator ! PoisonPill
+        override def receive: Receive = {
+          case rec: Record[_, _] if rec.value == null => send(TextMessage.Strict("{}"))
+          case rec: Record[_, _] => send(TextMessage.Strict(Encoder.json(rec.value)))
+          case None => send(TextMessage.Strict("{}"))
+          case Some(value) => send(TextMessage.Strict(Encoder.json(value)))
+          case opt: Optional[_] if !opt.isPresent => send(TextMessage.Strict("{}"))
+          case opt: Optional[_] => send(TextMessage.Strict(Encoder.json(opt.get)))
+          case other => send(TextMessage.Strict(Encoder.json(other)))
+        }
+      }))
 
-      override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
+      override def onClose(): Unit = mediator ! PoisonPill
+
+      override def receive(): PartialFunction[Message, Unit] = {
         case text: TextMessage => mediator ! Decoder.json(text.getStrictText)
         case binary: BinaryMessage => mediator ! Decoder.json(binary.dataStream)
-      }
-
-    }, new UpstreamActor {
-      override def handle: Receive = {
-        case rec: Record[_, _] if rec.value == null => push(TextMessage.Strict("{}"))
-        case rec: Record[_, _] => push(TextMessage.Strict(Encoder.json(rec.value)))
-        case None => push(TextMessage.Strict("{}"))
-        case Some(value) => push(TextMessage.Strict(Encoder.json(value)))
-        case opt: Optional[_] if !opt.isPresent => push(TextMessage.Strict("{}"))
-        case opt: Optional[_] => push(TextMessage.Strict(Encoder.json(opt.get)))
-        case other => push(TextMessage.Strict(Encoder.json(other)))
       }
     })
   }
 
   /**
     * avroWebSocket:
-    * +
-    * |                           send:TEXT   +----------+
-    * |                 +------+  send:BIN    |DOWNSTREAM|  send:AVRO
-    * |                 |      +------------> |ACTOR     +---------------+
-    * |                 |      |    close     +-----+----+  close   +-----------------------------+
-    * |                 |      |                    |               |    |                        |
-    * |                 | WEB  |                push|               | +--v------+     +---------+ |
-    * |     CLIENT <----+SOCKET|              SCHEMA|close          | |MEDIATOR +----->KEY|VALUE| |
-    * |                 |      |                    |               | +--+------+     +---------+ |
-    * |                 |      |                    |               |    |  STATE PARTITION       |
-    * |                 |      |     push     +-----v----+   push   +-----------------------------+
-    * |                 |      | <------------+UPSTREAM  +---------------+
-    * |                 +------+    BINARY    |ACTOR     |   AVRO
-    * +
-    * +----------+
+    *
+    * +                                        +---------------+
+    * |                                        |  GraphStage   |
+    * |                           send:TEXT    |               |  send:VALUE
+    * |                 +------+  send:BIN    +-+ receiee(AVRO)+---------------+
+    * |                 |      +------------> |-|   +          |  close   +-----------------------------+
+    * |                 |      |    close     +-+   |          |          |    |                        |
+    * |                 | WEB  |               |    |/Schema   |          | +--v------+     +---------+ |
+    * |     CLIENT <---->SOCKET|               |    |/Close    |          | |MEDIATOR +----->KEY|VALUE| |
+    * |                 |      |               |    |          |          | +--+------+     +---------+ |
+    * |                 |      |     push     +-+   v          |          |    |  STATE PARTITION       |
+    * |                 |      | <--------------| send(AVRO)   |   push   +-----------------------------+
+    * |                 +------+     TEXT     +-+ +--------+ <-----------------+
+    * |                                        |  | ...... |   |   VALUE
+    * |                                        |  +--------+   |
+    * +                                        +---------------+
+    *
+    *
     * Avro Web Socket Protocol:
     *
     * downstream TextMessage is considered a request for a schema of the given name
@@ -320,22 +323,37 @@ trait WebSocketSupport extends GatewayHttp {
     * @param mediator key-value mediator create using connectKeyValueMediator()
     */
   def avroWebSocket(exchange: WebSocketExchange, mediator: ActorRef): Unit = {
-    customWebSocket(exchange, new DownstreamActor {
-      override def onOpen(upstream: ActorRef): Unit = mediator ! RegisterMediatorSubscriber(upstream)
+    webSocket(exchange, new WSHandler {
+      context.actorOf(Props(new Actor {
+        override def preStart(): Unit = {
+          super.preStart()
+          mediator ! RegisterMediatorSubscriber(self)
+        }
 
-      override def onClose(upstream: ActorRef): Unit = mediator ! PoisonPill
+        override def receive: Receive = {
+          case None => send(BinaryMessage.Strict(ByteString())) //non-existent or delete key-value from the mediator
+          case Some(value: AvroRecord) => send(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
+          case rec: Record[_, _] if rec.value == null => send(BinaryMessage.Strict(ByteString())) //replication record
+          case rec: Record[_, _] => send(BinaryMessage.Strict(ByteString(avroSerde.toBytes(rec.value)))) //replication record
+          case value: AvroRecord => send(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
+          case opt: Optional[_] if !opt.isPresent => send(BinaryMessage.Strict(ByteString()))
+          case opt: Optional[_] if opt.get.isInstanceOf[AvroRecord] => send(BinaryMessage.Strict(ByteString(avroSerde.toBytes(opt.get))))
+        }
+      }))
 
-      override def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit] = {
+      override def onClose(): Unit = mediator ! PoisonPill
+
+      override def receive(): PartialFunction[Message, Unit] = {
         case text: TextMessage =>
           val schemaFqn = text.getStrictText
           val (schemaId, _) = avroSerde.getRuntimeSchema(schemaFqn)
           require(schemaId >= 0, s"Could not determine runtime schema for $schemaFqn")
-          upstream ! buildSchemaPushMessage(schemaId)
+          send(BinaryMessage.Strict(buildSchemaPushMessage(schemaId)))
         case binary: BinaryMessage =>
           try {
             val buf = binary.getStrictData.asByteBuffer
             buf.get(0) match {
-              case 123 => upstream ! buildSchemaPushMessage(schemaId = buf.getInt(1))
+              case 123 => send(BinaryMessage.Strict(buildSchemaPushMessage(schemaId = buf.getInt(1))))
               case 0 => try {
                 val record: Any = avroSerde.read(buf)
                 mediator ! record
@@ -346,7 +364,6 @@ trait WebSocketSupport extends GatewayHttp {
           } catch {
             case NonFatal(e) => log.warning("Invalid websocket binary avro message", e)
           }
-
       }
 
       def buildSchemaPushMessage(schemaId: Int): ByteString = {
@@ -363,144 +380,121 @@ trait WebSocketSupport extends GatewayHttp {
             throw e
         }
       }
-
-    }, new UpstreamActor {
-      override def handle: Receive = {
-        case direct: ByteString => push(BinaryMessage.Strict(direct)) //ByteString as the direct response from above downstream handler
-        case None => push(BinaryMessage.Strict(ByteString())) //non-existent or delete key-value from the mediator
-        case Some(value: AvroRecord) => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
-        case rec: Record[_, _] if rec.value == null => push(BinaryMessage.Strict(ByteString()))
-        case rec: Record[_, _] => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(rec.value))))
-        case value: AvroRecord => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
-        case opt: Optional[_] if !opt.isPresent => push(BinaryMessage.Strict(ByteString()))
-        case opt: Optional[_] if opt.get.isInstanceOf[AvroRecord] => push(BinaryMessage.Strict(ByteString(avroSerde.toBytes(opt.get))))
-      }
     })
   }
 
   /**
-    * customWebSocket:
-    * |
-    * |
-    * |                                                      +----------+     onOpen(upstream) ...
-    * |                                   +------+   send    |DOWNSTREAM+---> handleMessage(Message) ...
-    * |                                   |      +---------> |ACTOR     |     onClose() ...
-    * |                                   |      |   close   +-----+----+
-    * |                                   | WEB  |                 |
-    * |                       CLIENT <---->SOCKET|             push|close
-    * |                                   |      |                 |
-    * |                                   |      |   push    +-----v----+
-    * |                                   |      <---------+ |UPSTREAM  |
-    * |                                   +------+           |ACTOR     <---+ handle() ...
-    * |                                                      +----------+
-    * |
+    * webSocket:
+    * +                                                             WSHandler
+    * |                                                      +----------------------+
+    * |                                                      |           onOpen() +----+
+    * |                                                      |GraphStage            |
+    * |                                                      +---------+ receive()+----+
+    * |                                   +------+   send    ||        |            |
+    * |                                   |      +---------> || +---+  |            |
+    * |                                   |      |   close   ||     |  |            |
+    * |                                   | WEB  |           ||     |  |            |
+    * |                       CLIENT <---->SOCKET|           ||     |  |            |
+    * |                                   |      |           ||     |  |            |
+    * |                                   |      |   push    ||     |  |            |
+    * |                                   |      <---------+ || <---+  |            |
+    * |                                   +------+           ||        |  send() +-----+
+    * |                                                      +---------+            |
+    * +                                                      |            onClose()+---+
+    *                                                        +----------------------+
     *
-    * @param exchange   web socket echange as captured in the http interface
+    * @param exchange   web socket xechange as captured in the http interface
     * @param downstream actor which will handle messges sent from the client
     * @param upstream   actor which will handle messages directed at the client
     */
-  def customWebSocket(exchange: WebSocketExchange, downstream: => DownstreamActor, upstream: => UpstreamActor): Unit = {
-    //implicit val materializer: ActorMaterializer = ActorMaterializer.create(context.system)
-    val downstreamRef = context.actorOf(Props(downstream))
-    val upstreamRef = context.actorOf(Props(upstream))
-    implicit val timeout = Timeout(100 milliseconds)
-    Await.result(downstreamRef ? RegisterMediatorSubscriber(upstreamRef), timeout.duration)
-
-    val downMessageSink = Sink.actorRef[Message](downstreamRef, PoisonPill)
-    val pushMessageSource = Source.fromPublisher(ActorPublisher[Message](upstreamRef))
-    val flow = Flow.fromSinkAndSource(downMessageSink, pushMessageSource)
-
-    val upgrade = exchange.upgrade.handleMessages(flow)
+  def webSocket(exchange: WebSocketExchange, handler: => WSHandler): Unit = {
+    val maxBufferSize = conf.Affi.Node.Gateway.MaxWebSocketQueueSize()
+    val graph = new WSFlowStage(maxBufferSize, handler)
+    val upgrade = exchange.upgrade.handleMessages(Flow.fromGraph(graph))
     exchange.response.success(upgrade)
   }
 
-  implicit def textToMessage(text: String): Message = TextMessage.Strict(text)
+}
 
-  trait DownstreamActor extends Actor {
+class WSFlowStage(maxBufferSize: Int, mat: => WSHandler) extends GraphStage[FlowShape[Message, Message]] {
 
-    private var upstream: ActorRef = null
+  val in = Inlet[Message]("WS.from.client")
+  val out = Outlet[Message]("WS.to.client")
 
-    def onOpen(upstream: ActorRef): Unit = ()
+  override val shape = FlowShape(in, out)
 
-    def onClose(upstream: ActorRef): Unit = ()
+  override def createLogic(attr: Attributes): GraphStageLogic = {
+    new GraphStageLogic(shape) {
+      val clientBuffer = scala.collection.mutable.Queue[Message]()
+      var clientWaitingForData = false
 
-    def receiveMessage(upstream: ActorRef): PartialFunction[Message, Unit]
+      def isFull = clientBuffer.size == maxBufferSize
 
-    def receiveHandleError(upstream: ActorRef): PartialFunction[Throwable, Unit] = PartialFunction.empty
+      val handler: WSHandler = mat
+      handler.apply(sendReply)
 
-    override def postStop(): Unit = {
-      log.debug("WebSocket Downstream Actor Closing")
-      if (upstream != null) {
-        upstream ! PoisonPill
-        onClose(upstream)
-      }
-    }
-
-    final override def receive: Receive = {
-      case RegisterMediatorSubscriber(upstream) =>
-        this.upstream = upstream
-        sender ! true
-        onOpen(upstream)
-      case msg: Message if upstream == null => log.warning(s"websocket actors not yet connected, dropping 1 message ${msg.getClass}")
-      case msg: Message =>
-        try {
-          receiveMessage(upstream)(msg)
-        } catch {
-          case NonFatal(e) =>
-            var logged = false
-            val errorHandler: PartialFunction[Throwable, Unit] = receiveHandleError(upstream) orElse {
-              case RequestException(status, _) => upstream ! Map("type" -> "error", "code" -> status.intValue, "message" -> status.reason)
-              case e: ExecutionException => receiveHandleError(upstream)(e.getCause)
-              case e: NoSuchElementException => upstream ! Map("type" -> "error", "code" -> 404, "message" -> e.getMessage())
-              case e: IllegalArgumentException => upstream ! Map("type" -> "error", "code" -> 400, "message" -> e.getMessage())
-              case e: IllegalStateException => upstream ! Map("type" -> "error", "code" -> 409, "message" -> e.getMessage())
-              case _: IllegalAccessException => upstream ! Map("type" -> "error", "code" -> 403, "message" -> "Forbidden")
-              case _: SecurityException => upstream ! Map("type" -> "error", "code" -> 401, "message" -> "Unauthorized")
-              case _: NotImplementedError | _: UnsupportedOperationException => upstream ! Map("type" -> "error", "code" -> 501, "message" -> "Not Implemented")
-              case NonFatal(e) =>
-                logged = true
-                log.error(e, "Json WebSocket receive handler failure")
-                upstream ! Map("type" -> "error", "code" -> 500, "message" -> "Something went wrong with the server")
-            }
-            errorHandler(e)
-            if (!logged) log.warning(e.getMessage)
+      def sendReply(msg: Message): Unit = {
+        clientBuffer.enqueue(msg)
+        if (clientWaitingForData) {
+          clientWaitingForData = false
+          push(out, clientBuffer.dequeue())
         }
-    }
-
-  }
-
-  trait UpstreamActor extends ActorPublisher[Message] with ActorHandler {
-
-    final val maxBufferSize = conf.Affi.Node.Gateway.MaxWebSocketQueueSize()
-
-    override def preStart() = resume
-
-    override def postStop(): Unit = {
-      log.debug("WebSocket Upstream Actor Closing")
-    }
-
-    private val buffer = new util.LinkedList[Message]()
-
-    protected def push(messages: Message*) = {
-      while (buffer.size + messages.size > maxBufferSize) {
-        buffer.pop()
       }
-      messages.foreach(buffer.add)
-      while (isActive && totalDemand > 0 && buffer.size > 0) {
-        onNext(buffer.pop)
+
+      override def preStart(): Unit = {
+        pull(in)
+        handler.onOpen()
       }
-    }
 
-    override def manage: Receive = {
-      case Request(_) => push()
-      case Cancel => log.warning("UpstreamActor received Cancel event")
-    }
+      override def postStop(): Unit = {
+        handler.onClose()
+      }
 
-    override def unhandled: Receive = {
-      case msg: Message => push(msg)
-      case other: Any => log.warning(s"only Message types can be pushed, ignoring: $other")
+      setHandler(in, new InHandler {
+        override def onPush(): Unit = {
+          val msgFromClient: Message = grab(in)
+          handler.receive(msgFromClient)
+          if (!isFull) {
+            pull(in)
+          }
+        }
+      })
+      setHandler(out, new OutHandler {
+        override def onPull(): Unit = {
+          if (clientBuffer.isEmpty) {
+            clientWaitingForData = true
+          } else {
+            val elem: Message = clientBuffer.dequeue
+            push(out, elem)
+          }
+        }
+      })
+
+
     }
   }
+}
 
+
+trait WSHandler {
+
+  @volatile private[this] var replier: Message => Unit = null
+
+  def apply(replier: Message => Unit) = this.replier = replier
+
+  def onOpen(): Unit = ()
+
+  def onClose(): Unit = ()
+
+  final def send(msg: Message): Unit = replier(msg)
+
+  def receive: PartialFunction[Message, Unit]
+
+  //FIXME dow we need ?  def receiveHandleError(upstream: ActorRef): PartialFunction[Throwable, Unit] = PartialFunction.empty
+}
+
+class WSMediatedHandler(mediator: ActorRef) extends WSHandler {
+
+  override def receive: PartialFunction[Message, Unit] = ???
 
 }
