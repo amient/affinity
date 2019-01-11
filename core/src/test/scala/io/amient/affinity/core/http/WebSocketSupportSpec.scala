@@ -154,8 +154,8 @@ class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matc
         wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("Welcome")
         wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("Here is your token")
         wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("{}") //initial value of the key
-//        ws.send("Write")
-//        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
+        ws.send("Write")
+        wsqueue.poll(specTimeout.length, TimeUnit.SECONDS) should be("{\"type\":\"io.amient.affinity.core.http.ID\",\"data\":{\"id\":4}}")
 
       } finally {
         ws.close()
