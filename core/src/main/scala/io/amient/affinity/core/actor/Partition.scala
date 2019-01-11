@@ -22,11 +22,11 @@ package io.amient.affinity.core.actor
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.{Observable, Observer}
 
-import akka.actor.{Actor, ActorRef, Status}
+import akka.actor.{Actor, ActorRef, PoisonPill, Status}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.actor.Container.{PartitionOffline, PartitionOnline}
 import io.amient.affinity.core.serde.primitive.InternalMessage
-import io.amient.affinity.core.state.{KVStore, KVStoreLocal, ObservableKVStore}
+import io.amient.affinity.core.state.{KVStore, KVStoreLocal}
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
@@ -157,12 +157,20 @@ class KeyValueMediator[K](partition: ActorRef, state: KVStore[K, _], key: K) ext
 
   implicit val scheduler = context.system.scheduler
 
+  private[this] var subscriber: ActorRef = null
+
   override def postStop(): Unit = {
-    observer.foreach(state.removeKeyValueObserver(key, _))
+    observer.foreach { o =>
+      state.removeKeyValueObserver(key, o)
+      subscriber ! PoisonPill
+    }
   }
 
   override def receive: Receive = {
-    case RegisterMediatorSubscriber(subscriber:ActorRef) => createKeyValueObserver(key, subscriber)
+    case RegisterMediatorSubscriber(subscriber:ActorRef) =>
+      createKeyValueObserver(key, subscriber)
+      this.subscriber = subscriber
+
     case forward: Any => partition.tell(forward, sender)
   }
 
