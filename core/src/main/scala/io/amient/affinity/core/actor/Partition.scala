@@ -116,6 +116,7 @@ trait Partition extends ActorHandler {
       onBecomeStandby
 
     case CreateKeyValueMediator(stateStoreName: String, key: Any) => try {
+      logger.debug(s"[$partition]: CreateKeyValueMediator($stateStoreName/$key)")
       val state = getStateStore(stateStoreName)
       val props = state.uncheckedMediator(self, key)
       sender ! KeyValueMediatorCreated(context.actorOf(props))
