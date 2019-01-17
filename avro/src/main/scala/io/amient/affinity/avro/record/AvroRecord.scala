@@ -437,6 +437,9 @@ object AvroRecord extends AvroExtractors {
       }
     } else if (tpe <:< typeOf[Option[Any]]) {
       SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
+    } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isTrait && tpe.typeSymbol.asClass.isSealed) {
+      val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
+      schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
     } else if (tpe <:< typeOf[AvroRecord] || tpe.typeSymbol.asClass.isCaseClass) {
       val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
       val moduleMirror = typeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
@@ -497,9 +500,6 @@ object AvroRecord extends AvroExtractors {
           }
       }
       assembler.endRecord()
-    } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isTrait && tpe.typeSymbol.asClass.isSealed) {
-      val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
-      schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
     } else {
       throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString + " " + tpe.typeArgs(0) + " " + tpe.typeArgs(1))
     }

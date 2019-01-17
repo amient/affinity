@@ -261,11 +261,7 @@ trait WebSocketSupport extends GatewayHttp {
     */
   def jsonWebSocket(exchange: WebSocketExchange, mediator: ActorRef): Unit = {
     webSocket(exchange, new WSHandler {
-      context.actorOf(Props(new Actor {
-        override def preStart(): Unit = {
-          super.preStart()
-          mediator ! RegisterMediatorSubscriber(self)
-        }
+      val subscriber = context.actorOf(Props(new Actor {
 
         override def receive: Receive = {
           case rec: Record[_, _] if rec.value == null => send(TextMessage.Strict("{}"))
@@ -277,6 +273,8 @@ trait WebSocketSupport extends GatewayHttp {
           case other => send(TextMessage.Strict(Encoder.json(other)))
         }
       }))
+
+      override def onOpen() : Unit = mediator ! RegisterMediatorSubscriber(subscriber)
 
       override def onClose(): Unit = mediator ! PoisonPill
 
@@ -324,12 +322,7 @@ trait WebSocketSupport extends GatewayHttp {
     */
   def avroWebSocket(exchange: WebSocketExchange, mediator: ActorRef): Unit = {
     webSocket(exchange, new WSHandler {
-      context.actorOf(Props(new Actor {
-        override def preStart(): Unit = {
-          super.preStart()
-          mediator ! RegisterMediatorSubscriber(self)
-        }
-
+      val subscriber = context.actorOf(Props(new Actor {
         override def receive: Receive = {
           case None => send(BinaryMessage.Strict(ByteString())) //non-existent or delete key-value from the mediator
           case Some(value: AvroRecord) => send(BinaryMessage.Strict(ByteString(avroSerde.toBytes(value)))) //key-value from the mediator
@@ -340,6 +333,8 @@ trait WebSocketSupport extends GatewayHttp {
           case opt: Optional[_] if opt.get.isInstanceOf[AvroRecord] => send(BinaryMessage.Strict(ByteString(avroSerde.toBytes(opt.get))))
         }
       }))
+
+      override def onOpen() : Unit = mediator ! RegisterMediatorSubscriber(subscriber)
 
       override def onClose(): Unit = mediator ! PoisonPill
 
@@ -423,6 +418,7 @@ class WSFlowStage(maxBufferSize: Int, mat: => WSHandler) extends GraphStage[Flow
 
   override val shape = FlowShape(in, out)
 
+  //TODO investigate degradation in latency after replacing ActorPublisher with GraphStage
   override def createLogic(attr: Attributes): GraphStageLogic = {
     new GraphStageLogic(shape) {
       val clientBuffer = scala.collection.mutable.Queue[Message]()
