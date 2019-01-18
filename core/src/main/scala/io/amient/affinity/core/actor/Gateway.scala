@@ -132,7 +132,8 @@ trait Gateway extends ActorHandler {
   abstract override def preStart(): Unit = {
     super.preStart()
     //each gateway starts in a suspended mode so in case there are no keyspaces or globals the following will resume it
-    evaluateSuspensionStatus()
+//    evaluateSuspensionStatus()
+    resume
     started = true
   }
 
@@ -149,7 +150,7 @@ trait Gateway extends ActorHandler {
     super.postStop()
   }
 
-  abstract override def manage = super.manage orElse {
+  abstract override def manage: PartialFunction[Any, Unit] = super.manage orElse {
 
     case CreateGateway if !classOf[GatewayHttp].isAssignableFrom(this.getClass) =>
       context.parent ! Controller.GatewayCreated(List())
@@ -161,7 +162,8 @@ trait Gateway extends ActorHandler {
       if (keyspaces(group)._2.get != suspended) {
         logger.debug(s"keyspace ${msg}")
         keyspaces(group)._2.set(suspended)
-        evaluateSuspensionStatus(Some(msg))
+        if (suspended) suspend else resume
+//        evaluateSuspensionStatus(Some(msg))
       }
     }
 
@@ -169,7 +171,8 @@ trait Gateway extends ActorHandler {
       if (globals(group)._2.get != suspended) {
         logger.debug(s"global ${msg}")
         globals(group)._2.set(suspended)
-        evaluateSuspensionStatus(Some(msg))
+        if (suspended) suspend else resume
+//        evaluateSuspensionStatus(Some(msg))
       }
     }
 
@@ -177,23 +180,41 @@ trait Gateway extends ActorHandler {
 
   }
 
-  private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {
-    val shouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
-    if (shouldBeSuspended != isSuspended) {
-      if (shouldBeSuspended) suspend else resume
-      if (self.path.name == "gateway") {
-        //if this is an actual external gateway (as opposed to gateway trait mixed into partition)
-        //publish GatewayClusterStatus message for synchronizing test utilities
-        context.system.eventStream.publish(GatewayClusterStatus(isSuspended)) //this one for SystemTestBase
-      }
-    }
-    if (started && isSuspended && !stopping) {
-      offlineGroups = (keyspaces.filter(_._2._2.get) ++ globals.filter(_._2._2.get)).map(_._1).toList
-      if (offlineGroups.size > 0) {
-        logger.debug(s"Offline groups: ${offlineGroups.mkString(", ")}; in ${self.path}")
-      }
 
-    }
+  abstract override def canResume: Boolean = super.canResume && {
+    val shouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
+    !shouldBeSuspended
   }
+
+  override def onResume(): Unit = {
+    super.onResume()
+    context.system.eventStream.publish(GatewayClusterStatus(false)) //this one for SystemTestBase
+  }
+
+  override def onSuspend(): Unit = {
+    super.onSuspend()
+    context.system.eventStream.publish(GatewayClusterStatus(true)) //this one for SystemTestBase
+  }
+
+
+
+
+//  private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {
+//    val shouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
+//    if (shouldBeSuspended != isSuspended) {
+//      if (shouldBeSuspended) suspend else resume
+//      if (self.path.name == "gateway") {
+//        //if this is an actual external gateway (as opposed to gateway trait mixed into partition)
+//        //publish GatewayClusterStatus message for synchronizing test utilities
+//        context.system.eventStream.publish(GatewayClusterStatus(isSuspended)) //this one for SystemTestBase
+//      }
+//    }
+//    if (started && isSuspended && !stopping) {
+//      offlineGroups = (keyspaces.filter(_._2._2.get) ++ globals.filter(_._2._2.get)).map(_._1).toList
+//      if (offlineGroups.size > 0) {
+//        logger.debug(s"Offline groups: ${offlineGroups.mkString(", ")}; in ${self.path}")
+//      }
+//    }
+//  }
 
 }

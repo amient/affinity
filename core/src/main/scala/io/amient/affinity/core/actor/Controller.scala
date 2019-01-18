@@ -97,8 +97,10 @@ class Controller extends Actor {
 
     case _: StartRebalance =>
       if (conf.Affi.Node.DataAutoAssign()) {
-        conf.Affi.Keyspace().asScala.foreach { case (group, ksConfig) =>
-          getOrCreateContainer(group)
+        if (conf.Affi.Keyspace.isDefined) {
+          conf.Affi.Keyspace().asScala.foreach { case (group, ksConfig) =>
+            getOrCreateContainer(group)
+          }
         }
       } else if (conf.Affi.Node.Containers.isDefined) {
         conf.Affi.Node.Containers().asScala.toList.map {

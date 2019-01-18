@@ -20,11 +20,13 @@
 package io.amient.affinity.core.actor
 
 import java.io.Closeable
+import java.util
 import java.util.concurrent.{Executors, TimeUnit}
 
+import akka.ConfigurationException
 import io.amient.affinity.core.actor.Controller.FatalErrorShutdown
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
-import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
+import io.amient.affinity.core.storage.{LogEntry, LogStorage, LogStorageConf, Record}
 import io.amient.affinity.core.util.{CompletedJavaFuture, EventTime, OutputDataStream, TimeRange}
 
 import scala.collection.JavaConverters._
@@ -35,11 +37,13 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, TimeoutException}
 import scala.language.{existentials, postfixOps}
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 trait GatewayStream extends Gateway {
 
   @volatile private var closed = false
   @volatile private var suspendedSync = true
+  @volatile private var bootstrapLatch = 0
 
   private val lock = new Object
 
@@ -51,6 +55,8 @@ trait GatewayStream extends Gateway {
 
   private val declaredInputStreamProcessors = new mutable.ListBuffer[RunnableInputStream[_, _]]
 
+  lazy val inputStreams: ParSeq[RunnableInputStream[_, _]] = declaredInputStreamProcessors.result().par
+
   private val declardOutputStreams = new ListBuffer[OutputDataStream[_, _]]
 
   lazy val outputStreams: ParSeq[OutputDataStream[_, _]] = declardOutputStreams.result().par
@@ -60,12 +66,14 @@ trait GatewayStream extends Gateway {
     if (!streamConf.Class.isDefined) {
       logger.warning(s"Output stream is not enabled in the current configuration: $streamIdentifier")
       null
-    } else {
+    } else try {
       val keySerde: AbstractSerde[K] = Serde.of[K](config)
       val valSerde: AbstractSerde[V] = Serde.of[V](config)
-      val outpuDataStream = new OutputDataStream[K, V](keySerde, valSerde, streamConf)
-      declardOutputStreams += outpuDataStream
-      outpuDataStream
+      val outputDataStream = new OutputDataStream[K, V](keySerde, valSerde, streamConf)
+      declardOutputStreams += outputDataStream
+      outputDataStream
+    } catch {
+      case NonFatal(e) => throw new ConfigurationException(s"Could not configure output stream: $streamIdentifier", e)
     }
   }
 
@@ -81,25 +89,26 @@ trait GatewayStream extends Gateway {
     val streamConf = nodeConf.Gateway.Stream(streamIdentifier)
     if (!streamConf.Class.isDefined) {
       logger.warning(s"Input stream is not enabled in the current configuration: $streamIdentifier")
-    } else {
+    } else try {
       val keySerde: AbstractSerde[K] = Serde.of[K](config)
       val valSerde: AbstractSerde[V] = Serde.of[V](config)
       declaredInputStreamProcessors += new RunnableInputStream[K, V](streamIdentifier, keySerde, valSerde, streamConf, processor)
+    } catch {
+      case NonFatal(e) => throw new ConfigurationException(s"Could not configure input stream: $streamIdentifier", e)
     }
   }
 
   val inputStreamManager = new Thread {
     override def run(): Unit = {
-      val inputStreamProcessors = declaredInputStreamProcessors.result()
-      if (inputStreamProcessors.isEmpty) return
-      val inputStreamExecutor = Executors.newFixedThreadPool(inputStreamProcessors.size)
+      if (inputStreams.isEmpty) return
+      val inputStreamExecutor = Executors.newFixedThreadPool(inputStreams.size)
       try {
-        inputStreamProcessors.foreach(inputStreamExecutor.submit)
+        inputStreams.foreach(inputStreamExecutor.submit)
         while (!closed) {
           lock.synchronized(lock.wait(1000))
         }
         inputStreamExecutor.shutdown()
-        inputStreamProcessors.foreach(_.close)
+        inputStreams.foreach(_.close)
         inputStreamExecutor.awaitTermination(nodeConf.ShutdownTimeoutMs(), TimeUnit.MILLISECONDS)
       } finally {
         inputStreamExecutor.shutdownNow()
@@ -108,8 +117,16 @@ trait GatewayStream extends Gateway {
   }
 
   abstract override def preStart(): Unit = {
+    bootstrapLatch = declaredInputStreamProcessors.count(_.sync)
+    if (bootstrapLatch > 0) suspend
     inputStreamManager.start()
     super.preStart()
+  }
+
+  abstract override def canResume: Boolean = lock.synchronized {
+    this.suspendedSync = !super.canResume
+    lock.notifyAll()
+    !suspendedSync && bootstrapLatch == 0
   }
 
   abstract override def postStop(): Unit = {
@@ -129,30 +146,13 @@ trait GatewayStream extends Gateway {
     }
   }
 
-  abstract override def suspend() = try synchronized {
-    lock.synchronized {
-      this.suspendedSync = true
-      lock.notifyAll()
-    }
-  } finally {
-    super.suspend
-  }
-
-  abstract override def resume() = try synchronized {
-    lock.synchronized {
-      this.suspendedSync = false
-      lock.notifyAll()
-    }
-  } finally {
-    super.resume
-  }
-
   class RunnableInputStream[K, V](identifier: String,
                                   keySerde: AbstractSerde[K],
                                   valSerde: AbstractSerde[V],
                                   streamConfig: LogStorageConf,
                                   processor: InputStreamProcessor[K, V]) extends Runnable with Closeable {
 
+    val sync = streamConfig.Sync()
     val minTimestamp = streamConfig.MinTimestamp()
     val consumer = LogStorage.newInstanceEnsureExists(streamConfig)
     //this type of buffering has quite a high memory footprint but doesn't require a data structure with concurrent access
@@ -169,22 +169,13 @@ trait GatewayStream extends Gateway {
       try {
         consumer.resume(TimeRange.since(minTimestamp))
         logger.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
+
         var lastCommitTimestamp = System.currentTimeMillis()
         var finalized = false
         var uncommittedInput = false
-        logger.info(s"Starting input stream processor: $identifier")
-        while ((!closed && !finalized) || !lastCommit.isDone) {
-          //clusterSuspended is volatile so we check it for each message set, in theory this should not matter because whatever the processor() does
-          //should be suspended anyway and hang so no need to do it for every record
-          if (suspendedSync) {
-            logger.info(s"Pausing input stream processor: $identifier")
-            while (suspendedSync) {
-              lock.synchronized(lock.wait())
-              if (closed) return
-            }
-            logger.info(s"Resuming input stream processor: $identifier")
-          }
-          val entries = consumer.fetch(true)
+
+        def processMessageSet(entries: util.Iterator[_ <: LogEntry[_ <: Comparable[_]]]): Unit = {
+
           if (entries != null) for (entry <- entries.asScala) {
             val key: K = keySerde.fromBytes(entry.key)
             val value: V = valSerde.fromBytes(entry.value)
@@ -192,6 +183,7 @@ trait GatewayStream extends Gateway {
             if (!unitOfWork.isCompleted) work += unitOfWork
             uncommittedInput = true
           }
+
           /*  At-least-once guarantee processing input messages
            *  Every <commitInterval> all work is completed and then consumer is commited()
            */
@@ -218,9 +210,37 @@ trait GatewayStream extends Gateway {
           }
         }
 
+        if (streamConfig.Sync()) {
+          logger.info(s"Bootstrapping input stream: $identifier")
+          val it = consumer.boundedIterator()
+          while (((!closed && !finalized) || !lastCommit.isDone) && it.hasNext) {
+            val entry = it.next()
+            processMessageSet(Iterator(entry).asJava)
+          }
+          logger.info(s"Input stream boot completed: $identifier")
+          bootstrapLatch -= 1
+          resume
+        }
+
+        logger.info(s"Starting input stream processor: $identifier")
+        while ((!closed && !finalized) || !lastCommit.isDone) {
+
+          if (suspendedSync) {
+            logger.info(s"Pausing input stream processor: $identifier")
+            while (suspendedSync) {
+              lock.synchronized(lock.wait())
+              if (closed) return
+            }
+            logger.info(s"Resuming input stream processor: $identifier")
+          }
+
+          processMessageSet(consumer.fetch(true))
+        }
+
       } catch {
         case _: InterruptedException =>
-        case e: Throwable => context.system.eventStream.publish(FatalErrorShutdown(e))
+        case e: Throwable => context.system.eventStream.publish(FatalErrorShutdown(
+          new RuntimeException(s"Fatal error occurred while executing runnable input stream: $identifier", e)))
       } finally {
         logger.info(s"Finished input stream processor: $identifier (closed = $closed)")
         consumer.close()
