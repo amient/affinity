@@ -58,6 +58,7 @@ object KafkaStorage {
 
   class KafkaStorageConf extends CfgStruct[KafkaStorageConf](classOf[LogStorageConf]) {
     val Topic = string("kafka.topic", true).doc("kafka topic name")
+    val Compact = bool("kafka.compact", false, false).doc("whether the topic compaction should be enforced")
     val Partitions = integer("kafka.partitions", false).doc("requird number of partitions ")
     val ReplicationFactor = integer("kafka.replication.factor", 1).doc("replication factor of the kafka topic")
     val BootstrapServers = string("kafka.bootstrap.servers", true).doc("kafka connection string used for consumer and/or producer")
@@ -174,7 +175,24 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def resume(range: TimeRange): Unit = {
     this.range = range
-    kafkaConsumer.subscribe(List(topic).asJava, this)
+    if (!kafkaStorageConf.Consumer().GroupId.isDefined) {
+      val autoReset = consumerProps.getProperty("auto.offset.reset", "earliest")
+      log.warn(s"Assigning all partitions of topic `$topic` and resetting offsets to: $autoReset")
+      val partitions = (0 until getNumPartitions).map { p => new TopicPartition(topic, p) }.asJava
+      kafkaConsumer.assign(partitions)
+      if (autoReset == "latest") {
+        kafkaConsumer.seekToEnd(partitions)
+      } else {
+        kafkaConsumer.seekToBeginning(partitions)
+        partitions.asScala.foreach { tp =>
+          val startOffset: Long = kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp)
+          val endOffset: Long = kafkaConsumer.endOffsets(List(tp).asJava).get(tp) - 1
+          if (endOffset > startOffset) stopOffsets.put(tp.partition, endOffset)
+        }
+      }
+    } else {
+      kafkaConsumer.subscribe(List(topic).asJava, this)
+    }
   }
 
   override def onPartitionsRevoked(partitions: util.Collection[TopicPartition]) = {
@@ -278,11 +296,15 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   override def ensureExists(): Unit = {
     if (kafkaStorageConf.Partitions.isDefined) {
-      val admin = getAdminClient
-      try {
-        createTopicIfNotExists(admin, kafkaStorageConf.Partitions())
-      } finally {
-        admin.close()
+      if (kafkaStorageConf.Compact()) {
+        ensureCorrectConfiguration(0, kafkaStorageConf.Partitions(), false)
+      } else {
+        val admin = getAdminClient
+        try {
+          createTopicIfNotExists(admin, kafkaStorageConf.Partitions())
+        } finally {
+          admin.close()
+        }
       }
     } else {
       throw new IllegalArgumentException(s"storage configuration for topic $topic must have partitions property set to a postivie integer")
@@ -363,6 +385,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         throw new IllegalStateException(s"Kafka topic $topic has $actualReplFactor, expecting: $replicationFactor")
       }
     }
+
     _create()
     _verify()
   }

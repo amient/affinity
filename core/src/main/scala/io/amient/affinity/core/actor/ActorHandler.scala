@@ -41,7 +41,12 @@ trait ActorHandler extends Actor {
 
   def manage: Receive = PartialFunction.empty
 
-  def suspend: Unit = suspended = true
+  def onSuspend(): Unit = ()
+
+  final def suspend: Unit = if (!suspended) {
+    suspended = true
+    onSuspend()
+  }
 
   final def hold: Receive = {
     case message: Any if (suspended) => onHold(message, sender)
@@ -57,12 +62,17 @@ trait ActorHandler extends Actor {
 
   }
 
-  def resume: Unit = {
+  def canResume: Boolean = true
+
+  def onResume(): Unit = ()
+
+  final def resume: Unit = if (suspended && canResume) {
     suspended = false
     val reprocess = suspendedHttpRequestQueue.toList
     suspendedHttpRequestQueue.clear
     if (reprocess.length > 0) logger.info(s"Re-processing ${reprocess.length} suspended http requests")
     reprocess.foreach(handle(_))
+    onResume()
   }
 
   def handle: Receive = PartialFunction.empty
