@@ -32,6 +32,9 @@ public class LogStorageConf extends CfgStruct<LogStorageConf> {
     public Cfg<Class<? extends LogStorage>> Class = cls("class", LogStorage.class, false)
             .doc("Implementation of storage.LogStorage which will be used for persistence");
 
+    public Cfg<Boolean> Sync = bool("sync", false, false)
+            .doc("Whether to wait on startup until the known end offsets are reached");
+
     public Cfg<Long> MinTimestamp = longint("min.timestamp.ms", 0L)
             .doc("Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.");
 

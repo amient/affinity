@@ -75,18 +75,18 @@ trait GatewayHttp extends Gateway {
     super.postStop()
   }
 
-  abstract override def suspend(): Unit = try {
+  abstract override def onSuspend(): Unit = try {
     log.info("Http Gateway Suspended")
     onlineCounter.dec()
   } finally {
-    super.suspend
+    super.onSuspend
   }
 
-  abstract override def resume(): Unit = try {
+  abstract override def onResume(): Unit = try {
     log.info("Http Gateway Resumed")
     onlineCounter.inc()
   } finally {
-    super.resume
+    super.onResume
   }
 
   abstract override def manage: Receive = super.manage orElse {

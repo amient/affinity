@@ -126,7 +126,7 @@ trait Partition extends ActorHandler {
   }
 
   private[core] def getStateStore(stateStoreName: String): KVStoreLocal[_, _] = {
-    if (!started) throw new IllegalStateException("Cannot get state store rererence before the actor has started")
+    if (!started) throw new IllegalStateException("Cannot get state store reference before the actor has started")
     stateStores(stateStoreName)
   }
 
@@ -140,7 +140,7 @@ trait Partition extends ActorHandler {
       logger.debug(s"${self.path} Became standby for partition $group/$partition")
     } else {
       resume
-      logger.debug(s"${self.path} became master for partition $group/$partition")
+      logger.debug(s"${self.path} Became master for partition $group/$partition")
     }
   }
 
