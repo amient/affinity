@@ -242,4 +242,16 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     }
   }
 
+  "Value Class" should "be serializable as the underlying type and deserialized back into value class" in {
+    val schema = AvroRecord.inferSchema[Service]
+    println(schema)
+    val service = Service(ServiceID("s1"), Hostname("localhost"))
+    println(service)
+    //TODO #269 val bytes = AvroRecord.write(service, schema)
+    //TODO val deserialized = AvroRecord.read(bytes, schema)
+    //TODO deserialized should be(service)
+  }
+
 }
+
+
