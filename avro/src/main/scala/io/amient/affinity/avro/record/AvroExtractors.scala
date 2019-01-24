@@ -151,13 +151,13 @@ trait AvroExtractors {
     object AvroFixed {
       def unapply(f: Any): Option[GenericFixed] = {
         typeIsAllowed(Schema.Type.FIXED) flatMap {
-          case schema if schema.getProp("runtime") == "int" || f.isInstanceOf[Int] =>
+          case schema if schema.getProp("logicalType") == "int" || f.isInstanceOf[Int] =>
             Some(new GenericData.Fixed(schema, ByteUtils.intValue(f.asInstanceOf[Int])))
-          case schema if schema.getProp("runtime") == "long" || f.isInstanceOf[Long] =>
+          case schema if schema.getProp("logicalType") == "long" || f.isInstanceOf[Long] =>
             Some(new GenericData.Fixed(schema, ByteUtils.longValue(f.asInstanceOf[Long])))
-          case schema if schema.getProp("runtime") == "uuid" || schema.getProp("logicalType") == "uuid" || f.isInstanceOf[UUID] =>
+          case schema if schema.getProp("logicalType") == "uuid" || f.isInstanceOf[UUID] =>
             Some(new GenericData.Fixed(schema, ByteUtils.uuid(f.asInstanceOf[UUID])))
-          case schema if schema.getProp("runtime") == "string" || f.isInstanceOf[String] =>
+          case schema if schema.getProp("logicalType") == "string" || f.isInstanceOf[String] =>
             val result: Array[Byte] = AvroRecord.stringToFixed(f.asInstanceOf[String], schema.getFixedSize)
             Some(new GenericData.Fixed(schema, result))
           case schema if f.isInstanceOf[Array[Byte]] =>

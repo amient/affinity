@@ -60,6 +60,7 @@ Below is the table of all supported types, all which support default values.
     sealed trait {T1,T2,T3}         union(T1,T2,T3)      sealed trait's direct concrete types form a union type
     sealed abstract class{T1,T2,T3} union(T1,T2,T3)      sealed class's direct concrete types form a union type 
     case class                      record               nested schemas are allowed
+    class(T) extends AnyVal         T                    scala value classes will be serialized as their underlying primitive (experimental)
     ----------------------------------------------------------------------------------------------------    
     † Generic types cannot be top-level schemas, they can be nested in a case class record - this is because
       generics don't have concrete static type so have to be evaluated at runtime and cannot be efficiently cached. 
@@ -166,7 +167,7 @@ AvroRecord factory methods have variants which take 2 schemas: writer schema and
 The reader schema is the one that matches the current runtime case class.
 The writer schema is the schema which was used to serialize an instance into a binary.
 If we had serialized the person instance with a case class that didn't have the score: Option[Double]
-field it would be possible to project it onto our current runtime defintion of case class Person
+field it would be possible to project it onto our current runtime definition of case class Person
 because our current defintion has a default value None for the field:
 
     val readerSchema = AvroRecord.inferSchema[Person]

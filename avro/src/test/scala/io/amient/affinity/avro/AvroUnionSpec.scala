@@ -93,7 +93,6 @@ class AvroUnionSpec extends FlatSpec with Matchers {
                                                                    |          "name" : "chipit",
                                                                    |          "namespace" : "",
                                                                    |          "size" : 16,
-                                                                   |          "runtime" : "uuid",
                                                                    |          "logicalType" : "uuid"
                                                                    |        }
                                                                    |      } ]
