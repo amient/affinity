@@ -263,9 +263,13 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
       val wrappingSchema = schemaStack.head
       this.nextSchema = wrappingSchema.getType match {
         case Schema.Type.RECORD =>
-          wrappingSchema.getFields.get(fa.rindex).schema
-        case Schema.Type.UNION => wrappingSchema.getTypes.get(unionIndex)
-        case _ => wrappingSchema
+          val s = wrappingSchema.getFields.get(fa.rindex).schema
+          if (s.getType == Schema.Type.UNION) {
+            s.getTypes.get(unionIndex)
+          } else {
+            s
+          }
+        case other => wrappingSchema
       }
       this.logicalType = nextSchema.getLogicalType
       out.writeFieldName(fa.fname)

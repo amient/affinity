@@ -110,18 +110,18 @@ object AvroJsonConverter {
                 builder.set(field, to(d, field.schema()))
               }
             } catch {
-              case e: Throwable => throw new RuntimeException(s"Can't convert json field `$field` with value ${json.get(field.name)} using schema: ${field.schema}", e)
+              case e: Throwable => throw new IllegalArgumentException(s"Can't convert json field `$field` with value ${json.get(field.name)} using schema: ${field.schema}", e)
             }
           }
           try {
             builder.build()
           } catch {
-            case e: Throwable => throw new RuntimeException(s"Could not build ${schema}", e)
+            case e: Throwable => throw new IllegalArgumentException(s"Could not build ${schema}", e)
           }
         case x => throw new IllegalArgumentException(s"Unsupported schema type `$x`")
       }
     } catch {
-      case e: Throwable => throw new RuntimeException(s"Can't convert ${json} using schema: $schema", e)
+      case e: Throwable => throw new IllegalArgumentException(s"Can't convert ${json} using schema: $schema", e)
     }
 
     AvroRecord.read(to(mapper.readTree(json), schema), schema)

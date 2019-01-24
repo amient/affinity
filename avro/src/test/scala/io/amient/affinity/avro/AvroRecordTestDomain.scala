@@ -107,3 +107,8 @@ case class AvroPrmitives(
                        sn: Option[String] = None,
                        ss: Option[String] = Some("Hello")
                        ) extends AvroRecord
+
+
+case class ServiceID(id: String) extends AnyVal
+case class Hostname(name: String) extends AnyVal
+case class Service(id: ServiceID, host: Hostname) extends AvroRecord
