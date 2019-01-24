@@ -105,7 +105,7 @@ trait AvroExtractors {
     object AvroMap {
       def unapply(m: Map[_, _]): Option[(java.util.Map[String, AnyRef])] = {
         typeIsAllowed(Schema.Type.MAP) map { schema =>
-          val javaMap = new java.util.HashMap[String, AnyRef]()
+          val javaMap = new java.util.LinkedHashMap[String, AnyRef]()
           m.foreach {
             case (k: String, v) => javaMap.put(k, extract(v, List(schema.getValueType)))
             case (k, v) => javaMap.put(k.toString, extract(v, List(schema.getValueType)))

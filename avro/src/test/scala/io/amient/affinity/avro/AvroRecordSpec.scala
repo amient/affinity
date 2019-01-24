@@ -289,6 +289,15 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     deserialized should be(service)
   }
 
+//  "ListMap" should "be serialized as map in the same order" ignore {
+//    //TODO #269 to get ListMap working and its ordering survive the serialization - deserialization, generic reader has to be reimplemented
+//    val s = AvroRecord.inferSchema[AvroRecordWithListMapField]
+//    val a = AvroRecordWithListMapField(ListMap("a" -> 1, "b" -> 2, "c" -> 3, "d" -> 4, "e" -> 5, "f" -> 6, "g" -> 7, "h" -> 8))
+//    val b = AvroRecord.write(a, s)
+//    val d = AvroRecord.read[AvroRecordWithListMapField](b, s)
+//    println(d)
+//  }
+
 }
 
 
