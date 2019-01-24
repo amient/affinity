@@ -43,7 +43,7 @@ public class Text {
      * @return filtered input string
      */
     public static String apply(Pattern pattern, String input) {
-        if (pattern.pattern().startsWith("^")) throw new RuntimeException("Cannot use anchored regex for filtering");
+        if (pattern.pattern().startsWith("^")) throw new IllegalArgumentException("Cannot use anchored regex for filtering");
         return pattern.matcher(input).replaceAll("");
     }
 
@@ -54,7 +54,7 @@ public class Text {
      * @return true if the entire input matches the pattern
      */
     public static boolean is(Pattern pattern, String input) {
-        if (!pattern.pattern().startsWith("^")) throw new RuntimeException("Must use anchored regex for matching");
+        if (!pattern.pattern().startsWith("^")) throw new IllegalArgumentException("Must use anchored regex for matching");
         return pattern.matcher(input).matches();
     }
 

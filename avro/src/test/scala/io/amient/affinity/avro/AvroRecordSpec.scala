@@ -27,7 +27,10 @@ import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.{Schema, SchemaValidationException}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.immutable.Seq
+import scala.collection.immutable.{ListMap, Seq}
+
+
+case class AvroRecordWithListMapField(map: ListMap[String, Int]) extends AvroRecord
 
 class AvroRecordSpec extends FlatSpec with Matchers {
 
@@ -182,11 +185,11 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     val key = new UuidCompoundKey(uuidBytes, uuid, 1000L)
     val bytes = newSerde.toBytes(key)
     val prefix = newSerde.prefix(classOf[UuidCompoundKey], uuidBytes, uuid)
-    prefix.length should be (5 + 16 + 16)
+    prefix.length should be(5 + 16 + 16)
     true should be(ByteUtils.startsWith(bytes, prefix))
     val deserialized = newSerde.fromBytes(bytes).asInstanceOf[UuidCompoundKey]
     ByteUtils.uuid(deserialized.uuid1) should be(uuid)
-    deserialized.uuid2 should be (uuid)
+    deserialized.uuid2 should be(uuid)
   }
 
 
@@ -212,18 +215,54 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "Long Compound Key " should "have the same binary prefix as Simple Key" in {
 
-    AvroRecord.inferSchema[LongCompoundKey].toString should be("{\"type\":\"record\",\"name\":\"LongCompoundKey\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"version\",\"type\":{\"type\":\"fixed\",\"name\":\"version\",\"namespace\":\"\",\"size\":8,\"runtime\":\"long\"}},{\"name\":\"country\",\"type\":{\"type\":\"fixed\",\"name\":\"country\",\"namespace\":\"\",\"size\":2,\"runtime\":\"string\"}},{\"name\":\"city\",\"type\":{\"type\":\"fixed\",\"name\":\"city\",\"namespace\":\"\",\"size\":4,\"runtime\":\"string\"}},{\"name\":\"value\",\"type\":\"double\"}]}")
+    AvroRecord.inferSchema[LongCompoundKey].toString(true) should be(
+      """{
+        |  "type" : "record",
+        |  "name" : "LongCompoundKey",
+        |  "namespace" : "io.amient.affinity.avro",
+        |  "fields" : [ {
+        |    "name" : "version",
+        |    "type" : {
+        |      "type" : "fixed",
+        |      "name" : "version",
+        |      "namespace" : "",
+        |      "size" : 8,
+        |      "logicalType" : "long"
+        |    }
+        |  }, {
+        |    "name" : "country",
+        |    "type" : {
+        |      "type" : "fixed",
+        |      "name" : "country",
+        |      "namespace" : "",
+        |      "size" : 2,
+        |      "logicalType" : "string"
+        |    }
+        |  }, {
+        |    "name" : "city",
+        |    "type" : {
+        |      "type" : "fixed",
+        |      "name" : "city",
+        |      "namespace" : "",
+        |      "size" : 4,
+        |      "logicalType" : "string"
+        |    }
+        |  }, {
+        |    "name" : "value",
+        |    "type" : "double"
+        |  } ]
+        |}""".stripMargin)
     val key = LongCompoundKey(100L, "UK", "C001", 99.9)
     val bytes = newSerde.toBytes(key)
     val prefix = newSerde.prefix(classOf[LongCompoundKey], new java.lang.Long(100L), "UK", "C001")
     assert(ByteUtils.startsWith(bytes, prefix))
     newSerde.fromBytes(bytes) should be(key)
-    AvroJsonConverter.toJson(key) should be ("{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":99.9}")
+    AvroJsonConverter.toJson(key) should be("{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":99.9}")
   }
 
   "AvroRecord" should "be serializable by java serializer" in {
     val record = SimpleRecord()
-    AvroRecord.write(record, record.schema)  //trigger initialization of lazy vals
+    AvroRecord.write(record, record.schema) //trigger initialization of lazy vals
     val bos = new ByteArrayOutputStream()
     val bytes = try {
       val out = new ObjectOutputStream(bos)
@@ -236,10 +275,29 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     val bis = new ByteArrayInputStream(bytes)
     val in = new ObjectInputStream(bis)
     try {
-      in.readObject() should be (record)
+      in.readObject() should be(record)
     } finally {
       in.close()
     }
   }
 
+  "Value Class" should "be serializable as the underlying type and deserialized back into value class" in {
+    val schema = AvroRecord.inferSchema[Service]
+    val service = Service(ServiceID("s1"), Hostname("localhost"))
+    val bytes = AvroRecord.write(service, schema)
+    val deserialized = AvroRecord.read[Service](bytes, schema)
+    deserialized should be(service)
+  }
+
+//  "ListMap" should "be serialized as map in the same order" ignore {
+//    //TODO #269 to get ListMap working and its ordering survive the serialization - deserialization, generic reader has to be reimplemented
+//    val s = AvroRecord.inferSchema[AvroRecordWithListMapField]
+//    val a = AvroRecordWithListMapField(ListMap("a" -> 1, "b" -> 2, "c" -> 3, "d" -> 4, "e" -> 5, "f" -> 6, "g" -> 7, "h" -> 8))
+//    val b = AvroRecord.write(a, s)
+//    val d = AvroRecord.read[AvroRecordWithListMapField](b, s)
+//    println(d)
+//  }
+
 }
+
+

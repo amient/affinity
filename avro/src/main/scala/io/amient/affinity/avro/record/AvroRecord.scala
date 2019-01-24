@@ -305,6 +305,7 @@ object AvroRecord extends AvroExtractors {
   def read(datum: Any, schema: Schema): Any = {
 
     def readField(datum: Any, schema: Schema, tpe: Type): Any = {
+      val logicalTypeProp = schema.getProp("logicalType")
       schema.getType match {
         case ENUM => enumCache.getOrInitialize(tpe).apply(datum.asInstanceOf[EnumSymbol].toString)
         case UNION => unionCache.getOrInitialize(tpe, schema, readField)(datum)
@@ -319,6 +320,19 @@ object AvroRecord extends AvroExtractors {
             val elementType = tpe.typeArgs(0)
             datum.asInstanceOf[java.util.Collection[Any]].asScala.map(
               item => readField(item, elementSchema, elementType))
+          }
+        case RECORD => read(datum, schema)
+        case _ if schema.getLogicalType == null && logicalTypeProp != null =>
+          val arg = read(datum, schema)
+          try {
+            val (params: Seq[Type], constructorMirror) = fqnConstructorCache.getOrInitialize(logicalTypeProp)
+            if (params.size == 1) {
+              constructorMirror(arg)
+            } else {
+              arg
+            }
+          } catch {
+            case _: ClassNotFoundException => arg
           }
         case _ => read(datum, schema)
       }
@@ -342,13 +356,13 @@ object AvroRecord extends AvroExtractors {
       case BYTES => ByteUtils.bufToArray(datum.asInstanceOf[java.nio.ByteBuffer])
       case STRING if datum == null => null
       case STRING => datum.asInstanceOf[Utf8].toString
-      case FIXED if schema.getProp("runtime") == "int" || datum.isInstanceOf[Int] =>
+      case FIXED if schema.getProp("logicalType") == "int" || datum.isInstanceOf[Int] =>
         ByteUtils.asIntValue(datum.asInstanceOf[GenericFixed].bytes())
-      case FIXED if schema.getProp("runtime") == "long" || datum.isInstanceOf[Long] =>
+      case FIXED if schema.getProp("logicalType") == "long" || datum.isInstanceOf[Long] =>
         ByteUtils.asLongValue(datum.asInstanceOf[GenericFixed].bytes())
-      case FIXED if schema.getProp("runtime") == "string" =>
+      case FIXED if schema.getProp("logicalType") == "string" =>
         AvroRecord.fixedToString(datum.asInstanceOf[GenericFixed].bytes())
-      case FIXED if schema.getProp("runtime") == "uuid" =>
+      case FIXED if schema.getProp("logicalType") == "uuid" =>
         ByteUtils.uuid(datum.asInstanceOf[GenericFixed].bytes())
       case FIXED => datum.asInstanceOf[GenericFixed].bytes()
       case invalidTopLevel => throw new IllegalArgumentException(s"$invalidTopLevel is not allowed as a top-level avro type")
@@ -437,7 +451,13 @@ object AvroRecord extends AvroExtractors {
       }
     } else if (tpe <:< typeOf[Option[Any]]) {
       SchemaBuilder.builder().unionOf().nullType().and().`type`(inferSchema(tpe.typeArgs(0))).endUnion()
-    } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isTrait && tpe.typeSymbol.asClass.isSealed) {
+    } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isDerivedValueClass) {
+      val constructor = tpe.decl(universe.termNames.CONSTRUCTOR)
+      val underlying = constructor.asMethod.paramLists(0).head
+      val s = inferSchemaWithoutCache(underlying.typeSignature)
+      s.addProp("logicalType", tpe.typeSymbol.asClass.fullName.asInstanceOf[Object])
+      s
+    } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isSealed) {
       val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
       schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
     } else if (tpe <:< typeOf[AvroRecord] || tpe.typeSymbol.asClass.isCaseClass) {
@@ -454,13 +474,13 @@ object AvroRecord extends AvroExtractors {
           val fieldSchema = symbol.annotations.find(_.tree.tpe =:= typeOf[Fixed]).map { a =>
             val fixedSize = a.tree.children.tail.collect { case Literal(Constant(size: Int)) => size }.headOption
             fixedSize match {
-              case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "int").size(4)
-              case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "long").size(8)
+              case None if fieldType =:= typeOf[Int] => SchemaBuilder.builder().fixed(fieldName).prop("logicalType", "int").size(4)
+              case None if fieldType =:= typeOf[Long] => SchemaBuilder.builder().fixed(fieldName).prop("logicalType", "long").size(8)
               case None if fieldType =:= typeOf[UUID] =>
-                val s = SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+                val s = SchemaBuilder.builder().fixed(fieldName).prop("logicalType", "uuid").size(16)
                 LogicalTypes.uuid().addToSchema(s)
                 s
-              case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).prop("runtime", "string").size(size)
+              case Some(size) if fieldType =:= typeOf[String] => SchemaBuilder.builder().fixed(fieldName).prop("logicalType", "string").size(size)
               case None if fieldType =:= typeOf[String] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
               case Some(size) if fieldType =:= typeOf[Array[Byte]] => SchemaBuilder.builder().fixed(fieldName).size(size)
               case None if fieldType =:= typeOf[Array[Byte]] => throw new IllegalArgumentException(s"missing fixed size parameterInfo for @Fixed(<int>) $fieldName: $fieldType)")
@@ -469,7 +489,7 @@ object AvroRecord extends AvroExtractors {
             }
           }.getOrElse {
             if (fieldType =:= typeOf[UUID]) {
-              val s = SchemaBuilder.builder().fixed(fieldName).prop("runtime", "uuid").size(16)
+              val s = SchemaBuilder.builder().fixed(fieldName).prop("logicalType", "uuid").size(16)
               LogicalTypes.uuid().addToSchema(s)
               s
             } else {
@@ -501,11 +521,12 @@ object AvroRecord extends AvroExtractors {
       }
       assembler.endRecord()
     } else {
-      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString + " " + tpe.typeArgs(0) + " " + tpe.typeArgs(1))
+      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
     }
   }
 
   private def adaptFieldSchema(fieldSchema: Schema, value: AnyRef): Schema = {
+
     if (fieldSchema.getType == Schema.Type.MAP) {
       if (value == java.util.Collections.emptyMap[String, AnyRef]) {
         fieldSchema
