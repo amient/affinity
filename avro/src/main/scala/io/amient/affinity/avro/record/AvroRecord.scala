@@ -501,7 +501,7 @@ object AvroRecord extends AvroExtractors {
       }
       assembler.endRecord()
     } else {
-      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString + " " + tpe.typeArgs(0) + " " + tpe.typeArgs(1))
+      throw new IllegalArgumentException("Unsupported scala-avro type " + tpe.toString)
     }
   }
 
