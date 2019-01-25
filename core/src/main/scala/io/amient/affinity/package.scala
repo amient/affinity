@@ -27,6 +27,7 @@ import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.Node.NodeConf
 import io.amient.affinity.core.config._
 import io.amient.affinity.core.state.StateConf
+import io.amient.affinity.core.storage.{LogStorageConf, StorageConf}
 
 package object affinity {
 
@@ -55,6 +56,7 @@ package object affinity {
 
   class AffinityConf extends CfgStruct[AffinityConf] {
     val Avro: AvroConf = struct("avro", new AvroConf(), true)
+    val Storage = struct("storage", new StorageConf(), false)
     val SystemName = string("system.name", true).doc("Identifier which defines the whole system and the namespace of the Coordinators - all nodes in the same system must have the same system.name")
     val Coordinator: CoordinatorConf = struct("coordinator", new CoordinatorConf, true)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)

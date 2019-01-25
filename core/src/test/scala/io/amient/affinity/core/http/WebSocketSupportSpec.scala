@@ -203,7 +203,7 @@ class WebSocketSpecGateway extends GatewayHttp with WebSocketSupport {
                 mediator = keyValueMediator
                 send(TextMessage.Strict("Welcome"))
                 send(TextMessage.Strict("Here is your token"))
-                val subscriber = context.actorOf(Props(new Actor {
+                context.actorOf(Props(new Actor {
                   override def preStart(): Unit = {
                     super.preStart()
                     mediator ! RegisterMediatorSubscriber(self)
