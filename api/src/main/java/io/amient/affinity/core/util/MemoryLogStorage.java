@@ -177,4 +177,10 @@ public class MemoryLogStorage implements LogStorage<Long> {
     public String getStats() {
         return "logEndOffset=" + logEndOffset.get() + "; fetchStopOffset=" + fetchStopOffset.get();
     }
+
+    @Override
+    public String getTopic() {
+        return "default";
+    }
+
 }

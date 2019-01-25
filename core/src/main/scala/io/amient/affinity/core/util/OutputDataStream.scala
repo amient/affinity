@@ -19,25 +19,40 @@
 
 package io.amient.affinity.core.util
 
+import akka.util.Timeout
+import io.amient.affinity.core.actor.TransactionCoordinator
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.language.existentials
+import scala.language.{existentials, postfixOps}
 
-class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
+class OutputDataStream[K, V](txn: TransactionCoordinator, keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
 
   lazy val storage = LogStorage.newInstanceEnsureExists(conf)
 
+  private val topic: String = storage.getTopic()
+
+  implicit val timeout = Timeout(1 minute) //FIXME
+
   def append(record: Record[K, V]): Future[_ <: Comparable[_]] = {
-    val binaryRecord = new Record(keySerde.toBytes(record.key), valSerde.toBytes(record.value), record.timestamp)
-    val jf = storage.append(binaryRecord)
-    Future(jf.get)(ExecutionContext.Implicits.global)
+    if (txn.inTransaction()) {
+      txn.append(topic, keySerde.toBytes(record.key), valSerde.toBytes(record.value), Option(record.timestamp), None)
+    } else {
+      val binaryRecord = new Record(keySerde.toBytes(record.key), valSerde.toBytes(record.value), record.timestamp)
+      val jf = storage.append(binaryRecord)
+      Future(jf.get)(ExecutionContext.Implicits.global)
+    }
   }
 
   def delete(key: K): Future[_ <: Comparable[_]] = {
-    val jf = storage.delete(keySerde.toBytes(key))
-    Future(jf.get)(ExecutionContext.Implicits.global)
+    if (txn.inTransaction()) {
+      txn.append(topic, keySerde.toBytes(key), null, None, None)
+    } else {
+      val jf = storage.delete(keySerde.toBytes(key))
+      Future(jf.get)(ExecutionContext.Implicits.global)
+    }
   }
 
   def flush(): Unit = storage.flush()
@@ -49,3 +64,5 @@ class OutputDataStream[K, V](keySerde: AbstractSerde[_ >: K], valSerde: Abstract
     }
   }
 }
+
+
