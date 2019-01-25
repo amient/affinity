@@ -25,6 +25,7 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
+import io.amient.affinity.core.ack
 import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.config.{CfgList, CfgStruct}
@@ -66,10 +67,6 @@ trait Gateway extends ActorHandler {
 
   private var started = false
 
-  private var offlineGroups = List[String]()
-
-  private var stopping = false
-
   /**
     * internal map of all declared keyspaces (keyspace: String -> (KeyspaceActorRef, SuspendedFlag)
     */
@@ -81,9 +78,18 @@ trait Gateway extends ActorHandler {
 
   val metrics = AffinityMetrics.forActorSystem(context.system)
 
+  val txnCoordinator = new TransactionCoordinator(context)
+
   def trace(groupName: String, result: Promise[_ <: Any]): Unit = metrics.process(groupName, result)
 
   def trace(groupName: String, result: Future[Any]): Unit = metrics.process(groupName, result)
+
+  def beginTransaction(): Unit = txnCoordinator.begin()
+
+  def commitTransaction(): Unit = txnCoordinator.commit()
+
+  def abortTransaction(): Unit = txnCoordinator.abort()
+
 
   final def keyspace(identifier: String): ActorRef = {
     if (started) throw new IllegalStateException("Cannot declare keyspace after the actor has started")
@@ -131,15 +137,12 @@ trait Gateway extends ActorHandler {
 
   abstract override def preStart(): Unit = {
     super.preStart()
-    //each gateway starts in a suspended mode so in case there are no keyspaces or globals the following will resume it
-//    evaluateSuspensionStatus()
     resume
     started = true
   }
 
   abstract override def postStop(): Unit = try {
     logger.debug("Closing global state stores")
-    stopping = true
     globals.foreach { case (identifier, (store, _)) => try {
       store.close()
     } catch {
@@ -163,7 +166,6 @@ trait Gateway extends ActorHandler {
         logger.debug(s"keyspace ${msg}")
         keyspaces(group)._2.set(suspended)
         if (suspended) suspend else resume
-//        evaluateSuspensionStatus(Some(msg))
       }
     }
 
@@ -172,7 +174,6 @@ trait Gateway extends ActorHandler {
         logger.debug(s"global ${msg}")
         globals(group)._2.set(suspended)
         if (suspended) suspend else resume
-//        evaluateSuspensionStatus(Some(msg))
       }
     }
 
@@ -195,26 +196,5 @@ trait Gateway extends ActorHandler {
     super.onSuspend()
     context.system.eventStream.publish(GatewayClusterStatus(true)) //this one for SystemTestBase
   }
-
-
-
-
-//  private def evaluateSuspensionStatus(msg: Option[AnyRef] = None): Unit = {
-//    val shouldBeSuspended = keyspaces.exists(_._2._2.get) || globals.exists(_._2._2.get)
-//    if (shouldBeSuspended != isSuspended) {
-//      if (shouldBeSuspended) suspend else resume
-//      if (self.path.name == "gateway") {
-//        //if this is an actual external gateway (as opposed to gateway trait mixed into partition)
-//        //publish GatewayClusterStatus message for synchronizing test utilities
-//        context.system.eventStream.publish(GatewayClusterStatus(isSuspended)) //this one for SystemTestBase
-//      }
-//    }
-//    if (started && isSuspended && !stopping) {
-//      offlineGroups = (keyspaces.filter(_._2._2.get) ++ globals.filter(_._2._2.get)).map(_._1).toList
-//      if (offlineGroups.size > 0) {
-//        logger.debug(s"Offline groups: ${offlineGroups.mkString(", ")}; in ${self.path}")
-//      }
-//    }
-//  }
 
 }

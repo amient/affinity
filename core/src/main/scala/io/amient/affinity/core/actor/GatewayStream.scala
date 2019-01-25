@@ -27,7 +27,7 @@ import akka.ConfigurationException
 import io.amient.affinity.core.actor.Controller.FatalErrorShutdown
 import io.amient.affinity.core.serde.{AbstractSerde, Serde}
 import io.amient.affinity.core.storage.{LogEntry, LogStorage, LogStorageConf, Record}
-import io.amient.affinity.core.util.{CompletedJavaFuture, EventTime, OutputDataStream, TimeRange}
+import io.amient.affinity.core.util._
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -69,7 +69,7 @@ trait GatewayStream extends Gateway {
     } else try {
       val keySerde: AbstractSerde[K] = Serde.of[K](config)
       val valSerde: AbstractSerde[V] = Serde.of[V](config)
-      val outputDataStream = new OutputDataStream[K, V](keySerde, valSerde, streamConf)
+      val outputDataStream = new OutputDataStream[K, V](txnCoordinator, keySerde, valSerde, streamConf)
       declardOutputStreams += outputDataStream
       outputDataStream
     } catch {

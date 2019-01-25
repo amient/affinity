@@ -88,6 +88,12 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
     String getStats();
 
     /**
+     * This is a general concept of topic for all storage types
+     * @return name of this topic or channel this log is identified in the concrete implementation
+     */
+    String getTopic();
+
+    /**
      * get number of partitions of the underlying physical log
      * @return number of partitions
      */
