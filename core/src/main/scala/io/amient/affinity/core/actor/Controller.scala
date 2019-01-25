@@ -26,7 +26,8 @@ import akka.event.Logging
 import akka.util.Timeout
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Container.AssignPartition
+import io.amient.affinity.core.actor.Container.{AssignPartition, UpdateContainerPeers}
+import io.amient.affinity.core.cluster.Coordinator
 import io.amient.affinity.core.config.CfgIntList
 import io.amient.affinity.core.util.Reply
 
@@ -36,6 +37,8 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
 
 object Controller {
+
+  final case class UpdatePeers(peers: List[String])
 
   final case class StartRebalance()
 
@@ -49,7 +52,7 @@ object Controller {
 
 class Controller extends Actor {
 
-  private val log = Logging.getLogger(context.system, this)
+  private val logger = Logging.getLogger(context.system, this)
 
   import Controller._
 
@@ -62,6 +65,9 @@ class Controller extends Actor {
   private var gatewayPromise: Promise[List[Int]] = null
 
   private val containers = scala.collection.mutable.Map[String, ActorRef]()
+
+  final private val defaultGroup = "_affinity_cluster"
+  private val coordinator = Coordinator.create(context.system, defaultGroup)
 
   import context.dispatcher
 
@@ -78,22 +84,30 @@ class Controller extends Actor {
     case _: Throwable ⇒ Escalate
   }
 
-  private def getOrCreateContainer(group: String): ActorRef = {
-    if (!containers.contains(group)) {
-      log.info(s"Starting container `$group`")
-      val container = context.actorOf(Props(new Container(group)), name = group)
-      containers.put(group, container)
-    }
-    containers(group)
-  }
+  val zid: Option[String] = coordinator.attachController(self)
+
+  val txnCoordinator = new TransactionCoordinatorImpl(context, zid)
 
   override def preStart(): Unit = {
     super.preStart()
   }
 
+  private[this] var peers: List[String] = List()
+
   override def receive: Receive = {
 
     case Terminated(child) if (containers.contains(child.path.name)) => containers.remove(child.path.name)
+
+    case UpdatePeers(peers: Seq[String]) =>
+      logger.debug(s"${coordinator.akkaAddress}: peers = $peers")
+      this.peers = peers
+      peers.sorted.zipWithIndex.find(_._1 == zid.get).map(_._2) match {
+        case None => throw new IllegalStateException(s"This peer node is not registered: ${coordinator.akkaAddress}")
+        case Some(a: Int) =>
+          logger.debug(s"CLUSTER SIZE: ${peers.size}, THIS NODE ZID=${zid}, THIS NODE SEQ: $a")
+          containers.foreach (_._2 ! UpdateContainerPeers(zid.get, peers))
+      }
+
 
     case _: StartRebalance =>
       if (conf.Affi.Node.DataAutoAssign()) {
@@ -109,7 +123,7 @@ class Controller extends Actor {
             val partitions = value().asScala.map(_.toInt).toList
             val serviceClass = conf.Affi.Keyspace(group).PartitionClass()
             implicit val timeout = Timeout(startupTimeout)
-            Await.result(Future.sequence(partitions.map{ p =>
+            Await.result(Future.sequence(partitions.map { p =>
               container ?? AssignPartition(p, Props(serviceClass))
             }), startupTimeout)
         }
@@ -125,15 +139,31 @@ class Controller extends Actor {
       case _: InvalidActorNameException => request(sender) ! gatewayPromise.future
     }
 
+    case request@ControllerBeginTransaction() => request(sender) ! txnCoordinator.begin()
+    case request@TransactionCommit() => request(sender) ! txnCoordinator.commit()
+    case request@TransactionAbort() => request(sender) ! txnCoordinator.abort()
+    case request@TransactionalRecord(topic, key, value, timestamp, partition) => request(sender) ! txnCoordinator.append(topic, key, value, timestamp, partition)
+
     case Terminated(child) if (child.path.name == "gateway") =>
       if (!gatewayPromise.isCompleted) gatewayPromise.failure(new AkkaException("Gateway initialisation failed"))
 
     case GatewayCreated(ports) => if (!gatewayPromise.isCompleted) {
-      if (ports.length > 0) log.info("Gateway online (with http)") else log.info("Gateway online (stream only)")
+      if (ports.length > 0) logger.info("Gateway online (with http)") else logger.info("Gateway online (stream only)")
       gatewayPromise.success(ports)
     }
 
-    case anyOther => log.warning("Unknown controller message " + anyOther)
+    case anyOther => logger.warning("Unknown controller message " + anyOther)
   }
+
+  private def getOrCreateContainer(group: String): ActorRef = {
+    if (!containers.contains(group)) {
+      logger.info(s"Starting container `$group`")
+      val container = context.actorOf(Props(new Container(group)), name = group)
+      containers.put(group, container)
+      container ! UpdateContainerPeers(zid.get, this.peers)
+    }
+    containers(group)
+  }
+
 
 }

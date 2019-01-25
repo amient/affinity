@@ -19,6 +19,7 @@
 
 package io.amient.affinity.core.cluster
 
+import java.io.PrintWriter
 import java.util
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -28,7 +29,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
-import io.amient.affinity.core.actor.Container.UpdatePeers
+import io.amient.affinity.core.actor.Controller.UpdatePeers
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ByteUtils, Reply}
 
@@ -58,6 +59,7 @@ object Coordinator {
     /**
       * a method which is deterministic across multiple nodes that resolves which one of the replicas is the master for
       * each partition applying a murmur2 hash to the replica's unique handle and selecting the one with the largest hash
+      *
       * @return a set of all masters for each partition within the group this coordinator is managing
       */
     def masters: Set[ActorRef] = {
@@ -70,6 +72,7 @@ object Coordinator {
     /**
       * mastersDelta splits the current members of this update message into additions and removals
       * with respect to the provided known state
+      *
       * @param knownMasters a set of actors to which if the result is applied will be the same as the members of this update
       * @return (list of additions, list of removals)
       */
@@ -108,6 +111,19 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   protected val closed = new AtomicBoolean(false)
 
+  private val conf = Conf(system.settings.config)
+
+  final val akkaAddress = if (conf.Akka.Hostname() > "") {
+    if (conf.Akka.Hostname().trim == "0.0.0.0") {
+      throw new IllegalArgumentException("Hostname cannot be non-specific (0.0.0.0), use different hostname and bind-hostname settings")
+    } else {
+      s"akka.tcp://${system.name}@${conf.Akka.Hostname()}:${conf.Akka.Port()}"
+    }
+  } else {
+    s"akka://${system.name}"
+  }
+
+
   /**
     * wacthers - a list of all actors that will receive MembershipUpdate messages when members are added or removed
     * to the group
@@ -133,7 +149,7 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
   /**
     * watch changes in the coordinate group of routees in the whole cluster.
     *
-    * @param watcher     actor which will receive the messages
+    * @param watcher actor which will receive the messages
     */
   def watch(watcher: ActorRef): Unit = {
     synchronized {
@@ -213,11 +229,37 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
     registerPeer(akkaAddress, zid)
   }
 
-  final  protected def updatePeers(peers: List[String]) : Unit = peerWatcher ! UpdatePeers(peers)
+  final protected def updatePeers(peers: List[String]): Unit = peerWatcher ! UpdatePeers(peers)
 
-  protected def registerPeer( akkaAddress: String, knownZid: Option[String]): String
+  protected def registerPeer(akkaAddress: String, knownZid: Option[String]): String
 
+  private var zid: Option[String] = None
 
+  final def attachController(controller: ActorRef): Option[String] = {
+    val conf = Conf(system.settings.config)
+    if (conf.Affi.Coordinator.Class() == classOf[CoordinatorEmbedded]) {
+      zid = None
+    } else if (!conf.Affi.Node.DataDir.isDefined ) {
+      logger.warning("Ephemeral ZIDs are good for testing but in production they should be persisted by configuring:" + conf.Affi.Node.DataDir.path)
+      zid = Some(registerAndWatchPeers(akkaAddress, zid, controller))
+    } else {
+      val dir = conf.Affi.Node.DataDir()
+      val zidFile = dir.resolve(s"$group.zid").toFile
+      if (!zidFile.exists()) {
+        zidFile.getParentFile.mkdirs()
+        zidFile.createNewFile()
+      } else {
+        val source = scala.io.Source.fromFile(zidFile)
+        zid = Some((try source.mkString finally source.close()))
+      }
+      zid = Some(registerAndWatchPeers(akkaAddress, zid, controller))
+      new PrintWriter(zidFile) {
+        write(zid.get.toString);
+        close
+      }
+    }
+    return zid
+  }
 
 
 }

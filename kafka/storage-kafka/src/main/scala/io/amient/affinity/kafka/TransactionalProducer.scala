@@ -69,11 +69,11 @@ class TransactionalProducer extends Actor {
 
   override def receive: Receive = {
 
-    case req@TransactionBegin() => req(sender) ! {
+    case req@TransactionBegin(transactionalId) => req(sender) ! {
       if (producer == null) {
-        producerConfig.put("transactional.id", "my-unique-affinity-node-id") //TODO get affinity node id
+        producerConfig.put("transactional.id", transactionalId)
         producer = new KafkaProducer[Array[Byte], Array[Byte]](producerConfig)
-        logger.debug("Transactions.Init()")
+        logger.debug(s"Transactions.Init(transactional.id = $transactionalId)")
         producer.initTransactions()
       }
       logger.debug("Transactions.Begin()")

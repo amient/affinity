@@ -20,10 +20,9 @@
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.http.scaladsl.model.StatusCodes._
-import com.typesafe.config.{ConfigFactory, ConfigRenderOptions, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.HttpInterfaceConf
 import io.amient.affinity.core.util.AffinityTestBase
 import io.amient.affinity.kafka.EmbeddedKafka
 import io.amient.affinity.ws.WebSocketClient
@@ -36,9 +35,9 @@ import scala.language.postfixOps
 
 class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").Partitions()
+  def config = ConfigFactory.load("example")
 
-  val config = ConfigFactory.load("example")
+  override def numPartitions = Conf(config).Affi.Keyspace("graph").Partitions()
 
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))

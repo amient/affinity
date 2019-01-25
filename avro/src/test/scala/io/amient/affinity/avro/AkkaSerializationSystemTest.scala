@@ -19,6 +19,8 @@
 
 package io.amient.affinity.avro
 
+import java.nio.file.Files
+
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
