@@ -25,7 +25,7 @@ import io.amient.affinity.avro.MemorySchemaRegistry
 import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.avro.record.{AvroRecord, AvroSerde}
-import io.amient.affinity.core.actor.Routed
+import io.amient.affinity.core.actor.{Routed, TransactionCoordinator}
 import io.amient.affinity.core.storage.{LogStorage, LogStorageConf, Record}
 import io.amient.affinity.core.util.{EventTime, OutputDataStream, TimeRange}
 import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
@@ -92,6 +92,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
     createTopic(topic)
 
     val stream = new OutputDataStream[Int, CompactionTestEvent](
+      new TransactionCoordinator(null),
       AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap, numPartitions))
     try {
       (0 to 99).foreach { i =>
