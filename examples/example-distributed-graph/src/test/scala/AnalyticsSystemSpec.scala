@@ -19,7 +19,7 @@
 
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
@@ -33,14 +33,13 @@ import org.apache.spark.serializer._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
 class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
-  override def numPartitions = Conf(ConfigFactory.load("example")).Affi.Keyspace("graph").Partitions()
+  def config = ConfigFactory.load("example")
 
-  val config: Config = ConfigFactory.load("example")
+  override def numPartitions = Conf(config).Affi.Keyspace("graph").Partitions()
 
   val node2 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))
   val node1 = new Node(configure(config, Some(zkConnect), Some(kafkaBootstrap)))

@@ -235,21 +235,28 @@ abstract class Coordinator(val system: ActorSystem, val group: String) {
 
   private var zid: Option[String] = None
 
-  final def attachTo(who: ActorRef): Option[String] = {
+  final def attachController(controller: ActorRef): Option[String] = {
     val conf = Conf(system.settings.config)
-    val dir = conf.Affi.Node.DataDir()
-    val zidFile = dir.resolve(s"$group.zid").toFile
-    if (!zidFile.exists()) {
-      zidFile.getParentFile.mkdirs()
-      zidFile.createNewFile()
+    if (conf.Affi.Coordinator.Class() == classOf[CoordinatorEmbedded]) {
+      zid = None
+    } else if (!conf.Affi.Node.DataDir.isDefined ) {
+      logger.warning("Ephemeral ZIDs are good for testing but in production they should be persisted by configuring:" + conf.Affi.Node.DataDir.path)
+      zid = Some(registerAndWatchPeers(akkaAddress, zid, controller))
     } else {
-      val source = scala.io.Source.fromFile(zidFile)
-      zid = Some((try source.mkString finally source.close()))
-    }
-    zid = Some(registerAndWatchPeers(akkaAddress, zid, who))
-    new PrintWriter(zidFile) {
-      write(zid.get.toString);
-      close
+      val dir = conf.Affi.Node.DataDir()
+      val zidFile = dir.resolve(s"$group.zid").toFile
+      if (!zidFile.exists()) {
+        zidFile.getParentFile.mkdirs()
+        zidFile.createNewFile()
+      } else {
+        val source = scala.io.Source.fromFile(zidFile)
+        zid = Some((try source.mkString finally source.close()))
+      }
+      zid = Some(registerAndWatchPeers(akkaAddress, zid, controller))
+      new PrintWriter(zidFile) {
+        write(zid.get.toString);
+        close
+      }
     }
     return zid
   }

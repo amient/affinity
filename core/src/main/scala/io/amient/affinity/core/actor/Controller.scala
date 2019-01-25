@@ -66,7 +66,7 @@ class Controller extends Actor {
 
   private val containers = scala.collection.mutable.Map[String, ActorRef]()
 
-  final private val defaultGroup = "_"
+  final private val defaultGroup = "_affinity_cluster"
   private val coordinator = Coordinator.create(context.system, defaultGroup)
 
   import context.dispatcher
@@ -84,7 +84,7 @@ class Controller extends Actor {
     case _: Throwable ⇒ Escalate
   }
 
-  val zid: Option[String] = coordinator.attachTo(self)
+  val zid: Option[String] = coordinator.attachController(self)
 
   val txnCoordinator = new TransactionCoordinatorImpl(context, zid)
 
@@ -92,12 +92,15 @@ class Controller extends Actor {
     super.preStart()
   }
 
+  private[this] var peers: List[String] = List()
+
   override def receive: Receive = {
 
     case Terminated(child) if (containers.contains(child.path.name)) => containers.remove(child.path.name)
 
     case UpdatePeers(peers: Seq[String]) =>
       logger.debug(s"${coordinator.akkaAddress}: peers = $peers")
+      this.peers = peers
       peers.sorted.zipWithIndex.find(_._1 == zid.get).map(_._2) match {
         case None => throw new IllegalStateException(s"This peer node is not registered: ${coordinator.akkaAddress}")
         case Some(a: Int) =>
@@ -157,6 +160,7 @@ class Controller extends Actor {
       logger.info(s"Starting container `$group`")
       val container = context.actorOf(Props(new Container(group)), name = group)
       containers.put(group, container)
+      container ! UpdateContainerPeers(zid.get, this.peers)
     }
     containers(group)
   }

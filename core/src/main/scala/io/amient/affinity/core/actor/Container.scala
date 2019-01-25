@@ -67,13 +67,10 @@ class Container(group: String) extends Actor {
 
   private val masters = scala.collection.mutable.Set[ActorRef]()
 
-//  private var zid: Option[String] = None
-
   override def preStart(): Unit = {
     super.preStart()
     //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
     coordinator.watch(self)
-
   }
 
   override def postStop(): Unit = {
