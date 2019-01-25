@@ -32,7 +32,11 @@ import io.amient.affinity.core.storage.{LogStorageConf, StorageConf}
 package object affinity {
 
   object Conf extends Conf {
-    override def apply(config: Config): Conf = new Conf().apply(config)
+    override def apply(config: Config): Conf = {
+      val conf = new Conf().apply(config)
+      //TODO extra validation
+      conf
+    }
   }
 
   class Conf extends CfgStruct[Conf](Cfg.Options.IGNORE_UNKNOWN) {
@@ -61,7 +65,7 @@ package object affinity {
     val Coordinator: CoordinatorConf = struct("coordinator", new CoordinatorConf, true)
     val Keyspace: CfgGroup[KeyspaceConf] = group("keyspace", classOf[KeyspaceConf], false)
     val Global = group("global", classOf[StateConf], false).doc("each global state has an ID and needs to be further configured")
-    val Node = struct("node", new NodeConf, true)
+    val Node = struct("node", new NodeConf, false)
   }
 
   object AffinityActorSystem {

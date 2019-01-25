@@ -12,6 +12,9 @@
         <appender-ref ref="STDOUT" />
     </root>
 
+    <logger name="io.amient.affinity.core.actor.Controller" level="DEBUG" />
+    <logger name="io.amient.affinity.core.actor.Container" level="DEBUG" />
+
     <logger name="kafka" level="OFF" />
     <logger name="akka" level="ERROR" />
     <logger name="org.I0Itec.zkclient" level="ERROR" />

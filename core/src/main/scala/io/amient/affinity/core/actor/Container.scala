@@ -19,7 +19,7 @@
 
 package io.amient.affinity.core.actor
 
-import java.io.{File, PrintWriter}
+import java.io.File
 import java.nio.file.Files
 
 import akka.actor.{Actor, ActorPath, ActorRef, Props}
@@ -29,8 +29,8 @@ import io.amient.affinity
 import io.amient.affinity.Conf
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.Container._
-import io.amient.affinity.core.cluster.{Balancer, Coordinator}
 import io.amient.affinity.core.cluster.Coordinator.MembershipUpdate
+import io.amient.affinity.core.cluster.{Balancer, Coordinator}
 import io.amient.affinity.core.util.Reply
 
 import scala.collection.JavaConverters._
@@ -39,7 +39,7 @@ import scala.language.postfixOps
 
 object Container {
 
-  case class UpdatePeers(peers: List[String])
+  case class UpdateContainerPeers(zid: String, peers: List[String])
 
   case class AssignPartition(p: Int, props: Props) extends Reply[ActorRef]
 
@@ -59,16 +59,6 @@ class Container(group: String) extends Actor {
 
   private val startupTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
 
-  final private val akkaAddress = if (conf.Akka.Hostname() > "") {
-    if (conf.Akka.Hostname().trim == "0.0.0.0") {
-      throw new IllegalArgumentException("Hostname cannot be non-specific (0.0.0.0), use different hostname and bind-hostname settings")
-    } else {
-      s"akka.tcp://${context.system.name}@${conf.Akka.Hostname()}:${conf.Akka.Port()}"
-    }
-  } else {
-    s"akka://${context.system.name}"
-  }
-
   private val partitions = scala.collection.mutable.Map[ActorRef, String]()
 
   private val partitionIndex = scala.collection.mutable.Map[Int, ActorRef]()
@@ -77,30 +67,8 @@ class Container(group: String) extends Actor {
 
   private val masters = scala.collection.mutable.Set[ActorRef]()
 
-  private var zid: Option[String] = None
-
   override def preStart(): Unit = {
     super.preStart()
-    if (conf.Affi.Node.DataAutoAssign()) {
-      if (!conf.Affi.Node.DataDir.isDefined) {
-        logger.warning("node.data.auto.assign is enabled but node.data.dir is not defined - system's affinity to existing state will be minimal")
-        zid = Some(coordinator.registerAndWatchPeers(akkaAddress, None, self))
-      } else {
-        val dir = conf.Affi.Node.DataDir()
-        val zidFile = dir.resolve(s"$group.zid").toFile
-        if (!zidFile.exists()) {
-          zidFile.getParentFile.mkdirs()
-          zidFile.createNewFile()
-        } else {
-          val source = scala.io.Source.fromFile(zidFile)
-          zid = Some((try source.mkString finally source.close()))
-        }
-        zid = Some(coordinator.registerAndWatchPeers(akkaAddress, zid, self))
-        new PrintWriter(zidFile) {
-          write(zid.get.toString); close
-        }
-      }
-    }
     //from this point on MembershipUpdate messages will be received by this Container when members are added/removed
     coordinator.watch(self)
   }
@@ -122,15 +90,15 @@ class Container(group: String) extends Actor {
 
   override def receive: Receive = {
 
-    case UpdatePeers(peers: Seq[String]) if conf.Affi.Node.DataAutoAssign() && conf.Affi.Keyspace(group).isDefined =>
-      logger.debug(s"$akkaAddress: peers in group $group= $peers")
-      peers.sorted.zipWithIndex.find(_._1 == zid.get).map(_._2) match {
-        case None => throw new IllegalStateException(s"This peer is not registered: $akkaAddress")
+    case UpdateContainerPeers(zid, peers: Seq[String]) if conf.Affi.Node.DataAutoAssign() && conf.Affi.Keyspace(group).isDefined =>
+      logger.debug(s"${coordinator.akkaAddress}: peers in group $group= $peers")
+      peers.sorted.zipWithIndex.find(_._1 == zid).map(_._2) match {
+        case None => throw new IllegalStateException(s"This peer is not registered: ${coordinator.akkaAddress}")
         case Some(a) =>
           val ksConf: affinity.KeyspaceConf = conf.Affi.Keyspace(group)
           val serviceClass = ksConf.PartitionClass()
           val assignment = Balancer.generateAssignment(ksConf.Partitions(), ksConf.ReplicationFactor(), peers.size)
-          logger.debug(s"$akkaAddress: new assignment in group $group = $assignment")
+          logger.debug(s"${coordinator.akkaAddress}: new assignment in group $group = $assignment")
           val assigned = assignment(a).toSet
           val unassigned = (0 until ksConf.Partitions()).toSet -- assigned
           assigned.foreach(partition => self ! AssignPartition(partition, Props(serviceClass)))
@@ -138,7 +106,7 @@ class Container(group: String) extends Actor {
       }
 
     case request@AssignPartition(p, props) => request(sender) ! {
-      logger.debug(s"$akkaAddress: Assigning partition $group/$p")
+      logger.debug(s"${coordinator.akkaAddress}: Assigning partition $group/$p")
       partitionIndex.get(p) match {
         case Some(ref) => ref
         case None =>
@@ -150,18 +118,19 @@ class Container(group: String) extends Actor {
 
     case request@UnassignPartition(p) => request(sender) ! {
       if (partitionIndex.contains(p)) {
-        logger.debug(s"$akkaAddress: Unassigning partition $group/$p")
+        logger.debug(s"${coordinator.akkaAddress}: Unassigning partition $group/$p")
         partitionIndex.remove(p).foreach(context.stop)
       }
-      if (conf.Affi.Node.DataDir.isDefined && conf.Affi.Node.DataAutoDelete()) {
+      if (conf.Affi.Node.DataAutoDelete()) {
         val dir = conf.Affi.Node.DataDir()
         if (Files.exists(dir)) {
           def deleteDirectory(f: File): Unit = if (f.exists) {
             if (f.isDirectory) f.listFiles.foreach(deleteDirectory)
             if (!f.delete) throw new RuntimeException(s"Failed to delete ${f.getAbsolutePath}")
           }
+
           Files.newDirectoryStream(dir, s"$group-*-$p").asScala.foreach { partDir =>
-            logger.warning(s"$akkaAddress: Deleting unassigned partition data: $partDir")
+            logger.warning(s"${coordinator.akkaAddress}: Deleting unassigned partition data: $partDir")
             deleteDirectory(partDir.toFile)
           }
         }
@@ -169,7 +138,7 @@ class Container(group: String) extends Actor {
     }
 
     case PartitionOnline(ref) =>
-      val partitionActorPath = ActorPath.fromString(s"${akkaAddress}${ref.path.toStringWithoutAddress}")
+      val partitionActorPath = ActorPath.fromString(s"${coordinator.akkaAddress}${ref.path.toStringWithoutAddress}")
       val handle = coordinator.register(partitionActorPath)
       logger.debug(s"Partition online: handle=$handle, path=${partitionActorPath}")
       partitions += (ref -> handle)

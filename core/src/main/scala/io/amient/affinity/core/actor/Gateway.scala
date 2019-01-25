@@ -39,6 +39,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
+import scala.util.Success
 import scala.util.control.NonFatal
 
 object Gateway {
@@ -78,17 +79,29 @@ trait Gateway extends ActorHandler {
 
   val metrics = AffinityMetrics.forActorSystem(context.system)
 
-  val txnCoordinator = new TransactionCoordinator(context)
-
   def trace(groupName: String, result: Promise[_ <: Any]): Unit = metrics.process(groupName, result)
 
   def trace(groupName: String, result: Future[Any]): Unit = metrics.process(groupName, result)
 
-  def beginTransaction(): Unit = txnCoordinator.begin()
+  protected lazy val txnCoordinator: TransactionCoordinator = new TransactionCoordinatorActor(context)
 
-  def commitTransaction(): Unit = txnCoordinator.commit()
+  //TODO create a separate timeout configuration because startup timeouts may too long for transactions
+  val txnTimeout = conf.Affi.Node.StartupTimeoutMs().toLong milliseconds
 
-  def abortTransaction(): Unit = txnCoordinator.abort()
+  /**
+    * will block until completed
+    */
+  def beginTransaction(): Unit = Await.result(txnCoordinator.begin(), txnTimeout)
+
+  /**
+    * will block until completed
+    */
+  def commitTransaction(): Unit =  Await.result(txnCoordinator.commit(), txnTimeout)
+
+  /**
+    * will block until completed
+    */
+  def abortTransaction(): Unit = Await.result(txnCoordinator.abort(), txnTimeout)
 
 
   final def keyspace(identifier: String): ActorRef = {
