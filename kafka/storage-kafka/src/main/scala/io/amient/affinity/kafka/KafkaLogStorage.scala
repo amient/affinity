@@ -413,5 +413,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   override def getStats: String = {
     s"kafka topic `$topic`"
   }
+
+  /**
+    * This is a general concept of topic for all storage types
+    *
+    * @return
+    */
+  override def getTopic: String = topic
 }
 
