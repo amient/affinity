@@ -66,8 +66,7 @@ class Controller extends Actor {
 
   private val containers = scala.collection.mutable.Map[String, ActorRef]()
 
-  final private val defaultGroup = "_affinity_cluster"
-  private val coordinator = Coordinator.create(context.system, defaultGroup)
+  private val coordinator = Coordinator.create(context.system, system.name)
 
   import context.dispatcher
 
@@ -160,7 +159,9 @@ class Controller extends Actor {
       logger.info(s"Starting container `$group`")
       val container = context.actorOf(Props(new Container(group)), name = group)
       containers.put(group, container)
-      container ! UpdateContainerPeers(zid.get, this.peers)
+      if (zid.isDefined) {
+        container ! UpdateContainerPeers(zid.get, this.peers)
+      }
     }
     containers(group)
   }
