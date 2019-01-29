@@ -85,7 +85,7 @@ class Controller extends Actor {
 
   val zid: Option[String] = coordinator.attachController(self)
 
-  val txnCoordinator = new TransactionCoordinatorImpl(context, zid)
+  val txnCoordinator = new TransactionCoordinatorImpl(context, zid.map(system.name + "_" + _))
 
   override def preStart(): Unit = {
     super.preStart()
