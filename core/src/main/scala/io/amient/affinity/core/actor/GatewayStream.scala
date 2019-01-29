@@ -167,8 +167,8 @@ trait GatewayStream extends Gateway {
       var lastCommit: java.util.concurrent.Future[java.lang.Long] = new CompletedJavaFuture(0L)
 
       try {
+        logger.info(s"Initializing input stream processor: $identifier with min.timestamp= ${EventTime.local(minTimestamp)} and config: ${streamConfig}")
         consumer.resume(TimeRange.since(minTimestamp))
-        logger.info(s"Initializing input stream processor: $identifier, starting from: ${EventTime.local(minTimestamp)}, details: ${streamConfig}")
 
         var lastCommitTimestamp = System.currentTimeMillis()
         var finalized = false
@@ -180,7 +180,7 @@ trait GatewayStream extends Gateway {
             val key: K = keySerde.fromBytes(entry.key)
             val value: V = valSerde.fromBytes(entry.value)
             val unitOfWork = processor(new Record(key, value, entry.timestamp))
-            if (!unitOfWork.isCompleted) work += unitOfWork
+            work += unitOfWork
             uncommittedInput = true
           }
 
