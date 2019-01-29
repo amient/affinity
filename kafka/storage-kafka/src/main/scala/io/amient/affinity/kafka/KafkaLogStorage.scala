@@ -191,6 +191,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         }
       }
     } else {
+      log.debug(s"Resuming consumption of`$topic` with group ${kafkaStorageConf.Consumer().GroupId()}")
       kafkaConsumer.subscribe(List(topic).asJava, this)
     }
   }
@@ -208,8 +209,10 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         val nextOffset: Long = Option(kafkaConsumer.committed(tp)).map(_.offset() + 1).getOrElse(0)
         val resumeOffset: Long = math.max(minOffset, nextOffset)
         if (minOffset > nextOffset) {
-          log.info(s"Resuming partition=${tp.partition()} time range ${range.getLocalStart}:${range.getLocalEnd}, advancing to offset: ${resumeOffset}")
+          log.debug(s"Advancing partition=${tp.partition()} for time range ${range.getLocalStart}:${range.getLocalEnd} to offset: ${resumeOffset}")
           kafkaConsumer.seek(tp, resumeOffset)
+        } else {
+          log.debug(s"Resuming subscription of ${tp} from offset ${resumeOffset}")
         }
         stopOffsets.remove(tp.partition)
     }
@@ -353,10 +356,10 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     def _create(): Unit = {
       val start = System.currentTimeMillis
       while (System.currentTimeMillis < start + adminTimeoutMs) {
-        log.debug(s"Attempting to create topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor")
         if (admin.listTopics().names().get(adminTimeoutMs, TimeUnit.MILLISECONDS).contains(topic)) {
           return
         } else {
+          log.debug(s"Attempting to create topic $topic, num.partitions: $numPartitions, replication factor: $replicationFactor")
           val schemaTopicRequest = new NewTopic(topic, numPartitions, replicationFactor)
           try {
             admin.createTopics(List(schemaTopicRequest).asJava).all.get(adminTimeoutMs, TimeUnit.MILLISECONDS)

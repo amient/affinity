@@ -88,7 +88,7 @@ class TransactionalProducer extends Actor {
         timestamp.map(new java.lang.Long(_)).getOrElse(null),
         key,
         value)
-      logger.debug(s"Transactions.Append($topic)")
+      logger.debug(s"Transactions.Append(topic=$topic)")
       producer.send(producerRecord, new Callback {
         override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
           if (exception != null) {

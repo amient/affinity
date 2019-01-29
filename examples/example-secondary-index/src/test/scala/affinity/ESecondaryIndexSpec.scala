@@ -127,6 +127,12 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
   "Articles Store" should "see all articles conatining a word" in {
     val words = node.get_json(node.http_get("/words/green")).getElements.asScala.toList
     words.foreach(println)
+    //TODO once seen a result of this test fail on only 3 which needs looking into:
+    /**
+      * {"type":"affinity.Article","data":{"title":"Green Self-Driving Cars","timestamp":1530086400000}}
+      * {"type":"affinity.Article","data":{"title":"Green materials","timestamp":1530172800000}}
+      * {"type":"affinity.Article","data":{"title":"Green CVT Cars","timestamp":1530172800000}}
+      */
     words.size should be(4)
   }
 
