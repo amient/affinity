@@ -50,13 +50,16 @@ trait TransactionCoordinator {
 
   implicit val executor = scala.concurrent.ExecutionContext.global
 
-  final def begin(): Future[Unit] = _begin().transform(
-    (s) => { _isInTrnsaction = false; s },
-    (f) => { _isInTrnsaction = false; f})
+  final def begin(): Future[Unit] = {
+    _isInTrnsaction = true
+    _begin()
+  }
+
   def _begin(): Future[Unit]
 
   /**
     * this doesn't have to block and should guarantee the order
+    *
     * @param topic
     * @param key
     * @param value
@@ -66,15 +69,18 @@ trait TransactionCoordinator {
     */
   def append(topic: String, key: Array[Byte], value: Array[Byte], timestamp: Option[Long], partition: Option[Int]): Future[_ <: Comparable[_]]
 
-  final def commit(): Future[Unit] = _commit().transform(
-    (s) => { _isInTrnsaction = false; s },
-    (f) => { _isInTrnsaction = false; f})
+  final def commit(): Future[Unit] = {
+    _isInTrnsaction = false
+    _commit()
+  }
 
-  def _commit (): Future[Unit]
+  def _commit(): Future[Unit]
 
-  def abort(): Future[Unit] = _abort().transform(
-    (s) => { _isInTrnsaction = false; s },
-    (f) => { _isInTrnsaction = false; f})
+  def abort(): Future[Unit] = {
+    _isInTrnsaction = false
+    _abort()
+  }
+
   def _abort(): Future[Unit]
 
 }
