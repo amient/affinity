@@ -49,7 +49,6 @@ object KVStoreLocal {
 
   def configureMemStoreDataDir(identifier: String, stateConf: StateConf, system: ActorSystem, metrics: AffinityMetrics) = {
     if (!stateConf.MemStore.DataDir.isDefined) {
-      val conf = Conf(system.settings.config)
       val nodeConf = Conf(system.settings.config).Affi.Node
       if (nodeConf.DataDir.isDefined) {
         stateConf.MemStore.DataDir.setValue(nodeConf.DataDir().resolve(identifier))
