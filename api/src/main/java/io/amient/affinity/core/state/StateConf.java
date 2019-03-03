@@ -51,9 +51,6 @@ public class StateConf extends CfgStruct<StateConf> {
     @Override
     public StateConf apply(Config config) throws IllegalArgumentException {
         StateConf self = super.apply(config);
-        if (External.apply() && Partitions.isDefined()) {
-            throw new IllegalArgumentException("State cannot be both external and have defined number of partitions");
-        }
         return self;
     }
 }
