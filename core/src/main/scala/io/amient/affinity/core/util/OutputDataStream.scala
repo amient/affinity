@@ -28,7 +28,29 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.{existentials, postfixOps}
 
-class OutputDataStream[K, V](txn: TransactionCoordinator, keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
+
+object OutputDataStream {
+
+  class TransactionCoordinatorNoop extends TransactionCoordinator {
+    override def _begin(): Future[Unit] = Future.successful(())
+
+    override def _commit(): Future[Unit] = Future.successful(())
+
+    override def _abort(): Future[Unit] = Future.successful(())
+
+    override def append(topic: String, key: Array[Byte], value: Array[Byte], timestamp: Option[Long], partition: Option[Int]): Future[_ <: Comparable[_]] = {
+      Future.successful(0L)
+    }
+  }
+
+  @deprecated
+  def apply[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf): OutputDataStream[K, V] = {
+    new OutputDataStream[K, V](new TransactionCoordinatorNoop, keySerde, valSerde, conf)
+  }
+
+}
+
+class OutputDataStream[K, V] private[affinity](txn: TransactionCoordinator, keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf) {
 
   lazy val storage = LogStorage.newInstanceEnsureExists(conf)
 
