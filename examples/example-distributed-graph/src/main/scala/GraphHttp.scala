@@ -26,8 +26,6 @@ import io.amient.affinity.core.actor.{GatewayHttp, WebSocketSupport}
 import io.amient.affinity.core.http.Encoder
 import io.amient.affinity.core.http.RequestMatchers._
 
-import scala.language.postfixOps
-
 
 trait GraphHttp extends GatewayHttp with WebSocketSupport {
 
@@ -101,7 +99,7 @@ trait GraphHttp extends GatewayHttp with WebSocketSupport {
     /**
       * POST /disconnect/<vertex1>/<vertex2>
       */
-    case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), query, response) => handleWith(response) {
+    case HTTP(POST, PATH("disconnect", INT(id), INT(id2)), _, response) => handleWith(response) {
       trace("http.post-disconnect", response)
       disconnect(id, id2) map {
         _ => HttpResponse(SeeOther, headers = List(headers.Location(Uri(s"/vertex/$id"))))

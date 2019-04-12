@@ -19,7 +19,7 @@
 
 
 import akka.http.scaladsl.model.StatusCodes.SeeOther
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.core.cluster.Node
@@ -96,7 +96,7 @@ class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
 
     SparkDriver.componentRdd.collect.toList match {
       case (2, Component(0L, _)) :: Nil =>
-      case other => throw new AssertionError("Graph should contain 1 component")
+      case _ => throw new AssertionError("Graph should contain 1 component")
     }
 
   }

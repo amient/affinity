@@ -29,9 +29,8 @@ import io.amient.affinity.core.state.KVStore
 import io.amient.affinity.core.util.{TimeCryptoProof, TimeCryptoProofSHA256}
 import org.codehaus.jackson.annotate.JsonIgnore
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 final case class ConfigEntry(description: String, @JsonIgnore salt: String) extends AvroRecord {
@@ -51,7 +50,7 @@ trait PrivateApi extends GatewayHttp {
         Future.successful {
           Encoder.json(OK, Map(
             "credentials" -> user,
-            "settings" -> settings.iterator.map(record => (record.key, record.value)).toMap
+            "settings" -> settings.iterator.asScala.map(record => (record.key, record.value)).toMap
           ))
         }
       } catch {
@@ -60,10 +59,10 @@ trait PrivateApi extends GatewayHttp {
     }
 
 
-    case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), response) => AUTH_ADMIN(http) { (user: String) =>
+    case http@HTTP(POST, PATH("settings", "add"), QUERY(("key", key)), _) => AUTH_ADMIN(http) { _ =>
       Future.successful {
         settings(key) match {
-          case Some(existinKey) => Encoder.json(BadRequest, "That key already exists" -> key)
+          case Some(_) => Encoder.json(BadRequest, "That key already exists" -> key)
           case None =>
             val salt = TimeCryptoProof.toHex(TimeCryptoProof.generateSalt())
             settings.replace(key, ConfigEntry(key, salt))
@@ -72,7 +71,7 @@ trait PrivateApi extends GatewayHttp {
       }
     }
 
-    case http@HTTP(GET, PATH("status"), _, response) => AUTH_ADMIN(http)(user => Future.successful {
+    case http@HTTP(GET, PATH("status"), _, _) => AUTH_ADMIN(http)(_ => Future.successful {
       Encoder.json(OK, Map(
         "keyspaces" -> describeKeyspaces
       ))
@@ -109,7 +108,7 @@ trait PrivateApi extends GatewayHttp {
             case _ => response.success(HttpResponse(
               Unauthorized, headers = List(headers.`WWW-Authenticate`(HttpChallenge("BASIC", Some("Create admin password"))))))
           }
-        case Some(ConfigEntry(any, adminPassword)) => credentials match {
+        case Some(ConfigEntry(_, adminPassword)) => credentials match {
           case Some(BasicHttpCredentials(username, password)) if username == "admin"
             && TimeCryptoProof.toHex(password.getBytes) == adminPassword =>
 

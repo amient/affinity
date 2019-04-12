@@ -105,7 +105,7 @@ trait GraphApi extends Gateway {
       else graphService ?! GetVertexProps(queue.head) map {
         _ match {
           case None => throw new NoSuchElementException
-          case Some(VertexProps(_, cid, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)
+          case Some(VertexProps(_, _, Edges(connected))) => collect(queue.tail ++ (connected -- agg), agg ++ connected)
         }
       } recover {
         case NonFatal(e) => promise.failure(e)

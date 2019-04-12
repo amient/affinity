@@ -226,7 +226,7 @@ object LogRDD {
 
     sc.register(produced)
 
-    def updatePartition(context: TaskContext, partition: Iterator[(K, V)]): Unit = {
+    def updatePartition(partition: Iterator[(K, V)]): Unit = {
       val storage = storageBinder
       val keySerde = keySerdeBinder
       val valueSerde = valueSerdeBinder

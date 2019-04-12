@@ -21,8 +21,6 @@ package io.amient.affinity.kafka
 
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-import scala.language.postfixOps
-
 trait EmbeddedKafka extends EmbeddedService with EmbeddedKafkaServer with BeforeAndAfterAll {
 
   self: Suite =>

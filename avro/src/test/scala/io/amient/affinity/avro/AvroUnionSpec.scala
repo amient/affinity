@@ -18,7 +18,9 @@ case class Me(myPet: Pet) extends AvroRecord
 case class They(theirPets: List[Pet]) extends AvroRecord
 
 
-sealed abstract class AbstractPet(chipit: Option[UUID])
+sealed abstract class AbstractPet(chipit: Option[UUID]) {
+  override def toString() = chipit.toString
+}
 
 case class ConcreteDog(name: String, bark: Boolean, chipit: UUID) extends AbstractPet(Some(chipit))
 
@@ -124,7 +126,6 @@ class AvroUnionSpec extends FlatSpec with Matchers {
     val bytes = AvroRecord.write(me, schema)
     val m2: AbstractMe = AvroRecord.read[AbstractMe](bytes, schema)
     m2 should be(me)
-
   }
 
   it should "json marshall sealed abstract class whose extensions contain logical types" in {

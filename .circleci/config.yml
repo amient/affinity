@@ -24,6 +24,7 @@ jobs:
     steps:
       - checkout
 
+      # Master Scala Version
       # Download and cache dependencies
       - restore_cache:
           keys:
@@ -41,11 +42,33 @@ jobs:
             - ./.gradle
             - ~/.m2
             - ~/.ivy2
-          key: v1-dependencies-{{ checksum "build.gradle" }}
+          key: v1-dependencies-{{ .Branch }}-{{ checksum "build.gradle" }}
         
       # run tests!
       - run: ./gradlew test
 
+    # Previous Scala Version - 2.11
+    # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ .Branch }}-Scala-2.11-{{ checksum "build.gradle" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-{{ .Branch }}-Scala-2.11-
+          - v1-dependencies-
+
+      - run: ./gradlew compile -Pscala-version=2.11.8
+
+      - save_cache:
+          paths:
+          - ~/.gradle
+          - ./gradle
+          - ./.gradle
+          - ~/.m2
+          - ~/.ivy2
+          key: v1-dependencies-{{ .Branch }}-Scala-2.11-{{ checksum "build.gradle" }}
+
+    # run tests!
+      - run: ./gradlew test -Pscala-version=2.11.8
 
 
 

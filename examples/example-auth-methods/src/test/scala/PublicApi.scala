@@ -28,7 +28,6 @@ import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH}
 import io.amient.affinity.core.state.KVStore
 
 import scala.concurrent.Promise
-import scala.language.postfixOps
 
 case class ProtectedProfile(hello: String = "world") extends AvroRecord
 
@@ -38,14 +37,14 @@ trait PublicApi extends GatewayHttp {
 
   abstract override def handle: Receive = super.handle orElse {
 
-    case HTTP(GET, uri@PATH("profile", pii), query, response) => AUTH_DSA(uri, query, response) { (sig: String) =>
+    case HTTP(GET, uri@PATH("profile", _), query, response) => AUTH_DSA(uri, query, response) { (sig: String) =>
       Encoder.json(OK, Map(
         "signature" -> sig,
         "profile" -> ProtectedProfile()
       ))
     }
 
-    case HTTP(GET, uri@PATH("verify"), query, response) => AUTH_DSA(uri, query, response) { (sig: String) =>
+    case HTTP(GET, uri@PATH("verify"), query, response) => AUTH_DSA(uri, query, response) { _ =>
       Encoder.json(OK, Some(ProtectedProfile()))
     }
 
