@@ -47,7 +47,7 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
   override def compute(split: Partition, context: TaskContext): Iterator[(ByteKey, LogEntry[_])] = {
     val storage: LogStorage[POS] = storageBinder
     storage.reset(split.index, range)
-    context.addTaskCompletionListener(_ => storage.close)
+    context.addTaskCompletionListener[Unit](_ => storage.close)
     val compactor = (r1: LogEntry[POS], r2: LogEntry[POS]) => if (r1.timestamp > r2.timestamp) r1 else r2
     val logRecords = storage.boundedIterator().asScala.map { record =>
       if (record.key != null) (new ByteKey(record.key), record) else {
@@ -70,7 +70,7 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
     */
   def timelog: RDD[(Long, Long)] = {
     var processTime = 0L
-    map { case (key, entry) => entry.timestamp -> {
+    map { case (_, entry) => entry.timestamp -> {
       processTime += 1
       processTime
     }
@@ -101,7 +101,7 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
     mapPartitions { compactedRecords =>
       val keySerde = keySerdeBinder
       val valueSerde = valueSerdeBinder
-      TaskContext.get.addTaskCompletionListener { _ =>
+      TaskContext.get.addTaskCompletionListener[Unit] { _ =>
         try keySerde.close finally valueSerde.close
       }
       compactedRecords.map { case (key, record) =>
@@ -160,7 +160,7 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
 
     val otherWithByteKey: RDD[(ByteKey, (K, W))] = other.mapPartitions { partition =>
       val keySerde = keySerdeBinder
-      TaskContext.get.addTaskCompletionListener(_ => keySerde.close)
+      TaskContext.get.addTaskCompletionListener[Unit](_ => keySerde.close)
       partition.map { case (k: K, x) => (new ByteKey(keySerde.toBytes(k)), (k, x)) }
     }
 
@@ -168,7 +168,7 @@ class LogRDD[POS <: Comparable[POS]] private(@transient private val sc: SparkCon
 
     inverseJoin.mapPartitions { partition =>
       val valueSerde = valueSerdeBinder
-      TaskContext.get.addTaskCompletionListener(_ => valueSerde.close)
+      TaskContext.get.addTaskCompletionListener[Unit](_ => valueSerde.close)
       partition.map { case ((k, x), r) => (k, (valueSerde.fromBytes(r.value).asInstanceOf[V], x)) }
     }
   }

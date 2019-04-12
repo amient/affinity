@@ -23,6 +23,7 @@
   * [Cross-builds](#cross-builds)
     + [Current master versions](#current-master-versions)
     + [Scala 2.11](#scala-211)
+    + [Scala 2.12](#scala-211)
   * [JavaScript (affinity.js)](#javascript-affinityjs)
 
 
@@ -555,14 +556,17 @@ all master branches.
 The `zzz` script uses git and gradle to switch between the maintained master branches
 and different variants of scala, kafka and spark.
 
+#### Scala 2.12
+    - avro-scala_2.12
+    - core-scala_2.12
+    
 #### Scala 2.11
+    - avro-scala_2.11
     - core-scala_2.11
     - kafka_2.0-scala_2.11 (Kafka 2.0.1, Confluent 5.0.0)
     - kafka_1.1-scala_2.11 (Kafka 1.1.0, Confluent 4.1.0)
     - kafka_1.0-scala_2.11 (Kafka 1.0.1, Confluent 4.0.0)
     - kafka_0.11-scala_2.11 (Kafka 0.11.0.2, Confluent 3.3.1)
-    - spark_2.1-scala_2.11 (Spark 2.2.1)
-    - spark_2.0-scala_2.11 (Spark 2.0.2)
 
 ## JavaScript (affinity.js)
 

@@ -28,7 +28,7 @@ import org.scalatest.{Matchers, PropSpec}
 class TimeCryptoProofSpec extends PropSpec with PropertyChecks with Matchers {
 
   val salts: Gen[Array[Byte]] = for {
-    salt <- Gen.choose(Integer.MIN_VALUE + 1, Integer.MAX_VALUE)
+    _ <- Gen.choose(Integer.MIN_VALUE + 1, Integer.MAX_VALUE)
   } yield TimeCryptoProof.generateSalt
 
   val hexSalts: Gen[String] = for {

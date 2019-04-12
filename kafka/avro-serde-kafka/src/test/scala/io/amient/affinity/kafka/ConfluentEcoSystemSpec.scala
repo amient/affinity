@@ -31,13 +31,12 @@ import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.serde.Serde
 import io.amient.affinity.core.state.{KVStoreConf, KVStoreLocal}
 import io.amient.affinity.core.storage.MemStoreSimpleMap
-import io.amient.affinity.core.util.{AffinityMetrics, ByteUtils}
+import io.amient.affinity.core.util.ByteUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -70,7 +69,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
 
   val config = ConfigFactory.parseMap(Map(
       Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path -> registryUrl))
+      CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path -> registryUrl).asJava)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val topic = "visibility-test"
@@ -122,9 +121,9 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
     )
 
-    val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+    val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
 
-    consumer.subscribe(List(topic))
+    consumer.subscribe(List(topic).asJava)
     try {
 
       var read = 0
@@ -132,7 +131,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       while (read < numReads) {
         val records = consumer.poll(java.time.Duration.ofMillis(10000))
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
-        for (record <- records) {
+        for (record <- records.asScala) {
           read += 1
           record.value.key.id should equal(record.key)
           record.value.text should equal(s"test value ${record.key}")
@@ -152,7 +151,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       KafkaStorage.StateConf.Storage.BootstrapServers.path -> kafkaBootstrap,
       KafkaStorage.StateConf.Storage.Producer.path -> Map().asJava,
       KafkaStorage.StateConf.Storage.Consumer.path -> Map().asJava
-    )))
+    ).asJava))
     val keySerde = Serde.of[Int](config)
     val valueSerde = Serde.of[Test](config)
     val kvstore = new MemStoreSimpleMap("test", stateConf, null)
@@ -172,7 +171,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val topic = "test"
     createTopic(topic)
     val numWrites = new AtomicInteger(1000)
-    val producer = new KafkaProducer[Int, Test](producerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+    val producer = new KafkaProducer[Int, Test](producerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
     try {
       val numToWrite = numWrites.get
       val l = System.currentTimeMillis()

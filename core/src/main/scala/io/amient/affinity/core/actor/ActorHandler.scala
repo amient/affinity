@@ -53,7 +53,7 @@ trait ActorHandler extends Actor {
   }
 
   def onHold(message: Any, sender: ActorRef): Unit = {
-    logger.warning("Suspended handling: " + message)
+    logger.warning("Suspended handling: " + message + " sender: " + sender)
     if (suspendedHttpRequestQueue.size < suspendedQueueMaxSize) {
       suspendedHttpRequestQueue += message
     } else {

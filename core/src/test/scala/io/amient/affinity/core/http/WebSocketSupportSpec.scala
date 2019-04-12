@@ -227,7 +227,7 @@ class WebSocketSpecGateway extends GatewayHttp with WebSocketSupport {
               response => send(TextMessage.Strict(Encoder.json(response)))
             }
 
-          case msg => log.warning("unknown message for custome websocket")
+          case _ => log.warning("unknown message for custome websocket")
 
         }
 

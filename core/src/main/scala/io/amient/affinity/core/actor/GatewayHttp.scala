@@ -28,7 +28,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{CacheDirective, CacheDirectives, `Cache-Control`}
+import akka.http.scaladsl.model.headers.{CacheDirectives, `Cache-Control`}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.stream._
 import akka.stream.scaladsl.Flow
@@ -108,7 +108,7 @@ trait GatewayHttp extends Gateway {
       //no handler matched the HttpExchange
       exchange.promise.success(HttpResponse(NotFound, entity = "Server did not understand your request"))
     }
-    case other => throw new IllegalArgumentException(s"GatewayHttp can only handle HttpExchange messages")
+    case _ => throw new IllegalArgumentException(s"GatewayHttp can only handle HttpExchange messages")
   }
 
   def accept(response: Promise[HttpResponse], dataGenerator: => Any, headers: List[HttpHeader] = List()): Unit = try {
@@ -178,7 +178,7 @@ trait GatewayHttp extends Gateway {
 
   def handleWith(promise: Promise[HttpResponse], headers: List[HttpHeader] = List())(f: => Future[HttpResponse])(implicit ctx: ExecutionContext): Unit = {
     promise.completeWith(try {
-      f recover handleException(headers)
+      f.recover(handleException(headers))(ctx)
     } catch {
       case t: Throwable => Future.successful(handleException(headers)(t))
     })
@@ -489,10 +489,4 @@ trait WSHandler {
   def receive: PartialFunction[Message, Unit]
 
   //FIXME dow we need ?  def receiveHandleError(upstream: ActorRef): PartialFunction[Throwable, Unit] = PartialFunction.empty
-}
-
-class WSMediatedHandler(mediator: ActorRef) extends WSHandler {
-
-  override def receive: PartialFunction[Message, Unit] = ???
-
 }

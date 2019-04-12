@@ -25,7 +25,7 @@ import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic._
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.scalatest.{FlatSpec, Matchers}
-import org.apache.avro.io.{DatumReader, DatumWriter, EncoderFactory}
+import org.apache.avro.io.EncoderFactory
 import org.apache.avro.io.DecoderFactory
 
 import scala.collection.JavaConverters._

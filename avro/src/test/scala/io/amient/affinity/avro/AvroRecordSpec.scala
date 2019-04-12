@@ -170,7 +170,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     val bytes = newSerde.toBytes(SimpleRecord(SimpleKey(Int.MaxValue), SimpleEnum.C, Seq(SimpleKey(Int.MaxValue % 20)), Some(SimpleEnum.A)))
     println(s"AvroSerde Writes/Sec: ${n.toLong * 1000 / (writeEnd - writeStart)}")
     val readStart = System.currentTimeMillis
-    for (i <- 1 to n) {
+    for (_ <- 1 to n) {
       newSerde.fromBytes(bytes)
     }
     val readEnd = System.currentTimeMillis()

@@ -12,8 +12,13 @@ In order to use this formatter you need to build the following jar and place it 
 
 ### Download
 
-    https://repo1.maven.org/maven2/io/amient/affinity/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.11/0.10.1/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.11-0.10.1-all.jar
+#### Scala 2.12
+    
+    https://repo1.maven.org/maven2/io/amient/affinity/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.12/0.10.2/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.12-0.10.2-all.jar
 
+#### Scala 2.11
+
+    https://repo1.maven.org/maven2/io/amient/affinity/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.11/0.10.2/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.12-0.10.2-all.jar
 
 ### Usage
 
