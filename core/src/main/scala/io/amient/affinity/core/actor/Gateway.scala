@@ -25,7 +25,6 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.routing._
 import akka.util.Timeout
-import io.amient.affinity.core.ack
 import io.amient.affinity.core.Murmur2Partitioner
 import io.amient.affinity.core.actor.Controller.CreateGateway
 import io.amient.affinity.core.config.{CfgList, CfgStruct}
@@ -39,7 +38,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
-import scala.util.Success
 import scala.util.control.NonFatal
 
 object Gateway {
