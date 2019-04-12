@@ -10,6 +10,11 @@ In order to use this formatter you need to build the following jar and place it 
     cp ./kafka/avro-formatter-kafka/build/lib/avro-formatter-kafka-*-all.jar $KAFKA_HOME/libs
 
 
+### Download
+
+    https://repo1.maven.org/maven2/io/amient/affinity/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.11/0.10.1/avro-formatter-kafka_<KAFKA-MINOR-VERSION>-scala_2.11-0.10.1-all.jar
+
+
 ### Usage
 
     kafka-console-consumer.sh \
