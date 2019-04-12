@@ -205,7 +205,6 @@ if [ "$RUN_ON_VARIANTS" == "true" ]; then
     variant "kafka_0.11" "$SETS" $C
     variant "spark_2.0" "$SETS" $C
     variant "spark_2.2" "$SETS" $C
-    variant "scala_2.12" "$SETS" $C
 fi
 
 LANG=en_GB git checkout "$ROOT"
