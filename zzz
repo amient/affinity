@@ -53,11 +53,6 @@ variant() {
             echo $MESSAGE
             ./gradlew $C
             continue $? $MESSAGE
-        elif [ $SETS == "spark" ]; then
-            MESSAGE="$BRANCH/:spark:$C"
-            echo $MESSAGE
-            ./gradlew :spark:$C
-            continue $? $MESSAGE
         elif [ $SETS == "kafka" ]; then
             MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
             echo $MESSAGE
@@ -109,7 +104,6 @@ Usage() {
     echo "  MODULE-SET:"
     echo "      -                   - if omitted runs for all modules"
     echo "      kafka               - run for all kafka submodules"
-    echo "      spark               - run for all spark submodules"
     echo ""
     echo "  TASK: "
     echo "      compile             - run compile on all variants"
