@@ -19,8 +19,6 @@ import org.codehaus.jackson.JsonGenerator
 import org.codehaus.jackson.util.DefaultPrettyPrinter
 import org.codehaus.jackson.util.MinimalPrettyPrinter
 
-import scala.collection.mutable
-
 /** An {@link Encoder} for Avro's JSON data encoding.
   * </p>
   * Construct using {@link EncoderFactory}.
@@ -251,7 +249,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
   private var logicalType: LogicalType = null
   private var unionIndex = -1
   private var nextSchema = sc
-  private val schemaStack = new mutable.Stack[Schema] // TODO replace with inverse List
+  private var schemaStack = List.empty[Schema]
 
   @throws[IOException]
   override def doAction(input: Symbol, top: Symbol): Symbol = {
@@ -271,10 +269,10 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
       this.logicalType = nextSchema.getLogicalType
       out.writeFieldName(fa.fname)
     } else if (top eq Symbol.RECORD_START) {
-      schemaStack.push(nextSchema)
+      schemaStack = nextSchema +: schemaStack
       out.writeStartObject()
     } else if (top eq Symbol.RECORD_END) {
-      schemaStack.pop()
+      schemaStack = schemaStack.tail
       out.writeEndObject()
     } else if (top eq Symbol.UNION_END) {
       out.writeEndObject()
