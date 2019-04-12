@@ -28,6 +28,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.{CacheDirective, CacheDirectives, `Cache-Control`}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.stream._
 import akka.stream.scaladsl.Flow
@@ -206,9 +207,10 @@ trait GatewayHttp extends Gateway {
 
   private def errorResponse(e: Throwable, status: StatusCode, headers: List[HttpHeader] = List()): HttpResponse = {
     log.error(e, s"${status} - default http error handler")
-    status.defaultMessage() match {
-      case null => HttpResponse(status, headers = headers)
-      case message => HttpResponse(status, entity = message, headers = headers)
+    val secureHeaders = headers :+ `Cache-Control`(CacheDirectives.`no-store`, CacheDirectives.`must-revalidate`)
+      status.defaultMessage() match {
+      case null => HttpResponse(status, headers = secureHeaders)
+      case message => HttpResponse(status, entity = message, headers = secureHeaders)
     }
   }
 
