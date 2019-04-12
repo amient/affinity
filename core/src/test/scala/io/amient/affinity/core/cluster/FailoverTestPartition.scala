@@ -2,7 +2,6 @@ package io.amient.affinity.core.cluster
 
 import io.amient.affinity.core.actor.{Partition, Routed}
 import io.amient.affinity.core.util.Reply
-import scala.collection.JavaConverters._
 
 class FailoverTestPartition extends Partition {
 

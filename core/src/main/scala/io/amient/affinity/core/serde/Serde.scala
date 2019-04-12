@@ -136,14 +136,13 @@ class Serdes(val config: Config, val system: Option[ExtendedActorSystem]) {
   }
 
   lazy val bindings: immutable.Seq[ClassSerde] = {
-    val fromConfig = for {
-      (className: String, alias: String) ← settings.SerializationBindings
-      if alias != "none" && checkGoogleProtobuf(className)
-      if serializers.contains(alias)
-    } yield (Class.forName(className), serializers(alias))
-
-    val result = sort(fromConfig)
-    result
+    val fromConfig = settings.SerializationBindings filter {
+      case (className: String, alias: String) =>
+        alias != "none" && checkGoogleProtobuf(className) && serializers.contains(alias)
+    } map {
+      case (className: String, alias: String) => (Class.forName(className), serializers(alias))
+    }
+    sort(fromConfig)
   }
 
   def by(identifier: Int): Serde[_] = serializers.map(_._2).find(_.identifier == identifier)

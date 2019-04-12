@@ -34,7 +34,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -160,9 +160,9 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
       new ZkAvroConf().ZooKeeper.Connect.path -> zkConnect
     )
 
-    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
 
-    consumer.subscribe(List(topic))
+    consumer.subscribe(List(topic).asJava)
     try {
 
       var read = 0
@@ -170,7 +170,7 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
       while (read < numReads) {
         val records = consumer.poll(specTimeout.toMillis)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
-        for (record <- records) {
+        for (record <- records.asScala) {
           read += 1
           record.value.key.id should equal(record.key)
           record.value.text should equal(s"test value ${record.key}")

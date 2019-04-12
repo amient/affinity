@@ -71,6 +71,8 @@ class CoordinatorEmbedded(system: ActorSystem, group: String, _conf: Coordinator
 
   private val realm = CoordinatorEmbedded.get(s"${system.name}:$group", this)
 
+  require(_conf.Class() == classOf[CoordinatorEmbedded])
+
   override def register(actorPath: ActorPath): String = {
     val handle = actorPath.toString
     realm.put(handle)

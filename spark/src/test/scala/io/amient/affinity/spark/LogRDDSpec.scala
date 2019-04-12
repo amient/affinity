@@ -35,7 +35,7 @@ import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.language.existentials
 import scala.reflect.ClassTag
 
@@ -54,7 +54,7 @@ object LogRDDSpecUniverse {
   def getSerdeConf = AvroConf(Map(
     AvroConf.Class.path -> classOf[MemorySchemaRegistry].getName,
     MemAvroConf(AvroConf).ID.path -> schemaRegistryId
-  ))
+  ).asJava)
 
   def getStorageConf(kafkaBootstrap: String, numPartitions: Int) = new LogStorageConf().apply(Map(
     LogStorage.StorageConf.Class.path -> classOf[KafkaLogStorage].getName,
@@ -62,7 +62,7 @@ object LogRDDSpecUniverse {
     KafkaStorageConf.Topic.path -> topic,
     KafkaStorageConf.Partitions.path -> numPartitions,
     "kafka.producer.retries" -> "1"
-  ))
+  ).asJava)
 
   def avroCompactRdd[K: ClassTag, V: ClassTag](avroConf: AvroConf, storageConf: LogStorageConf, range: TimeRange = TimeRange.UNBOUNDED)
                                               (implicit sc: SparkContext): RDD[(K, V)] = {

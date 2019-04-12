@@ -21,7 +21,6 @@ package io.amient.affinity.kafka
 
 import java.util
 
-import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.AffinityActorSystem
@@ -31,13 +30,13 @@ import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
 import org.apache.kafka.streams.processor.internals.DefaultStreamPartitioner
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 class KafkaPartitionerSpec extends FlatSpec with Matchers {
 
   def mockCluster(numParts: Int) = new Cluster("mock-cluster",
     util.Arrays.asList[Node](),
-    (0 to numParts - 1).map(p => new PartitionInfo("test", p, null, Array(), Array())),
+    (0 to numParts - 1).map(p => new PartitionInfo("test", p, null, Array(), Array())).asJava,
     new util.HashSet[String],
     new util.HashSet[String])
 
@@ -60,7 +59,7 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
     val key = "6290853012217500191217"
 
     val system = AffinityActorSystem.create(ConfigFactory.parseMap(
-        (cfg.map { case (k, v) => ("affinity.avro." + k, v) }) + ("affinity.system.name" -> "KafkaPartitionerSpec")))
+        ((cfg.map { case (k, v) => ("affinity.avro." + k, v) }) + ("affinity.system.name" -> "KafkaPartitionerSpec")).asJava))
     val akkaSerializedKey = try {
       val serialization = SerializationExtension(system)
       serialization.serialize(key).get
@@ -68,7 +67,7 @@ class KafkaPartitionerSpec extends FlatSpec with Matchers {
       system.terminate()
     }
     val kafkaSerde = new KafkaAvroSerde()
-    kafkaSerde.configure(cfg, true)
+    kafkaSerde.configure(cfg.asJava, true)
     val kafkaSerialized = kafkaSerde.serializer().serialize("test", key)
     akkaSerializedKey.mkString(".") should equal(kafkaSerialized.mkString("."))
     new Murmur2Partitioner().partition(akkaSerializedKey, 9) should be(4)

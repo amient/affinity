@@ -29,7 +29,6 @@ import io.amient.affinity.core.http.RequestMatchers.HTTP
 import io.amient.affinity.core.util.AffinityTestBase
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
-import scala.language.postfixOps
 
 class TlsGateway extends GatewayHttp {
   override def handle: Receive = {
