@@ -39,11 +39,11 @@ import scala.collection.immutable.Seq
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe, _}
 
-final class Alias(aliases: String*) extends StaticAnnotation
+final class Alias(val aliases: String*) extends StaticAnnotation
 
-final class Fixed(len: Int = -1) extends StaticAnnotation
+final class Fixed(val len: Int = -1) extends StaticAnnotation
 
-final class Doc(text: String) extends StaticAnnotation
+final class Doc(val text: String) extends StaticAnnotation
 
 abstract class AvroRecord extends SpecificRecord with java.io.Serializable {
 

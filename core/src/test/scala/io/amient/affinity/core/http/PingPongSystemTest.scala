@@ -35,7 +35,7 @@ import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.duration._
-import scala.language.{existentials, implicitConversions, postfixOps}
+import scala.language.postfixOps
 
 class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAfterAll with Matchers {
 

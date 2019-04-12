@@ -20,7 +20,7 @@
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.http.scaladsl.model.StatusCodes._
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.util.AffinityTestBase
@@ -31,7 +31,6 @@ import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
-import scala.language.postfixOps
 
 class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
 
