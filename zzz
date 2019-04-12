@@ -166,11 +166,6 @@ case "$2" in
         publish "$ROOT-kafka_1.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_1.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_1.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.11" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.11" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.11" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.11" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_0.11" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
         LANG=EN_GB git checkout "$ROOT"
         exit 0;
         ;;
@@ -197,13 +192,11 @@ if [ "$RUN_ON_VARIANTS" == "true" ]; then
     variant "kafka_2.0" "$SETS" $C
     variant "kafka_1.1" "$SETS" $C
     variant "kafka_1.0" "$SETS" $C
-    variant "kafka_0.11" "$SETS" $C
     if [ "$C" != "-" ]; then
         #scala 2.11
         variant "kafka_2.0" "$SETS" $C -Pscala-version=2.11.8
         variant "kafka_1.1" "$SETS" $C -Pscala-version=2.11.8
         variant "kafka_1.0" "$SETS" $C -Pscala-version=2.11.8
-        variant "kafka_0.11" "$SETS" $C -Pscala-version=2.11.8
     fi
 fi
 
