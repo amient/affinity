@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
-import io.amient.affinity.core.config.{CfgString, CfgStruct}
+import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.exception.ZkNodeExistsException

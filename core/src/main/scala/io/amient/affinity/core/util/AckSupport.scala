@@ -106,7 +106,7 @@ final class AckableActorRef(val target: ActorRef) extends AnyRef {
   def ??[T](message: Reply[T])(implicit timeout: Timeout, context: ExecutionContext): Future[T] = {
     message match {
       case scatter: Scatter[T] => ??(ScatterGather(scatter, timeout)).map(_.reduce(scatter.gather))
-      case other => target ? message map (result => (if (result.isInstanceOf[BoxedUnit]) () else result).asInstanceOf[T])
+      case _ => target ? message map (result => (if (result.isInstanceOf[BoxedUnit]) () else result).asInstanceOf[T])
     }
   }
 

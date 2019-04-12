@@ -22,7 +22,6 @@ package io.amient.affinity.avro.record
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.UUID
 
 import io.amient.affinity.avro.record.AvroRecord.extract
 import io.amient.affinity.core.util.ByteUtils

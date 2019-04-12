@@ -50,7 +50,7 @@ class TupleSerde(serdes: Serdes) extends AbstractWrapSerde(serdes) with Serde[Pr
     val arity = ByteUtils.asIntValue(bytes, 0)
     var tmp = scala.collection.immutable.List[Any]()
     var offset = 4
-    (1 to arity).foreach { a =>
+    (1 to arity).foreach { _ =>
       val len = ByteUtils.asIntValue(bytes, offset)
       offset += 4
       val b = new Array[Byte](len)

@@ -5,10 +5,9 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util
-import java.util.UUID
 
 import io.amient.affinity.core.util.ByteUtils
-import org.apache.avro.{AvroTypeException, LogicalType, LogicalTypes, Schema}
+import org.apache.avro.{AvroTypeException, LogicalType, Schema}
 import org.apache.avro.io.ParsingEncoder
 import org.apache.avro.io.parsing.JsonGrammarGenerator
 import org.apache.avro.io.parsing.Parser
@@ -21,8 +20,6 @@ import org.codehaus.jackson.util.DefaultPrettyPrinter
 import org.codehaus.jackson.util.MinimalPrettyPrinter
 
 import scala.collection.mutable
-import scala.collection.JavaConverters._
-
 
 /** An {@link Encoder} for Avro's JSON data encoding.
   * </p>
@@ -254,7 +251,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
   private var logicalType: LogicalType = null
   private var unionIndex = -1
   private var nextSchema = sc
-  private val schemaStack = new mutable.Stack[Schema]
+  private val schemaStack = new mutable.Stack[Schema] // TODO replace with inverse List
 
   @throws[IOException]
   override def doAction(input: Symbol, top: Symbol): Symbol = {
@@ -269,7 +266,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
           } else {
             s
           }
-        case other => wrappingSchema
+        case _ => wrappingSchema
       }
       this.logicalType = nextSchema.getLogicalType
       out.writeFieldName(fa.fname)

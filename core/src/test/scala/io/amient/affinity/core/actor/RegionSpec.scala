@@ -42,7 +42,7 @@ class RegionSpec extends WordSpecLike with Matchers with Eventually with Integra
     }
 
     override def handle: Receive = {
-      case e: IllegalStateException => context.stop(self)
+      case _: IllegalStateException => context.stop(self)
       case _ =>
     }
   })
@@ -108,7 +108,7 @@ class RegionSpecPartition extends Partition {
   }
 
   override def handle: Receive = {
-    case e: IllegalStateException => context.stop(self)
+    case _: IllegalStateException => context.stop(self)
     case _ =>
   }
 }

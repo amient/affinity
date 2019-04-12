@@ -20,14 +20,14 @@
 package io.amient
 
 import akka.actor.ActorSystem
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory}
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.actor.Partition
 import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.Node.NodeConf
 import io.amient.affinity.core.config._
 import io.amient.affinity.core.state.StateConf
-import io.amient.affinity.core.storage.{LogStorageConf, StorageConf}
+import io.amient.affinity.core.storage.{StorageConf}
 
 package object affinity {
 

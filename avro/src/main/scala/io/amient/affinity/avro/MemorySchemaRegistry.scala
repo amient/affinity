@@ -21,7 +21,7 @@ package io.amient.affinity.avro
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf

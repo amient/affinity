@@ -19,7 +19,6 @@
 
 package io.amient.affinity.avro
 
-import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf

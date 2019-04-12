@@ -1,6 +1,6 @@
 package io.amient.affinity.core.state
 
-import java.util.{Observable, Observer}
+import java.util.Observer
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorContext, Props}

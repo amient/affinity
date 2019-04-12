@@ -9,21 +9,21 @@ In order to use this formatter you need to build the following jar and place it 
 
     cp ./kafka/metrics-reporter/build/lib/metrics-reporter-kafka-*-all.jar $KAFKA_HOME/libs
 
+### Download
+
+    https://repo1.maven.org/maven2/io/amient/affinity/metrics-reporter-kafka_<KAFKA-MINOR-VERSION>/0.10.1/metrics-reporter-kafka_<KAFKA-MINOR-VERSION>-0.10.1-all.jar
 
 ### Usage
 
-    kafka-console-consumer.sh \
-      --bootstrap-server <...> 
-      --topic <...> \
-      --formatter io.amient.affinity.kafka.AvroMessageFormatter \
-     [--property schema.registry.url=<CONFLUENT-SCHEMA-REGISTRY-URL> \]
-     [--property schema.registry.zookeeper.connect=<ZOOKEEPER-SCHEMA-REGISTRY-CONNECT> \]
-     [--property schema.registry.zookeeper.root=<ZOOKEEPER-SCHEMA-REGISTRY-ROOT> \]
-     [--property pretty ]
-     [--property print.partition]
-     [--property print.type]
-     [--property print.offset]
-     [--property print.key] 
-     [--property print.timestamp]
-     [--property no.value]
+Put the packaged/downloaded -all jar into the kafka broker libs/ and add the following lines to the kafka server.properties
 
+    kafka.metrics.reporters=io.amient.kafka.metrics.ConsumerGroupReporter
+    kafka.metrics.polling.interval=<NUM-SECONDS>    
+    kafka.metrics.bootstrap.servers=<LOCAL-LISTENER>
+    #if sasl is enabled for local listeners
+    #kafka.metrics.security...
+    #kafka.metrics.sasl.mechanism=
+    #kafka.metrics.sasl.jaas.config=
+
+This will produce additional kafka metrics objects under `kafka.consumer` jmx namespace 
+    
