@@ -15,7 +15,8 @@ ext {
     junitVersion = '4.12'
     typesafeConfigVersion = '1.3.0'
     //
-    scalaVersion = '2.11.8'
+    scalaVersion = rootProject.hasProperty("scala-version") ? rootProject.property("scala-version") : '2.12.8'
+    baseScalaVersion = scalaVersion.split("\\.")[0] + '.' + scalaVersion.split("\\.")[1]
     scalaTestVersion = '3.0.5'
     scalaCheckVersion = '1.13.5'
     slf4jVersion = '1.7.21'
@@ -27,7 +28,7 @@ ext {
     jacksonVersion = '2.6.5' // com.fasterxml.jackson - spark 2.x uses 2.6.5 while the newer kafka 2.9.1, as usually testing with embedded instances has conflicts
     zkClientVersion = '0.11' // zkclient provides zookeeper server transitively
     //
-    baseScalaVersion = scalaVersion.split("\\.")[0] + '.' + scalaVersion.split("\\.")[1]
+
 
 }
 

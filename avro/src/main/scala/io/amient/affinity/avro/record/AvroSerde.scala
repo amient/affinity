@@ -27,7 +27,7 @@ import java.util.UUID
 import com.typesafe.config.Config
 import io.amient.affinity.avro.AvroSchemaRegistry
 import io.amient.affinity.avro.record.AvroSerde.MAGIC
-import io.amient.affinity.core.config.{Cfg, CfgCls, CfgStruct}
+import io.amient.affinity.core.config.{Cfg, CfgStruct}
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.Schema
@@ -124,7 +124,7 @@ trait AvroSerde extends AbstractSerde[Any] with AvroSchemaRegistry {
     require(schemaId >= 0, "avro schema id cannot be negative")
     value match {
       case null => null
-      case any: Any =>
+      case _: Any =>
         val valueOut = new ByteArrayOutputStream()
         try {
           valueOut.write(MAGIC.toInt)

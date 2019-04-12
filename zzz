@@ -91,8 +91,10 @@ publish() {
     continue $? "$BRANCH/checkout"
     LANG=en_GB git pull
     continue $? "$BRANCH/pull"
-    ./gradlew $COMMAND
-    continue $? "$BRANCH/publish"
+    ./gradlew $COMMAND -Pscala-version=2.11.8
+    continue $? "$BRANCH/publish (Scala 2.11.8)"
+    ./gradlew $COMMAND -Pscala-version=2.12.8
+    continue $? "$BRANCH/publish (Scala 2.12.8)"
 }
 
 Usage() {
@@ -155,8 +157,6 @@ case "$2" in
         ;;
     publish)
         publish "$ROOT" "uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-spark_2.0" ":spark:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-spark_2.2" ":spark:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_2.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_2.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
         publish "$ROOT-kafka_2.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
@@ -199,13 +199,18 @@ fi
 
 #excute on the variant branches
 if [ "$RUN_ON_VARIANTS" == "true" ]; then
+    #scala 2.12
     variant "kafka_2.0" "$SETS" $C
     variant "kafka_1.1" "$SETS" $C
     variant "kafka_1.0" "$SETS" $C
     variant "kafka_0.11" "$SETS" $C
-    variant "spark_2.0" "$SETS" $C
-    variant "spark_2.2" "$SETS" $C
-    variant "scala_2.12" "$SETS" $C
+    if [ "$C" != "-" ]; then
+        #scala 2.11
+        variant "kafka_2.0" "$SETS" $C -Pscala-version=2.11.8
+        variant "kafka_1.1" "$SETS" $C -Pscala-version=2.11.8
+        variant "kafka_1.0" "$SETS" $C -Pscala-version=2.11.8
+        variant "kafka_0.11" "$SETS" $C -Pscala-version=2.11.8
+    fi
 fi
 
 LANG=en_GB git checkout "$ROOT"

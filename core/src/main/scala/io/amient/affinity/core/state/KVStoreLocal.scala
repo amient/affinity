@@ -198,7 +198,7 @@ class KVStoreLocal[K, V](val identifier: String,
     val indexConf = new StateConf().apply(stateConf)
     logOption match {
       case None => indexConf.MemStore.Class.setValue(classOf[MemStoreSimpleMap])
-      case Some(log) => indexConf.External.setValue(true)
+      case Some(_) => indexConf.External.setValue(true)
     }
     configureMemStoreDataDir(indexIdentifier, indexConf, system, metrics)
     indexConf.MemStore.KeyPrefixSize.setValue(4)
@@ -493,7 +493,7 @@ class KVStoreLocal[K, V](val identifier: String,
             Future.successful(Some(value))
           case Some(log) =>
             log.append(memstore, key, valueBytes, recordTimestamp) transform(
-              pos => { //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
+              _ => { //TODO pos is currently not used but could be instrumental in direct synchronization of standby replicas
                 writesMeter.markSuccess(timerContext)
                 Some(value)
               },

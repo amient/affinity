@@ -31,7 +31,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.scalatest.{FlatSpec, Matchers, Suite}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 case class TestRecord(key: Int, ts: Long = 0L, text: String = "", keyOpt: Option[KEY] = None) extends AvroRecord {
   override def hashCode(): Int = key.hashCode()
@@ -66,7 +66,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "max.poll.records" -> 1000
     )
 
-    val producer = new KafkaProducer[Int, TestRecord](producerConfig)
+    val producer = new KafkaProducer[Int, TestRecord](producerConfig.mapValues(_.asInstanceOf[AnyRef]).asJava)
 
     val topic = "test"
     createTopic(topic)
@@ -79,15 +79,15 @@ class KafkaAvroSpec extends FlatSpec with Suite
     numWrites.get should be > (0)
 
     val consumer = new KafkaConsumer[Int, GenericRecord](
-      consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+      consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
 
-    consumer.subscribe(List(topic))
+    consumer.subscribe(List(topic).asJava)
     try {
       var read = 0
       while (read < numWrites.get) {
         val records = consumer.poll(10000)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
-        for (record <- records) {
+        for (record <- records.asScala) {
           read += 1
           record.value.get("key") should equal(record.key)
           record.value.get("text").asInstanceOf[Utf8].toString should equal(s"test value ${record.key}")
@@ -110,7 +110,7 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
       new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
       new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
-    ).mapValues(_.asInstanceOf[AnyRef]))
+    ).mapValues(_.asInstanceOf[AnyRef]).asJava)
 
     for (i <- (1 to 10)) yield {
       producer.send(new ProducerRecord[Int, TestRecord](
@@ -130,16 +130,16 @@ class KafkaAvroSpec extends FlatSpec with Suite
 
     )
 
-    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]))
+    val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
 
-    consumer.subscribe(List(topic))
+    consumer.subscribe(List(topic).asJava)
     try {
 
       var read = 0
       while (read < numWrites.get) {
         val records = consumer.poll(10000)
         if (records.isEmpty) throw new Exception("Consumer poll timeout")
-        for (record <- records) {
+        for (record <- records.asScala) {
           read += 1
           record.value.key should equal(record.key)
           record.value.text should equal(s"test value ${record.key}")

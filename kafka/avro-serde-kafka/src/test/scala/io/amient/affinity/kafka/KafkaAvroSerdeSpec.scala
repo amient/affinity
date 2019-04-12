@@ -21,7 +21,7 @@ package io.amient.affinity.kafka
 
 import java.util
 
-import io.amient.affinity.avro.{ConfluentSchemaRegistry, MemorySchemaRegistry}
+import io.amient.affinity.avro.MemorySchemaRegistry
 import org.scalatest.{FlatSpec, Matchers}
 
 class KafkaAvroSerdeSpec extends FlatSpec with Matchers {

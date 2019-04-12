@@ -61,7 +61,7 @@ class Group(identifier: String, numPartitions: Int, partitioner: Partitioner) ex
       remove.foreach { routee =>
         val partition = routee.path.name.toInt
         routees.remove(partition) foreach { removed =>
-          if (removed != routee) routees.put(partition, removed)
+          if (removed.ref != routee) routees.put(partition, removed)
         }
       }
       add.foreach { routee =>
