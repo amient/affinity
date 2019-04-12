@@ -1,4 +1,4 @@
-import java.io.{File, PrintWriter}
+import java.io.PrintWriter
 import java.nio.file.Path
 
 import com.typesafe.config.Config

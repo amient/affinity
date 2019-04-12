@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.language.reflectiveCalls
 
 object KafkaStorage {
 

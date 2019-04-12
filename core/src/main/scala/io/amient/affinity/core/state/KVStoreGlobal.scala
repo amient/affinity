@@ -14,7 +14,7 @@ import io.amient.affinity.core.{Murmur2Partitioner, ack, any2ref}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.language.postfixOps
+
 import scala.reflect.ClassTag
 
 case class KVGReplace(key: Any, value: Any) extends Routed with Reply[Option[Any]] with InternalMessage

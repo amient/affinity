@@ -44,7 +44,7 @@ import io.amient.affinity.core.util.ByteUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.language.{implicitConversions, postfixOps}
+
 import scala.util.control.NonFatal
 
 trait GatewayHttp extends Gateway {

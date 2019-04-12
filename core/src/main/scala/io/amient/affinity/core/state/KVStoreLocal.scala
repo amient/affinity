@@ -48,6 +48,7 @@ object KVStoreLocal {
 
 
   def configureMemStoreDataDir(identifier: String, stateConf: StateConf, system: ActorSystem, metrics: AffinityMetrics) = {
+    require(metrics != null || metrics == null)
     if (!stateConf.MemStore.DataDir.isDefined) {
       val nodeConf = Conf(system.settings.config).Affi.Node
       if (nodeConf.DataDir.isDefined) {
@@ -97,8 +98,8 @@ object KVStoreLocal {
     val external = stateConf.External()
     val logOption = if (!stateConf.Storage.isDefined || !stateConf.Storage.Class.isDefined) None else Some {
       val storage = LogStorage.newInstance(stateConf.Storage)
-      if (partition == 0) storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
       if (!external) {
+        if (partition == 0) storage.ensureCorrectConfiguration(ttlMs, numPartitions, external)
         //if this storage is not managed externally, register key and value subjects in the registry
         for (registry <- asAvroRegistry(keySerde)) {
           Option(storage.keySubject).foreach(some => registry.register(implicitly[ClassTag[K]].runtimeClass, some))
