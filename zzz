@@ -86,10 +86,33 @@ publish() {
     continue $? "$BRANCH/checkout"
     LANG=en_GB git pull
     continue $? "$BRANCH/pull"
-    ./gradlew $COMMAND -Pscala-version=2.11.8
-    continue $? "$BRANCH/publish (Scala 2.11.8)"
-    ./gradlew $COMMAND -Pscala-version=2.12.8
-    continue $? "$BRANCH/publish (Scala 2.12.8)"
+    ./gradlew $COMMAND
+    continue $? "$BRANCH/publish"
+}
+
+publish_all() {
+    if [ ! -z "$1" ]; then
+        SP="-Pscala-version=$1"
+    else
+        SP=""
+    fi
+    publish "$ROOT" "uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.1" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.1" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.1" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.1" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.1" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_1.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    LANG=EN_GB git checkout "$ROOT"
 }
 
 Usage() {
@@ -150,23 +173,8 @@ case "$2" in
         RUN_ON_VARIANTS="true"
         ;;
     publish)
-        publish "$ROOT" "uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_2.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_2.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_2.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_2.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_2.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.1" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.1" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.1" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.1" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.1" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet"
-        publish "$ROOT-kafka_1.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet"
-        LANG=EN_GB git checkout "$ROOT"
+        publish_all
+        publish_all "2.11.8"
         exit 0;
         ;;
     *)
@@ -184,6 +192,9 @@ fi
 #excute on the root branch
 if [ "$RUN_ON_ROOT" == "true" ]; then
     variant "$ROOT" "$SETS" "$C"
+    if [ "$C" != "-" ]; then
+        variant "$ROOT" "$SETS" "$C" -Pscala-version=2.11.8
+    fi
 fi
 
 #excute on the variant branches
