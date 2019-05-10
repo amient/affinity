@@ -200,11 +200,13 @@ fi
 #excute on the variant branches
 if [ "$RUN_ON_VARIANTS" == "true" ]; then
     #scala 2.12
+    variant "kafka_2.1" "$SETS" $C
     variant "kafka_2.0" "$SETS" $C
     variant "kafka_1.1" "$SETS" $C
     variant "kafka_1.0" "$SETS" $C
     if [ "$C" != "-" ]; then
         #scala 2.11
+        variant "kafka_2.1" "$SETS" $C -Pscala-version=2.11.8
         variant "kafka_2.0" "$SETS" $C -Pscala-version=2.11.8
         variant "kafka_1.1" "$SETS" $C -Pscala-version=2.11.8
         variant "kafka_1.0" "$SETS" $C -Pscala-version=2.11.8
