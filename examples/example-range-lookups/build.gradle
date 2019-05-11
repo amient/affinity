@@ -7,7 +7,6 @@ dependencies {
     compile project(':core')
     compile project(':rocksdb')
     compile project(':kafka:storage-kafka')
-    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile group: "ch.qos.logback", name: "logback-classic", version: "1.2.3"
     testCompile group: "ch.qos.logback", name: "logback-core", version: "1.2.3"
     testCompile group: 'com.typesafe.akka', name: 'akka-slf4j_' + baseScalaVersion, version: akkaVersion
