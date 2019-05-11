@@ -56,7 +56,7 @@ jobs:
           - v1-dependencies-{{ .Branch }}-Scala-2.11-
           - v1-dependencies-
 
-      - run: ./gradlew compile -Pscala-version=2.11.8
+      - run: ./gradlew compile -Pscala-version=2.11.12
 
       - save_cache:
           paths:
@@ -68,7 +68,7 @@ jobs:
           key: v1-dependencies-{{ .Branch }}-Scala-2.11-{{ checksum "build.gradle" }}
 
     # run tests!
-      - run: ./gradlew test -Pscala-version=2.11.8
+      - run: ./gradlew test -Pscala-version=2.11.12
 
 
 
