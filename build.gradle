@@ -172,8 +172,9 @@ allprojects {
         test.dependsOn scalaTest
 
         dependencies {
-            testCompile group: 'org.scalatest', name: 'scalatest_' + baseScalaVersion, version: scalaTestVersion
-            testCompile group: 'org.scalacheck', name: 'scalacheck_' + baseScalaVersion, version: scalaCheckVersion
+            compile group: 'org.scala-lang', name: 'scala-library', version: rootProject.scalaVersion
+            testCompile group: 'org.scalatest', name: 'scalatest_' + rootProject.baseScalaVersion, version: rootProject.scalaTestVersion
+            testCompile group: 'org.scalacheck', name: 'scalacheck_' + rootProject.baseScalaVersion, version: rootProject.scalaCheckVersion
         }
     }
 
