@@ -31,7 +31,6 @@ dependencies {
 
     compile project(':api')
     compile project(':avro')
-    compile 'org.scala-lang:scala-library:' + scalaVersion
     compile group: 'com.typesafe.akka', name: 'akka-actor_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-stream_' + baseScalaVersion, version: akkaVersion
     compile group: 'com.typesafe.akka', name: 'akka-remote_' + baseScalaVersion, version: akkaVersion

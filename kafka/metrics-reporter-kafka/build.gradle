@@ -36,7 +36,6 @@ uploadArchives.dependsOn assemble
 dependencies {
     compile group: 'com.yammer.metrics', name: 'metrics-core', version:'2.2.0'
     provided group: 'org.apache.kafka', name: 'kafka_' + rootProject.baseScalaVersion, version: project(':kafka').kafkaVersion
-    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
 }
 
 

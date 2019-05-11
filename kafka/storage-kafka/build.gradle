@@ -37,7 +37,6 @@ dependencies {
     compile project(':core')
     compile project(':kafka:avro-serde-kafka')
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: project(':kafka').kafkaVersion
-    compile 'org.scala-lang:scala-library:' + rootProject.scalaVersion
     testCompile project(':kafka:test-util-kafka')
     testCompile group: 'org.apache.kafka', name: 'kafka-streams', version: project(':kafka').kafkaVersion
 }
