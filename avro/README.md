@@ -38,33 +38,34 @@ be moved in future to a separate module avro-zookeeper-registry.
 
 Below is the table of all supported types, all which support default values.
 
-    Scala Type                      Avro Type            Note
-    ----------------------------------------------------------------------------------------------------
-    Null                            null
-    Boolean                         boolean
-    Int                             int                  avro compressed binary
-    @Fixed Int                      fixed(4)             4-byte big endian 
-    Long                            long                 avro compressed binary
-    @Fixed Long                     fixed(8)             8-byte big endian
-    Float                           float
-    Double                          double
-    String                          string               UTF-8
-    @Fixed(size) String             fixed(size)          ASCII
-    Array[Byte]                     bytes                varible length byte array
-    @Fixed Array[Byte]              fixed(size)          fixed size byte array
-    UUID                            fixed(16)            16-byte uuid representation, same as when @Fixed 
-    Map[String, T]   †              map(T)               Maps have to have String keys
-    Iterable[T]      †              array(T)             List[T], Seq[T], Set[T], etc.
-    Enumeration      †              enum                 only scala enums are suppored
-    Option[T]        †              union(null,T)        
-    sealed trait {T1,T2,T3}         union(T1,T2,T3)      sealed trait's direct concrete types form a union type
-    sealed abstract class{T1,T2,T3} union(T1,T2,T3)      sealed class's direct concrete types form a union type 
-    case class                      record               nested schemas are allowed
-    class(T) extends AnyVal         T                    scala value classes will be serialized as their underlying primitive (experimental)
+    Scala Type                        Avro Type            Note
+    ------------------------------------------------------------------------------------------------------
+    Null                              null
+    Boolean                           boolean
+    Int                               int                  avro compressed binary
+    @Fixed Int                        fixed(4)             4-byte big endian
+    Long                              long                 avro compressed binary
+    @Fixed Long                       fixed(8)             8-byte big endian
+    Float                             float
+    Double                            double
+    String                            string               UTF-8
+    @Fixed(size) String               fixed(size)          ASCII
+    Array[Byte]                       bytes                varible length byte array
+    @Fixed Array[Byte]                fixed(size)          fixed size byte array
+    UUID                              fixed(16)            16-byte uuid representation, same as when @Fixed
+    Map[String, T]   †                map(T)               Maps have to have String keys
+    Iterable[T]      †                array(T)             List[T], Seq[T], Set[T], etc.
+    Enumeration      †                enum                 only scala enums are suppored
+    Option[T]        †                union(null,T)
+    sealed trait {T1,T2,T3}         ∆ union(T1,T2,T3)      sealed trait's direct concrete types form a union type
+    sealed abstract class{T1,T2,T3} ∆ union(T1,T2,T3)      sealed class's direct concrete types form a union type
+    case class                        record               nested schemas are allowed
+    class(T) extends AnyVal           T                    scala value classes will be serialized as their underlying primitive (experimental)
     ----------------------------------------------------------------------------------------------------    
     † Generic types cannot be top-level schemas, they can be nested in a case class record - this is because
       generics don't have concrete static type so have to be evaluated at runtime and cannot be efficiently cached. 
       There would be a significant pefromance penalty for that although conceptually it could be possible.
+    ∆ Sealed subtypes must be annotated with @Union(index = 1..n) to have deterministic position in the union
 
 ### Note on Top-level primitive types
 
