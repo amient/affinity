@@ -460,11 +460,17 @@ object AvroRecord extends AvroExtractors {
       s.addProp("logicalType", tpe.typeSymbol.asClass.fullName.asInstanceOf[Object])
       s
     } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isSealed) {
+      var usedIndicies = Set.empty[Int]
       val subtypes = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.sortBy(_.fullName).map { s =>
         val a = s.annotations.find(_.tree.tpe =:= typeOf[Union]).getOrElse{
           throw new IllegalArgumentException(s"Sealed Union type ${s} is not annotated with @Union(index)")
         }
-        a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.asInstanceOf[Int]).head -> inferSchema(s.asType.toType)
+        val i = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.asInstanceOf[Int]).head
+        if (usedIndicies.contains(i)) {
+          throw new IllegalArgumentException(s"Sealed Union type ${s} is defined at @Union(index = ${i}) which is already allocated")
+        }
+        usedIndicies += i
+        i -> inferSchema(s.asType.toType)
       }
       //sealed union types are ordered using the index defined by @Union annotation
       val schemas = subtypes.sortBy(_._1).map(_._2)
