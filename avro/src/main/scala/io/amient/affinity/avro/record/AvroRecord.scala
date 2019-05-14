@@ -458,7 +458,7 @@ object AvroRecord extends AvroExtractors {
       s.addProp("logicalType", tpe.typeSymbol.asClass.fullName.asInstanceOf[Object])
       s
     } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isSealed) {
-      val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
+      val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.sortBy(_.fullName).map(_.asType.toType).map(inferSchema)
       schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
     } else if (tpe <:< typeOf[AvroRecord] || tpe.typeSymbol.asClass.isCaseClass) {
       val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
@@ -502,8 +502,8 @@ object AvroRecord extends AvroExtractors {
           }
           symbol.annotations.find(_.tree.tpe =:= typeOf[Doc]).foreach {
             a =>
-              val desc = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n").asInstanceOf[Object]
-              fieldSchema.addProp("description", desc)
+              val doc = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n")
+              builder.doc(doc)
           }
 
           val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))
