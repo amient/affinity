@@ -2,15 +2,17 @@ package io.amient.affinity.avro
 
 import java.util.UUID
 
-import io.amient.affinity.avro.record.{AvroJsonConverter, AvroRecord}
+import io.amient.affinity.avro.record.{AvroJsonConverter, AvroRecord, Union}
 import org.scalatest.{FlatSpec, Matchers}
 
 sealed trait Pet {
   def name: String
 }
 
+@Union(1)
 case class Cat(name: String, opt: Option[Int] = Some(1)) extends Pet
 
+@Union(2)
 case class Dog(name: String) extends Pet
 
 case class Me(myPet: Pet) extends AvroRecord
@@ -22,10 +24,13 @@ sealed abstract class AbstractPet(chipit: Option[UUID]) {
   override def toString() = chipit.toString
 }
 
+@Union(1)
 case class ConcreteDog(name: String, bark: Boolean, chipit: UUID) extends AbstractPet(Some(chipit))
 
+@Union(2)
 case class ConcreteCat(name: String, meow: Boolean, chipit: UUID) extends AbstractPet(Some(chipit))
 
+@Union(3)
 case class ConcreteRat() extends AbstractPet(None)
 
 case class AbstractMe(myPet: AbstractPet) extends AvroRecord
@@ -37,7 +42,7 @@ class AvroUnionSpec extends FlatSpec with Matchers {
 
   "AvroRecord" should "use old fields when Alias annotation is used" in {
     val schema = AvroRecord.inferSchema[AliasedAvro]
-    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":{\"type\":\"string\",\"description\":\"Really cool string that was once renamed!\"},\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
+    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":\"string\",\"doc\":\"Really cool string that was once renamed!\",\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
   }
 
   behavior of "sealed traits in avro conversion"
@@ -81,12 +86,12 @@ class AvroUnionSpec extends FlatSpec with Matchers {
                                                                    |    "name" : "myPet",
                                                                    |    "type" : [ {
                                                                    |      "type" : "record",
-                                                                   |      "name" : "ConcreteCat",
+                                                                   |      "name" : "ConcreteDog",
                                                                    |      "fields" : [ {
                                                                    |        "name" : "name",
                                                                    |        "type" : "string"
                                                                    |      }, {
-                                                                   |        "name" : "meow",
+                                                                   |        "name" : "bark",
                                                                    |        "type" : "boolean"
                                                                    |      }, {
                                                                    |        "name" : "chipit",
@@ -100,12 +105,12 @@ class AvroUnionSpec extends FlatSpec with Matchers {
                                                                    |      } ]
                                                                    |    }, {
                                                                    |      "type" : "record",
-                                                                   |      "name" : "ConcreteDog",
+                                                                   |      "name" : "ConcreteCat",
                                                                    |      "fields" : [ {
                                                                    |        "name" : "name",
                                                                    |        "type" : "string"
                                                                    |      }, {
-                                                                   |        "name" : "bark",
+                                                                   |        "name" : "meow",
                                                                    |        "type" : "boolean"
                                                                    |      }, {
                                                                    |        "name" : "chipit",
