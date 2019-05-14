@@ -41,6 +41,8 @@ import scala.reflect.runtime.{universe, _}
 
 final class Alias(val aliases: String*) extends StaticAnnotation
 
+final class Union(val index: Int) extends StaticAnnotation
+
 final class Fixed(val len: Int = -1) extends StaticAnnotation
 
 final class Doc(val text: String) extends StaticAnnotation
@@ -458,7 +460,20 @@ object AvroRecord extends AvroExtractors {
       s.addProp("logicalType", tpe.typeSymbol.asClass.fullName.asInstanceOf[Object])
       s
     } else if (tpe.typeSymbol.isClass && tpe.typeSymbol.asClass.isSealed) {
-      val schemas = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.map(_.asType.toType).map(inferSchema)
+      var usedIndicies = Set.empty[Int]
+      val subtypes = tpe.typeSymbol.asClass.knownDirectSubclasses.toList.sortBy(_.fullName).map { s =>
+        val a = s.annotations.find(_.tree.tpe =:= typeOf[Union]).getOrElse{
+          throw new IllegalArgumentException(s"Sealed Union type ${s} is not annotated with @Union(index)")
+        }
+        val i = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.asInstanceOf[Int]).head
+        if (usedIndicies.contains(i)) {
+          throw new IllegalArgumentException(s"Sealed Union type ${s} is defined at @Union(index = ${i}) which is already allocated")
+        }
+        usedIndicies += i
+        i -> inferSchema(s.asType.toType)
+      }
+      //sealed union types are ordered using the index defined by @Union annotation
+      val schemas = subtypes.sortBy(_._1).map(_._2)
       schemas.tail.foldLeft(SchemaBuilder.builder().unionOf().`type`(schemas.head))(_.and.`type`(_)).endUnion()
     } else if (tpe <:< typeOf[AvroRecord] || tpe.typeSymbol.asClass.isCaseClass) {
       val typeMirror = fqnMirrorCache.getOrInitialize(tpe.typeSymbol.asClass.fullName)
@@ -502,8 +517,8 @@ object AvroRecord extends AvroExtractors {
           }
           symbol.annotations.find(_.tree.tpe =:= typeOf[Doc]).foreach {
             a =>
-              val desc = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n").asInstanceOf[Object]
-              fieldSchema.addProp("description", desc)
+              val doc = a.tree.children.tail.map(_.productElement(0).asInstanceOf[Constant].value.toString).mkString("\n")
+              builder.doc(doc)
           }
 
           val defaultDef = companionMirror.symbol.typeSignature.member(TermName(s"apply$$default$$${i + 1}"))

@@ -43,7 +43,7 @@ object OutputDataStream {
     }
   }
 
-  @deprecated
+  //create OutputDataStream without transactional support
   def apply[K, V](keySerde: AbstractSerde[_ >: K], valSerde: AbstractSerde[_ >: V], conf: LogStorageConf): OutputDataStream[K, V] = {
     new OutputDataStream[K, V](new TransactionCoordinatorNoop, keySerde, valSerde, conf)
   }

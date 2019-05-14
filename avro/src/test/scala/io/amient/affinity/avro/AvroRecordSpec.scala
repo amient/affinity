@@ -157,7 +157,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
 
   "AvroRecord" should "use old fields when Alias annotation is used" in {
     val schema = AvroRecord.inferSchema[AliasedAvro]
-    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":{\"type\":\"string\",\"description\":\"Really cool string that was once renamed!\"},\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
+    schema.toString should be("{\"type\":\"record\",\"name\":\"AliasedAvro\",\"namespace\":\"io.amient.affinity.avro\",\"fields\":[{\"name\":\"name\",\"type\":\"string\",\"doc\":\"Really cool string that was once renamed!\",\"aliases\":[\"old_name1\",\"old_name2\"]}]}")
   }
 
   it should "have minimum read/write throughput" in {
