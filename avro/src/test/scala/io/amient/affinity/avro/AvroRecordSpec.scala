@@ -257,7 +257,7 @@ class AvroRecordSpec extends FlatSpec with Matchers {
     val prefix = newSerde.prefix(classOf[LongCompoundKey], new java.lang.Long(100L), "UK", "C001")
     assert(ByteUtils.startsWith(bytes, prefix))
     newSerde.fromBytes(bytes) should be(key)
-    AvroJsonConverter.toJson(key) should be("{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":99.9}")
+    AvroJsonConverter.toJson(key) should be("{\"version\":\"AAAAAAAAAGQ=\",\"country\":\"VUs=\",\"city\":\"QzAwMQ==\",\"value\":99.9}")
   }
 
   "AvroRecord" should "be serializable by java serializer" in {

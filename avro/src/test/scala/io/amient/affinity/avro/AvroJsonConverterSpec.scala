@@ -62,7 +62,7 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
   it should "handle fixed field variants" in {
     val msg = LongCompoundKey(100L, "UK", "C001", 9.9)
     val avroJson = AvroJsonConverter.toJson(msg)
-    avroJson should be("{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":9.9}")
+    avroJson should be("{\"version\":\"AAAAAAAAAGQ=\",\"country\":\"VUs=\",\"city\":\"QzAwMQ==\",\"value\":9.9}")
     AvroJsonConverter.toAvro(avroJson, msg.getSchema()) should be (msg)
   }
 
@@ -96,17 +96,18 @@ class AvroJsonConverterSpec extends FlatSpec with Matchers {
     val u = UUID.fromString("01010101-0202-0202-0303-030304040404")
     val a = UuidCompoundKey(Array(65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65), u, 1L)
     val j = AvroJsonConverter.toJson(a)
-    j should include("AAAAAAAAAAAAAAAA")
+    j should include("QUFBQUFBQUFBQUFBQUFBQQ==")
     j should include("01010101-0202-0202-0303-030304040404")
     val a2 = AvroJsonConverter.toAvro[UuidCompoundKey](j)
     a2.uuid2 should equal(a.uuid2)
     a.uuid2 should equal(u)
     val n = NestedLogicalType(a)
     val jn = AvroJsonConverter.toJson(n)
-    jn should include("AAAAAAAAAAAAAAAA")
+    jn should include("QUFBQUFBQUFBQUFBQUFBQQ==")
     jn should include("01010101-0202-0202-0303-030304040404")
     val n2 = AvroJsonConverter.toAvro[NestedLogicalType](jn)
     n2.u.uuid2 should equal(a.uuid2)
     n2.u.uuid2 should equal(u)
   }
+
 }
