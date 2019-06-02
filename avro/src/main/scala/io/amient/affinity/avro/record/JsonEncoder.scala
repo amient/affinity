@@ -1,23 +1,17 @@
 package io.amient.affinity.avro.record
 
-import java.io.IOException
-import java.io.OutputStream
+import java.io.{IOException, OutputStream}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util
 
 import io.amient.affinity.core.util.ByteUtils
-import org.apache.avro.{AvroTypeException, LogicalType, Schema}
 import org.apache.avro.io.ParsingEncoder
-import org.apache.avro.io.parsing.JsonGrammarGenerator
-import org.apache.avro.io.parsing.Parser
-import org.apache.avro.io.parsing.Symbol
+import org.apache.avro.io.parsing.{JsonGrammarGenerator, Parser, Symbol}
 import org.apache.avro.util.Utf8
-import org.codehaus.jackson.JsonEncoding
-import org.codehaus.jackson.JsonFactory
-import org.codehaus.jackson.JsonGenerator
-import org.codehaus.jackson.util.DefaultPrettyPrinter
-import org.codehaus.jackson.util.MinimalPrettyPrinter
+import org.apache.avro.{AvroTypeException, LogicalType, Schema}
+import org.codehaus.jackson.{JsonEncoding, JsonFactory, JsonGenerator}
+import org.codehaus.jackson.util.{DefaultPrettyPrinter, MinimalPrettyPrinter}
 
 /** An {@link Encoder} for Avro's JSON data encoding.
   * </p>
@@ -149,12 +143,7 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
   @throws[IOException]
   override def writeBytes(bytes: Array[Byte], start: Int, len: Int): Unit = {
     parser.advance(Symbol.BYTES)
-    writeByteArray(bytes, start, len)
-  }
-
-  @throws[IOException]
-  private def writeByteArray(bytes: Array[Byte], start: Int, len: Int): Unit = {
-    out.writeString(new String(bytes, start, len, StandardCharsets.UTF_8))
+    out.writeBinary(bytes, start, len)
   }
 
   @throws[IOException]
@@ -165,11 +154,11 @@ class JsonEncoder private[io](val sc: Schema, out: JsonGenerator) extends Parsin
       throw new AvroTypeException("Incorrect length for fixed binary: expected " + top.size + " but received " + len + " bytes.")
     }
     logicalType match {
-      case null => writeByteArray(bytes, start, len)
+      case null => out.writeBinary(bytes, start, len)
       case AvroJsonConverter.UUID_TYPE =>
         val uuid = ByteUtils.uuid(bytes, start).toString.getBytes
-        writeByteArray(uuid, 0, uuid.length)
-      case _ => writeByteArray(bytes, start, len)
+        out.writeString(new String(uuid, 0, uuid.length, StandardCharsets.UTF_8))
+      case _ => out.writeBinary(bytes, start, len)
     }
 
   }
