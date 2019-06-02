@@ -58,7 +58,7 @@ class EncoderSpec extends FlatSpec with Matchers {
   it should "correctly translate collections of avro records with fixed fields" in {
     val list = List(LongCompoundKey(100L, "UK", "C001", 9.9))
     list.toString should be ("List(LongCompoundKey(100,UK,C001,9.9))")
-    val sameJson = "[{\"type\":\"io.amient.affinity.core.http.LongCompoundKey\",\"data\":{\"version\":\"\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000\\u0000d\",\"country\":\"UK\",\"city\":\"C001\",\"value\":9.9}}]"
+    val sameJson = "[{\"type\":\"io.amient.affinity.core.http.LongCompoundKey\",\"data\":{\"version\":\"AAAAAAAAAGQ=\",\"country\":\"VUs=\",\"city\":\"QzAwMQ==\",\"value\":9.9}}]"
     Encoder.json(list) should be(sameJson)
   }
 
