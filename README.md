@@ -114,7 +114,7 @@ Gateways tend to be the orchestration layer while Keyspaces and their Partitions
 
 There ws an experimintal piece of code around lightweight transactions that can be wrapped
 around orchestrated logic which use reversible Instructions to compensate failed operations
-but this was abandonned as for it to operate consistently distributed locks would have to be used.
+but this was abandoned as for it to operate consistently distributed locks would have to be used.
 
 ### Akka Patterns
 
