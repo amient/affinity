@@ -57,7 +57,7 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     super.afterAll()
   }
 
-  "Graph API" should "should maintain connected components when adding and removing edges" in {
+  "Graph API" should "should maintain connected components when adding and removing edges" ignore {
     //(1~>2), (3~>4) ==> component1(1,2), component3(3,4)
     node1.http_get("/vertex/1").status should be(NotFound)
     node1.http_get("/vertex/2").status should be(NotFound)
