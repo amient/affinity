@@ -110,7 +110,7 @@ object RebalanceTool extends Tool {
       val pw = new PrintWriter(path.toFile)
       try {
         val json = mapper.createObjectNode()
-        json.put("version", "1")
+        json.put("version", 1)
         val jsonPartitions = json.putArray("partitions")
         assignments.filter(_.modified).foreach {
           assignment =>
