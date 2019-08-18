@@ -397,16 +397,20 @@ In all examples and for all tests, logback binding is used.
         affinity.global.<ID>.storage.commit.interval.ms [LONG] (5000)                           Frequency at which consumed records will be committed to the log storage backend
         affinity.global.<ID>.storage.commit.timeout.ms [LONG] (30000)                           Number of milliseconds after which a commit is considered failed
         affinity.global.<ID>.storage.min.timestamp.ms [LONG] (0)                                Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
+        affinity.global.<ID>.storage.sync [TRUE|FALSE] (false)                                  Whether to wait on startup until the known end offsets are reached
         affinity.global.<ID>.ttl.sec [INT] (-1)                                                 Per-record expiration which will based off event-time if the data class implements EventTime trait
         affinity.global.<ID>.write.timeout.ms [LONG] (10000)                                    How long can any of the write operation on a global store take before throwing a TimeoutException
 
 ### Global State Storage(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.global.<ID>.storage.kafka.bootstrap.servers [STRING] (!)                       kafka connection string used for consumer and/or producer
+        affinity.global.<ID>.storage.kafka.compact [TRUE|FALSE] (false)                         whether the topic compaction should be enforced
         affinity.global.<ID>.storage.kafka.consumer                                             any settings that the underlying version of kafka consumer client supports
         affinity.global.<ID>.storage.kafka.consumer.group.id [STRING] (-)                       kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
-        affinity.global.<ID>.storage.kafka.partitions [INT] (-)                                 requird number of partitions
+        affinity.global.<ID>.storage.kafka.partitions [INT] (-)                                 requird number of partitions 
         affinity.global.<ID>.storage.kafka.producer                                             any settings that the underlying version of kafka producer client supports
         affinity.global.<ID>.storage.kafka.replication.factor [INT] (1)                         replication factor of the kafka topic
+        affinity.global.<ID>.storage.kafka.security.protocol [STRING] (PLAINTEXT)               kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..
+        affinity.global.<ID>.storage.kafka.ssl                                                  kafka connection ssl settings when protocol includes SSL
         affinity.global.<ID>.storage.kafka.topic [STRING] (!)                                   kafka topic name
 
 ### Global State Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
@@ -422,7 +426,7 @@ In all examples and for all tests, logback binding is used.
 
 
 ## Keyspaces
-        affinity.keyspace [<ID>] (-)
+        affinity.keyspace [<ID>] (-)                                                            
         affinity.keyspace.<ID>.class [FQN] (!)                                                  Implementation of core.actor.Partition of whose instances is the Keyspace composed
         affinity.keyspace.<ID>.partitions [INT] (!)                                             Total number of partitions in the Keyspace
         affinity.keyspace.<ID>.replication.factor [INT] (1)                                     Desired number of online replicas for this keypsace
@@ -438,16 +442,20 @@ In all examples and for all tests, logback binding is used.
         affinity.keyspace.<ID>.state.<ID>.storage.commit.interval.ms [LONG] (5000)              Frequency at which consumed records will be committed to the log storage backend
         affinity.keyspace.<ID>.state.<ID>.storage.commit.timeout.ms [LONG] (30000)              Number of milliseconds after which a commit is considered failed
         affinity.keyspace.<ID>.state.<ID>.storage.min.timestamp.ms [LONG] (0)                   Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
+        affinity.keyspace.<ID>.state.<ID>.storage.sync [TRUE|FALSE] (false)                     Whether to wait on startup until the known end offsets are reached
         affinity.keyspace.<ID>.state.<ID>.ttl.sec [INT] (-1)                                    Per-record expiration which will based off event-time if the data class implements EventTime trait
         affinity.keyspace.<ID>.state.<ID>.write.timeout.ms [LONG] (10000)                       How long can any of the write operation on a global store take before throwing a TimeoutException
 
 ### Keyspaces Storage(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.bootstrap.servers [STRING] (!)          kafka connection string used for consumer and/or producer
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.compact [TRUE|FALSE] (false)            whether the topic compaction should be enforced
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer                                any settings that the underlying version of kafka consumer client supports
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.consumer.group.id [STRING] (-)          kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
-        affinity.keyspace.<ID>.state.<ID>.storage.kafka.partitions [INT] (-)                    requird number of partitions
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.partitions [INT] (-)                    requird number of partitions 
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.producer                                any settings that the underlying version of kafka producer client supports
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.replication.factor [INT] (1)            replication factor of the kafka topic
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.security.protocol [STRING] (PLAINTEXT)  kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.ssl                                     kafka connection ssl settings when protocol includes SSL
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)                      kafka topic name
 
 ### Keyspaces Memstore(io.amient.affinity.core.storage.rocksdb.MemStoreRocksDb)
@@ -463,12 +471,12 @@ In all examples and for all tests, logback binding is used.
 
 
 ## Node Context
-        affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3]
-        affinity.node.container.<ID>
-        affinity.node.container.<ID>.[] [INT] (!)
+        affinity.node.container [<ID>] (-)                                                      Array of partitions assigned to this node, <ID> represents the Keyspace, e.g. assigning first four partitions of MyKeySpace: affinity.node.container.MyKeySpace = [0,1,2,3] 
+        affinity.node.container.<ID>                                                            
+        affinity.node.container.<ID>.[] [INT] (!)                                               
         affinity.node.data.auto.assign [TRUE|FALSE] (false)                                     Determines whether this node auto-balances data its containers; if set tot false the fixed list of container partitions will be used
         affinity.node.data.auto.delete [TRUE|FALSE] (false)                                     If set to true, any unassigned partitions will be deleted from the local storage
-        affinity.node.data.dir [FILE-PATH] (-)                                                  Location under which any local state or registers will be kept
+        affinity.node.data.dir [FILE-PATH] (-)                                                  Location under which any local state or registers will be kept - this is required if running in a distributed mode or when using persisted kv stores
         affinity.node.gateway.class [FQN] (!)                                                   Entry point class for all external requests, both http and stream inputs
         affinity.node.gateway.listeners                                                         list of listener interface configurations
         affinity.node.gateway.listeners.[].host [STRING] (!)                                    host to which the http interface binds to
@@ -484,6 +492,7 @@ In all examples and for all tests, logback binding is used.
         affinity.node.gateway.stream.<ID>.commit.interval.ms [LONG] (5000)                      Frequency at which consumed records will be committed to the log storage backend
         affinity.node.gateway.stream.<ID>.commit.timeout.ms [LONG] (30000)                      Number of milliseconds after which a commit is considered failed
         affinity.node.gateway.stream.<ID>.min.timestamp.ms [LONG] (0)                           Any records with timestamp lower than this value will be immediately dropped - if not set, this settings will be derived from the owning state, if any.
+        affinity.node.gateway.stream.<ID>.sync [TRUE|FALSE] (false)                             Whether to wait on startup until the known end offsets are reached
         affinity.node.gateway.suspended.reject [TRUE|FALSE] (true)                              controls how http requests are treated in suspended state: true - immediately rejected with 503 Service Unavailable; false - enqueued for reprocessing on resumption
         affinity.node.shutdown.timeout.ms [LONG] (30000)                                        Maximum time a node can take to shutdown gracefully
         affinity.node.startup.timeout.ms [LONG] (2147483647)                                    Maximum time a node can take to startup - this number must account for any potential state bootstrap
@@ -491,25 +500,28 @@ In all examples and for all tests, logback binding is used.
 
 ### Node Context Stream(io.amient.affinity.kafka.KafkaLogStorage)
         affinity.node.gateway.stream.<ID>.kafka.bootstrap.servers [STRING] (!)                  kafka connection string used for consumer and/or producer
+        affinity.node.gateway.stream.<ID>.kafka.compact [TRUE|FALSE] (false)                    whether the topic compaction should be enforced
         affinity.node.gateway.stream.<ID>.kafka.consumer                                        any settings that the underlying version of kafka consumer client supports
         affinity.node.gateway.stream.<ID>.kafka.consumer.group.id [STRING] (-)                  kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally
-        affinity.node.gateway.stream.<ID>.kafka.partitions [INT] (-)                            requird number of partitions
+        affinity.node.gateway.stream.<ID>.kafka.partitions [INT] (-)                            requird number of partitions 
         affinity.node.gateway.stream.<ID>.kafka.producer                                        any settings that the underlying version of kafka producer client supports
         affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)                    replication factor of the kafka topic
+        affinity.node.gateway.stream.<ID>.kafka.security.protocol [STRING] (PLAINTEXT)          kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..
+        affinity.node.gateway.stream.<ID>.kafka.ssl                                             kafka connection ssl settings when protocol includes SSL
         affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name
 
 
 ## Important Akka Configuration Options
         akka.actor.provider [STRING] (-)                                                        Set this to "akka.remote.RemoteActorRefProvider" when running in a cluster
-        akka.http.server.idle-timeout [STRING] (infinite)
-        akka.http.server.max-connections [INT] (1000)
-        akka.http.server.remote-address-header [STRING] (on)
-        akka.http.server.request-timeout [STRING] (30s)
-        akka.http.server.server-header [STRING] (-)
+        akka.http.server.idle-timeout [STRING] (infinite)                                       
+        akka.http.server.max-connections [INT] (1000)                                           
+        akka.http.server.remote-address-header [STRING] (on)                                    
+        akka.http.server.request-timeout [STRING] (30s)                                         
+        akka.http.server.server-header [STRING] (-)                                             
         akka.remote.enabled-transports                                                          Set this to ["akka.remote.netty.tcp"] when running in a cluster
-        akka.remote.enabled-transports.[] [STRING] (!)
-        akka.remote.netty.tcp.hostname [STRING] (-)
-        akka.remote.netty.tcp.port [INT] (-)
+        akka.remote.enabled-transports.[] [STRING] (!)                                          
+        akka.remote.netty.tcp.hostname [STRING] (-)                                             
+        akka.remote.netty.tcp.port [INT] (-)                                                    
 
 # Metrics
 

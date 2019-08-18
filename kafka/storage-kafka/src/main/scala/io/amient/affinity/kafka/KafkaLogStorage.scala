@@ -61,11 +61,15 @@ object KafkaStorage {
     val Partitions = integer("kafka.partitions", false).doc("requird number of partitions ")
     val ReplicationFactor = integer("kafka.replication.factor", 1).doc("replication factor of the kafka topic")
     val BootstrapServers = string("kafka.bootstrap.servers", true).doc("kafka connection string used for consumer and/or producer")
+    val SecurityProtocol = string("kafka.security.protocol", "PLAINTEXT").doc("kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..")
+    val Ssl = struct("kafka.ssl", new KafkaSslConf, false).doc("kafka connection ssl settings when protocol includes SSL")
     val Producer = struct("kafka.producer", new KafkaProducerConf, false).doc("any settings that the underlying version of kafka producer client supports")
     val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false).doc("any settings that the underlying version of kafka consumer client supports")
   }
 
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)
+
+  class KafkaSslConf extends CfgStruct[KafkaSslConf](Cfg.Options.IGNORE_UNKNOWN)
 
   class KafkaConsumerConf extends CfgStruct[KafkaConsumerConf](Cfg.Options.IGNORE_UNKNOWN) {
     val GroupId = string("group.id", false).doc("kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally")
@@ -91,6 +95,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     put("retries", Int.MaxValue.toString)
     put("max.in.flight.requests.per.connection", "1")
     put("max.block.ms", Long.MaxValue.toString)
+    put("security.protocol", kafkaStorageConf.SecurityProtocol())
+    if (kafkaStorageConf.Ssl.isDefined) {
+      kafkaStorageConf.Ssl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+        put("ssl." + entry.getKey, entry.getValue.apply.toString)
+      }
+    }
     if (kafkaStorageConf.Producer.isDefined) {
       val producerConfig = kafkaStorageConf.Producer.toMap()
       if (producerConfig.containsKey("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
@@ -111,6 +121,12 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
   private val consumerProps = new Properties() {
     put("auto.offset.reset", "earliest")
+    put("security.protocol", kafkaStorageConf.SecurityProtocol())
+    if (kafkaStorageConf.Ssl.isDefined) {
+      kafkaStorageConf.Ssl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+        put("ssl." + entry.getKey, entry.getValue.apply.toString)
+      }
+    }
     if (kafkaStorageConf.Consumer.isDefined) {
       val consumerConfig = kafkaStorageConf.Consumer.toMap()
       if (consumerConfig.containsKey("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage consumer")
