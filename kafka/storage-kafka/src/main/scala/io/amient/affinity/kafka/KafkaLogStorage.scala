@@ -352,6 +352,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
       val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
 
+      createTopicIfNotExists(admin, numPartitions)
+
+      val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
+      val actualConfig = admin.describeConfigs(List(topicConfigResource).asJava)
+        .values().asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
       val topicConfigs = Map(
         TopicConfig.CLEANUP_POLICY_CONFIG -> compactionPolicy,
         TopicConfig.MESSAGE_TIMESTAMP_TYPE_CONFIG -> "CreateTime",
@@ -359,23 +364,17 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         TopicConfig.RETENTION_MS_CONFIG -> (if (ttlMs > 0) ttlMs else Long.MaxValue).toString,
         TopicConfig.RETENTION_BYTES_CONFIG -> "-1"
       )
-
-      createTopicIfNotExists(admin, numPartitions)
-
       log.debug(s"Checking that topic $topic contains all required configs: ${topicConfigs}")
-      val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
-      val actualConfig = admin.describeConfigs(List(topicConfigResource).asJava)
-        .values().asScala.head._2.get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-      val configOutOfSync = topicConfigs.filter { case (k, v) => actualConfig.get(k).value() != v }
+      val configs = topicConfigs.filter { case (k, v) => actualConfig.get(k).value() != v }
       if (readonly) {
-        if (configOutOfSync.nonEmpty) log.warn(s"External topic $topic configuration doesn't match the state expectations: $configOutOfSync")
-      } else if (configOutOfSync.nonEmpty) {
-        val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }.asJavaCollection
-        admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)).asJava)
+        if (configs.nonEmpty) log.warn(s"External topic $topic configuration doesn't match the state expectations: $configs")
+      } else if (configs.nonEmpty) {
+        val entries = configs.map { case (k, v) => new ConfigEntry(k, v) } ++ actualConfig.entries().asScala.filter(e => !configs.contains(e.name()))
+        admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries.asJavaCollection)).asJava)
           .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
 // broker must be 2.3+ to support incremental alter config so it's better to use deprecated api above
-//        val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }
-//        val ops = entries.map(entry => new AlterConfigOp(entry, AlterConfigOp.OpType.SET)).asJavaCollection
+//        val ops = configs.map { case (k, v) => new ConfigEntry(k, v) }
+//            .map(entry => new AlterConfigOp(entry, AlterConfigOp.OpType.SET)).asJavaCollection
 //        val altOpts = Map(topicConfigResource -> ops).asJava
 //        admin.incrementalAlterConfigs(altOpts).all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
         log.info(s"Topic $topic configuration altered successfully")
