@@ -19,8 +19,8 @@
 
 package io.amient.affinity.kafka
 
-import java.util.{Properties, UUID}
 import java.util.concurrent.{ExecutionException, Future, TimeUnit}
+import java.util.{Properties, UUID}
 import java.{lang, util}
 
 import com.typesafe.config.Config
@@ -29,7 +29,7 @@ import io.amient.affinity.core.state.StateConf
 import io.amient.affinity.core.storage._
 import io.amient.affinity.core.util.{EventTime, JavaPromise, MappedJavaFuture, TimeRange}
 import io.amient.affinity.kafka.KafkaStorage.KafkaStorageConf
-import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, ConfigEntry, NewTopic}
+import org.apache.kafka.clients.admin._
 import org.apache.kafka.clients.consumer.{ConsumerRebalanceListener, KafkaConsumer, OffsetAndMetadata, OffsetCommitCallback}
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -63,6 +63,7 @@ object KafkaStorage {
     val BootstrapServers = string("kafka.bootstrap.servers", true).doc("kafka connection string used for consumer and/or producer")
     val SecurityProtocol = string("kafka.security.protocol", "PLAINTEXT").doc("kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..")
     val Ssl = struct("kafka.ssl", new KafkaSslConf, false).doc("kafka connection ssl settings when protocol includes SSL")
+    val Sasl = struct("kafka.sasl", new KafkaSaslConf, false).doc("kafka connection sasl settings when protocol includes SASL")
     val Producer = struct("kafka.producer", new KafkaProducerConf, false).doc("any settings that the underlying version of kafka producer client supports")
     val Consumer = struct("kafka.consumer", new KafkaConsumerConf, false).doc("any settings that the underlying version of kafka consumer client supports")
   }
@@ -70,6 +71,8 @@ object KafkaStorage {
   class KafkaProducerConf extends CfgStruct[KafkaProducerConf](Cfg.Options.IGNORE_UNKNOWN)
 
   class KafkaSslConf extends CfgStruct[KafkaSslConf](Cfg.Options.IGNORE_UNKNOWN)
+
+  class KafkaSaslConf extends CfgStruct[KafkaSaslConf](Cfg.Options.IGNORE_UNKNOWN)
 
   class KafkaConsumerConf extends CfgStruct[KafkaConsumerConf](Cfg.Options.IGNORE_UNKNOWN) {
     val GroupId = string("group.id", false).doc("kafka consumer group.id will be used if it backs an input stream, state stores manage partitions internally")
@@ -101,6 +104,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         put("ssl." + entry.getKey, entry.getValue.apply.toString)
       }
     }
+    if (kafkaStorageConf.Sasl.isDefined) {
+      kafkaStorageConf.Sasl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+        put("sasl." + entry.getKey, entry.getValue.apply.toString)
+      }
+    }
     if (kafkaStorageConf.Producer.isDefined) {
       val producerConfig = kafkaStorageConf.Producer.toMap()
       if (producerConfig.containsKey("bootstrap.servers")) throw new IllegalArgumentException("bootstrap.servers cannot be overriden for KafkaStroage producer")
@@ -125,6 +133,11 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     if (kafkaStorageConf.Ssl.isDefined) {
       kafkaStorageConf.Ssl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
         put("ssl." + entry.getKey, entry.getValue.apply.toString)
+      }
+    }
+    if (kafkaStorageConf.Sasl.isDefined) {
+      kafkaStorageConf.Sasl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+        put("sasl." + entry.getKey, entry.getValue.apply.toString)
       }
     }
     if (kafkaStorageConf.Consumer.isDefined) {
@@ -357,9 +370,10 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       if (readonly) {
         if (configOutOfSync.nonEmpty) log.warn(s"External topic $topic configuration doesn't match the state expectations: $configOutOfSync")
       } else if (configOutOfSync.nonEmpty) {
-        val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }.asJavaCollection
-        admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries)).asJava)
-          .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        val entries = topicConfigs.map { case (k, v) => new ConfigEntry(k, v) }
+        val ops = entries.map(entry => new AlterConfigOp(entry, AlterConfigOp.OpType.SET)).asJavaCollection
+        val altOpts = Map(topicConfigResource -> ops).asJava
+        admin.incrementalAlterConfigs(altOpts).all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
         log.info(s"Topic $topic configuration altered successfully")
       } else {
         log.debug(s"Topic $topic configuration is up to date")
@@ -415,7 +429,18 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
   private def getAdminClient: AdminClient = {
     val adminProps = new Properties() {
       put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaStorageConf.BootstrapServers())
+      put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, kafkaStorageConf.SecurityProtocol())
       log.debug("Configuring Admin Client: " + AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG + " = " + kafkaStorageConf.BootstrapServers())
+      if (kafkaStorageConf.Ssl.isDefined) {
+        kafkaStorageConf.Ssl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+          put("ssl." + entry.getKey, entry.getValue.apply.toString)
+        }
+      }
+      if (kafkaStorageConf.Sasl.isDefined) {
+        kafkaStorageConf.Sasl.toMap().entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
+          put("sasl." + entry.getKey, entry.getValue.apply.toString)
+        }
+      }
       //the following is here to pass the correct security settings - maybe only security.* and sasl.* settings could be filtered
       if (kafkaStorageConf.Consumer.isDefined) {
         val consumerConfig = kafkaStorageConf.Consumer.toMap()
