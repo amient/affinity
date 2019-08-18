@@ -21,7 +21,7 @@ package io.amient.affinity.avro
 
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.kafka.EmbeddedConfluentRegistry
 import io.amient.affinity.{AffinityActorSystem, Conf}
@@ -36,11 +36,11 @@ class AkkaSerializationSystemTest extends FlatSpec with EmbeddedConfluentRegistr
 
   val config = ConfigFactory.empty
     .withValue(Conf.Affi.SystemName.path, ConfigValueFactory.fromAnyRef("CfTest"))
-    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ConfluentSchemaRegistry].getName))
-    .withValue(CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
+    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[HttpSchemaRegistry].getName))
+    .withValue(HttpAvroConf(Conf.Affi.Avro).HttpSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
 
 
-  assert(config.getString(CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path) == registryUrl)
+  assert(config.getString(HttpAvroConf(Conf.Affi.Avro).HttpSchemaRegistryUrl.path) == registryUrl)
 
   override def numPartitions = 2
 
