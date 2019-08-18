@@ -19,40 +19,49 @@
 
 package io.amient.affinity.avro
 
-import java.io.DataOutputStream
-import java.net.{HttpURLConnection, URL}
-import java.util.Base64
+import java.io.{File, FileInputStream}
+import java.net.URL
+import java.security.KeyStore
 
 import com.typesafe.config.Config
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroSerde
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.config.CfgStruct
 import org.apache.avro.Schema
+import org.apache.http.client.methods.{HttpGet, HttpPost}
+import org.apache.http.entity.StringEntity
+import org.apache.http.impl.client.HttpClients
+import org.apache.http.ssl.SSLContexts
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 
-object ConfluentSchemaRegistry {
+object HttpSchemaRegistry {
 
-  object CfAvroConf extends CfAvroConf {
-    override def apply(config: Config) = new CfAvroConf().apply(config)
+  object HttpAvroConf extends HttpAvroConf {
+    override def apply(config: Config): HttpAvroConf = new HttpAvroConf().apply(config)
   }
 
-  class CfAvroConf extends CfgStruct[CfAvroConf](classOf[AvroConf]) {
-    val ConfluentSchemaRegistryUrl = url("schema.registry.url", new URL("http://localhost:8081"))
-      .doc("Confluent Schema Registry connection base URL")
+  class HttpAvroConf extends CfgStruct[HttpAvroConf](classOf[AvroConf]) {
+    val HttpSchemaRegistryUrl = url("schema.registry.url", new URL("http://localhost:8081"))
+      .doc("Http Schema Registry connection base URL")
+    val HttpSchemaRegistryKeyStore = string("schema.registry.keystore", false).doc("optional <key-store-file>:<key-store-password>")
+    val HttpSchemaRegistryTrustStore = string("schema.registry.truststore", false).doc("optional <trust-store-file>:<trust-store-password>")
   }
 
 }
 
 
-class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends AvroSerde with AvroSchemaRegistry {
+class HttpSchemaRegistry(client: HttpSchemaRegistryClient) extends AvroSerde with AvroSchemaRegistry {
 
-  def this(conf: CfAvroConf) = this(new ConfluentSchemaRegistryClient(conf.ConfluentSchemaRegistryUrl()))
+  def this(conf: HttpAvroConf) = this(new HttpSchemaRegistryClient(
+    conf.HttpSchemaRegistryUrl(),
+    if (!conf.HttpSchemaRegistryKeyStore.isDefined) null else conf.HttpSchemaRegistryKeyStore(),
+    if (!conf.HttpSchemaRegistryTrustStore.isDefined) null else conf.HttpSchemaRegistryTrustStore()))
 
-  def this(_conf: AvroConf) = this(CfAvroConf(_conf))
+  def this(_conf: AvroConf) = this(HttpAvroConf(_conf))
 
   override def close(): Unit = ()
 
@@ -64,9 +73,26 @@ class ConfluentSchemaRegistry(client: ConfluentSchemaRegistryClient) extends Avr
 
 }
 
-class ConfluentSchemaRegistryClient(baseUrl: URL) {
+class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustStoreP12: String = null) {
 
   private val mapper = new ObjectMapper
+
+  val httpClient = baseUrl.getProtocol match {
+    case "https" =>
+      val sslContext = SSLContexts.custom()
+      if (keyStoreP12 != null) {
+        val Array(keyStoreFile, keyStorePass) = keyStoreP12.split(":")
+        val keyStore = KeyStore.getInstance("PKCS12")
+        keyStore.load(new FileInputStream(keyStoreFile), keyStorePass.toCharArray())
+        sslContext.loadKeyMaterial(keyStore, keyStorePass.toCharArray)
+      }
+      if (trustStoreP12 != null) {
+        val Array(trustStoreFile, trustStorePass) = trustStoreP12.split(":")
+        sslContext.loadTrustMaterial(new File(trustStoreFile), trustStorePass.toCharArray)
+      }
+      HttpClients.custom().setSSLContext(sslContext.build()).build()
+    case _ => HttpClients.createDefault()
+  }
 
   def getSubjects: Iterator[String] = {
     val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
@@ -115,49 +141,27 @@ class ConfluentSchemaRegistryClient(baseUrl: URL) {
     if (j.has("id")) j.get("id").getIntValue else throw new IllegalArgumentException
   }
 
-  private def get(path: String): String = http(path) { connection =>
+  private def get(path: String): String = {
+    val httpGet = httpClient.execute(new HttpGet(baseUrl + path))
     try {
-      connection.setRequestMethod("GET")
-    } catch {
-      case _: java.net.ConnectException => throw new java.net.ConnectException(baseUrl + path)
+      scala.io.Source.fromInputStream(httpGet.getEntity().getContent).mkString
+    } finally {
+      httpGet.close();
     }
   }
 
-  private def post(path: String, entity: String): String = http(path) { connection =>
-    connection.addRequestProperty("Content-Type", "application/json")
-    connection.addRequestProperty("Accept", "application/vnd.schemaregistry.v1+json, application/vnd.schemaregistry+json, application/json")
-    connection.setDoOutput(true)
-    connection.setRequestMethod("POST")
-    val output = try {
-      new DataOutputStream( connection.getOutputStream())
-    } catch {
-      case _: java.net.ConnectException => throw new java.net.ConnectException(baseUrl + path)
+  private def post(path: String, entity: String): String = {
+    val post = new HttpPost(baseUrl + path)
+    post.addHeader("Content-Type", "application/json")
+    post.addHeader("Accept", "application/vnd.schemaregistry.v1+json, application/vnd.schemaregistry+json, application/json")
+    post.setEntity(new StringEntity(entity))
+    val response = httpClient.execute(post)
+    try {
+      scala.io.Source.fromInputStream(response.getEntity().getContent).mkString
+    } finally {
+      response.close();
     }
-    output.write( entity.getBytes("UTF-8"))
   }
 
-  private def http(path: String)(init: HttpURLConnection => Unit ): String = {
-
-    val url = new URL(baseUrl.toString + path)
-    val connection = url.openConnection.asInstanceOf[HttpURLConnection]
-    connection.setConnectTimeout(30000)
-    connection.setReadTimeout(15000)
-
-    if (url.getUserInfo != null && url.getUserInfo != "") {
-      connection.setRequestProperty("Authorization", "Basic " + new String(Base64.getEncoder.encode(url.getUserInfo.getBytes)))
-    }
-
-    init(connection)
-
-    val status = connection.getResponseCode()
-    val inputStream = if (status == HttpURLConnection.HTTP_OK) {
-      connection.getInputStream
-    } else {
-      connection.getErrorStream
-    }
-    val content = scala.io.Source.fromInputStream(inputStream).mkString
-    if (inputStream != null) inputStream.close
-    content
-  }
 }
 
