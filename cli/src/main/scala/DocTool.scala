@@ -1,10 +1,10 @@
 import com.typesafe.config.Config
 import io.amient.affinity
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
-import io.amient.affinity.avro.{ConfluentSchemaRegistry, LocalSchemaRegistry, MemorySchemaRegistry, ZookeeperSchemaRegistry}
+import io.amient.affinity.avro.{HttpSchemaRegistry, LocalSchemaRegistry, MemorySchemaRegistry, ZookeeperSchemaRegistry}
 import io.amient.affinity.core.cluster.CoordinatorZk
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgList, CfgStruct}
@@ -32,8 +32,8 @@ object DocTool extends Tool {
     println("\n\n## Avro")
     apply(affinity.Conf.Affi.Avro)
 
-    println(s"\n### Avro (${classOf[ConfluentSchemaRegistry].getName})")
-    apply(CfAvroConf(affinity.Conf.Affi.Avro))
+    println(s"\n### Avro (${classOf[HttpSchemaRegistry].getName})")
+    apply(HttpAvroConf(affinity.Conf.Affi.Avro))
 
     println(s"\n### Avro (${classOf[ZookeeperSchemaRegistry].getName})")
     apply(ZkAvroConf(affinity.Conf.Affi.Avro))
