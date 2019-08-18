@@ -21,8 +21,8 @@ package io.amient.affinity.kafka
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import io.amient.affinity.avro.ConfluentSchemaRegistry
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import org.apache.avro.generic.GenericRecord
@@ -52,8 +52,8 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "bootstrap.servers" -> kafkaBootstrap,
       "key.serializer" -> classOf[KafkaAvroSerializer].getName,
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
-      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+      new AvroConf().Class.path -> classOf[HttpSchemaRegistry].getName,
+      new HttpAvroConf().HttpSchemaRegistryUrl.path -> registryUrl
     )
 
     val consumerProps = Map(
@@ -108,8 +108,8 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "bootstrap.servers" -> kafkaBootstrap,
       "key.serializer" -> classOf[KafkaAvroSerializer].getName,
       "value.serializer" -> classOf[KafkaAvroSerializer].getName,
-      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+      new AvroConf().Class.path -> classOf[HttpSchemaRegistry].getName,
+      new HttpAvroConf().HttpSchemaRegistryUrl.path -> registryUrl
     ).mapValues(_.asInstanceOf[AnyRef]).asJava)
 
     for (i <- (1 to 10)) yield {
@@ -125,8 +125,8 @@ class KafkaAvroSpec extends FlatSpec with Suite
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      new CfAvroConf().ConfluentSchemaRegistryUrl.path -> registryUrl
+      new AvroConf().Class.path -> classOf[HttpSchemaRegistry].getName,
+      new HttpAvroConf().HttpSchemaRegistryUrl.path -> registryUrl
 
     )
 

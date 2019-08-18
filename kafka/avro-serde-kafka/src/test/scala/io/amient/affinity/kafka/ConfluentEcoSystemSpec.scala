@@ -24,8 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.Conf
-import io.amient.affinity.avro.ConfluentSchemaRegistry
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.serde.Serde
@@ -68,8 +68,8 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
   private val log = LoggerFactory.getLogger(classOf[ConfluentEcoSystemSpec])
 
   val config = ConfigFactory.parseMap(Map(
-      Conf.Affi.Avro.Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      CfAvroConf(Conf.Affi.Avro).ConfluentSchemaRegistryUrl.path -> registryUrl).asJava)
+      Conf.Affi.Avro.Class.path -> classOf[HttpSchemaRegistry].getName,
+      HttpAvroConf(Conf.Affi.Avro).HttpSchemaRegistryUrl.path -> registryUrl).asJava)
 
   "AvroRecords registered with Affinity" should "be visible to the Confluent Registry Client" in {
     val topic = "visibility-test"
@@ -117,8 +117,8 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      AvroConf.Class.path -> classOf[ConfluentSchemaRegistry].getName,
-      CfAvroConf.ConfluentSchemaRegistryUrl.path -> registryUrl
+      AvroConf.Class.path -> classOf[HttpSchemaRegistry].getName,
+      HttpAvroConf.HttpSchemaRegistryUrl.path -> registryUrl
     )
 
     val consumer = new KafkaConsumer[Int, Test](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
