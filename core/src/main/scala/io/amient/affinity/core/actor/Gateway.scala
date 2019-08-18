@@ -129,7 +129,7 @@ trait Gateway extends ActorHandler {
   }
 
   final def connectKeyValueMediator(keyspace: ActorRef, stateStoreName: String, key: Any): Future[ActorRef] = {
-    implicit val timeout = Timeout(1 second)
+    implicit val timeout = Timeout(6 second)
     keyspace ? CreateKeyValueMediator(stateStoreName, key) collect {
       case KeyValueMediatorCreated(keyValueMediator) => keyValueMediator
     }
