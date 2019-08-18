@@ -23,10 +23,10 @@ import java.io.PrintStream
 import java.net.URL
 import java.util.{Objects, Properties}
 
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
-import io.amient.affinity.avro.{ConfluentSchemaRegistry, ZookeeperSchemaRegistry}
+import io.amient.affinity.avro.{HttpSchemaRegistry, ZookeeperSchemaRegistry}
 import io.amient.affinity.core.util.EventTime
 import io.amient.affinity.kafka.AvroMessageFormatter.TimesstampToIso
 import kafka.common.MessageFormatter
@@ -60,9 +60,9 @@ class AvroMessageFormatter extends MessageFormatter {
     if (props.containsKey("print.type")) printType = true
     if (props.containsKey("no.value")) printValue = false
     if (props.containsKey("schema.registry.url")) {
-      val conf = new CfAvroConf()
-      conf.ConfluentSchemaRegistryUrl.setValue(new URL(props.getProperty("schema.registry.url")))
-      serde = new ConfluentSchemaRegistry(conf)
+      val conf = new HttpAvroConf()
+      conf.HttpSchemaRegistryUrl.setValue(new URL(props.getProperty("schema.registry.url")))
+      serde = new HttpSchemaRegistry(conf)
     } else if (props.containsKey("schema.registry.zookeeper.connect")) {
       val conf = new ZkAvroConf()
       conf.ZooKeeper.Connect.setValue(props.getProperty("schema.registry.zookeeper.connect"))
