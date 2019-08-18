@@ -411,6 +411,7 @@ In all examples and for all tests, logback binding is used.
         affinity.global.<ID>.storage.kafka.partitions [INT] (-)                                 requird number of partitions 
         affinity.global.<ID>.storage.kafka.producer                                             any settings that the underlying version of kafka producer client supports
         affinity.global.<ID>.storage.kafka.replication.factor [INT] (1)                         replication factor of the kafka topic
+        affinity.global.<ID>.storage.kafka.sasl                                                 kafka connection sasl settings when protocol includes SASL
         affinity.global.<ID>.storage.kafka.security.protocol [STRING] (PLAINTEXT)               kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..
         affinity.global.<ID>.storage.kafka.ssl                                                  kafka connection ssl settings when protocol includes SSL
         affinity.global.<ID>.storage.kafka.topic [STRING] (!)                                   kafka topic name
@@ -456,6 +457,7 @@ In all examples and for all tests, logback binding is used.
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.partitions [INT] (-)                    requird number of partitions 
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.producer                                any settings that the underlying version of kafka producer client supports
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.replication.factor [INT] (1)            replication factor of the kafka topic
+        affinity.keyspace.<ID>.state.<ID>.storage.kafka.sasl                                    kafka connection sasl settings when protocol includes SASL
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.security.protocol [STRING] (PLAINTEXT)  kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.ssl                                     kafka connection ssl settings when protocol includes SSL
         affinity.keyspace.<ID>.state.<ID>.storage.kafka.topic [STRING] (!)                      kafka topic name
@@ -508,6 +510,7 @@ In all examples and for all tests, logback binding is used.
         affinity.node.gateway.stream.<ID>.kafka.partitions [INT] (-)                            requird number of partitions 
         affinity.node.gateway.stream.<ID>.kafka.producer                                        any settings that the underlying version of kafka producer client supports
         affinity.node.gateway.stream.<ID>.kafka.replication.factor [INT] (1)                    replication factor of the kafka topic
+        affinity.node.gateway.stream.<ID>.kafka.sasl                                            kafka connection sasl settings when protocol includes SASL
         affinity.node.gateway.stream.<ID>.kafka.security.protocol [STRING] (PLAINTEXT)          kafka connection security protocol, e.g. SASL_SSL, SSL, PLAINTEXT..
         affinity.node.gateway.stream.<ID>.kafka.ssl                                             kafka connection ssl settings when protocol includes SSL
         affinity.node.gateway.stream.<ID>.kafka.topic [STRING] (!)                              kafka topic name
@@ -523,7 +526,7 @@ In all examples and for all tests, logback binding is used.
         akka.remote.enabled-transports                                                          Set this to ["akka.remote.netty.tcp"] when running in a cluster
         akka.remote.enabled-transports.[] [STRING] (!)                                          
         akka.remote.netty.tcp.hostname [STRING] (-)                                             
-        akka.remote.netty.tcp.port [INT] (-)                                                      
+        akka.remote.netty.tcp.port [INT] (-)   
 
 # Metrics
 
