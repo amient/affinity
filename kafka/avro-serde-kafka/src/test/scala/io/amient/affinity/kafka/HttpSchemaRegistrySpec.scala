@@ -19,8 +19,8 @@
 
 package io.amient.affinity.kafka
 
-import io.amient.affinity.avro.ConfluentSchemaRegistry
-import io.amient.affinity.avro.ConfluentSchemaRegistry.CfAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import org.apache.avro.Schema
@@ -47,14 +47,14 @@ case class CompositeRecord(
                    val setOfPrimitives: Set[Long] = Set() ) extends AvroRecord
 
 
-class ConfluentSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedConfluentRegistry {
+class HttpSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedConfluentRegistry {
 
   override def numPartitions = 1
 
-  behavior of "ConfluentSchemaRegistry"
+  behavior of "HttpSchemaRegistry"
 
-  val serde = new ConfluentSchemaRegistry(CfAvroConf(Map(
-    CfAvroConf(AvroConf).ConfluentSchemaRegistryUrl.path -> registryUrl
+  val serde = new HttpSchemaRegistry(HttpAvroConf(Map(
+    HttpAvroConf(AvroConf).HttpSchemaRegistryUrl.path -> registryUrl
   ).asJava))
 
   serde.register[SimpleKey]
