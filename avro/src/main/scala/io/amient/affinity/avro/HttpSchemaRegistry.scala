@@ -48,7 +48,7 @@ object HttpSchemaRegistry {
     val HttpSchemaRegistryUrl = url("schema.registry.url", new URL("http://localhost:8081"))
       .doc("Http Schema Registry connection base URL")
     val HttpSchemaRegistryKeyStore = string("schema.registry.keystore", false).doc("optional <key-store-file>:<key-store-password>")
-    val HttpSchemaRegistryTrustStore = string("schema.registry.keystore", false).doc("optional <trust-store-file>:<trust-store-password>")
+    val HttpSchemaRegistryTrustStore = string("schema.registry.truststore", false).doc("optional <trust-store-file>:<trust-store-password>")
   }
 
 }
