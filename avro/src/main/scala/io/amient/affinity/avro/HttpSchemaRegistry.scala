@@ -23,7 +23,6 @@ import java.io.{File, FileInputStream}
 import java.net.URL
 import java.security.KeyStore
 
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
 import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroSerde
@@ -34,6 +33,8 @@ import org.apache.http.client.methods.{HttpGet, HttpPost}
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.ssl.SSLContexts
+import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 
@@ -96,9 +97,9 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def getSubjects: Iterator[String] = {
     val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.elements().asScala.map(_.asText)
+      j.getElements().asScala.map(_.asText)
     } else {
-      if (j.get("error_code").asInt() == 40401) {
+      if (j.get("error_code").asInt == 40401) {
         Iterator.empty
       } else {
         throw new RuntimeException(j.get("message").asText)
@@ -109,7 +110,7 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def getVersions(subject: String): Iterator[Int] = {
     val j = mapper.readValue(get(s"/subjects/$subject/versions"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.elements().asScala.map(_.asInt())
+      j.getElements().asScala.map(_.asInt)
     } else {
       if (j.get("error_code").asInt == 40401) {
         Iterator.empty
