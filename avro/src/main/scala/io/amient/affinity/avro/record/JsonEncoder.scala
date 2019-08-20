@@ -5,13 +5,13 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util
 
+import com.fasterxml.jackson.core.util.{DefaultPrettyPrinter, MinimalPrettyPrinter}
+import com.fasterxml.jackson.core.{JsonEncoding, JsonFactory, JsonGenerator}
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.io.ParsingEncoder
 import org.apache.avro.io.parsing.{JsonGrammarGenerator, Parser, Symbol}
 import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroTypeException, LogicalType, Schema}
-import org.codehaus.jackson.{JsonEncoding, JsonFactory, JsonGenerator}
-import org.codehaus.jackson.util.{DefaultPrettyPrinter, MinimalPrettyPrinter}
 
 /** An {@link Encoder} for Avro's JSON data encoding.
   * </p>
@@ -30,7 +30,7 @@ object JsonEncoder {
   @throws[IOException]
   private def getJsonGenerator(out: OutputStream, pretty: Boolean) = {
     if (null == out) throw new NullPointerException("OutputStream cannot be null")
-    val g = new JsonFactory().createJsonGenerator(out, JsonEncoding.UTF8)
+    val g = new JsonFactory().createGenerator(out, JsonEncoding.UTF8)
     if (pretty) {
       val pp = new DefaultPrettyPrinter() { //@Override
         @throws[IOException]
