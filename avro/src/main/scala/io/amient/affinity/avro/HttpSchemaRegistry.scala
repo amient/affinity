@@ -23,6 +23,7 @@ import java.io.{File, FileInputStream}
 import java.net.URL
 import java.security.KeyStore
 
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
 import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.record.AvroSerde
@@ -33,8 +34,6 @@ import org.apache.http.client.methods.{HttpGet, HttpPost}
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.ssl.SSLContexts
-import org.codehaus.jackson.JsonNode
-import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 
@@ -97,12 +96,12 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def getSubjects: Iterator[String] = {
     val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.getElements().asScala.map(_.getTextValue)
+      j.elements().asScala.map(_.asText)
     } else {
-      if (j.get("error_code").getIntValue == 40401) {
+      if (j.get("error_code").asInt() == 40401) {
         Iterator.empty
       } else {
-        throw new RuntimeException(j.get("message").getTextValue)
+        throw new RuntimeException(j.get("message").asText)
       }
     }
   }
@@ -110,26 +109,26 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def getVersions(subject: String): Iterator[Int] = {
     val j = mapper.readValue(get(s"/subjects/$subject/versions"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.getElements().asScala.map(_.getIntValue)
+      j.elements().asScala.map(_.asInt())
     } else {
-      if (j.get("error_code").getIntValue == 40401) {
+      if (j.get("error_code").asInt == 40401) {
         Iterator.empty
       } else {
-        throw new RuntimeException(j.get("message").getTextValue)
+        throw new RuntimeException(j.get("message").asText)
       }
     }
   }
 
   def getSchema(subject: String, version: Int): (Int, Schema) = {
     val j = mapper.readValue(get(s"/subjects/$subject/versions/$version"), classOf[JsonNode])
-    if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
-    (j.get("id").getIntValue, new Schema.Parser().parse(j.get("schema").getTextValue))
+    if (j.has("error_code")) throw new RuntimeException(j.get("message").asText)
+    (j.get("id").asInt, new Schema.Parser().parse(j.get("schema").asText))
   }
 
   def getSchema(id: Int): Schema = {
     val j = mapper.readValue(get(s"/schemas/ids/$id"), classOf[JsonNode])
-    if (j.has("error_code")) throw new RuntimeException(j.get("message").getTextValue)
-    new Schema.Parser().parse(j.get("schema").getTextValue)
+    if (j.has("error_code")) throw new RuntimeException(j.get("message").asText)
+    new Schema.Parser().parse(j.get("schema").asText)
   }
 
   def registerSchema(subject: String, schema: Schema): Int = {
@@ -137,8 +136,8 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
     entity.put("schema", schema.toString)
     val j = mapper.readValue(post(s"/subjects/$subject/versions", entity.toString), classOf[JsonNode])
     if (j.has("error_code")) throw new RuntimeException(
-      s"could not register schema subject: ${schema.getFullName} due to ${j.get("message").getTextValue}, schema: ${schema}")
-    if (j.has("id")) j.get("id").getIntValue else throw new IllegalArgumentException
+      s"could not register schema subject: ${schema.getFullName} due to ${j.get("message").asText}, schema: ${schema}")
+    if (j.has("id")) j.get("id").asInt else throw new IllegalArgumentException
   }
 
   private def get(path: String): String = {

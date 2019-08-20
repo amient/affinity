@@ -25,8 +25,8 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Source, StreamConverters}
 import akka.util.ByteString
-import org.codehaus.jackson.{JsonFactory, JsonNode, JsonParser}
-import org.codehaus.jackson.map.ObjectMapper
+import com.fasterxml.jackson.core.{JsonFactory, JsonParser}
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -47,7 +47,7 @@ object Decoder {
 
   def json(source: Source[ByteString, Any])(implicit materializer: Materializer): JsonNode = {
     val is = source.runWith(StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS)))
-    val jp: JsonParser = factory.createJsonParser(is)
+    val jp: JsonParser = factory.createParser(is)
     mapper.readValue(jp, classOf[JsonNode])
   }
 

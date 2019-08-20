@@ -52,7 +52,7 @@ class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with Befo
   lazy val crypto = new TimeCryptoProofSHA256({
     val createApiKey = node1.http_post(s"/settings/add?key=$publicKey", Array(), List(Authorization.basic("admin", "1234")))
     createApiKey.status should be(OK)
-    node1.get_json(createApiKey).getTextValue
+    node1.get_json(createApiKey).asText
   })
 
   override def beforeAll(): Unit = try {
@@ -93,9 +93,9 @@ class AuthApiSpec extends FlatSpec with AffinityTestBase with Matchers with Befo
     response.status should be(OK)
     //the response should also be signed by the server and the response signature must be valid
     val json = node1.get_json(response)
-    json.get("profile").get("type").getTextValue should be ("ProtectedProfile")
-    json.get("profile").get("data").get("hello").getTextValue should be("world")
-    val responseSignature = json.get("signature").getTextValue
+    json.get("profile").get("type").asText should be ("ProtectedProfile")
+    json.get("profile").get("data").get("hello").asText should be("world")
+    val responseSignature = json.get("signature").asText
     crypto.verify(responseSignature, requestSignature + "!")
   }
 

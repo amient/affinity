@@ -27,10 +27,10 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.{Date, HttpEncodings, `Content-Encoding`}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import com.fasterxml.jackson.databind.JsonNode
 import io.amient.affinity.avro.record.AvroJsonConverter
 import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferOutputStream
-import org.codehaus.jackson.JsonNode
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
