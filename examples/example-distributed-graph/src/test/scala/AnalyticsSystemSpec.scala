@@ -63,8 +63,8 @@ class AnalyticsSystemSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
 
   "Spark Module" should "be able to see avro-serialised state in kafka" in {
 
-    node1.get_json(node1.http_get("/vertex/1")).get("data").get("component").getIntValue should be(1)
-    node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").getIntValue should be(1)
+    node1.get_json(node1.http_get("/vertex/1")).get("data").get("component").asInt should be(1)
+    node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").asInt should be(1)
 
     implicit val sc = new SparkContext(new SparkConf()
       .setMaster("local[4]")

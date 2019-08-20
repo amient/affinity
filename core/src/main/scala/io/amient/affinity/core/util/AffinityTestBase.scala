@@ -35,6 +35,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
@@ -43,8 +44,6 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.Encoder
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
 import org.apache.avro.util.ByteBufferInputStream
-import org.codehaus.jackson.JsonNode
-import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
