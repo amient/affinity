@@ -8,7 +8,6 @@ import kafka.server.{KafkaConfig, KafkaServerStartable}
 import kafka.zk.BrokerIdZNode
 import org.I0Itec.zkclient.ZkClient
 import org.I0Itec.zkclient.serialize.ZkSerializer
-import org.apache.commons.compress.utils.Charsets
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.security.auth.SecurityProtocol
@@ -55,7 +54,7 @@ trait EmbeddedKafkaServer extends EmbeddedService with EmbeddedZookeperServer {
     override def deserialize(bytes: Array[Byte]): Object = new String(bytes)
   })
 
-  val broker = BrokerIdZNode.decode(1, tmpZkClient.readData[String]("/brokers/ids/1").getBytes(Charsets.UTF_8)).broker
+  val broker = BrokerIdZNode.decode(1, tmpZkClient.readData[String]("/brokers/ids/1").getBytes("utf-8")).broker
   val kafkaBootstrap = broker.brokerEndPoint(ListenerName.forSecurityProtocol(SecurityProtocol.PLAINTEXT)).connectionString()
   tmpZkClient.close
   log.info(s"Embedded Kafka $kafkaBootstrap, data dir: $testDir")
