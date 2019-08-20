@@ -24,7 +24,7 @@ ext {
     akkaHttpVersion = '10.1.3'
     metricsVersion = '3.1.2'
     //
-    avroVersion = '1.8.2' // avro version provides also org.codehouse.jackson transitively
+    avroVersion = '1.9.0' // avro version provides also org.codehouse.jackson transitively
     jacksonVersion = '2.6.5' // com.fasterxml.jackson - spark 2.x uses 2.6.5 while the newer kafka 2.9.1, as usually testing with embedded instances has conflicts
     zkClientVersion = '0.11' // zkclient provides zookeeper server transitively
     //
