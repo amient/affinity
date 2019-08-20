@@ -13,8 +13,6 @@ ext {
 }
 
 artifacts {
-    archives jar
-    archives sourcesJar
     archives shadowJar
 }
 
