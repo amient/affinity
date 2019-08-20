@@ -1,5 +1,5 @@
-group = rootProject.group
-version = rootProject.version
+group = parent.group
+version = parent.version
 
 apply plugin: 'scala'
 apply plugin: 'signing'
@@ -33,7 +33,7 @@ dependencies {
     testCompile project(':kafka:test-util-kafka')
     provided group: 'org.apache.spark', name: 'spark-core_' + rootProject.baseScalaVersion, version: sparkVersion
     provided group: 'org.apache.parquet', name: 'parquet-avro', version: rootProject.avroVersion
-    provided group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2'
+    //provided group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2'
 }
 
 

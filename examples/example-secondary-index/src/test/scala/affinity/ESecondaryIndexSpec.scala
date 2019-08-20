@@ -120,12 +120,12 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
 
 
   "Articles Store" should "see all authors artiles" in {
-    val articles = node.get_json(node.http_get("/articles/mtjames")).getElements.asScala
+    val articles = node.get_json(node.http_get("/articles/mtjames")).elements.asScala
     articles.size should be(2)
   }
 
   "Articles Store" should "see all articles conatining a word" in {
-    val words = node.get_json(node.http_get("/words/green")).getElements.asScala.toList
+    val words = node.get_json(node.http_get("/words/green")).elements.asScala.toList
     words.foreach(println)
     //TODO once seen a result of this test fail on only 3 which needs looking into:
     /**
@@ -137,14 +137,14 @@ class ESecondaryIndexSpec extends FlatSpec with AffinityTestBase with EmbeddedKa
   }
 
   "Articles Store" should "see all articles conatining a word limited by timerange" in {
-    val wordsSince = node.get_json(node.http_get("/words-since/green")).getElements.asScala.toList
+    val wordsSince = node.get_json(node.http_get("/words-since/green")).elements.asScala.toList
     wordsSince.size should be(3)
   }
 
   "Articles Store" should "deindex removed articles entries" in {
-    node.get_json(node.http_get("/words/machines")).getElements.asScala.toList.size should be(1)
+    node.get_json(node.http_get("/words/machines")).elements.asScala.toList.size should be(1)
     node.http_get("/delete-articles-containing/machines").status should be (StatusCodes.Accepted)
-    node.get_json(node.http_get("/words/quantum")).getElements.asScala.toList.size should be (0)
-    node.get_json(node.http_get("/words/machines")).getElements.asScala.toList.size should be (0)
+    node.get_json(node.http_get("/words/quantum")).elements.asScala.toList.size should be (0)
+    node.get_json(node.http_get("/words/machines")).elements.asScala.toList.size should be (0)
   }
 }

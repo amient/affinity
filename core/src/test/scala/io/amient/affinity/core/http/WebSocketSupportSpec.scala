@@ -32,6 +32,7 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
+import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.ConfigFactory
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.core.actor.{RegisterMediatorSubscriber, _}
@@ -40,7 +41,6 @@ import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
 import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, JsonMessageHandler, TextMessageHandler}
 import org.apache.avro.generic.GenericData
-import org.codehaus.jackson.JsonNode
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
