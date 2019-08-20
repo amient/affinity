@@ -38,6 +38,8 @@ dependencies {
     provided (group: 'org.apache.parquet', name: 'parquet-avro', version: rootProject.avroVersion) {
         exclude group: 'com.fasterxml.jackson.core'
     }
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: rootProject.jacksonVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: rootProject.jacksonVersion
     //provided group: 'org.apache.avro', name: 'avro-mapred', version: rootProject.avroVersion, classifier: 'hadoop2'
 }
 
