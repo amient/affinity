@@ -40,6 +40,7 @@ dependencies {
     testCompile project(':kafka:test-util-kafka')
     testCompile (group: 'io.confluent', name: 'kafka-schema-registry', version: project(':kafka').confluentVersion) {
         exclude group: 'org.apache.kafka'
+        exclude group: 'com.fasterxml.jackson.core'
     }
     testCompile (group: 'io.confluent', name: 'kafka-avro-serializer', version: project(':kafka').confluentVersion)
 }
