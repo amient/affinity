@@ -56,7 +56,7 @@ object Decoder {
     json(source)
   }
 
-  def json(content: String) = {
+  def json(content: String): JsonNode = {
     mapper.readValue(content, classOf[JsonNode])
   }
 
