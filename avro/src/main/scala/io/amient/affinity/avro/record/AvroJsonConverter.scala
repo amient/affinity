@@ -22,13 +22,14 @@ package io.amient.affinity.avro.record
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
 
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import io.amient.affinity.avro.record.AvroRecord.extract
 import io.amient.affinity.core.util.ByteUtils
 import org.apache.avro.generic.GenericData.EnumSymbol
 import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
 import org.apache.avro.{LogicalTypes, Schema}
+import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe.TypeTag
@@ -64,35 +65,35 @@ object AvroJsonConverter {
     def to(json: JsonNode, schema: Schema): Any = try {
       schema.getType match {
         case Schema.Type.NULL if json == null || json.isNull => null
-        case Schema.Type.BOOLEAN if json.isBoolean => json.asBoolean()
-        case Schema.Type.INT if json.isNumber => json.asInt()
-        case Schema.Type.LONG if json.isNumber => json.asLong()
-        case Schema.Type.FLOAT if json.isNumber => json.asDouble().toFloat
-        case Schema.Type.DOUBLE if json.isNumber => json.asDouble()
+        case Schema.Type.BOOLEAN if json.isBoolean => json.asBoolean
+        case Schema.Type.INT if json.isNumber => json.asInt
+        case Schema.Type.LONG if json.isNumber => json.asLong
+        case Schema.Type.FLOAT if json.isNumber => json.asDouble.toFloat
+        case Schema.Type.DOUBLE if json.isNumber => json.asDouble
         case Schema.Type.STRING if json == null => new Utf8()
-        case Schema.Type.STRING if json.isTextual => new Utf8(json.asText())
+        case Schema.Type.STRING if json.isTextual => new Utf8(json.asText)
         case Schema.Type.UNION if schema.getTypes.size == 2 && (schema.getTypes.get(0).getType == Schema.Type.NULL || schema.getTypes.get(1).getType == Schema.Type.NULL) =>
           schema.getTypes.asScala.map { s => Try(to(json, s)) }.find(_.isSuccess).map(_.get).get
         case Schema.Type.UNION =>
-          val utype = json.fieldNames().next
+          val utype = json.getFieldNames.next
           schema.getTypes.asScala.filter(_.getFullName == utype).map(s => Try(to(json.get(utype), s))).find(_.isSuccess).map(_.get).get
         case Schema.Type.ARRAY if json == null => java.util.Collections.emptyList[AnyRef]()
         case Schema.Type.ARRAY if json.isArray =>
           val javaList = new java.util.LinkedList[Any]()
-          json.elements().asScala.foreach(x => javaList.add(to(x, schema.getElementType)))
+          json.getElements.asScala.foreach(x => javaList.add(to(x, schema.getElementType)))
           javaList
         case Schema.Type.MAP if json == null => java.util.Collections.emptyMap[Utf8, AnyRef]()
         case Schema.Type.MAP if json.isObject =>
           val javaMap = new java.util.HashMap[Utf8, Any]()
-          json.fields.asScala foreach { entry =>
+          json.getFields.asScala foreach { entry =>
             javaMap.put(new Utf8(entry.getKey), to(entry.getValue, schema.getValueType))
           }
           javaMap
-        case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.asText())
-        case Schema.Type.BYTES => ByteBuffer.wrap(json.binaryValue())
+        case Schema.Type.ENUM if json.isTextual => new EnumSymbol(schema, json.asText)
+        case Schema.Type.BYTES => ByteBuffer.wrap(json.getBinaryValue)
         case Schema.Type.FIXED if schema.getLogicalType == UUID_TYPE =>
-          new GenericData.Fixed(schema, ByteUtils.parseUUID(json.asText()))
-        case Schema.Type.FIXED => new GenericData.Fixed(schema, json.binaryValue())
+          new GenericData.Fixed(schema, ByteUtils.parseUUID(json.asText))
+        case Schema.Type.FIXED => new GenericData.Fixed(schema, json.getBinaryValue)
         case Schema.Type.RECORD if json.isObject =>
           val builder = new GenericRecordBuilder(schema)
           schema.getFields.asScala foreach { field =>
