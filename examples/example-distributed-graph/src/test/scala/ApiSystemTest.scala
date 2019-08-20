@@ -67,9 +67,9 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     node1.get_json(node1.http_get("/vertex/2")).get("data").get("component").asInt should be(1)
     node1.get_json(node1.http_get("/vertex/3")).get("data").get("component").asInt should be(3)
     node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").asInt should be(3)
-    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").elements.asScala.map(_.asInt).toSet.diff(Set(1, 2)) should be(Set())
+    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").getElements().asScala.map(_.asInt).toSet.diff(Set(1, 2)) should be(Set())
     node1.http_get("/component/2").status should be(NotFound)
-    node1.get_json(node1.http_get("/component/3")).get("data").get("connected").elements.asScala.map(_.asInt).toSet.diff(Set(3, 4)) should be(Set())
+    node1.get_json(node1.http_get("/component/3")).get("data").get("connected").getElements().asScala.map(_.asInt).toSet.diff(Set(3, 4)) should be(Set())
     node1.http_get("/component/4").status should be(NotFound)
 
     //(3~>1)         ==> component1(1,2,3,4)
@@ -78,7 +78,7 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     node1.get_json(node1.http_get("/vertex/2")).get("data").get("component").asInt should be(1)
     node1.get_json(node1.http_get("/vertex/3")).get("data").get("component").asInt should be(1)
     node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").asInt should be(1)
-    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").elements().asScala.map(_.asInt).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
+    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").getElements().asScala.map(_.asInt).toSet.diff(Set(1, 2, 3, 4)) should be(Set())
     node1.http_get("/component/2").status should be(NotFound)
     node1.http_get("/component/3").status should be(NotFound)
     node1.http_get("/component/4").status should be(NotFound)
@@ -89,10 +89,10 @@ class ApiSystemTest extends FlatSpec with AffinityTestBase with EmbeddedKafka wi
     node1.get_json(node1.http_get("/vertex/2")).get("data").get("component").asInt should be(1)
     node1.get_json(node1.http_get("/vertex/3")).get("data").get("component").asInt should be(1)
     node1.get_json(node1.http_get("/vertex/4")).get("data").get("component").asInt should be(4)
-    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").elements().asScala.map(_.asInt).toSet.diff(Set(1, 2, 3)) should be(Set())
+    node1.get_json(node1.http_get("/component/1")).get("data").get("connected").getElements().asScala.map(_.asInt).toSet.diff(Set(1, 2, 3)) should be(Set())
     node1.http_get("/component/2").status should be(NotFound)
     node1.http_get("/component/3").status should be(NotFound)
-    node1.get_json(node1.http_get("/component/4")).get("data").get("connected").elements().asScala.map(_.asInt).toSet.diff(Set(4)) should be(Set())
+    node1.get_json(node1.http_get("/component/4")).get("data").get("connected").getElements().asScala.map(_.asInt).toSet.diff(Set(4)) should be(Set())
 
   }
 

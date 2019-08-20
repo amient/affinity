@@ -123,31 +123,31 @@ class ExampleBankSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka 
 
 
   "ExampleWallet" should "should able to retrieve all transactions for the first account" in {
-    node.get_json(node.http_get("/transactions/11-10-30/10233321")).elements.asScala.size should be(3)
+    node.get_json(node.http_get("/transactions/11-10-30/10233321")).getElements.asScala.size should be(3)
   }
 
   "ExampleWallet" should "should able to retrieve all transactions for the second account" in {
-    node.get_json(node.http_get("/transactions/11-10-30/88885454")).elements.asScala.size should be(2)
+    node.get_json(node.http_get("/transactions/11-10-30/88885454")).getElements.asScala.size should be(2)
   }
 
   "ExampleWallet" should "should able to retrieve all transactions for the third account" in {
-    node.get_json(node.http_get("/transactions/33-55-10/49772300")).elements.asScala.size should be(1)
+    node.get_json(node.http_get("/transactions/33-55-10/49772300")).getElements.asScala.size should be(1)
   }
 
   "ExampleWallet" should "should able to retrieve all transactions for the first branch" in {
-    node.get_json(node.http_get("/transactions/11-10-30")).elements.asScala.size should be(5)
+    node.get_json(node.http_get("/transactions/11-10-30")).getElements.asScala.size should be(5)
   }
 
   "ExampleWallet" should "should able to retrieve all transactions for the second branch" in {
-    node.get_json(node.http_get("/transactions/33-55-10")).elements.asScala.size should be(1)
+    node.get_json(node.http_get("/transactions/33-55-10")).getElements.asScala.size should be(1)
   }
 
   "ExampleWallet" should "should respond with empty transaction list for unknown branch" in {
-    node.get_json(node.http_get("/transactions/xx-xx-xx")).elements.asScala shouldBe empty
+    node.get_json(node.http_get("/transactions/xx-xx-xx")).getElements.asScala shouldBe empty
   }
 
   "ExampleWallet" should "should able to retrieve all transactions before a given date for the first branch" in {
-    node.get_json(node.http_get("/transactions/11-10-30?before=2018-06-28")).elements.asScala.size should be(3)
+    node.get_json(node.http_get("/transactions/11-10-30?before=2018-06-28")).getElements.asScala.size should be(3)
   }
 
   "ExampleWallet" should "be stored in kafka with event-time index" in {
