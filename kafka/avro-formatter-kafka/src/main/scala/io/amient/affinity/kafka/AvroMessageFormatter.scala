@@ -23,7 +23,6 @@ import java.io.PrintStream
 import java.net.URL
 import java.util.{Objects, Properties}
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
@@ -33,6 +32,7 @@ import io.amient.affinity.kafka.AvroMessageFormatter.TimesstampToIso
 import kafka.common.MessageFormatter
 import org.apache.avro.generic.GenericContainer
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.codehaus.jackson.map.ObjectMapper
 
 
 /**
