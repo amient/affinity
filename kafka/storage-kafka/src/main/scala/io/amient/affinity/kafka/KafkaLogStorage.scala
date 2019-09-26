@@ -149,10 +149,6 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       consumerConfig.entrySet.asScala.filter(_.getValue.isDefined).foreach { case (entry) =>
         put(entry.getKey, entry.getValue.apply.toString)
       }
-      if (!kafkaStorageConf.Consumer().GroupId.isDefined) {
-        //FIXME is this backward compatible ? kafka 2.2 changed behaviour of consumers and requires group.id even for manual assignment
-        put("group.id", UUID.randomUUID().toString())
-      }
     }
     put("bootstrap.servers", kafkaStorageConf.BootstrapServers())
     put("enable.auto.commit", "false")
