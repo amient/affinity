@@ -135,10 +135,16 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def registerSchema(subject: String, schema: Schema): Int = {
     val entity = mapper.createObjectNode()
     entity.put("schema", schema.toString)
-    val j = mapper.readValue(post(s"/subjects/$subject/versions", entity.toString), classOf[JsonNode])
-    if (j.has("error_code")) throw new RuntimeException(
-      s"could not register schema subject: ${schema.getFullName} due to ${j.get("message").asText}, schema: ${schema}")
-    if (j.has("id")) j.get("id").asInt else throw new IllegalArgumentException
+    val response = post(s"/subjects/$subject/versions", entity.toString)
+    try {
+      val j = mapper.readValue(response, classOf[JsonNode])
+      if (j.has("error_code")) throw new RuntimeException(j.get("message").asText)
+      if (j.has("id")) j.get("id").asInt else throw new IllegalArgumentException
+    } catch {
+      case e: Throwable => throw new RuntimeException(
+        s"schema registration failed subject: ${schema.getFullName}, schema: ${schema}, response: $response", e)
+    }
+
   }
 
   private def get(path: String): String = {
