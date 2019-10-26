@@ -90,6 +90,16 @@ class MemorySchemaRegistry(universe: MemorySchemaRegistry.Universe) extends Avro
 
   def this() = this(new MemAvroConf())
 
+  //this is for stable tests
+  register[Null]("null")
+  register[Boolean]("boolean")
+  register[Int]("int")
+  register[Long]("long")
+  register[Float]("float")
+  register[Double]("double")
+  register[String]("string")
+  register[Array[Byte]]("bytes")
+
   /**
     * @param id
     * @return schema
