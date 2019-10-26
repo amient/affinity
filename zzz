@@ -83,6 +83,7 @@ publish() {
     BRANCH=$1
     COMMAND=$2
     LANG=en_GB git checkout $BRANCH
+    echo "$BRANCH / $COMMAND"
     continue $? "$BRANCH/checkout"
     LANG=en_GB git pull
     continue $? "$BRANCH/pull"
