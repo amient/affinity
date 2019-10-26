@@ -63,7 +63,7 @@ class HttpSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedConflue
   serde.register[CompositeRecord](v1schema)
 
   it should "allow compatible version of previously registered schema" in {
-    serde.register[CompositeRecord] should be(12)
+    serde.register[CompositeRecord] should be(4)
   }
 
   it should "reject incompatible schema registration" in {
@@ -76,15 +76,15 @@ class HttpSchemaRegistrySpec extends FlatSpec with Matchers with EmbeddedConflue
 
   }
 
-  it should "registerd topic subject when fqn subject is already registered" in {
+  it should "register topic subject when fqn subject is already registered" in {
     val data = SimpleRecord()
     //fqn should be already registered
-    serde.getRuntimeSchema(classOf[SimpleRecord].getName) should be((10, data.getSchema))
+    serde.getRuntimeSchema(classOf[SimpleRecord].getName) should be((2, data.getSchema))
     //now simulate what KafkaAvroSerde would do
     val (schemaId, objSchema) = serde.from(data, "topic-simple")
-    schemaId should be(10)
+    schemaId should be(2)
     objSchema should be(data.getSchema)
     //and check the additional subject was registered with the same schema
-    serde.register("topic-simple", data.getSchema) should be(10)
+    serde.register("topic-simple", data.getSchema) should be(2)
   }
 }

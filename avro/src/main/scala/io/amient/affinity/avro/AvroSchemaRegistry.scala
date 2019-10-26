@@ -36,15 +36,6 @@ trait AvroSchemaRegistry extends Closeable {
 
   val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateAll() //equivalent to FULL_TRANSITIVE
 
-  register[Null]("null")
-  register[Boolean]("boolean")
-  register[Int]("int")
-  register[Long]("long")
-  register[Float]("float")
-  register[Double]("double")
-  register[String]("string")
-  register[Array[Byte]]("bytes")
-
   //register compile-time type with its current/actual schema and its fqn as subject
   final def register[T: TypeTag]: Int = register[T](typeOf[T].typeSymbol.fullName)
 

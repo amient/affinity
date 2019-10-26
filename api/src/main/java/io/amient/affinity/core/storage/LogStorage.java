@@ -239,8 +239,19 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
 
             @Override
             public boolean hasNext() {
-                if (i == null) seek();
-                return record != null;
+                if (record == null) {
+                    while (i == null || !i.hasNext()) {
+                        try {
+                            i = fetch(unbounded);
+                            if (i == null) return false;
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                    }
+                    record = i.next();
+                }
+                return true;
             }
 
             @Override
@@ -249,23 +260,9 @@ public interface LogStorage<POS extends Comparable<POS>> extends Closeable {
                     throw new NoSuchElementException();
                 } else {
                     LogEntry<POS> result = record;
-                    seek();
+                    record = null;
                     return result;
                 }
-            }
-
-            void seek() {
-                record = null;
-                while (i == null || !i.hasNext()) {
-                    try {
-                        i = fetch(unbounded);
-                        if (i == null) return;
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-
-                }
-                if (i.hasNext()) record = i.next();
             }
 
         };
