@@ -101,11 +101,9 @@ the data partition - each Keyspace is therefore a dynamic Akka Router which
 maintains a copy of the active Partition Actors using internal instance of Coordinator
 (see distributed coordination section below).
 
-The system is capable of simple partition assignment driven only by R=replication factor and N=number 
-of nodes but it would be nice to in future to add a kind of resonance with the previous state 
-which would be preserved across shutdowns/startups until certain thershold of inbalance is created
-by adding or removing nodes, increasing replication factor, etc. - the ground work
-for this has been already done at the MemStore level, see State Management section below.
+The algorithm used for partition assignment is a heuristic that attempts to keep in-sync state partitions
+assigned while preferring new assignments where there is a partially synced state and lastly it 
+considers node utilisation - this logic applies to both leaders and replicas.
 
 Gateways tend to be the orchestration layer while Keyspaces and their Partitions
  are usually restricted to their scope, however any Actor within the system can hold
