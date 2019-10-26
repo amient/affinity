@@ -20,7 +20,7 @@
 package io.amient.affinity.kafka
 
 import java.util.concurrent.{ExecutionException, Future, TimeUnit}
-import java.util.{Properties, UUID}
+import java.util.Properties
 import java.{lang, util}
 
 import com.typesafe.config.Config
@@ -186,6 +186,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       //empty partition
       return null
     } else {
+
       kafkaConsumer.seek(tp, startOffset)
       val maxOffset: Long = kafkaConsumer.endOffsets(List(tp).asJava).get(tp) - 1
       val stopOffset = maxOffset
@@ -253,9 +254,18 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
     }
 
     val kafkaRecords = try {
-      kafkaConsumer.poll(java.time.Duration.ofMillis(500))
+      kafkaConsumer.poll(java.time.Duration.ofMillis(1000))
     } catch {
       case _: WakeupException => return null
+    }
+
+    if (!unbounded && kafkaRecords.isEmpty) {
+      kafkaConsumer.assignment().asScala.foreach { tp =>
+        val pos = kafkaConsumer.position(tp)
+        if (stopOffsets.get(tp.partition).exists(_ > pos)) {
+          log.warn(s"failed to fetch kafka record at position=${tp.topic}/${tp.partition}:${pos} - fetcher is probably being throttled")
+        }
+      }
     }
 
     kafkaRecords.iterator.asScala.filter { record =>
