@@ -564,8 +564,8 @@ all master branches.
 #### Current master versions
 
     Scala **2.12.X**
-    Kafka **2.2.X**
-    Confluent **5.2.X**
+    Kafka **2.3.X**
+    Confluent **5.3.X**
     Spark **2.4.0**
 
 The `zzz` script uses git and gradle to switch between the maintained master branches
