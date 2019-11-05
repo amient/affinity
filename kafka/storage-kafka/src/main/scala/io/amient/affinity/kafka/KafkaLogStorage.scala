@@ -348,7 +348,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         }
       }
     } else {
-      throw new IllegalArgumentException(s"storage configuration for topic $topic must have partitions property set to a postivie integer")
+      ensureCorrectConfiguration(0, -1, true)
     }
   }
 
@@ -358,7 +358,9 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
 
       val compactionPolicy = (if (ttlMs > 0) "compact,delete" else "compact")
 
-      createTopicIfNotExists(admin, numPartitions)
+      if (numPartitions > 0) {
+        createTopicIfNotExists(admin, numPartitions)
+      }
 
       val topicConfigResource = new ConfigResource(ConfigResource.Type.TOPIC, topic)
       val actualConfig = admin.describeConfigs(List(topicConfigResource).asJava)
