@@ -120,8 +120,8 @@ class PingPongGateway extends GatewayHttp {
         case pong => Encoder.json(OK, pong, gzip = false)
       }
     }
-    case HTTP_POST(ContentTypes.APPLICATION_JSON, entity, PATH("ping"), _, response) =>
-      response.success(Encoder.json(OK, Decoder.json(entity), gzip = true))
+    case HTTP_POST(ContentTypes.APPLICATION_JSON, _, PATH("ping"), _, response) =>
+      response.success(Encoder.json(OK, Map("hello" -> "hello"), gzip = true))
 
     case HTTP(GET, PATH("restartable"), _, _) => throw new Exception("Simulated restartable exception")
 
