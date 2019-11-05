@@ -281,8 +281,8 @@ trait WebSocketSupport extends GatewayHttp {
       override def onClose(): Unit = mediator ! PoisonPill
 
       override def receive(): PartialFunction[Message, Unit] = {
-        case text: TextMessage => mediator ! Decoder.json(text.getStrictText)
-        case binary: BinaryMessage => mediator ! Decoder.json(binary.dataStream)
+        case text: TextMessage => mediator ! text.getStrictText
+        case binary: BinaryMessage => mediator ! Decoder.text(binary.dataStream)
       }
     })
   }
@@ -400,9 +400,7 @@ trait WebSocketSupport extends GatewayHttp {
     * +                                                      |            onClose()+---+
     *                                                        +----------------------+
     *
-    * @param exchange   web socket xechange as captured in the http interface
-    * @param downstream actor which will handle messges sent from the client
-    * @param upstream   actor which will handle messages directed at the client
+    * @param exchange   web socket ecchange as captured in the http interface
     */
   def webSocket(exchange: WebSocketExchange, handler: => WSHandler): Unit = {
     val maxBufferSize = conf.Affi.Node.Gateway.MaxWebSocketQueueSize()
