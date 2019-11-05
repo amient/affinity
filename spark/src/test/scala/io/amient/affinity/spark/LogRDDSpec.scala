@@ -51,16 +51,15 @@ object LogRDDSpecUniverse {
   val FebruaryFirst2018 = Instant.ofEpochMilli(1517443201000L)
   val schemaRegistryId = "345"
 
-  def getSerdeConf = AvroConf(Map(
+  def getSerdeConf: AvroConf = AvroConf(Map(
     AvroConf.Class.path -> classOf[MemorySchemaRegistry].getName,
     MemAvroConf(AvroConf).ID.path -> schemaRegistryId
   ).asJava)
 
-  def getStorageConf(kafkaBootstrap: String, numPartitions: Int) = new LogStorageConf().apply(Map(
+  def getStorageConf(kafkaBootstrap: String) = new LogStorageConf().apply(Map(
     LogStorage.StorageConf.Class.path -> classOf[KafkaLogStorage].getName,
     KafkaStorageConf.BootstrapServers.path -> kafkaBootstrap,
     KafkaStorageConf.Topic.path -> topic,
-    KafkaStorageConf.Partitions.path -> numPartitions,
     "kafka.producer.retries" -> "1"
   ).asJava)
 
@@ -93,7 +92,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
 
     val stream = new OutputDataStream[Int, CompactionTestEvent](
       new TransactionCoordinatorImpl(null, None),
-      AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap, numPartitions))
+      AvroSerde.create(getSerdeConf), AvroSerde.create(getSerdeConf), getStorageConf(kafkaBootstrap))
     try {
       (0 to 99).foreach { i =>
         stream.append(new Record(i, CompactionTestEvent(i, s"January($i)", JanuaryFirst2018.toEpochMilli + i * 1000)))
@@ -113,7 +112,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
   }
 
   "full reset RDD" should "return fully compacted stream" in {
-    val rdd = avroCompactRdd[Int, CompactionTestEvent](getSerdeConf, getStorageConf(kafkaBootstrap, numPartitions))
+    val rdd = avroCompactRdd[Int, CompactionTestEvent](getSerdeConf, getStorageConf(kafkaBootstrap))
     val result = rdd.collect.sortBy(_._1)
     result.size should be(100)
     result.forall(_._2.eventTimeUnix >= FebruaryFirst2018.toEpochMilli)
@@ -121,7 +120,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
 
   "range reset RDD" should "return compacted range of the stream" in {
     val rdd = avroCompactRdd[Int, CompactionTestEvent](
-      getSerdeConf, getStorageConf(kafkaBootstrap, numPartitions), TimeRange.prev(Duration.ofSeconds(50), Instant.from(Duration.ofSeconds(100).addTo(FebruaryFirst2018))))
+      getSerdeConf, getStorageConf(kafkaBootstrap), TimeRange.prev(Duration.ofSeconds(50), Instant.from(Duration.ofSeconds(100).addTo(FebruaryFirst2018))))
     val result = rdd.collect.sortBy(_._1)
     result.size should be(50)
     result.forall(_._2.eventTimeUnix >= FebruaryFirst2018.toEpochMilli)
@@ -129,7 +128,7 @@ class LogRDDSpec extends FlatSpec with EmbeddedKafka with Matchers with BeforeAn
 
   "join on LogRDD" should "only serialize keys on the right rdd in the first stage" in {
     val avroConf = getSerdeConf
-    val storageConf = getStorageConf(kafkaBootstrap, numPartitions)
+    val storageConf = getStorageConf(kafkaBootstrap)
     val compactLogRdd = LogRDD(LogStorage.newInstance(storageConf)).compact
     val right: RDD[(Int, String)] = sc.parallelize(List(49 -> "Fourty Nine",50 -> "Fifity"))
     val optimiziedJoin = compactLogRdd.join(AvroSerde.create(avroConf), right)
