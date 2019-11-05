@@ -47,24 +47,6 @@ final public class WebSocketClient {
         void onError(Throwable e);
     }
 
-    public interface JsonMessageHandler extends TextMessageHandler {
-        ObjectMapper mapper = new ObjectMapper();
-
-        void onMessage(JsonNode message);
-
-        @Override
-        default void onMessage(String message) {
-            JsonNode x = null;
-            try {
-                x = mapper.readValue(message, JsonNode.class);
-                if (x != null) onMessage(x);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-    }
-
     public interface AvroMessageHandler {
         void onMessage(Object message);
         void onError(Throwable e);
