@@ -40,7 +40,7 @@ import io.amient.affinity.Conf
 import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.Node
-import io.amient.affinity.core.http.Encoder
+import io.amient.affinity.core.http.{Decoder, Encoder}
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
 import org.apache.avro.util.ByteBufferInputStream
 import org.codehaus.jackson.JsonNode
@@ -176,7 +176,7 @@ class NodeWithTestMethods(underlying: Node) {
   val mapper = new ObjectMapper()
 
   def get_json(response: HttpResponse): JsonNode = {
-    val json = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
+    val json = Decoder.text(response.entity)
     mapper.readValue(json, classOf[JsonNode])
   }
 

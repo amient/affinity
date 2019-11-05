@@ -25,10 +25,9 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Source, StreamConverters}
 import akka.util.ByteString
-import org.codehaus.jackson.{JsonFactory, JsonNode, JsonParser}
 import org.codehaus.jackson.map.ObjectMapper
+import org.codehaus.jackson.{JsonFactory, JsonNode, JsonParser}
 
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 object Decoder {
@@ -37,27 +36,20 @@ object Decoder {
 
   val factory = new JsonFactory()
 
-  def jsonEntity(entity: HttpEntity)(implicit materializer: Materializer): Future[JsonNode] = {
-    //TODO do this using pure streaming not by converting to blocking InputStream
-    import materializer.executionContext
-    Future {
-      json(entity)
-    }
+  def text(entity: HttpEntity)(implicit materializer: Materializer): String = text(entity.dataBytes)
+
+  def text(source: Source[ByteString, Any])(implicit materializer: Materializer): String = {
+    val is = source.runWith(StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS)))
+    scala.io.Source.fromInputStream(is).mkString
   }
 
-  def json(source: Source[ByteString, Any])(implicit materializer: Materializer): JsonNode = {
+  def json(entity: HttpEntity)(implicit materializer: Materializer): String = json(entity.dataBytes)
+
+  def json(source: Source[ByteString, Any])(implicit materializer: Materializer): String = {
     val is = source.runWith(StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS)))
     val jp: JsonParser = factory.createJsonParser(is)
-    mapper.readValue(jp, classOf[JsonNode])
+    mapper.writeValueAsString(mapper.readValue(jp, classOf[JsonNode]))
   }
 
-  def json(entity: HttpEntity)(implicit materializer: Materializer): JsonNode = {
-    val source = entity.dataBytes
-    json(source)
-  }
-
-  def json(content: String): JsonNode = {
-    mapper.readValue(content, classOf[JsonNode])
-  }
 
 }
