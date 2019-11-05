@@ -54,7 +54,7 @@ class OutputDataStream[K, V] private[affinity](txn: TransactionCoordinator, keyS
 
   lazy val storage = LogStorage.newInstanceEnsureExists(conf)
 
-  private val topic: String = storage.getTopic()
+  lazy private val topic: String = storage.getTopic()
 
   implicit val timeout = Timeout(1 minute) //FIXME
 
