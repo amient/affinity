@@ -38,9 +38,10 @@ import io.amient.affinity.core.actor.{RegisterMediatorSubscriber, _}
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.RequestMatchers._
 import io.amient.affinity.ws.WebSocketClient
-import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, JsonMessageHandler, TextMessageHandler}
+import io.amient.affinity.ws.WebSocketClient.{AvroMessageHandler, TextMessageHandler}
 import org.apache.avro.generic.GenericData
 import org.codehaus.jackson.JsonNode
+import org.codehaus.jackson.map.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -123,18 +124,19 @@ class WebSocketSupportSpec extends WordSpecLike with BeforeAndAfterAll with Matc
 
   "Json WebSocket channel" must {
     "receive json updates from the connected key-value" in {
+      val mapper = new ObjectMapper()
       val wsqueue = new LinkedBlockingQueue[JsonNode]()
-      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-json-socket"), new JsonMessageHandler() {
+      val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-json-socket"), new TextMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
 
-        override def onMessage(message: JsonNode) = wsqueue.add(message)
+        override def onMessage(json: String) = wsqueue.add(mapper.readTree(json))
       })
       try {
         val push1 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
-        push1 should be(Decoder.json("{}"))
+        push1 should be(mapper.readTree("{}"))
         http_get(Uri(s"http://127.0.0.1:$httpPort/update-it"))
         val push2 = wsqueue.poll(specTimeout.length, TimeUnit.SECONDS)
-        push2 should be(Decoder.json("{\"type\":\"io.amient.affinity.core.http.Envelope\",\"data\":{\"id\":{\"id\":2},\"side\":\"RIGHT\",\"seq\":[]}}"))
+        push2 should be(mapper.readTree("{\"type\":\"io.amient.affinity.core.http.Envelope\",\"data\":{\"id\":{\"id\":2},\"side\":\"RIGHT\",\"seq\":[]}}"))
       } finally {
         ws.close()
       }
