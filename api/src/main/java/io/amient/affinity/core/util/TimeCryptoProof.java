@@ -102,6 +102,17 @@ public abstract class TimeCryptoProof {
      * @throws Exception if anything goes wrong
      */
     final public String sign(String arg) throws Exception {
+        return sign(arg, 0);
+    }
+
+    /**
+     * Sign a given input argument with time-based salted hash
+     * @param arg input string to sign
+     * @param windowOffset how many time windows to offset the clculation by +/-
+     * @return signature string
+     * @throws Exception if anything goes wrong
+     */
+    final public String sign(String arg, int windowOffset) throws Exception {
         return toHex(sign(arg.getBytes("UTF-8")));
     }
 
@@ -112,7 +123,18 @@ public abstract class TimeCryptoProof {
      * @throws Exception if anything goes wrong
      */
     final public byte[] sign(byte[] arg) throws Exception {
-        return sign(arg, utcInWholeMinutes(0));
+        return sign(arg, 0);
+    }
+
+    /**
+     * Sign a given input argument with time-based salted hash
+     * @param arg input string to sign
+     * @param windowOffset how many time windows to offset the clculation by +/-
+     * @return signature string
+     * @throws Exception if anything goes wrong
+     */
+    final public byte[] sign(byte[] arg, int windowOffset) throws Exception {
+        return sign(arg, utcInWholeMinutes(windowOffset));
     }
 
     private byte[] sign(byte[] arg, long utc) throws Exception {
