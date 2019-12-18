@@ -113,7 +113,7 @@ public abstract class TimeCryptoProof {
      * @throws Exception if anything goes wrong
      */
     final public String sign(String arg, int windowOffset) throws Exception {
-        return toHex(sign(arg.getBytes("UTF-8")));
+        return toHex(sign(arg.getBytes("UTF-8"), windowOffset));
     }
 
     /**
