@@ -568,22 +568,7 @@ all master branches.
     Spark **2.4.0**
 
 The `zzz` script uses git and gradle to switch between the maintained master branches
-and different variants of scala, kafka and spark.
-
-#### Scala 2.12
-    - avro-scala_2.12
-    - core-scala_2.12
-    
-#### Scala 2.13
-    - avro-scala_2.13
-    - core-scala_2.13
-    - kafka_2.4-scala_2.13 (Kafka 2.4.1, Confluent 5.4.1)
-    - kafka_2.3-scala_2.13 (Kafka 2.3.1, Confluent 5.3.1)
-    - kafka_2.2-scala_2.13 (Kafka 2.2.0, Confluent 5.2.1)
-    - kafka_2.1-scala_2.13 (Kafka 2.1.1, Confluent 5.1.2)
-    - kafka_2.0-scala_2.13 (Kafka 2.0.1, Confluent 5.0.2)
-    - kafka_1.1-scala_2.13 (Kafka 1.1.0, Confluent 4.1.2)
-    - kafka_1.0-scala_2.13 (Kafka 1.0.2, Confluent 4.0.3)
+and different variants of scala, kafka and spark.   
 
 ## JavaScript (affinity.js)
 

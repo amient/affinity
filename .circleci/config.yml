@@ -47,28 +47,28 @@ jobs:
       # run tests!
       - run: ./gradlew test
 
-    # Other Scala Version - 2.13
-    # Download and cache dependencies
-      - restore_cache:
-          keys:
-          - v2-dependencies-{{ .Branch }}-Scala-2.13-{{ checksum "build.gradle" }}
-          # fallback to using the latest cache if no exact match is found
-          - v2-dependencies-{{ .Branch }}-Scala-2.13-
-          - v2-dependencies-
-
-      - run: ./gradlew compile -Pscala-version=2.13.3
-
-      - save_cache:
-          paths:
-          - ~/.gradle
-          - ./gradle
-          - ./.gradle
-          - ~/.m2
-          - ~/.ivy2
-          key: v2-dependencies-{{ .Branch }}-Scala-2.13-{{ checksum "build.gradle" }}
-
-    # run tests!
-      - run: ./gradlew test -Pscala-version=2.13.3
+#    # Other Scala Version - 2.13
+#    # Download and cache dependencies
+#      - restore_cache:
+#          keys:
+#          - v2-dependencies-{{ .Branch }}-Scala-2.13-{{ checksum "build.gradle" }}
+#          # fallback to using the latest cache if no exact match is found
+#          - v2-dependencies-{{ .Branch }}-Scala-2.13-
+#          - v2-dependencies-
+#
+#      - run: ./gradlew compile -Pscala-version=2.13.3
+#
+#      - save_cache:
+#          paths:
+#          - ~/.gradle
+#          - ./gradle
+#          - ./.gradle
+#          - ~/.m2
+#          - ~/.ivy2
+#          key: v2-dependencies-{{ .Branch }}-Scala-2.13-{{ checksum "build.gradle" }}
+#
+#    # run tests!
+#      - run: ./gradlew test -Pscala-version=2.13.3
 
 
 
