@@ -184,7 +184,6 @@ allprojects {
                                                     "-unchecked",
                                                     "-deprecation",
                                                     "-Xfuture",
-                                                    "-Yno-adapted-args",
                                                     "-Ywarn-dead-code",
                                                     "-Ywarn-numeric-widen",
                                                     "-Ywarn-unused"
