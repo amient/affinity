@@ -5,7 +5,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.core.config.CfgStruct
 import io.amient.affinity.core.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.ZkClient
-import org.codehaus.jackson.map.ObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 
 import scala.collection.JavaConverters._
 
@@ -77,10 +77,10 @@ object RebalanceTool extends Tool {
     val topics = zkClient.getChildren("/brokers/topics").asScala.filter(x => topicsOnly.isEmpty || topicsOnly.contains(x))
     val assignments = topics.flatMap { topic =>
       val data = mapper.readTree(zkClient.readData[String](s"/brokers/topics/$topic"))
-      val partitions = data.get("partitions").getFieldNames.asScala.map(_.toInt).toList.sorted
+      val partitions = data.get("partitions").fieldNames.asScala.map(_.toInt).toList.sorted
       partitions.map { partition =>
         val target: List[Int] = (0 until targetReplFactor).toList.map(r => brokers((partition + r) % numBrokers))
-        val replicas = data.get("partitions").get(partition.toString).getElements.asScala.map(_.asInt).toList
+        val replicas = data.get("partitions").get(partition.toString).elements.asScala.map(_.asInt).toList
         Assignment(topic, partition, replicas, target)
       }
     }
