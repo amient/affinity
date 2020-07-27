@@ -348,7 +348,7 @@ object AvroRecord extends AvroExtractors {
         val arguments = record.getSchema.getFields.asScala.map { field =>
           readField(record.get(field.pos), field.schema, params(field.pos))
         }
-        constructorMirror(arguments: _*)
+        constructorMirror(arguments.toSeq: _*)
       case BOOLEAN => datum.asInstanceOf[Boolean]
       case INT => datum.asInstanceOf[Int]
       case NULL => null
