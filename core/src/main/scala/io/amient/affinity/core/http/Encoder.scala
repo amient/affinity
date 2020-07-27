@@ -30,7 +30,7 @@ import akka.util.ByteString
 import io.amient.affinity.avro.record.AvroJsonConverter
 import org.apache.avro.generic.IndexedRecord
 import org.apache.avro.util.ByteBufferOutputStream
-import org.codehaus.jackson.JsonNode
+import com.fasterxml.jackson.databind.JsonNode
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable

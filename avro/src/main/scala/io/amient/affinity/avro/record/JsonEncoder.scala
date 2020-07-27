@@ -10,8 +10,8 @@ import org.apache.avro.io.ParsingEncoder
 import org.apache.avro.io.parsing.{JsonGrammarGenerator, Parser, Symbol}
 import org.apache.avro.util.Utf8
 import org.apache.avro.{AvroTypeException, LogicalType, Schema}
-import org.codehaus.jackson.{JsonEncoding, JsonFactory, JsonGenerator}
-import org.codehaus.jackson.util.{DefaultPrettyPrinter, MinimalPrettyPrinter}
+import com.fasterxml.jackson.core.{JsonEncoding, JsonFactory, JsonGenerator}
+import com.fasterxml.jackson.core.util.{DefaultPrettyPrinter, MinimalPrettyPrinter}
 
 /** An {@link Encoder} for Avro's JSON data encoding.
   * </p>
