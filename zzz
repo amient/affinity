@@ -98,26 +98,43 @@ publish_all() {
         SP=""
     fi
     publish "$ROOT" "uploadArchives -Pmaven-central --quiet $SP"
+
+    publish "$ROOT-kafka_2.4" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.4" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.4" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.4" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.4" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+
+    publish "$ROOT-kafka_2.3" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.3" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.3" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.3" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
+    publish "$ROOT-kafka_2.3" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+
     publish "$ROOT-kafka_2.2" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.2" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.2" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.2" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.2" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+
     publish "$ROOT-kafka_2.1" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.1" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.1" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.1" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.1" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+
     publish "$ROOT-kafka_2.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.0" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.0" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+
     publish "$ROOT-kafka_1.1" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_1.1" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_1.1" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_1.1" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_1.1" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+
     publish "$ROOT-kafka_1.0" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_1.0" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_1.0" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
@@ -185,7 +202,7 @@ case "$2" in
         ;;
     publish)
         publish_all
-        publish_all "2.13.3"
+#        publish_all "2.13.3"
         exit 0;
         ;;
     *)
