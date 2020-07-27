@@ -32,8 +32,7 @@ import io.amient.affinity.kafka.AvroMessageFormatter.TimesstampToIso
 import kafka.common.MessageFormatter
 import org.apache.avro.generic.GenericContainer
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.codehaus.jackson.map.ObjectMapper
-
+import com.fasterxml.jackson.databind.ObjectMapper
 
 /**
   * See README of this module for Usage in kafka console consumer utility.
