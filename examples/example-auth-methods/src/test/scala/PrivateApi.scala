@@ -27,7 +27,7 @@ import io.amient.affinity.core.http.RequestMatchers.{HTTP, PATH, QUERY}
 import io.amient.affinity.core.http.{Encoder, HttpExchange}
 import io.amient.affinity.core.state.KVStore
 import io.amient.affinity.core.util.{TimeCryptoProof, TimeCryptoProofSHA256}
-import org.codehaus.jackson.annotate.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonIgnore
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
