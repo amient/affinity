@@ -185,7 +185,7 @@ case "$2" in
         ;;
     publish)
         publish_all
-        publish_all "2.11.12"
+        publish_all "2.13.3"
         exit 0;
         ;;
     *)
@@ -204,25 +204,29 @@ fi
 if [ "$RUN_ON_ROOT" == "true" ]; then
     variant "$ROOT" "$SETS" "$C"
     if [ "$C" != "-" ]; then
-        variant "$ROOT" "$SETS" "$C" -Pscala-version=2.11.12
+        variant "$ROOT" "$SETS" "$C"
     fi
 fi
 
 #excute on the variant branches
 if [ "$RUN_ON_VARIANTS" == "true" ]; then
     #scala 2.12
+    variant "kafka_2.4" "$SETS" $C
+    variant "kafka_2.3" "$SETS" $C
     variant "kafka_2.2" "$SETS" $C
     variant "kafka_2.1" "$SETS" $C
     variant "kafka_2.0" "$SETS" $C
     variant "kafka_1.1" "$SETS" $C
     variant "kafka_1.0" "$SETS" $C
     if [ "$C" != "-" ]; then
-        #scala 2.11
-        variant "kafka_2.2" "$SETS" $C -Pscala-version=2.11.12
-        variant "kafka_2.1" "$SETS" $C -Pscala-version=2.11.12
-        variant "kafka_2.0" "$SETS" $C -Pscala-version=2.11.12
-        variant "kafka_1.1" "$SETS" $C -Pscala-version=2.11.12
-        variant "kafka_1.0" "$SETS" $C -Pscala-version=2.11.12
+        #scala 2.13
+        variant "kafka_2.4" "$SETS" $C -Pscala-version=2.13.3
+        variant "kafka_2.3" "$SETS" $C -Pscala-version=2.13.3
+        variant "kafka_2.2" "$SETS" $C -Pscala-version=2.13.3
+        variant "kafka_2.1" "$SETS" $C -Pscala-version=2.13.3
+        variant "kafka_2.0" "$SETS" $C -Pscala-version=2.13.3
+        variant "kafka_1.1" "$SETS" $C -Pscala-version=2.13.3
+        variant "kafka_1.0" "$SETS" $C -Pscala-version=2.13.3
     fi
 fi
 

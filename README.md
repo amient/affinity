@@ -550,8 +550,7 @@ of the akka core:
 ### Cross-builds
 
 Currently the Akka, Akka Http and Akka Streams are held constant while other components can be
-cross-built: different Kafka, Spark and Scala versions can be created. At the moment only
-Scala 2.11 is there but once all the Akka and Akka Http modules are available in 2.12 they will appear here.
+cross-built: different Kafka, Spark and Scala versions can be created.
 
 Maintained crossbuilds appear as `master-<variant>` branches and are always up to date with the current `master`.
 On a clean working directory you can use `zzz` script which runs various gradle commands across
@@ -563,9 +562,9 @@ all master branches.
 
 #### Current master versions
 
-    Scala **2.12.X**
-    Kafka **2.3.X**
-    Confluent **5.3.X**
+    Scala **2.12.6**
+    Kafka **2.5.0**
+    Confluent **5.5.1**
     Spark **2.4.0**
 
 The `zzz` script uses git and gradle to switch between the maintained master branches
@@ -575,12 +574,16 @@ and different variants of scala, kafka and spark.
     - avro-scala_2.12
     - core-scala_2.12
     
-#### Scala 2.11
-    - avro-scala_2.11
-    - core-scala_2.11
-    - kafka_2.0-scala_2.11 (Kafka 2.0.1, Confluent 5.0.0)
-    - kafka_1.1-scala_2.11 (Kafka 1.1.0, Confluent 4.1.0)
-    - kafka_1.0-scala_2.11 (Kafka 1.0.1, Confluent 4.0.0)
+#### Scala 2.13
+    - avro-scala_2.13
+    - core-scala_2.13
+    - kafka_2.4-scala_2.13 (Kafka 2.4.1, Confluent 5.4.1)
+    - kafka_2.3-scala_2.13 (Kafka 2.3.1, Confluent 5.3.1)
+    - kafka_2.2-scala_2.13 (Kafka 2.2.0, Confluent 5.2.1)
+    - kafka_2.1-scala_2.13 (Kafka 2.1.1, Confluent 5.1.2)
+    - kafka_2.0-scala_2.13 (Kafka 2.0.1, Confluent 5.0.2)
+    - kafka_1.1-scala_2.13 (Kafka 1.1.0, Confluent 4.1.2)
+    - kafka_1.0-scala_2.13 (Kafka 1.0.2, Confluent 4.0.3)
 
 ## JavaScript (affinity.js)
 

@@ -33,8 +33,8 @@ import org.apache.http.client.methods.{HttpGet, HttpPost}
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.ssl.SSLContexts
-import org.codehaus.jackson.JsonNode
-import org.codehaus.jackson.map.ObjectMapper
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 
 import scala.collection.JavaConverters._
 
@@ -97,7 +97,7 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def getSubjects: Iterator[String] = {
     val j = mapper.readValue(get("/subjects"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.getElements().asScala.map(_.asText)
+      j.elements().asScala.map(_.asText)
     } else {
       if (j.get("error_code").asInt == 40401) {
         Iterator.empty
@@ -110,7 +110,7 @@ class HttpSchemaRegistryClient(baseUrl: URL, keyStoreP12: String = null, trustSt
   def getVersions(subject: String): Iterator[Int] = {
     val j = mapper.readValue(get(s"/subjects/$subject/versions"), classOf[JsonNode])
     if (!j.has("error_code")) {
-      j.getElements().asScala.map(_.asInt)
+      j.elements().asScala.map(_.asInt)
     } else {
       if (j.get("error_code").asInt == 40401) {
         Iterator.empty
