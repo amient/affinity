@@ -69,7 +69,3 @@ jobs:
 #
 #    # run tests!
 #      - run: ./gradlew test -Pscala-version=2.13.3
->>>>>>> master
-
-
-
