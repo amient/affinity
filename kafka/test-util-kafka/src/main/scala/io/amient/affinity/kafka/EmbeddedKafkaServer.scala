@@ -41,7 +41,7 @@ trait EmbeddedKafkaServer extends EmbeddedService with EmbeddedZookeperServer {
   lazy val admin = AdminClient.create(Map[String, AnyRef]("bootstrap.servers" -> kafkaBootstrap).asJava)
 
   def createTopic(name: String): Unit = {
-    admin.createTopics(List(new NewTopic(name, numPartitions, 1)).asJava).all().get(30, TimeUnit.SECONDS)
+    admin.createTopics(List(new NewTopic(name, numPartitions, 1.toShort)).asJava).all().get(30, TimeUnit.SECONDS)
   }
 
   def listTopics: mutable.Set[String] = {

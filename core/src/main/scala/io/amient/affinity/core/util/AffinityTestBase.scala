@@ -43,8 +43,7 @@ import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{Decoder, Encoder}
 import javax.net.ssl.{SSLContext, TrustManagerFactory}
 import org.apache.avro.util.ByteBufferInputStream
-import org.codehaus.jackson.JsonNode
-import org.codehaus.jackson.map.ObjectMapper
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._

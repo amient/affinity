@@ -25,8 +25,8 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Source, StreamConverters}
 import akka.util.ByteString
-import org.codehaus.jackson.map.ObjectMapper
-import org.codehaus.jackson.{JsonFactory, JsonNode, JsonParser}
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.core.{JsonFactory, JsonParser}
 
 import scala.concurrent.duration.FiniteDuration
 
