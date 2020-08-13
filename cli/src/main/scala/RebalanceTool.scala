@@ -1,11 +1,11 @@
 import java.io.PrintWriter
 import java.nio.file.Path
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.amient.affinity.core.config.CfgStruct
-import io.amient.affinity.core.util.{ZkClients, ZkConf}
+import io.amient.affinity.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.ZkClient
-import com.fasterxml.jackson.databind.ObjectMapper
 
 import scala.collection.JavaConverters._
 
