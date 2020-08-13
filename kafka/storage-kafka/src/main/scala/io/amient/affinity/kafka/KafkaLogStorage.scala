@@ -235,7 +235,7 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
         val beginOffset: Long = kafkaConsumer.beginningOffsets(List(tp).asJava).get(tp)
         val rangeStartOffset: Long = Option(kafkaConsumer.offsetsForTimes(Map(tp -> new java.lang.Long(range.start)).asJava).get(tp)).map(_.offset).getOrElse(beginOffset)
         val minOffset: Long = math.max(beginOffset, rangeStartOffset)
-        val nextOffset: Long = Option(kafkaConsumer.committed(tp)).map(_.offset() + 1).getOrElse(0)
+        val nextOffset: Long = Option(kafkaConsumer.committed(Set(tp).asJava).asScala.head._2).map(_.offset() + 1).getOrElse(0)
         val resumeOffset: Long = math.max(minOffset, nextOffset)
         if (minOffset > nextOffset) {
           log.debug(s"Advancing partition=${tp.partition()} for time range ${range.getLocalStart}:${range.getLocalEnd} to offset: ${resumeOffset}")
