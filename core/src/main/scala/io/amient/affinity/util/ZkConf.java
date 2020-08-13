@@ -17,11 +17,9 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.core.util;
+package io.amient.affinity.util;
 
 import io.amient.affinity.core.config.Cfg;
-import io.amient.affinity.core.config.CfgInt;
-import io.amient.affinity.core.config.CfgString;
 import io.amient.affinity.core.config.CfgStruct;
 
 import java.util.Arrays;

@@ -23,8 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.serialization.SerializationExtension
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import io.amient.affinity.avro.ZookeeperSchemaRegistry
-import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
+import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
+import io.amient.affinity.avro.{HttpSchemaRegistry}
 import io.amient.affinity.avro.record.AvroRecord
 import io.amient.affinity.avro.record.AvroSerde.AvroConf
 import io.amient.affinity.core.state.KVStoreLocal
@@ -57,7 +57,7 @@ case class TestRecord(key: KEY, uuid: UUID, ts: Long = 0L, text: String = "") ex
   override def hashCode(): Int = key.hashCode()
 }
 
-class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with Matchers {
+class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka with EmbeddedConfluentRegistry with Matchers {
 
   val specTimeout = 15 seconds
 
@@ -66,7 +66,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
   private val log = LoggerFactory.getLogger(classOf[KafkaStorageSpec])
 
   val config = configure(ConfigFactory.load("kafkastoragetest")
-    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[ZookeeperSchemaRegistry].getName))
+    .withValue(Conf.Affi.Avro.Class.path, ConfigValueFactory.fromAnyRef(classOf[HttpSchemaRegistry].getName))
+    .withValue(HttpAvroConf(Conf.Affi.Avro).HttpSchemaRegistryUrl.path, ConfigValueFactory.fromAnyRef(registryUrl))
     , Some(zkConnect), Some(kafkaBootstrap))
 
   val system = AffinityActorSystem.create(config)
@@ -96,8 +97,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
   behavior of "KafkaStorage"
 
   it should "survive failing writes" in {
-    config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
-    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
+    config.getString(Conf.Affi.Avro.Class.path) should be(classOf[HttpSchemaRegistry].getName)
+    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[HttpSchemaRegistry].getName)
     val stateStoreName = "failure-test"
     val topic = KafkaStorage.StateConf(Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
     val state = createStateStoreForPartition("keyspace1", partition = 0, stateStoreName)
@@ -124,8 +125,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
 
   it should "be able to work with ZkAvroSchemaRegistry" in {
 
-    config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
-    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[ZookeeperSchemaRegistry].getName)
+    config.getString(Conf.Affi.Avro.Class.path) should be(classOf[HttpSchemaRegistry].getName)
+    system.settings.config.getString(Conf.Affi.Avro.Class.path) should be(classOf[HttpSchemaRegistry].getName)
 
     val stateStoreName = "throughput-test"
     val topic = KafkaStorage.StateConf(Conf(config).Affi.Keyspace("keyspace1").State(stateStoreName)).Storage.Topic()
@@ -156,8 +157,8 @@ class KafkaStorageSpec extends FlatSpec with AffinityTestBase with EmbeddedKafka
       "max.poll.records" -> 1000,
       "key.deserializer" -> classOf[KafkaAvroDeserializer].getName,
       "value.deserializer" -> classOf[KafkaAvroDeserializer].getName,
-      new AvroConf().Class.path -> classOf[ZookeeperSchemaRegistry].getName,
-      new ZkAvroConf().ZooKeeper.Connect.path -> zkConnect
+      new AvroConf().Class.path -> classOf[HttpSchemaRegistry].getName,
+      new HttpAvroConf().HttpSchemaRegistryUrl.path -> registryUrl
     )
 
     val consumer = new KafkaConsumer[Int, TestRecord](consumerProps.mapValues(_.toString.asInstanceOf[AnyRef]).asJava)
