@@ -103,11 +103,11 @@ publish_all() {
     publish "$ROOT" ":spark:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT" ":ws-client:uploadArchives -Pmaven-central --quiet $SP"
 
-    publish "$ROOT-kafka_2.6" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
-    publish "$ROOT-kafka_2.6" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
-    publish "$ROOT-kafka_2.6" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
-    publish "$ROOT-kafka_2.6" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
-    publish "$ROOT-kafka_2.6" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
+#    publish "$ROOT-kafka_2.6" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
+#    publish "$ROOT-kafka_2.6" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
+#    publish "$ROOT-kafka_2.6" ":kafka:avro-serde-kafka:uploadArchives -Pmaven-central --quiet $SP"
+#    publish "$ROOT-kafka_2.6" ":kafka:storage-kafka:uploadArchives -Pmaven-central --quiet $SP"
+#    publish "$ROOT-kafka_2.6" ":kafka:test-util-kafka:uploadArchives -Pmaven-central --quiet $SP"
 
     publish "$ROOT-kafka_2.5" ":kafka:avro-formatter-kafka:uploadArchives -Pmaven-central --quiet $SP"
     publish "$ROOT-kafka_2.5" ":kafka:metrics-reporter:uploadArchives -Pmaven-central --quiet $SP"
