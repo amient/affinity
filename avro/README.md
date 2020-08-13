@@ -28,7 +28,6 @@ It is a very light-weight module and besides the scala libarary it only carries 
 
     org.apache.avro:avro
     com.typesafe:config
-    com.101tec:zkclient
 
 The ZooKeeper client is there because there is an implementation of
 schema registry based on ZooKeeper for simpler deployments but it may
