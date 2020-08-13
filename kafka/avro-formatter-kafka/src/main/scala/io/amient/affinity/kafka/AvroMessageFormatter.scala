@@ -24,9 +24,8 @@ import java.net.URL
 import java.util.{Objects, Properties}
 
 import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
-import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.avro.record.{AvroJsonConverter, AvroSerde}
-import io.amient.affinity.avro.{HttpSchemaRegistry, ZookeeperSchemaRegistry}
+import io.amient.affinity.avro.{HttpSchemaRegistry}
 import io.amient.affinity.core.util.EventTime
 import io.amient.affinity.kafka.AvroMessageFormatter.TimesstampToIso
 import kafka.common.MessageFormatter
@@ -62,13 +61,6 @@ class AvroMessageFormatter extends MessageFormatter {
       val conf = new HttpAvroConf()
       conf.HttpSchemaRegistryUrl.setValue(new URL(props.getProperty("schema.registry.url")))
       serde = new HttpSchemaRegistry(conf)
-    } else if (props.containsKey("schema.registry.zookeeper.connect")) {
-      val conf = new ZkAvroConf()
-      conf.ZooKeeper.Connect.setValue(props.getProperty("schema.registry.zookeeper.connect"))
-      if (!props.containsKey("schema.registry.zookeeper.root")) {
-        conf.ZkRoot.setValue(props.getProperty("schema.registry.zookeeper.root"))
-      }
-      serde = new ZookeeperSchemaRegistry(conf)
     } else {
       throw new IllegalArgumentException("Required --property schema.registry.url OR --property schema.zookeeper.connect")
     }

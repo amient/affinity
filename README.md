@@ -354,18 +354,12 @@ In all examples and for all tests, logback binding is used.
 
 
 ## Avro
-        affinity.avro.schema.registry.class [FQN] (!)                                           one of HttpSchemaRegistry, ZookeeperSchemaRegistry, LocalSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
+        affinity.avro.schema.registry.class [FQN] (!)                                           one of HttpSchemaRegistry, LocalSchemaRegistry or MemorySchemaRegistry from the io.amient.affinity.avro package
 
 ### Avro (io.amient.affinity.avro.HttpSchemaRegistry)
         affinity.avro.schema.registry.keystore [STRING] (-)                                     optional <key-store-file>:<key-store-password>
         affinity.avro.schema.registry.truststore [STRING] (-)                                   optional <trust-store-file>:<trust-store-password>
         affinity.avro.schema.registry.url [URL] (http://localhost:8081)                         Http Schema Registry connection base URL
-
-### Avro (io.amient.affinity.avro.ZookeeperSchemaRegistry)
-        affinity.avro.schema.registry.zookeeper.connect [STRING] (!)                            Coma-separated list of host:port zookeeper servers
-        affinity.avro.schema.registry.zookeeper.timeout.connect.ms [INT] (6000)                 Time-out for establishing connection to zookeeper cluster
-        affinity.avro.schema.registry.zookeeper.timeout.session.ms [INT] (10000)                Time-out after which any ephemeral nodes will be removed for a lost connection
-        affinity.avro.schema.registry.zookeeper.root [STRING] (/affinity-schema-registry)       znode under which schemas will be stored
 
 ### Avro (io.amient.affinity.avro.LocalSchemaRegistry)
         affinity.avro.schema.registry.path [FILE-PATH] (!)                                      local file path under which schemas will be stored
