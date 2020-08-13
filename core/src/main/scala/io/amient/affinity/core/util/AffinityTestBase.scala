@@ -37,7 +37,6 @@ import akka.stream.scaladsl.StreamConverters._
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.amient.affinity.Conf
-import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.cluster.Node
 import io.amient.affinity.core.http.{Decoder, Encoder}
@@ -80,7 +79,6 @@ trait AffinityTestBase {
       case Some(zkConnectString) =>
         layer2
           .withValue(CoordinatorZkConf(Conf.Affi.Coordinator).ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
-          .withValue(ZkAvroConf(Conf.Affi.Avro).ZooKeeper.Connect.path, ConfigValueFactory.fromAnyRef(zkConnectString))
     }
 
     kafkaBootstrap match {
