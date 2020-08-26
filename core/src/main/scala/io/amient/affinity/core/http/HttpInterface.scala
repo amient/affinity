@@ -101,13 +101,12 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
     context.init(keyManagerFactory.getKeyManagers, null, new SecureRandom)
   }
 
-
-  val connectionCtx: ConnectionContext = sslContext match {
-    case None => Http().defaultServerHttpContext
-    case Some(sslContext) => ConnectionContext.https(sslContext)
+  val server = sslContext match {
+    case None => Http().newServerAt(host, port)
+    case Some(sslContext) => Http().newServerAt(host, port).enableHttps(ConnectionContext.httpsServer(sslContext))
   }
 
-  val incoming: Source[IncomingConnection, Future[ServerBinding]] = Http().bind(host, port, connectionCtx)
+  val incoming: Source[IncomingConnection, Future[ServerBinding]] = server.connectionSource()
 
   @volatile private var binding: ServerBinding = null
 
@@ -128,7 +127,7 @@ class HttpInterface(httpConf: HttpInterfaceConf)(implicit system: ActorSystem) {
           if (! request.uri.path.startsWith(prefix)) Future.successful(HttpResponse(status = StatusCodes.NotFound)) else {
             val responsePromise = Promise[HttpResponse]()
             val pathWithoutPrefix = request.uri.path.dropChars(prefix.charCount)
-            gateway ! HttpExchange(request.copy(uri = request.uri.copy(path = pathWithoutPrefix)), responsePromise)
+            gateway ! HttpExchange(request.withUri(request.uri.copy(path = pathWithoutPrefix)), responsePromise)
             responsePromise.future
           }
         }
