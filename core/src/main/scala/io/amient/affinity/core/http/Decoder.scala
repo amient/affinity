@@ -47,7 +47,7 @@ object Decoder {
 
   def json(source: Source[ByteString, Any])(implicit materializer: Materializer): String = {
     val is = source.runWith(StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS)))
-    val jp: JsonParser = factory.createJsonParser(is)
+    val jp: JsonParser = factory.createParser(is)
     mapper.writeValueAsString(mapper.readValue(jp, classOf[JsonNode]))
   }
 
