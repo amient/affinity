@@ -25,6 +25,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import io.amient.affinity.core.ack
 import io.amient.affinity.core.actor.{GatewayHttp, Partition}
@@ -34,6 +35,7 @@ import io.amient.affinity.core.util.{AffinityTestBase, Scatter}
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -71,7 +73,9 @@ class PingPongSystemTest extends FlatSpec with AffinityTestBase with BeforeAndAf
     val t = System.currentTimeMillis()
     val response = node1.http_get("/timeout")
     response.status should be(ServiceUnavailable)
-    response.entity.toString.contains("The server was not able to produce a timely response") should be(true)
+    implicit val materializer = ActorMaterializer.create(node1.system)
+    val text = Await.result(response.entity.dataBytes.runWith(Sink.head), 1 second).utf8String
+    text.contains("The server was not able to produce a timely response") should be(true)
     (System.currentTimeMillis() - t) should be < 1000L
   }
 
