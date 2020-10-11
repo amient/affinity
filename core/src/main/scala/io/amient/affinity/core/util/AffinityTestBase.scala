@@ -139,7 +139,7 @@ class NodeWithTestMethods(underlying: Node) {
     certManagerFactory.init(certStore)
     val context = SSLContext.getInstance("TLS")
     context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
-    ConnectionContext.httpsServer(context)
+    ConnectionContext.https(context)
   }
 
   def wsuri(path: String, interface: Int = 0) = new java.net.URI(s"ws://localhost:${underlying.getHttpPort(interface)}$path")
