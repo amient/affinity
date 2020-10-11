@@ -76,7 +76,7 @@ class ConfluentEcoSystemSpec extends FlatSpec with EmbeddedKafka with EmbeddedCo
     val state = createStateStoreForPartition(topic, 0)
     state.insert(1, Test(KEY(1), UUID.random, System.currentTimeMillis(), s"test value 1"))
     val testSchemaId = registryClient.getLatestSchemaMetadata(classOf[Test].getName).getId
-    registryClient.getByID(testSchemaId) should equal(AvroRecord.inferSchema(classOf[Test]))
+    registryClient.getSchemaById(testSchemaId) should equal(AvroRecord.inferSchema(classOf[Test]))
   }
 
   "Confluent KafkaAvroDeserializer" should "read Affinity AvroRecords as IndexedRecords (high throughput scenario)" in {
