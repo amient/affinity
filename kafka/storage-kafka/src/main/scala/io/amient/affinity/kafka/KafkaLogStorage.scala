@@ -377,14 +377,10 @@ class KafkaLogStorage(conf: LogStorageConf) extends LogStorage[java.lang.Long] w
       if (readonly) {
         if (configs.nonEmpty) log.warn(s"External topic $topic configuration doesn't match the state expectations: $configs")
       } else if (configs.nonEmpty) {
-        val entries = configs.map { case (k, v) => new ConfigEntry(k, v) } ++ actualConfig.entries().asScala.filter(e => !configs.contains(e.name()))
-        admin.alterConfigs(Map(topicConfigResource -> new org.apache.kafka.clients.admin.Config(entries.asJavaCollection)).asJava)
-          .all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
-// broker must be 2.3+ to support incremental alter config so it's better to use deprecated api above
-//        val ops = configs.map { case (k, v) => new ConfigEntry(k, v) }
-//            .map(entry => new AlterConfigOp(entry, AlterConfigOp.OpType.SET)).asJavaCollection
-//        val altOpts = Map(topicConfigResource -> ops).asJava
-//        admin.incrementalAlterConfigs(altOpts).all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
+        val ops = configs.map { case (k, v) => new ConfigEntry(k, v) }
+            .map(entry => new AlterConfigOp(entry, AlterConfigOp.OpType.SET)).asJavaCollection
+        val altOpts = Map(topicConfigResource -> ops).asJava
+        admin.incrementalAlterConfigs(altOpts).all().get(adminTimeoutMs, TimeUnit.MILLISECONDS)
         log.info(s"Topic $topic configuration altered successfully")
       } else {
         log.debug(s"Topic $topic configuration is up to date")
