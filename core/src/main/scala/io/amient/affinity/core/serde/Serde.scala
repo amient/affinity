@@ -109,13 +109,13 @@ class Serdes(val config: Config, val system: Option[ExtendedActorSystem]) {
     * obeying any order between unrelated subtypes (insert sort).
     */
   def sort(in: Iterable[ClassSerde]): immutable.Seq[ClassSerde] =
-    ((new ArrayBuffer[ClassSerde](in.size) /: in) { (buf, ca) ⇒
+    (new ArrayBuffer[ClassSerde](in.size) /: in) { (buf, ca) ⇒
       buf.indexWhere(_._1 isAssignableFrom ca._1) match {
         case -1 ⇒ buf append ca
         case x ⇒ buf insert(x, ca)
       }
       buf
-    }).to[immutable.Seq]
+    }.to[immutable.Seq]
 
   private def serdeClass(cls: Class[_]) = {
     if (cls == classOf[Boolean]) classOf[java.lang.Boolean]
