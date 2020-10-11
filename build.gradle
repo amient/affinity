@@ -183,7 +183,6 @@ allprojects {
                                                     "-encoding", "UTF-8",
                                                     "-unchecked",
                                                     "-deprecation",
-                                                    "-Xfuture",
                                                     "-Ywarn-dead-code",
                                                     "-Ywarn-numeric-widen",
                                                     "-Ywarn-unused"
