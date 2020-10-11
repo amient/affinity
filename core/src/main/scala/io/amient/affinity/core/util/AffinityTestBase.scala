@@ -139,7 +139,7 @@ class NodeWithTestMethods(underlying: Node) {
     certManagerFactory.init(certStore)
     val context = SSLContext.getInstance("TLS")
     context.init(null, certManagerFactory.getTrustManagers, new SecureRandom)
-    ConnectionContext.https(context)
+    ConnectionContext.httpsServer(context)
   }
 
   def wsuri(path: String, interface: Int = 0) = new java.net.URI(s"ws://localhost:${underlying.getHttpPort(interface)}$path")
@@ -210,7 +210,7 @@ class NodeWithTestMethods(underlying: Node) {
               byteBufferSequence =>
                 val unzipped = fromInputStream(() => new GZIPInputStream(new ByteBufferInputStream(byteBufferSequence.asJava)))
                 val unzippedEntity = HttpEntity(response.entity.contentType, unzipped)
-                response.copy(entity = unzippedEntity)
+                response.withEntity(unzippedEntity)
             }
           case _ => Future.successful(response)
         }
