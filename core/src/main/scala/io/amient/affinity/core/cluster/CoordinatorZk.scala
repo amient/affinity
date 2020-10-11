@@ -26,7 +26,7 @@ import com.typesafe.config.Config
 import io.amient.affinity.core.cluster.Coordinator.CoordinatorConf
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.config.CfgStruct
-import io.amient.affinity.core.util.{ZkClients, ZkConf}
+import io.amient.affinity.util.{ZkClients, ZkConf}
 import org.I0Itec.zkclient.IZkChildListener
 import org.apache.zookeeper.CreateMode
 

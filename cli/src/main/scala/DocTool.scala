@@ -3,8 +3,7 @@ import io.amient.affinity
 import io.amient.affinity.avro.HttpSchemaRegistry.HttpAvroConf
 import io.amient.affinity.avro.LocalSchemaRegistry.LocalAvroConf
 import io.amient.affinity.avro.MemorySchemaRegistry.MemAvroConf
-import io.amient.affinity.avro.ZookeeperSchemaRegistry.ZkAvroConf
-import io.amient.affinity.avro.{HttpSchemaRegistry, LocalSchemaRegistry, MemorySchemaRegistry, ZookeeperSchemaRegistry}
+import io.amient.affinity.avro.{HttpSchemaRegistry, LocalSchemaRegistry, MemorySchemaRegistry}
 import io.amient.affinity.core.cluster.CoordinatorZk
 import io.amient.affinity.core.cluster.CoordinatorZk.CoordinatorZkConf
 import io.amient.affinity.core.config.{Cfg, CfgGroup, CfgList, CfgStruct}
@@ -34,9 +33,6 @@ object DocTool extends Tool {
 
     println(s"\n### Avro (${classOf[HttpSchemaRegistry].getName})")
     apply(HttpAvroConf(affinity.Conf.Affi.Avro))
-
-    println(s"\n### Avro (${classOf[ZookeeperSchemaRegistry].getName})")
-    apply(ZkAvroConf(affinity.Conf.Affi.Avro))
 
     println(s"\n### Avro (${classOf[LocalSchemaRegistry].getName})")
     apply(LocalAvroConf(affinity.Conf.Affi.Avro))
