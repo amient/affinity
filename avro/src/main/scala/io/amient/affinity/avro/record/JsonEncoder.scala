@@ -30,7 +30,7 @@ object JsonEncoder {
   @throws[IOException]
   private def getJsonGenerator(out: OutputStream, pretty: Boolean) = {
     if (null == out) throw new NullPointerException("OutputStream cannot be null")
-    val g = new JsonFactory().createJsonGenerator(out, JsonEncoding.UTF8)
+    val g = new JsonFactory().createGenerator(out, JsonEncoding.UTF8)
     if (pretty) {
       val pp = new DefaultPrettyPrinter() { //@Override
         @throws[IOException]

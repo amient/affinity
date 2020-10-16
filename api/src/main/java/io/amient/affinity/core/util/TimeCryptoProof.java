@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core.util;
 
-import javax.xml.bind.DatatypeConverter;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.time.ZoneOffset;
@@ -37,8 +36,15 @@ public abstract class TimeCryptoProof {
      * @return result hexadecimal number
      */
     static public String toHex(byte[] bytes) {
-        return DatatypeConverter.printHexBinary(bytes);
+        char[] hexChars = new char[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+        }
+        return new String(hexChars);
     }
+    private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
 
     /**
      * convert hexadecimal representation to bytes
@@ -46,7 +52,13 @@ public abstract class TimeCryptoProof {
      * @return byte array
      */
     static public byte[] fromHex(String hex) {
-        return DatatypeConverter.parseHexBinary(hex);
+        int len = hex.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                    + Character.digit(hex.charAt(i+1), 16));
+        }
+        return data;
     }
 
     /**

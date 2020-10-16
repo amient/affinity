@@ -19,7 +19,6 @@
 
 package io.amient.affinity.core.util;
 
-import javax.xml.bind.DatatypeConverter;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.time.ZoneOffset;
@@ -61,7 +60,7 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
      * @throws Exception if anything goes wrong
      */
     public String timeBasedHash(String arg, String hexSalt, int shift) throws Exception {
-        byte[] salt = DatatypeConverter.parseHexBinary(hexSalt);
+        byte[] salt = TimeCryptoProof.fromHex(hexSalt);
         long utcWholeMinute = ZonedDateTime.now(ZoneOffset.UTC)
                 .withNano(0).withSecond(0).toEpochSecond() + shift * 60;
         byte[] argBytes = arg.getBytes();
@@ -72,7 +71,7 @@ public class TimeCryptoProofSHA256 extends TimeCryptoProof {
         in.flip();
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(in.array());
-        String hexHash = DatatypeConverter.printHexBinary(hash);
+        String hexHash = TimeCryptoProof.toHex(hash);
         return hexHash;
     }
 
